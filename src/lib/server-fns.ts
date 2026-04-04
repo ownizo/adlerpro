@@ -4,7 +4,7 @@ import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
 import type { DashboardStats } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
-import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail } from './identity-admin'
+import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
 
 function extractAccessToken(): string | null {
   try {
@@ -408,7 +408,12 @@ export const adminCreateCompanyUser = createServerFn({ method: 'POST' })
         companyRole: data.role,
       })
 
-      if (!result.created && result.reason === 'already_exists') {
+      if (result.created) {
+        await db.updateCompanyUser(id, {
+          identityStatus: 'active',
+          updatedAt: new Date().toISOString(),
+        })
+      } else if (result.reason === 'already_exists') {
         await db.updateCompanyUser(id, {
           identityStatus: 'already_registered',
           updatedAt: new Date().toISOString(),
@@ -439,6 +444,10 @@ export const adminUpdateCompanyUser = createServerFn({ method: 'POST' })
       const current = users.find((user) => user.id === data.id)
       if (!current?.email) throw new Error('Utilizador não encontrado para atualizar password no Identity.')
       await updateIdentityUserPasswordByEmail(current.email, data.updates.accessPassword)
+      // Garantir que o identity_status fica como active após reset de password
+      if (!data.updates.identityStatus) {
+        data.updates.identityStatus = 'active'
+      }
     }
 
     await db.updateCompanyUser(data.id, {
@@ -452,6 +461,15 @@ export const adminDeleteCompanyUser = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((id: string) => id)
   .handler(async ({ data: id }) => {
+    const users = await db.getCompanyUsers()
+    const user = users.find((u) => u.id === id)
+    if (user?.email) {
+      try {
+        await deleteIdentityUserByEmail(user.email)
+      } catch (e) {
+        console.error('Aviso: falha ao eliminar utilizador do Auth:', e)
+      }
+    }
     await db.deleteCompanyUser(id)
     return { success: true }
   })

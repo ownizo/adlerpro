@@ -54,8 +54,30 @@ export async function updateIdentityUserPasswordByEmail(email: string, password:
   if (listError) throw new Error('Falha ao listar utilizadores.')
 
   const user = data.users.find((u) => u.email?.toLowerCase() === normalizedEmail)
-  if (!user) throw new Error('Utilizador não encontrado para atualização de password.')
+  if (!user) {
+    // Se o utilizador não existe no Auth, criar com a nova password
+    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      email: normalizedEmail,
+      password,
+      email_confirm: true,
+    })
+    if (createError) throw new Error('Falha ao criar utilizador no Auth: ' + createError.message)
+    return
+  }
 
   const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, { password })
   if (error) throw new Error('Falha ao atualizar password: ' + error.message)
+}
+
+export async function deleteIdentityUserByEmail(email: string): Promise<void> {
+  const normalizedEmail = email.toLowerCase()
+
+  const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+  if (listError) throw new Error('Falha ao listar utilizadores.')
+
+  const user = data.users.find((u) => u.email?.toLowerCase() === normalizedEmail)
+  if (!user) return // Utilizador não existe no Auth, nada a fazer
+
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(user.id)
+  if (error) throw new Error('Falha ao eliminar utilizador do Auth: ' + error.message)
 }
