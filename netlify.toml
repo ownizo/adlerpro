@@ -6,6 +6,9 @@
   NODE_VERSION = "22"
   SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_ANON_KEY,VITE_SUPABASE_URL,SUPABASE_SERVICE_ROLE_KEY"
 
+[functions]
+  directory = "netlify/api-functions"
+
 [dev]
   command = "npm run dev"
   targetPort = 3000
