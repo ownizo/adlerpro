@@ -517,7 +517,10 @@ function AdminPage() {
 
             {tab === 'alerts' && (
               <div>
-                <h2 className="text-lg font-semibold text-navy-700 mb-4">Apólices a Terminar (60 dias)</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-navy-700">Apólices a Terminar (60 dias)</h2>
+                  <SendRenewalAlertsButton />
+                </div>
                 {expiringPolicies.length === 0 ? (
                   <p className="text-navy-500">Não existem apólices a terminar nos próximos 60 dias.</p>
                 ) : (
@@ -551,6 +554,60 @@ function AdminPage() {
         )}
       </div>
     </AppLayout>
+  )
+}
+
+function SendRenewalAlertsButton() {
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState<{ sent: number; companies: number } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleSend = async () => {
+    if (!confirm('Enviar alertas de renovação por email a todos os clientes com apólices a expirar nos próximos 90 dias?')) return
+    setSending(true); setResult(null); setError(null)
+    try {
+      const res = await fetch('/api/send-renewal-alerts', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer adler-admin-2025', 'Content-Type': 'application/json' },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Erro ao enviar alertas')
+      setResult({ sent: data.sent, companies: data.companies })
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+      <button
+        onClick={handleSend}
+        disabled={sending}
+        style={{
+          fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem',
+          padding: '0.55rem 1rem', background: sending ? '#cccccc' : '#C8961A',
+          color: '#ffffff', border: 'none', borderRadius: '4px',
+          cursor: sending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
+        }}
+      >
+        {sending
+          ? <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />A enviar...</>
+          : <>✉️ Enviar Alertas por Email</>}
+      </button>
+      {result && (
+        <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#166534', background: '#EAF3DE', padding: '0.25rem 0.6rem', borderRadius: '4px' }}>
+          ✓ {result.sent} email{result.sent !== 1 ? 's' : ''} enviado{result.sent !== 1 ? 's' : ''} para {result.companies} empresa{result.companies !== 1 ? 's' : ''}
+        </span>
+      )}
+      {error && (
+        <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#dc2626', background: '#FEE2E2', padding: '0.25rem 0.6rem', borderRadius: '4px' }}>
+          ⚠️ {error}
+        </span>
+      )}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
   )
 }
 
