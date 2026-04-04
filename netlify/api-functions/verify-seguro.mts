@@ -1,12 +1,23 @@
 import type { Config } from '@netlify/functions'
 
-const SEGURO_ENDPOINT = 'https://apigwws.bizapis.com/v2/documents/seguro-by-matricula'
+// Endpoint gratuito da BizAPIs — não requer chave de API
+const FREE_ENDPOINT = 'https://apigwws.bizapis.com/free-services/powerUser/seguro-by-matricula'
 
 function normalizePlate(value: string): string {
   return value
     .toUpperCase()
     .replace(/\s+/g, '')
     .replace(/[^A-Z0-9-]/g, '')
+}
+
+// Converte data de YYYY-MM-DD para DD-MM-YYYY (formato esperado pela BizAPIs)
+function formatDateForBizAPIs(date: string): string {
+  if (/^\d{2}-\d{2}-\d{4}$/.test(date)) return date
+  if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split('-')
+    return `${day}-${month}-${year}`
+  }
+  return date
 }
 
 export default async (req: Request) => {
@@ -26,53 +37,41 @@ export default async (req: Request) => {
       return Response.json({ error: 'Data é obrigatória para consulta de seguro' }, { status: 400 })
     }
 
-    const apiKey = process.env.BIZAPIS_API_KEY
-    if (!apiKey) {
-      console.warn('BIZAPIS_API_KEY não configurada. A devolver dados de seguro simulados para demonstração.')
-      return Response.json({
-        plate: matricula,
-        date,
-        source: 'bizapis (mock)',
-        seguro: {
-          seguradora: 'Seguradora Simulada S.A.',
-          nrApolice: `SIM-${Math.floor(Math.random() * 10000000).toString().padStart(7, '0')}`,
-          dataInicio: new Date(new Date().setFullYear(new Date().getFullYear() - 1)).toISOString().split('T')[0],
-          dataFim: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-          estado: 'Ativo',
-          matricula: matricula,
-          marca: 'Marca Simulada',
-          modelo: 'Modelo Simulado',
-          nota: 'Dados gerados localmente pois a BIZAPIS_API_KEY não está configurada.'
-        },
-      })
-    }
+    const formattedDate = formatDateForBizAPIs(String(date))
 
-    const response = await fetch(SEGURO_ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        matricula,
-        data: date,
-      }),
+    // Endpoint gratuito — sem chave de API necessária
+    const url = new URL(FREE_ENDPOINT)
+    url.searchParams.set('licensePlate', matricula)
+    url.searchParams.set('date', formattedDate)
+
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' },
     })
 
-    const data = await response.json()
+    const data = await response.json() as any
 
     if (!response.ok) {
-      const errorMsg = typeof data === 'object' && data !== null
-        ? (data as Record<string, unknown>).message || (data as Record<string, unknown>).error || 'Erro ao consultar seguro'
-        : 'Erro ao consultar seguro'
+      const errorMsg = data?.message || data?.error || 'Erro ao consultar seguro'
       return Response.json({ error: String(errorMsg) }, { status: response.status })
     }
 
+    // Normalizar a resposta do endpoint gratuito
+    const seguroData = data?.data || data
+
     return Response.json({
       plate: matricula,
-      date,
+      date: formattedDate,
       source: 'bizapis',
-      seguro: data,
+      seguro: {
+        seguradora: seguroData.entity || seguroData.seguradora || 'N/D',
+        nrApolice: seguroData.policy || seguroData.nrApolice || 'N/D',
+        dataInicio: seguroData.startDate || seguroData.dataInicio || 'N/D',
+        dataFim: seguroData.endDate || seguroData.dataFim || 'N/D',
+        estado: 'Ativo',
+        matricula: seguroData.licensePlate || matricula,
+        requestId: seguroData.requestId || null,
+      },
     })
   } catch (error: any) {
     console.error('Error verifying seguro:', error)
