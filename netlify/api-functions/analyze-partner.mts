@@ -1,6 +1,25 @@
 import type { Config } from '@netlify/functions'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
+// Retry com backoff exponencial para o rate limit do Gemini
+async function generateWithRetry(model: any, prompt: string, maxRetries = 3): Promise<string> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const result = await model.generateContent(prompt)
+      return result.response.text()
+    } catch (error: any) {
+      const isRateLimit = error?.message?.includes('RESOURCE_EXHAUSTED') || error?.message?.includes('quota') || error?.status === 429
+      if (isRateLimit && attempt < maxRetries - 1) {
+        const delay = Math.pow(2, attempt) * 2000 // 2s, 4s, 8s
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        continue
+      }
+      throw error
+    }
+  }
+  throw new Error('Número máximo de tentativas atingido')
+}
+
 export default async (req: Request) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -10,64 +29,150 @@ export default async (req: Request) => {
   }
 
   try {
-    const { nif } = await req.json()
+    const body = await req.json()
+    const { nif, cprc } = body
 
-    // 1. Tentar obter o nome real da empresa através de uma API pública (ex: nif.pt)
-    let companyName = `Empresa Parceira ${nif} Lda`;
-    try {
-      // Para funcionar em produção requer chave API do nif.pt, mas deixamos a estrutura preparada
-      const nifRes = await fetch(`https://www.nif.pt/?json=1&q=${nif}`);
-      if (nifRes.ok) {
-        const nifData = await nifRes.json();
-        // Se a API retornar dados válidos e não um erro de "Key necessary"
-        if (nifData.result === 'success' && nifData.records && nifData.records[nif]) {
-          const title = nifData.records[nif].title;
-          if (title && !title.includes('Key necessary')) {
-            companyName = title;
+    if (!nif && !cprc) {
+      return Response.json({ error: 'NIF ou código CPRC obrigatório' }, { status: 400 })
+    }
+
+    // 1. Obter dados reais via BizAPIs — nifName (identidade fiscal)
+    let identityData: any = null
+    let cprcData: any = null
+
+    if (nif) {
+      try {
+        const nifRes = await fetch(
+          `https://apigwws.bizapis.com/free-services/powerUser/nifName?service=IDENTITY&nif=${encodeURIComponent(nif)}`
+        )
+        if (nifRes.ok) {
+          const nifJson = await nifRes.json()
+          if (nifJson?.data && !nifJson.message?.includes('not valid')) {
+            identityData = nifJson.data
           }
         }
+      } catch (e) {
+        console.warn('BizAPIs nifName falhou:', e)
       }
-    } catch (e) {
-      console.warn('Não foi possível obter o nome real pelo NIF, a usar nome fictício.');
     }
 
-    // 2. Simulação da chamada à Bizapis para obter dados de risco
-    const isHighRisk = nif.startsWith('500');
-    const bizapisData = {
-      nif,
-      nome: companyName,
-      estado_atividade: 'Ativa',
-      incidentes_judiciais: isHighRisk ? 2 : 0,
-      dividas_fiscais: isHighRisk,
-      valor_divida: isHighRisk ? 15400.50 : 0,
-      risco_credito: isHighRisk ? 'Elevado' : 'Baixo',
-      ultima_atualizacao: new Date().toISOString()
+    // 2. Obter dados do Registo Comercial via CPRC (se fornecido)
+    if (cprc) {
+      try {
+        const cprcRes = await fetch(
+          `https://apigwws.bizapis.com/free-services/powerUser/cprc?cprc=${encodeURIComponent(cprc)}`
+        )
+        if (cprcRes.ok) {
+          const cprcJson = await cprcRes.json()
+          if (cprcJson?.data && !cprcJson.message) {
+            cprcData = cprcJson.data
+          }
+        }
+      } catch (e) {
+        console.warn('BizAPIs CPRC falhou:', e)
+      }
     }
 
-    // 3. Chamada a IA para analisar os dados
+    // 3. Construir perfil da empresa com dados reais
+    const companyName = cprcData?.NomeEmpresa || identityData?.name || `Empresa NIF ${nif}`
+    const nipc = cprcData?.NIPC || nif
+    const naturezaJuridica = cprcData?.NaturezaJuridica || 'Não disponível'
+    const capitalSocial = cprcData?.CapitalSocial?.Montante ? `${cprcData.CapitalSocial.Montante} ${cprcData.CapitalSocial.Moeda || 'EUR'}` : 'Não disponível'
+    const dataCriacao = cprcData?.DataCriacao || 'Não disponível'
+    const cae = cprcData?.CAE?.Principal || 'Não disponível'
+    const situacaoIVA = identityData?.situation || 'Não disponível'
+    const enquadramentoIVA = identityData?.inclusion_iva || 'Não disponível'
+    const reparticaoFinancas = identityData?.desc_financas || 'Não disponível'
+    const representantes = cprcData?.Representantes || []
+    const socios = cprcData?.Socios || []
+    const factosPendentes = cprcData?.FactosPendentes === true ? 'Sim' : 'Não'
+    const penhoraQuotas = cprcData?.PenhoraQuotas ? 'Sim' : 'Não'
+    const processoRevitalizacao = cprcData?.ProcessoRevitalizacao ? 'Sim' : 'Não'
+
+    const companyProfile = {
+      identificacao: {
+        nome: companyName,
+        nif: nif || nipc,
+        nipc,
+        naturezaJuridica,
+        capitalSocial,
+        dataCriacao,
+        cae,
+        reparticaoFinancas,
+      },
+      situacaoFiscal: {
+        situacaoIVA,
+        enquadramentoIVA,
+      },
+      governanca: {
+        representantes: representantes.slice(0, 5).map((r: any) => ({
+          nome: r.Nome,
+          cargo: r.Cargo || 'Gerente',
+          percentagemCapital: r.PercentagemCapitalDetido,
+        })),
+        socios: socios.slice(0, 5).map((s: any) => ({
+          nome: s.Nome,
+          percentagem: s.PercentagemCapitalDetido,
+        })),
+      },
+      alertas: {
+        factosPendentes,
+        penhoraQuotas,
+        processoRevitalizacao,
+      },
+      fonteDados: {
+        bizapisNifName: identityData ? 'Disponível' : 'Não disponível',
+        bizapisCPRC: cprcData ? 'Disponível' : 'Não disponível',
+        dataConsulta: new Date().toLocaleDateString('pt-PT'),
+      },
+    }
+
+    // 4. Análise IA com Gemini
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) {
-      return Response.json({ error: 'GEMINI_API_KEY nao configurada' }, { status: 500 })
+      return Response.json({ error: 'Serviço de IA não configurado' }, { status: 500 })
     }
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
 
-    const prompt = `Atua como consultor de risco de parceiros da Adler & Rochefort. Recebeste os seguintes dados para o NIF ${nif}:
-${JSON.stringify(bizapisData, null, 2)}
+    const prompt = `Actua como consultor sénior de risco da Adler & Rochefort, mediadora de seguros. Recebeste os seguintes dados reais da empresa "${companyName}" (NIF: ${nif || nipc}) obtidos via Registo Comercial e Autoridade Tributária:
 
-Escreve um relatorio de analise de risco em formato HTML (usa apenas tags semanticas como <h3>, <p>, <ul>, <li>, <strong>) analisando a exposicao ao risco desta empresa, destacando as dividas e o risco de credito. O relatorio deve mencionar o nome da empresa. Nao incluas marcadores de codigo. Responde apenas com HTML puro.`
+${JSON.stringify(companyProfile, null, 2)}
 
-    const result = await model.generateContent(prompt)
-    let report = result.response.text()
-    report = report.replace(/^```(?:html)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+Elabora um relatório profissional de análise de risco em HTML semântico (usa apenas <h3>, <h4>, <p>, <ul>, <li>, <strong>, <table>, <tr>, <td>, <th>, <div>). O relatório deve:
 
-    return Response.json({ report })
+1. **Identificação da Empresa** — Apresentar nome completo, NIF/NIPC, natureza jurídica, capital social, data de constituição e CAE com a descrição da actividade
+2. **Situação Fiscal** — Analisar o enquadramento IVA e situação fiscal actual
+3. **Estrutura de Governança** — Identificar os sócios/gerentes e a estrutura de capital
+4. **Avaliação de Risco** — Classificar o risco global (Baixo/Médio/Elevado) com justificação baseada nos dados reais, incluindo:
+   - Risco de crédito (baseado no capital social e estrutura)
+   - Risco operacional (baseado na natureza jurídica e CAE)
+   - Alertas activos (factos pendentes, penhoras, processos de revitalização)
+5. **Recomendações para Seguros** — Sugerir tipos de seguros adequados ao perfil da empresa (ex: RC Profissional, Multirriscos, D&O, Cyber)
+6. **Conclusão** — Parecer final sobre a viabilidade como parceiro/cliente
+
+Usa uma linguagem profissional e técnica adequada ao sector segurador. Não incluas marcadores de código. Responde apenas com HTML puro.`
+
+    const reportHtml = await generateWithRetry(model, prompt)
+    const cleanReport = reportHtml.replace(/^```(?:html)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
+
+    return Response.json({
+      report: cleanReport,
+      companyName,
+      companyProfile,
+    })
   } catch (error: any) {
     console.error('Error analyzing partner:', error)
+    const isRateLimit = error?.message?.includes('RESOURCE_EXHAUSTED') || error?.message?.includes('quota')
     return Response.json(
-      { error: 'Erro ao analisar parceiro', details: error.message },
-      { status: 500 }
+      {
+        error: isRateLimit
+          ? 'Limite de análises atingido. Tente novamente em alguns minutos.'
+          : 'Erro ao analisar parceiro. Verifique o NIF e tente novamente.',
+        details: error.message,
+      },
+      { status: isRateLimit ? 429 : 500 }
     )
   }
 }
