@@ -5,6 +5,27 @@ import type { User } from './identity-context'
 
 export type { User as IdentityUser }
 
+function parseCookieValue(value: string): string | null {
+  try {
+    const decoded = decodeURIComponent(value)
+    // @supabase/ssr stores as base64-<base64encodedJSON>
+    if (decoded.startsWith('base64-')) {
+      const b64 = decoded.slice(7)
+      const json = Buffer.from(b64, 'base64').toString('utf-8')
+      const parsed = JSON.parse(json)
+      if (parsed?.access_token) return parsed.access_token
+      return null
+    }
+    const parsed = JSON.parse(decoded)
+    if (typeof parsed === 'string') return parsed
+    if (Array.isArray(parsed) && parsed[0]) return parsed[0]
+    if (parsed?.access_token) return parsed.access_token
+    return null
+  } catch {
+    return value || null
+  }
+}
+
 function extractAccessToken(): string | null {
   try {
     const authHeader = getRequestHeader('authorization')
@@ -13,18 +34,12 @@ function extractAccessToken(): string | null {
     }
 
     const cookies = getCookies()
+
     // Supabase stores tokens in cookies named sb-<ref>-auth-token
     for (const [name, value] of Object.entries(cookies)) {
       if (name.match(/^sb-[^-]+-auth-token$/) && value) {
-        try {
-          const decoded = decodeURIComponent(value)
-          const parsed = JSON.parse(decoded)
-          if (typeof parsed === 'string') return parsed
-          if (Array.isArray(parsed) && parsed[0]) return parsed[0]
-          if (parsed?.access_token) return parsed.access_token
-        } catch {
-          return value
-        }
+        const token = parseCookieValue(value)
+        if (token) return token
       }
     }
 
@@ -34,13 +49,8 @@ function extractAccessToken(): string | null {
       .sort()
     if (chunkNames.length > 0) {
       const full = chunkNames.map((n) => cookies[n]).join('')
-      try {
-        const decoded = decodeURIComponent(full)
-        const parsed = JSON.parse(atob(decoded))
-        if (parsed?.access_token) return parsed.access_token
-      } catch {
-        // Not base64
-      }
+      const token = parseCookieValue(full)
+      if (token) return token
     }
 
     return null

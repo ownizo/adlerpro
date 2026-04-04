@@ -72,7 +72,7 @@ function QuotesComparisonPage() {
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-navy-700">Comparativo de Cotações (IA)</h1>
-          <p className="text-navy-500 mt-1">Carregue até 3 cotações para uma análise detalhada feita pela nossa inteligência artificial Claude.</p>
+          <p className="text-navy-500 mt-1">Carregue até 3 cotações para uma análise detalhada feita pela nossa inteligência artificial.</p>
         </div>
 
         <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-8">
@@ -81,14 +81,14 @@ function QuotesComparisonPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <p className="text-navy-600 mb-2">Arraste os ficheiros ou clique para selecionar</p>
-            <p className="text-xs text-navy-400 mb-4">Até 3 ficheiros (Texto, HTML, etc)</p>
+            <p className="text-xs text-navy-400 mb-4">Até 3 ficheiros (PDF, imagens, texto)</p>
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
               className="hidden"
               multiple
-              accept="text/plain,text/html,application/json,.csv,.md,.pdf"
+              accept=".pdf,image/*,text/plain,text/html,application/json,.csv,.md"
             />
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -152,7 +152,7 @@ function QuotesComparisonPage() {
         {result && (
           <div className="bg-white rounded-[4px] border border-navy-200 p-8 shadow-sm">
             <h2 className="text-xl font-bold text-navy-700 mb-6 pb-4 border-b border-navy-100">
-              Conclusão da Análise (Claude IA)
+              Conclusão da Análise (IA Adler & Rochefort)
             </h2>
             <div 
               className="prose prose-navy max-w-none prose-headings:font-bold prose-h3:text-lg prose-p:text-navy-600 prose-li:text-navy-600"

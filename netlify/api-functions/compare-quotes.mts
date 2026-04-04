@@ -27,30 +27,32 @@ export default async (req: Request) => {
       const arrayBuffer = await file.arrayBuffer()
       const base64 = Buffer.from(arrayBuffer).toString('base64')
 
-      if (file.type.startsWith('image/')) {
-        contentBlocks.push({
-          type: 'text',
-          text: `--- COTAÇÃO (${file.name}) ---`
-        })
+      contentBlocks.push({
+        type: 'text',
+        text: `--- COTACAO: ${file.name} ---`,
+      })
+
+      if (file.type.startsWith('image/') || file.type === 'application/pdf') {
         contentBlocks.push({
           type: 'image_url',
           image_url: {
-            url: `data:${file.type};base64,${base64}`
-          }
+            url: `data:${file.type};base64,${base64}`,
+            detail: 'high',
+          },
         })
       } else {
-        // Fallback to text for PDF or other documents. 
-        // Em produção, deve-se usar uma biblioteca de PDF-to-Text antes do envio para a OpenAI se não suportar nativo no chat completions,
-        // mas para teste assumimos que o conteúdo textual vai ser legível ou é um ficheiro de texto
         const text = Buffer.from(arrayBuffer).toString('utf-8')
         contentBlocks.push({
           type: 'text',
-          text: `--- COTAÇÃO (${file.name}) ---\n${text.substring(0, 20000)}\n\n`
+          text: text.substring(0, 20000),
         })
       }
     }
 
-    const openai = new OpenAI()
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+    })
     
     contentBlocks.push({
       type: 'text',
@@ -64,7 +66,7 @@ Não inclua \`\`\`html no output. Apenas o HTML cru.`
     })
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o', // Modelo capaz de ler imagem e texto longo
+      model: 'gpt-4.1-mini',
       messages: [
         {
           role: 'system',
@@ -75,7 +77,8 @@ Não inclua \`\`\`html no output. Apenas o HTML cru.`
           content: contentBlocks
         }
       ],
-      max_tokens: 2000
+      max_tokens: 3000,
+      temperature: 0.3
     })
 
     const report = response.choices[0]?.message?.content || ''

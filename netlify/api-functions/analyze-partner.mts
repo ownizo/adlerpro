@@ -1,5 +1,5 @@
 import type { Config } from '@netlify/functions'
-import Anthropic from '@anthropic-ai/sdk'
+import OpenAI from 'openai'
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
@@ -44,22 +44,28 @@ export default async (req: Request) => {
       ultima_atualizacao: new Date().toISOString()
     }
 
-    // 3. Chamada à IA da Claude para analisar os dados
-    const anthropic = new Anthropic()
-    
-    const prompt = `Atua como consultor de risco de parceiros. Recebeste os seguintes dados da API Bizapis para o NIF ${nif}:
-${JSON.stringify(bizapisData, null, 2)}
-
-Por favor, escreve um relatório de análise de risco em formato HTML (usa apenas tags semânticas como <h3>, <p>, <ul>, <li>, <strong>) analisando a exposição ao risco desta empresa, destacando as dívidas e o risco de crédito. O relatório deve mencionar o nome da empresa.`
-
-    const message = await anthropic.messages.create({
-      model: 'claude-opus-4-5',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }],
+    // 3. Chamada a IA para analisar os dados
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
     })
 
-    let report = message.content[0].type === 'text' ? message.content[0].text : ''
-    // Remover marcadores de código markdown se presentes (```html ... ``` ou ``` ... ```)
+    const prompt = `Atua como consultor de risco de parceiros da Adler & Rochefort. Recebeste os seguintes dados para o NIF ${nif}:
+${JSON.stringify(bizapisData, null, 2)}
+
+Escreve um relatorio de analise de risco em formato HTML (usa apenas tags semanticas como <h3>, <p>, <ul>, <li>, <strong>) analisando a exposicao ao risco desta empresa, destacando as dividas e o risco de credito. O relatorio deve mencionar o nome da empresa. Nao incluas marcadores de codigo.`
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4.1-mini',
+      max_tokens: 1024,
+      temperature: 0.3,
+      messages: [
+        { role: 'system', content: 'Es um consultor de risco especializado. Respondes sempre em HTML puro sem marcadores de codigo.' },
+        { role: 'user', content: prompt },
+      ],
+    })
+
+    let report = response.choices[0]?.message?.content || ''
     report = report.replace(/^```(?:html)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
 
     return Response.json({ report })
