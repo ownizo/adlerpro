@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
-import { fetchDashboardStats, fetchAlerts, fetchPolicies } from '@/lib/server-fns'
+import { fetchDashboardAll } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { DashboardStats, Alert, Policy } from '@/lib/types'
 import { POLICY_TYPE_LABELS } from '@/lib/types'
@@ -21,8 +21,8 @@ function DashboardPage() {
 
   useEffect(() => {
     if (!ready || !user) return
-    Promise.all([fetchDashboardStats(), fetchAlerts(), fetchPolicies()])
-      .then(([s, a, p]) => {
+    fetchDashboardAll()
+      .then(({ stats: s, alerts: a, policies: p }) => {
         setStats(s)
         setAlerts(a)
         setPolicies(p)

@@ -11,17 +11,26 @@ export const Route = createRootRoute({
       { title: 'Adler & Rochefort — VaultSuite' },
       { name: 'description', content: 'Portal seguro para clientes de corretagem de seguros empresariais' },
     ],
-    links: [
-      {
-        rel: 'preconnect',
-        href: 'https://fonts.googleapis.com',
-      },
-      {
-        rel: 'preconnect',
-        href: 'https://fonts.gstatic.com',
-        crossOrigin: 'anonymous',
-      },
-    ],
+      links: [
+        {
+          rel: 'preconnect',
+          href: 'https://fonts.googleapis.com',
+        },
+        {
+          rel: 'preconnect',
+          href: 'https://fonts.gstatic.com',
+          crossOrigin: 'anonymous',
+        },
+        {
+          rel: 'preload',
+          href: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap',
+          as: 'style',
+        },
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap',
+        },
+      ],
   }),
   component: RootComponent,
   shellComponent: RootDocument,

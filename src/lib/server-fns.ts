@@ -60,10 +60,10 @@ function extractAccessToken(): string | null {
   }
 }
 
-async function getViewerScope() {
-  const token = extractAccessToken()
-  if (!token) throw new Error('Authentication required')
+// Cache em memória por token para evitar chamadas repetidas ao Supabase Auth na mesma request
+const _scopeCache = new Map<string, { scope: Awaited<ReturnType<typeof _resolveScope>>; ts: number }>()
 
+async function _resolveScope(token: string) {
   const { data: { user: supaUser }, error } = await supabaseAdmin.auth.getUser(token)
   if (error || !supaUser) throw new Error('Authentication required')
 
@@ -89,7 +89,60 @@ async function getViewerScope() {
   }
 }
 
-// Dashboard
+async function getViewerScope() {
+  const token = extractAccessToken()
+  if (!token) throw new Error('Authentication required')
+
+  // Cache válido por 30 segundos para evitar chamadas duplicadas na mesma navegação
+  const cached = _scopeCache.get(token)
+  if (cached && Date.now() - cached.ts < 30_000) return cached.scope
+
+  const scope = await _resolveScope(token)
+  _scopeCache.set(token, { scope, ts: Date.now() })
+  // Limpar entradas antigas (> 2 min) para não acumular memória
+  if (_scopeCache.size > 50) {
+    const cutoff = Date.now() - 120_000
+    for (const [k, v] of _scopeCache) {
+      if (v.ts < cutoff) _scopeCache.delete(k)
+    }
+  }
+  return scope
+}
+
+// Dashboard — endpoint unificado: retorna stats + alertas + apólices numa só chamada
+export const fetchDashboardAll = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    const scope = await getViewerScope()
+    const companyId = scope.companyId ?? undefined
+
+    const [policies, claims, alerts] = await Promise.all([
+      db.getPolicies(companyId),
+      db.getClaims(companyId),
+      db.getAlerts(companyId),
+    ])
+
+    const activePolicies = policies.filter((p) => p.status === 'active' || p.status === 'expiring').length
+    const annualPremiums = policies
+      .filter((p) => p.status === 'active' || p.status === 'expiring')
+      .reduce((sum, p) => sum + p.annualPremium, 0)
+
+    const now = new Date()
+    const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
+    const renewalsIn90Days = policies.filter((p) => {
+      const endDate = new Date(p.endDate)
+      return endDate >= now && endDate <= in90Days && (p.status === 'active' || p.status === 'expiring')
+    }).length
+
+    const openClaims = claims.filter(
+      (c) => !['approved', 'denied', 'paid'].includes(c.status)
+    ).length
+
+    const stats: DashboardStats = { activePolicies, annualPremiums, renewalsIn90Days, openClaims }
+    return { stats, alerts, policies }
+  })
+
+// Manter para compatibilidade
 export const fetchDashboardStats = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(
@@ -282,6 +335,22 @@ export const fetchCurrentUserCompanyProfile = createServerFn({ method: 'GET' })
 export const fetchApiConnections = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => db.getApiConnections())
+
+// Admin — endpoint unificado: retorna todos os dados do painel admin numa só chamada
+export const fetchAdminAll = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .handler(async () => {
+    const [companies, companyUsers, userEvents, apiConnections, policies, claims, documents] = await Promise.all([
+      db.getCompanies(),
+      db.getCompanyUsers(),
+      db.getUserMetricEvents(),
+      db.getApiConnections(),
+      db.getPolicies(),
+      db.getClaims(),
+      db.getDocuments(),
+    ])
+    return { companies, companyUsers, userEvents, apiConnections, policies, claims, documents }
+  })
 
 // Admin functions
 export const adminCreatePolicy = createServerFn({ method: 'POST' })

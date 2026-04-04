@@ -18,8 +18,12 @@ import type {
 
 // ============================================================
 // Cliente Supabase (server-side — usa service_role key)
+// Singleton: criado uma vez e reutilizado em todas as chamadas
 // ============================================================
+let _sbAdmin: ReturnType<typeof createClient> | null = null
+
 function getSupabaseAdmin() {
+  if (_sbAdmin) return _sbAdmin
   const url =
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) ||
     process.env['VITE_SUPABASE_URL'] ||
@@ -28,9 +32,10 @@ function getSupabaseAdmin() {
     process.env['SUPABASE_SERVICE_ROLE_KEY'] ||
     (typeof import.meta !== 'undefined' && import.meta.env?.SUPABASE_SERVICE_ROLE_KEY) ||
     ''
-  return createClient(url, key, {
-    auth: { persistSession: false },
+  _sbAdmin = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
   })
+  return _sbAdmin
 }
 
 // ============================================================

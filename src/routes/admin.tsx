@@ -1,21 +1,15 @@
 import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import {
-  fetchCompanies,
-  fetchPolicies,
-  fetchClaims,
-  fetchDocuments,
+  fetchAdminAll,
   adminCreatePolicy,
   adminUpdateClaimStatus,
   adminCreateCompany,
   adminUpdateCompany,
   adminDeleteCompany,
-  fetchCompanyUsers,
-  fetchUserMetricEvents,
   adminCreateCompanyUser,
   adminDeleteCompanyUser,
   adminUpdateCompanyUser,
-  fetchApiConnections,
   adminRefreshApiConnection,
   adminUpdateApiConnection,
 } from '@/lib/server-fns'
@@ -56,15 +50,7 @@ function AdminPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
 
   const reload = async () => {
-    const [c, u, e, a, p, cl, d] = await Promise.all([
-      fetchCompanies(),
-      fetchCompanyUsers(),
-      fetchUserMetricEvents(),
-      fetchApiConnections(),
-      fetchPolicies(),
-      fetchClaims(),
-      fetchDocuments(),
-    ])
+    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d } = await fetchAdminAll()
     setCompanies(c)
     setCompanyUsers(u)
     setUserEvents(e)
