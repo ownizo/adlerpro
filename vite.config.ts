@@ -12,11 +12,7 @@ const config = defineConfig({
     }),
     tailwindcss(),
     netlify(),
-    tanstackStart({
-      spa: {
-        enabled: true,
-      },
-    }),
+    tanstackStart(),
     viteReact(),
   ],
 })
