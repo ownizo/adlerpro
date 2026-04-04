@@ -11,16 +11,19 @@ function LandingPage() {
   return (
     <div className="min-h-screen bg-white text-primary">
       {/* Header / Nav */}
-      <header className="flex items-center justify-between" style={{ padding: '1.25rem 2.5rem', borderBottom: '1.5px solid #111111' }}>
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '52px', width: 'auto' }} />
-          <div>
-            <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '1.1rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' as const, color: '#111111' }}>
-              Adler<span style={{ color: '#C8961A' }}>.</span>Pro
-            </h1>
-          </div>
+      <header style={{ padding: '1.25rem 2.5rem', borderBottom: '1.5px solid #111111', display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center' }}>
+        {/* Esquerda: nome */}
+        <div>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '1.1rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' as const, color: '#111111', margin: 0 }}>
+            Adler<span style={{ color: '#C8961A' }}>.</span>Pro
+          </h1>
         </div>
-        <div className="flex items-center gap-4">
+        {/* Centro: logo */}
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '64px', width: 'auto' }} />
+        </div>
+        {/* Direita: botões */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '1rem' }}>
           <Link
             to="/contact"
             style={{

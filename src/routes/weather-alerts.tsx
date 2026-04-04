@@ -292,6 +292,88 @@ function WeatherAlertsPage() {
             </p>
           </div>
         )}
+
+        {/* Secção: Certificados Meteorológicos IPMA */}
+        <div style={{ marginTop: '2rem', borderTop: '1.5px solid #111', paddingTop: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+            <div style={{ width: '36px', height: '36px', background: '#111', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>Certificados Meteorológicos IPMA</h3>
+              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#888', margin: 0 }}>Documentos oficiais para processos de sinistro junto das seguradoras</p>
+            </div>
+          </div>
+
+          {/* Explicação */}
+          <div style={{ background: '#f9f9f9', border: '1px solid #eee', borderRadius: '4px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
+              <div>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#C8961A', marginBottom: '0.5rem' }}>O que é</p>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', color: '#555', lineHeight: 1.6, margin: 0 }}>
+                  Um certificado meteorológico é um documento oficial emitido pelo IPMA (Instituto Português do Mar e da Atmosfera) que atesta as condições climáticas verificadas numa determinada data e localidade.
+                </p>
+              </div>
+              <div>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#C8961A', marginBottom: '0.5rem' }}>Para que serve</p>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', color: '#555', lineHeight: 1.6, margin: 0 }}>
+                  É exigido pelas seguradoras como prova de evento meteorológico em sinistros de tempestade, granizo, vento forte, inundação ou queda de árvores. Sem este documento, a seguradora pode rejeitar ou atrasar a indemnização.
+                </p>
+              </div>
+              <div>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#C8961A', marginBottom: '0.5rem' }}>Como obter</p>
+                <ol style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', color: '#555', lineHeight: 1.8, margin: 0, paddingLeft: '1.1rem' }}>
+                  <li>Aceda ao formulário de contacto do IPMA</li>
+                  <li>Seleccione <strong>"Certidões e Declarações"</strong> como assunto</li>
+                  <li>Indique a data, hora e localidade do evento</li>
+                  <li>Descreva o tipo de fenómeno (vento, granizo, etc.)</li>
+                  <li>Aguarde resposta em 5–10 dias úteis</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
+          {/* Botão de acção */}
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' as const, alignItems: 'center' }}>
+            <a
+              href="https://www.ipma.pt/pt/siteinfo/contactar.jsp"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontFamily: "'Montserrat', sans-serif",
+                fontWeight: 600,
+                fontSize: '0.82rem',
+                padding: '0.65rem 1.5rem',
+                background: '#111',
+                color: '#fff',
+                borderRadius: '4px',
+                textDecoration: 'none',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+              }}
+            >
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Pedir Certificado ao IPMA
+            </a>
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#888', margin: 0 }}>
+              Será rediricionado para o formulário oficial do IPMA em nova janela.
+            </p>
+          </div>
+
+          {/* Aviso */}
+          <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '4px', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+            <AlertTriangle style={{ width: '16px', height: '16px', color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#92400e', margin: 0, lineHeight: 1.5 }}>
+              <strong>Importante:</strong> Solicite o certificado o mais rapidamente possível após o evento. O IPMA pode não ter registos detalhados para datas muito antigas. Guarde sempre o número de processo atribuído pelo IPMA para acompanhamento.
+            </p>
+          </div>
+        </div>
+
       </div>
     </AppLayout>
   )

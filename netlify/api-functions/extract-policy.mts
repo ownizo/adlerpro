@@ -1,5 +1,5 @@
 import type { Config } from '@netlify/functions'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import Anthropic from '@anthropic-ai/sdk'
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
@@ -17,17 +17,16 @@ export default async (req: Request) => {
       return Response.json({ error: 'Nenhum ficheiro fornecido.' }, { status: 400 })
     }
 
-    const apiKey = process.env.GEMINI_API_KEY
+    const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       return Response.json({ error: 'Serviço de IA não configurado. Contacte o suporte.' }, { status: 500 })
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    // gemini-2.0-flash é mais estável para extracção de documentos
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const client = new Anthropic({ apiKey })
 
     const arrayBuffer = await file.arrayBuffer()
     const bytes = new Uint8Array(arrayBuffer)
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
 
     const prompt = `Analisa este documento de apólice de seguro e extrai as seguintes informações em formato JSON estrito, sem texto adicional, sem marcadores de código:
 {
@@ -47,33 +46,34 @@ Se não conseguires extrair um campo, usa null para strings e 0 para números. R
     // Verificar se é PDF válido (começa com %PDF)
     const isPdf = file.type === 'application/pdf' ||
       (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)
-
     const isImage = file.type.startsWith('image/')
 
-    let result
+    let messageContent: Anthropic.MessageParam['content']
 
-    if ((isPdf || isImage) && bytes.length > 100) {
-      const base64 = Buffer.from(arrayBuffer).toString('base64')
-      const mimeType = isPdf ? 'application/pdf' : (file.type || 'image/jpeg')
-      result = await model.generateContent([
-        {
-          inlineData: {
-            mimeType: mimeType as any,
-            data: base64,
-          },
-        },
-        prompt,
-      ])
+    if (isPdf && bytes.length > 100) {
+      messageContent = [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
+        { type: 'text', text: prompt },
+      ]
+    } else if (isImage && bytes.length > 100) {
+      const mimeType = (file.type || 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
+      messageContent = [
+        { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
+        { type: 'text', text: prompt },
+      ]
     } else {
-      // Texto ou ficheiro não reconhecido
       const text = Buffer.from(arrayBuffer).toString('utf-8')
       const cleanText = text.replace(/[^\x20-\x7E\u00A0-\uFFFF\n\r\t]/g, ' ').substring(0, 30000)
-      result = await model.generateContent([
-        `${prompt}\n\nConteúdo do documento:\n${cleanText}`,
-      ])
+      messageContent = [{ type: 'text', text: `${prompt}\n\nConteúdo do documento:\n${cleanText}` }]
     }
 
-    const contentText = result.response.text()
+    const response = await client.messages.create({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 2048,
+      messages: [{ role: 'user', content: messageContent }],
+    })
+
+    const contentText = response.content[0].type === 'text' ? response.content[0].text : ''
 
     // Extrair JSON da resposta (pode vir com texto à volta)
     const jsonMatch = contentText.match(/\{[\s\S]*\}/)
@@ -92,8 +92,8 @@ Se não conseguires extrair um campo, usa null para strings e 0 para números. R
 
     if (errMsg.includes('no pages') || errMsg.includes('No pages')) {
       userMessage = 'O PDF enviado parece estar vazio ou corrompido. Por favor verifique o ficheiro.'
-    } else if (errMsg.includes('quota') || errMsg.includes('RESOURCE_EXHAUSTED')) {
-      userMessage = 'Limite de análises atingido. Tente novamente em alguns minutos.'
+    } else if (errMsg.includes('rate_limit') || errMsg.includes('overloaded')) {
+      userMessage = 'Serviço temporariamente sobrecarregado. Tente novamente em alguns segundos.'
     } else if (errMsg.includes('too large') || errMsg.includes('size')) {
       userMessage = 'Ficheiro demasiado grande. Por favor reduza o tamanho e tente novamente.'
     } else if (errMsg.includes('JSON')) {

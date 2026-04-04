@@ -1,24 +1,5 @@
 import type { Config } from '@netlify/functions'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-
-// Retry com backoff exponencial para o rate limit do Gemini
-async function generateWithRetry(model: any, prompt: string, maxRetries = 3): Promise<string> {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const result = await model.generateContent(prompt)
-      return result.response.text()
-    } catch (error: any) {
-      const isRateLimit = error?.message?.includes('RESOURCE_EXHAUSTED') || error?.message?.includes('quota') || error?.status === 429
-      if (isRateLimit && attempt < maxRetries - 1) {
-        const delay = Math.pow(2, attempt) * 2000 // 2s, 4s, 8s
-        await new Promise((resolve) => setTimeout(resolve, delay))
-        continue
-      }
-      throw error
-    }
-  }
-  throw new Error('Número máximo de tentativas atingido')
-}
+import Anthropic from '@anthropic-ai/sdk'
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
@@ -127,14 +108,13 @@ export default async (req: Request) => {
       },
     }
 
-    // 4. Análise IA com Gemini
-    const apiKey = process.env.GEMINI_API_KEY
+    // 4. Análise IA com Claude
+    const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       return Response.json({ error: 'Serviço de IA não configurado' }, { status: 500 })
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+    const claude = new Anthropic({ apiKey })
 
     const prompt = `Actua como consultor sénior de risco da Adler & Rochefort, mediadora de seguros. Recebeste os seguintes dados reais da empresa "${companyName}" (NIF: ${nif || nipc}) obtidos via Registo Comercial e Autoridade Tributária:
 
@@ -152,9 +132,14 @@ Elabora um relatório profissional de análise de risco em HTML semântico (usa 
 5. **Recomendações para Seguros** — Sugerir tipos de seguros adequados ao perfil da empresa (ex: RC Profissional, Multirriscos, D&O, Cyber)
 6. **Conclusão** — Parecer final sobre a viabilidade como parceiro/cliente
 
-Usa uma linguagem profissional e técnica adequada ao sector segurador. Não incluas marcadores de código. Responde apenas com HTML puro.`
+Usa uma linguagem profissional e técnica adequada ao sector segurador. Não incluías marcadores de código. Responde apenas com HTML puro.`
 
-    const reportHtml = await generateWithRetry(model, prompt)
+    const aiResponse = await claude.messages.create({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 4096,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    const reportHtml = aiResponse.content[0].type === 'text' ? aiResponse.content[0].text : ''
     const cleanReport = reportHtml.replace(/^```(?:html)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
 
     return Response.json({
@@ -164,11 +149,11 @@ Usa uma linguagem profissional e técnica adequada ao sector segurador. Não inc
     })
   } catch (error: any) {
     console.error('Error analyzing partner:', error)
-    const isRateLimit = error?.message?.includes('RESOURCE_EXHAUSTED') || error?.message?.includes('quota')
+    const isRateLimit = error?.message?.includes('rate_limit') || error?.message?.includes('overloaded')
     return Response.json(
       {
         error: isRateLimit
-          ? 'Limite de análises atingido. Tente novamente em alguns minutos.'
+          ? 'Serviço temporariamente sobrecarregado. Tente novamente em alguns segundos.'
           : 'Erro ao analisar parceiro. Verifique o NIF e tente novamente.',
         details: error.message,
       },
