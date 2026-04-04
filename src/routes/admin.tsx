@@ -76,7 +76,12 @@ function AdminPage() {
 
   useEffect(() => {
     if (!ready || !user || !user.roles?.includes('admin')) return
-    reload().then(() => setLoading(false))
+    reload()
+      .then(() => setLoading(false))
+      .catch((err) => {
+        console.error('[AdminPage] reload error:', err)
+        setLoading(false)
+      })
   }, [ready, user])
 
   if (!ready) {
