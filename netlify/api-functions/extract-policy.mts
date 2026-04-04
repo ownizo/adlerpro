@@ -28,6 +28,10 @@ export default async (req: Request) => {
     const bytes = new Uint8Array(arrayBuffer)
     const base64 = Buffer.from(arrayBuffer).toString('base64')
 
+    const isPdf = file.type === 'application/pdf' ||
+      (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)
+    const isImage = file.type.startsWith('image/')
+
     const prompt = `Analisa este documento de apólice de seguro e extrai as seguintes informações em formato JSON estrito, sem texto adicional, sem marcadores de código:
 {
   "type": "tipo de seguro: auto | health | home | life | liability | other",
@@ -43,39 +47,36 @@ export default async (req: Request) => {
 }
 Se não conseguires extrair um campo, usa null para strings e 0 para números. Responde APENAS com o JSON, sem mais nada.`
 
-    // Verificar se é PDF válido (começa com %PDF)
-    const isPdf = file.type === 'application/pdf' ||
-      (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)
-    const isImage = file.type.startsWith('image/')
-
-    let messageContent: Anthropic.MessageParam['content']
+    let messageParts: Anthropic.MessageParam['content']
 
     if (isPdf && bytes.length > 100) {
-      messageContent = [
+      messageParts = [
         { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any,
         { type: 'text', text: prompt },
       ]
     } else if (isImage && bytes.length > 100) {
       const mimeType = (file.type || 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
-      messageContent = [
+      messageParts = [
         { type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } },
         { type: 'text', text: prompt },
       ]
     } else {
       const text = Buffer.from(arrayBuffer).toString('utf-8')
       const cleanText = text.replace(/[^\x20-\x7E\u00A0-\uFFFF\n\r\t]/g, ' ').substring(0, 30000)
-      messageContent = [{ type: 'text', text: `${prompt}\n\nConteúdo do documento:\n${cleanText}` }]
+      messageParts = [
+        { type: 'text', text: `${prompt}\n\nConteúdo do documento:\n${cleanText}` },
+      ]
     }
 
     const response = await client.messages.create({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 2048,
-      messages: [{ role: 'user', content: messageContent }],
+      messages: [{ role: 'user', content: messageParts }],
     })
 
     const contentText = response.content[0].type === 'text' ? response.content[0].text : ''
 
-    // Extrair JSON da resposta (pode vir com texto à volta)
+    // Extrair JSON da resposta
     const jsonMatch = contentText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       throw new Error('Não foi possível extrair os dados em formato JSON do documento.')
@@ -86,7 +87,6 @@ Se não conseguires extrair um campo, usa null para strings e 0 para números. R
 
   } catch (error: any) {
     console.error('[extract-policy] Error:', error)
-
     let userMessage = 'Erro ao processar o documento. Verifique se o ficheiro é uma apólice de seguro válida.'
     const errMsg = error?.message ?? ''
 
