@@ -30,7 +30,8 @@ interface SeguroResult {
   plate: string
   date: string
   source: string
-  seguro: Record<string, unknown>
+  seguro: Record<string, unknown> | null
+  message?: string
 }
 
 function LicensePlatesPage() {
@@ -79,7 +80,7 @@ function LicensePlatesPage() {
       })
         .then(async (response) => {
           const data = await response.json()
-          if (!response.ok) throw new Error(data?.error || 'Seguro não encontrado')
+          if (!response.ok) throw new Error(data?.error || 'Serviço de seguro indisponível. Tente novamente.')
           setSeguroResult(data)
         })
         .catch((err: any) => {
@@ -199,10 +200,16 @@ function LicensePlatesPage() {
                 </span>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
-                <Field label="Data Consultada" value={seguroResult.date} />
-                <SeguroFields data={seguroResult.seguro} />
-              </div>
+              {seguroResult.seguro === null ? (
+                <div className="text-navy-500 text-sm py-2">
+                  {seguroResult.message || 'Não foram encontrados dados de seguro para esta matrícula e data.'}
+                </div>
+              ) : (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <Field label="Data Consultada" value={seguroResult.date} />
+                  <SeguroFields data={seguroResult.seguro} />
+                </div>
+              )}
             </div>
           )}
 
