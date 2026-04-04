@@ -2,6 +2,9 @@
   command = "vite build"
   publish = "dist/client"
 
+[build.environment]
+  NODE_VERSION = "22"
+
 [dev]
   command = "npm run dev"
   targetPort = 3000

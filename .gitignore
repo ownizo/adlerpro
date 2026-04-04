@@ -1,0 +1,17 @@
+# Dependências
+node_modules/
+
+# Build
+dist/
+
+# Netlify
+.netlify/
+
+# Ambiente local
+.env
+.env.local
+.env.*.local
+
+# Editor
+.DS_Store
+*.log
