@@ -1,0 +1,40 @@
+{
+  "name": "saas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev --port 3000",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.82.0",
+    "@netlify/blobs": "^10.7.4",
+    "@netlify/functions": "^5.1.5",
+    "@supabase/supabase-js": "^2.101.1",
+    "@tailwindcss/vite": "^4.0.6",
+    "@tanstack/react-router": "^1.163.3",
+    "@tanstack/react-start": "^1.166.1",
+    "@tanstack/react-store": "^0.9.1",
+    "@tanstack/router-plugin": "^1.164.0",
+    "@tanstack/store": "^0.9.1",
+    "lucide-react": "^0.576.0",
+    "openai": "^6.33.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwindcss": "^4.0.6",
+    "vite-tsconfig-paths": "^6.0.2"
+  },
+  "devDependencies": {
+    "@netlify/vite-plugin-tanstack-start": "^1.2.14",
+    "@tailwindcss/vite": "^4.0.6",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "lucide-react": "^0.576.0",
+    "rimraf": "^6.0.1",
+    "tailwindcss": "^4.0.6",
+    "typescript": "^5.7.2",
+    "vite": "^7.1.7"
+  }
+}

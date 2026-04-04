@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss" source("../");
+
+@theme {
+  --color-primary: #111111;
+  --color-gold: #C8961A;
+  --color-muted: #666666;
+  --color-label: #888888;
+  --color-label-light: #999999;
+  --color-border: #eeeeee;
+  --color-border-strong: #111111;
+  --color-body: #555555;
+  --color-feature-text: #444444;
+  --color-footer-text: #bbbbbb;
+
+  --color-badge-active-bg: #EAF3DE;
+  --color-badge-active-text: #3B6D11;
+  --color-badge-review-bg: #FAEEDA;
+  --color-badge-review-text: #854F0B;
+
+  /* Legacy color mappings for components that still reference navy/gold */
+  --color-navy-50: #f8f8f8;
+  --color-navy-100: #eeeeee;
+  --color-navy-200: #eeeeee;
+  --color-navy-300: #999999;
+  --color-navy-400: #888888;
+  --color-navy-500: #666666;
+  --color-navy-600: #333333;
+  --color-navy-700: #111111;
+  --color-navy-800: #0a0a0a;
+  --color-navy-900: #111111;
+  --color-navy-950: #000000;
+
+  --color-gold-50: #FAEEDA;
+  --color-gold-100: #f5e0b5;
+  --color-gold-200: #e8c96a;
+  --color-gold-300: #d4a83a;
+  --color-gold-400: #C8961A;
+  --color-gold-500: #b8860b;
+  --color-gold-600: #9a7424;
+  --color-gold-700: #7a5820;
+  --color-gold-800: #654822;
+  --color-gold-900: #573d21;
+  --color-gold-950: #321f0f;
+}
+
+body {
+  @apply m-0 bg-white text-primary;
+  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', sans-serif;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f8f8f8;
+}
+::-webkit-scrollbar-thumb {
+  background: #cccccc;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #999999;
+}
