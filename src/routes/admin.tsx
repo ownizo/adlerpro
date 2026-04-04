@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import {
   fetchCompanies,
@@ -31,19 +31,14 @@ import type {
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect } from 'react'
-import { getServerUser } from '@/lib/auth'
+import { useIdentity } from '@/lib/identity-context'
 
 export const Route = createFileRoute('/admin')({
-  beforeLoad: async () => {
-    const user = await getServerUser()
-    if (!user) throw redirect({ to: '/login' })
-    if (!user.roles?.includes('admin')) throw redirect({ to: '/dashboard' })
-    return { user }
-  },
   component: AdminPage,
 })
 
 function AdminPage() {
+  const { user, ready } = useIdentity()
   const [tab, setTab] = useState<'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts'>('companies')
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
@@ -53,13 +48,11 @@ function AdminPage() {
   const [claims, setClaims] = useState<Claim[]>([])
   const [documents, setDocuments] = useState<DocType[]>([])
   const [loading, setLoading] = useState(true)
-
   const [showNewCompany, setShowNewCompany] = useState(false)
   const [showNewPolicy, setShowNewPolicy] = useState(false)
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null)
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null)
   const [showUserFormForCompanyId, setShowUserFormForCompanyId] = useState<string | null>(null)
-
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
 
   const reload = async () => {
@@ -82,8 +75,20 @@ function AdminPage() {
   }
 
   useEffect(() => {
+    if (!ready || !user || !user.roles?.includes('admin')) return
     reload().then(() => setLoading(false))
-  }, [])
+  }, [ready, user])
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user) return <Navigate to="/login" />
+  if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
   const tabs = [
     { key: 'companies' as const, label: 'Empresas' },

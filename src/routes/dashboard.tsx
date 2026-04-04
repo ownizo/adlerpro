@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { fetchDashboardStats, fetchAlerts, fetchPolicies } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -6,24 +6,21 @@ import type { DashboardStats, Alert, Policy } from '@/lib/types'
 import { POLICY_TYPE_LABELS } from '@/lib/types'
 import { useState, useEffect } from 'react'
 import { Link } from '@tanstack/react-router'
-import { getServerUser } from '@/lib/auth'
+import { useIdentity } from '@/lib/identity-context'
 
 export const Route = createFileRoute('/dashboard')({
-  beforeLoad: async () => {
-    const user = await getServerUser()
-    if (!user) throw redirect({ to: '/login' })
-    return { user }
-  },
   component: DashboardPage,
 })
 
 function DashboardPage() {
+  const { user, ready } = useIdentity()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!ready || !user) return
     Promise.all([fetchDashboardStats(), fetchAlerts(), fetchPolicies()])
       .then(([s, a, p]) => {
         setStats(s)
@@ -35,7 +32,17 @@ function DashboardPage() {
         console.error('Erro ao carregar dashboard:', err)
         setLoading(false)
       })
-  }, [])
+  }, [ready, user])
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!user) return <Navigate to="/login" />
 
   return (
     <AppLayout>
