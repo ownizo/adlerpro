@@ -1,5 +1,5 @@
 import type { Config } from '@netlify/functions'
-import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
@@ -16,19 +16,18 @@ export default async (req: Request) => {
       return Response.json({ error: 'Nenhum ficheiro fornecido' }, { status: 400 })
     }
 
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return Response.json({ error: 'GEMINI_API_KEY nao configurada' }, { status: 500 })
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+
     const arrayBuffer = await file.arrayBuffer()
     const base64 = Buffer.from(arrayBuffer).toString('base64')
 
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
-    })
-
-    const systemPrompt = `És um especialista em análise de apólices de seguros da Adler & Rochefort.
-A tua tarefa é extrair informação estruturada de documentos de apólices de seguro.
-Responde APENAS com JSON válido, sem texto adicional, sem marcadores de código.`
-
-    const userPrompt = `Analisa este documento de apólice de seguro e extrai as seguintes informações em formato JSON estrito:
+    const prompt = `Analisa este documento de apolice de seguro e extrai as seguintes informacoes em formato JSON estrito, sem texto adicional, sem marcadores de codigo:
 {
   "type": "tipo de seguro: auto | health | home | life | liability | other",
   "insurer": "Nome da Seguradora",
@@ -41,43 +40,28 @@ Responde APENAS com JSON válido, sem texto adicional, sem marcadores de código
   "coverages": ["Cobertura 1 (Capital: X euros, Franquia: Y euros)", "Cobertura 2"],
   "exclusions": ["Exclusao 1", "Exclusao 2"]
 }
-Se nao conseguires extrair um campo, usa null para strings e 0 para numeros.`
+Se nao conseguires extrair um campo, usa null para strings e 0 para numeros. Responde APENAS com o JSON, sem mais nada.`
 
-    let messages: any[]
+    let result
 
     if (file.type === 'application/pdf' || file.type.startsWith('image/')) {
-      messages = [
-        { role: 'system', content: systemPrompt },
+      result = await model.generateContent([
         {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${file.type};base64,${base64}`,
-                detail: 'high',
-              },
-            },
-            { type: 'text', text: userPrompt },
-          ],
+          inlineData: {
+            mimeType: file.type as any,
+            data: base64,
+          },
         },
-      ]
+        prompt,
+      ])
     } else {
       const text = Buffer.from(arrayBuffer).toString('utf-8')
-      messages = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: `${userPrompt}\n\nConteudo do documento:\n${text.substring(0, 30000)}` },
-      ]
+      result = await model.generateContent([
+        `${prompt}\n\nConteudo do documento:\n${text.substring(0, 30000)}`,
+      ])
     }
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
-      messages,
-      max_tokens: 2048,
-      temperature: 0.1,
-    })
-
-    const contentText = response.choices[0]?.message?.content || ''
+    const contentText = result.response.text()
     const jsonMatch = contentText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
       throw new Error('Nao foi possivel extrair os dados em formato JSON.')

@@ -1,5 +1,5 @@
 import type { Config } from '@netlify/functions'
-import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
@@ -45,27 +45,21 @@ export default async (req: Request) => {
     }
 
     // 3. Chamada a IA para analisar os dados
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
-    })
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return Response.json({ error: 'GEMINI_API_KEY nao configurada' }, { status: 500 })
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
     const prompt = `Atua como consultor de risco de parceiros da Adler & Rochefort. Recebeste os seguintes dados para o NIF ${nif}:
 ${JSON.stringify(bizapisData, null, 2)}
 
-Escreve um relatorio de analise de risco em formato HTML (usa apenas tags semanticas como <h3>, <p>, <ul>, <li>, <strong>) analisando a exposicao ao risco desta empresa, destacando as dividas e o risco de credito. O relatorio deve mencionar o nome da empresa. Nao incluas marcadores de codigo.`
+Escreve um relatorio de analise de risco em formato HTML (usa apenas tags semanticas como <h3>, <p>, <ul>, <li>, <strong>) analisando a exposicao ao risco desta empresa, destacando as dividas e o risco de credito. O relatorio deve mencionar o nome da empresa. Nao incluas marcadores de codigo. Responde apenas com HTML puro.`
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
-      max_tokens: 1024,
-      temperature: 0.3,
-      messages: [
-        { role: 'system', content: 'Es um consultor de risco especializado. Respondes sempre em HTML puro sem marcadores de codigo.' },
-        { role: 'user', content: prompt },
-      ],
-    })
-
-    let report = response.choices[0]?.message?.content || ''
+    const result = await model.generateContent(prompt)
+    let report = result.response.text()
     report = report.replace(/^```(?:html)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
 
     return Response.json({ report })

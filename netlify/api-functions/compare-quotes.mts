@@ -1,5 +1,5 @@
 import type { Config } from '@netlify/functions'
-import OpenAI from 'openai'
+import { GoogleGenerativeAI } from '@google/generative-ai'
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
@@ -14,80 +14,69 @@ export default async (req: Request) => {
     const files = formData.getAll('quotes') as File[]
 
     if (!files || files.length === 0) {
-      return Response.json({ error: 'Por favor envie até 3 cotações (ficheiros)' }, { status: 400 })
-    }
-    
-    if (files.length > 3) {
-      return Response.json({ error: 'Por favor envie no máximo 3 cotações.' }, { status: 400 })
+      return Response.json({ error: 'Por favor envie pelo menos uma cotacao' }, { status: 400 })
     }
 
-    const contentBlocks: any[] = []
-    
+    if (files.length > 3) {
+      return Response.json({ error: 'Por favor envie no maximo 3 cotacoes.' }, { status: 400 })
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      return Response.json({ error: 'GEMINI_API_KEY nao configurada' }, { status: 500 })
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
+
+    // Build content parts for Gemini
+    const parts: any[] = []
+
     for (const file of files) {
       const arrayBuffer = await file.arrayBuffer()
       const base64 = Buffer.from(arrayBuffer).toString('base64')
 
-      contentBlocks.push({
-        type: 'text',
-        text: `--- COTACAO: ${file.name} ---`,
-      })
+      parts.push({ text: `--- COTACAO: ${file.name} ---` })
 
       if (file.type.startsWith('image/') || file.type === 'application/pdf') {
-        contentBlocks.push({
-          type: 'image_url',
-          image_url: {
-            url: `data:${file.type};base64,${base64}`,
-            detail: 'high',
+        parts.push({
+          inlineData: {
+            mimeType: file.type as any,
+            data: base64,
           },
         })
       } else {
         const text = Buffer.from(arrayBuffer).toString('utf-8')
-        contentBlocks.push({
-          type: 'text',
-          text: text.substring(0, 20000),
-        })
+        parts.push({ text: text.substring(0, 20000) })
       }
     }
 
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
-    })
-    
-    contentBlocks.push({
-      type: 'text',
-      text: `Com base nestas cotações, por favor:
-1. Extrai os pontos principais de cada uma (Prémio, Coberturas principais, Franquias, Exclusões).
-2. Compara as cotações destacando prós e contras de cada.
-3. Apresenta uma conclusão final indicando qual é a melhor opção para o cliente e porquê.
+    parts.push({
+      text: `Com base nestas ${files.length} cotacao(oes) de seguro, realiza uma analise comparativa detalhada:
 
-Apresenta a resposta num formato HTML bem estruturado usando as tags semânticas (<div class="mb-4">, <h3>, <p>, <ul class="list-disc pl-5">, <li>, <strong>) para fácil leitura.
-Não inclua \`\`\`html no output. Apenas o HTML cru.`
-    })
+1. Resumo de cada cotacao: Premio anual, coberturas principais, franquias e exclusoes relevantes.
+2. Comparacao lado a lado: Pontos fortes e fracos de cada opcao.
+3. Recomendacao final: Qual a melhor opcao para o cliente e porque razao.
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'Atuas como um consultor de seguros especializado (Adler & Rochefort). O cliente enviou documentos com cotações de seguros.'
-        },
-        {
-          role: 'user',
-          content: contentBlocks
-        }
-      ],
-      max_tokens: 3000,
-      temperature: 0.3
+Apresenta a resposta em HTML bem estruturado usando estas classes:
+- Titulos: <h3 class="text-lg font-semibold mt-4 mb-2">
+- Paragrafos: <p class="mb-2 text-gray-700">
+- Listas: <ul class="list-disc pl-5 mb-3 space-y-1"><li class="text-gray-700">
+- Destaque: <strong class="text-gray-900">
+- Seccoes: <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+- Recomendacao: <div class="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+
+NAO incluas marcadores de codigo como \`\`\`html. Apenas HTML puro.`,
     })
 
-    const report = response.choices[0]?.message?.content || ''
+    const result = await model.generateContent(parts)
+    const report = result.response.text().replace(/```html\n?|\n?```/g, '').trim()
 
-    return Response.json({ report: report.replace(/```html\n?|\n?```/g, '') })
+    return Response.json({ report })
   } catch (error: any) {
     console.error('Error analyzing quotes:', error)
     return Response.json(
-      { error: 'Erro ao analisar cotações', details: error.message },
+      { error: 'Erro ao analisar cotacoes', details: error.message },
       { status: 500 }
     )
   }
