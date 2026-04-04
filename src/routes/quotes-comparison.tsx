@@ -53,114 +53,270 @@ function QuotesComparisonPage() {
         body: formData,
       })
 
+      // Verificar Content-Type antes de tentar parse JSON
+      const contentType = res.headers.get('content-type') ?? ''
+      if (!contentType.includes('application/json')) {
+        const text = await res.text()
+        console.error('[compare-quotes] Resposta não-JSON:', text.substring(0, 200))
+        throw new Error('O servidor devolveu uma resposta inesperada. Tente novamente.')
+      }
+
       const data = await res.json()
 
       if (!res.ok) {
-        throw new Error(data.error || 'Erro na análise')
+        throw new Error(data.error || 'Erro na análise das cotações.')
+      }
+
+      if (!data.report) {
+        throw new Error('A análise não retornou resultados. Tente novamente.')
       }
 
       setResult(data.report)
     } catch (err: any) {
-      setError(err.message || 'Ocorreu um erro inesperado')
+      setError(err.message || 'Ocorreu um erro inesperado. Tente novamente.')
     } finally {
       setAnalyzing(false)
     }
+  }
+
+  const getFileIcon = (file: File) => {
+    if (file.type === 'application/pdf') return '📄'
+    if (file.type.startsWith('image/')) return '🖼️'
+    return '📝'
+  }
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-navy-700">Comparativo de Cotações (IA)</h1>
-          <p className="text-navy-500 mt-1">Carregue até 3 cotações para uma análise detalhada feita pela nossa inteligência artificial.</p>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1.5rem', color: '#111111' }}>
+            Comparativo de Cotações
+          </h1>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.9rem', color: '#666666', marginTop: '0.35rem' }}>
+            Carregue até 3 cotações (PDF ou imagem) para uma análise comparativa detalhada pela nossa IA.
+          </p>
         </div>
 
-        <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-8">
-          <div className="border-2 border-dashed border-navy-200 rounded-[4px] p-8 text-center hover:bg-navy-50/50 transition-colors">
-            <svg className="w-12 h-12 mx-auto text-navy-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p className="text-navy-600 mb-2">Arraste os ficheiros ou clique para selecionar</p>
-            <p className="text-xs text-navy-400 mb-4">Até 3 ficheiros (PDF, imagens, texto)</p>
+        {/* Upload Area */}
+        <div style={{ background: '#ffffff', border: '1.5px solid #eeeeee', borderRadius: '4px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+          <div
+            style={{
+              border: '2px dashed #dddddd',
+              borderRadius: '4px',
+              padding: '2rem',
+              textAlign: 'center',
+              cursor: 'pointer',
+              transition: 'border-color 0.2s',
+            }}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.borderColor = '#C8961A' }}
+            onDragLeave={(e) => { e.currentTarget.style.borderColor = '#dddddd' }}
+            onDrop={(e) => {
+              e.preventDefault()
+              e.currentTarget.style.borderColor = '#dddddd'
+              const dropped = Array.from(e.dataTransfer.files)
+              if (dropped.length + files.length > 3) {
+                setError('Pode enviar no máximo 3 cotações.')
+                return
+              }
+              setFiles([...files, ...dropped])
+              setError(null)
+            }}
+          >
+            <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>📋</div>
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.9rem', color: '#333333', marginBottom: '0.35rem' }}>
+              Arraste os ficheiros ou clique para selecionar
+            </p>
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.8rem', color: '#999999' }}>
+              Até 3 ficheiros · PDF, imagens (JPG, PNG) ou texto
+            </p>
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              className="hidden"
+              style={{ display: 'none' }}
               multiple
-              accept=".pdf,image/*,text/plain,text/html,application/json,.csv,.md"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.txt"
             />
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={files.length >= 3}
-              className="px-6 py-2 bg-navy-700 text-white font-medium rounded-[2px] hover:bg-navy-600 transition-colors text-sm disabled:opacity-50"
-            >
-              Selecionar Ficheiros
-            </button>
           </div>
 
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 text-red-700 text-sm rounded-[2px] border border-red-100">
-              {error}
-            </div>
-          )}
-
+          {/* File List */}
           {files.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-sm font-medium text-navy-700 mb-3">Ficheiros Selecionados ({files.length}/3)</h3>
-              <ul className="space-y-2">
-                {files.map((file, i) => (
-                  <li key={i} className="flex items-center justify-between p-3 bg-navy-50 rounded-[2px] border border-navy-100">
-                    <span className="text-sm text-navy-600 truncate">{file.name}</span>
-                    <button
-                      onClick={() => handleRemoveFile(i)}
-                      className="text-red-500 hover:text-red-700 p-1"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-6 flex justify-end">
-                <button
-                  onClick={handleAnalyze}
-                  disabled={analyzing}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 transition-colors"
+            <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {files.map((file, index) => (
+                <div
+                  key={index}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '0.65rem 0.85rem',
+                    background: '#f8f8f8',
+                    borderRadius: '4px',
+                    border: '1px solid #eeeeee',
+                  }}
                 >
-                  {analyzing ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-navy-700 border-t-transparent rounded-full animate-spin" />
-                      A Analisar...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                      Analisar Cotações
-                    </>
-                  )}
-                </button>
-              </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                    <span style={{ fontSize: '1.25rem' }}>{getFileIcon(file)}</span>
+                    <div>
+                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', color: '#333333', margin: 0 }}>
+                        {file.name}
+                      </p>
+                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', margin: 0 }}>
+                        {formatFileSize(file.size)}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleRemoveFile(index)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#999999',
+                      fontSize: '1.1rem',
+                      padding: '0.25rem',
+                      lineHeight: 1,
+                    }}
+                    title="Remover"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
             </div>
           )}
+
+          {/* Error */}
+          {error && (
+            <div style={{
+              marginTop: '1rem',
+              padding: '0.75rem 1rem',
+              background: '#fff5f5',
+              border: '1px solid #fecaca',
+              borderRadius: '4px',
+              fontFamily: "'Montserrat', sans-serif",
+              fontSize: '0.85rem',
+              color: '#dc2626',
+            }}>
+              ⚠️ {error}
+            </div>
+          )}
+
+          {/* Analyze Button */}
+          <div style={{ marginTop: '1.25rem', display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <button
+              onClick={handleAnalyze}
+              disabled={analyzing || files.length === 0}
+              style={{
+                fontFamily: "'Montserrat', sans-serif",
+                fontWeight: 600,
+                fontSize: '0.9rem',
+                padding: '0.75rem 1.75rem',
+                background: analyzing || files.length === 0 ? '#cccccc' : '#111111',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: analyzing || files.length === 0 ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                transition: 'background 0.2s',
+              }}
+            >
+              {analyzing ? (
+                <>
+                  <span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #ffffff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  A analisar...
+                </>
+              ) : (
+                <>✦ Analisar com IA</>
+              )}
+            </button>
+            {files.length > 0 && !analyzing && (
+              <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', color: '#999999' }}>
+                {files.length} ficheiro{files.length > 1 ? 's' : ''} seleccionado{files.length > 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
         </div>
 
-        {result && (
-          <div className="bg-white rounded-[4px] border border-navy-200 p-8 shadow-sm">
-            <h2 className="text-xl font-bold text-navy-700 mb-6 pb-4 border-b border-navy-100">
-              Conclusão da Análise (IA Adler & Rochefort)
-            </h2>
-            <div 
-              className="prose prose-navy max-w-none prose-headings:font-bold prose-h3:text-lg prose-p:text-navy-600 prose-li:text-navy-600"
-              dangerouslySetInnerHTML={{ __html: result }} 
+        {/* Loading State */}
+        {analyzing && (
+          <div style={{
+            background: '#ffffff',
+            border: '1.5px solid #eeeeee',
+            borderRadius: '4px',
+            padding: '2.5rem',
+            textAlign: 'center',
+          }}>
+            <div style={{
+              width: '40px',
+              height: '40px',
+              border: '3px solid #eeeeee',
+              borderTopColor: '#C8961A',
+              borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+              margin: '0 auto 1rem',
+            }} />
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.9rem', color: '#333333' }}>
+              A analisar as cotações...
+            </p>
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.8rem', color: '#999999', marginTop: '0.35rem' }}>
+              Este processo pode demorar 15–30 segundos dependendo do tamanho dos documentos.
+            </p>
+          </div>
+        )}
+
+        {/* Result */}
+        {result && !analyzing && (
+          <div style={{ background: '#ffffff', border: '1.5px solid #eeeeee', borderRadius: '4px', padding: '1.5rem' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '1.25rem',
+              paddingBottom: '1rem',
+              borderBottom: '1px solid #eeeeee',
+            }}>
+              <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#111111', margin: 0 }}>
+                ✦ Análise Comparativa
+              </h2>
+              <button
+                onClick={() => { setResult(null); setFiles([]) }}
+                style={{
+                  fontFamily: "'Montserrat', sans-serif",
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  padding: '0.4rem 0.85rem',
+                  background: 'none',
+                  color: '#666666',
+                  border: '1px solid #dddddd',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                }}
+              >
+                Nova análise
+              </button>
+            </div>
+            <div
+              className="prose prose-sm max-w-none"
+              style={{ fontFamily: "'Montserrat', sans-serif" }}
+              dangerouslySetInnerHTML={{ __html: result }}
             />
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
     </AppLayout>
   )
 }

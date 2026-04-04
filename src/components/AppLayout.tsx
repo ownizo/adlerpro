@@ -55,8 +55,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         style={{ borderRight: '1.5px solid #111111' }}
       >
         <div className="p-6" style={{ borderBottom: '1px solid #eeeeee' }}>
-          <Link to="/dashboard" className="flex items-center gap-3">
-            <img src="/logo.png" alt="Adler & Rochefort" className="h-9 w-auto" />
+          <Link to="/dashboard" className="flex items-center gap-2">
+            <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '52px', width: 'auto' }} />
             <div>
               <h1 style={{
                 fontFamily: "'Montserrat', sans-serif",
@@ -66,7 +66,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 textTransform: 'uppercase' as const,
                 color: '#111111',
               }}>
-                VAULT<span style={{ color: '#C8961A' }}>.</span>SUITE
+                Adler<span style={{ color: '#C8961A' }}>.</span>Pro
               </h1>
               <p style={{
                 fontFamily: "'Montserrat', sans-serif",

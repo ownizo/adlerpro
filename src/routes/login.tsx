@@ -203,7 +203,7 @@ function LoginPage() {
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Adler & Rochefort" className="h-16 w-auto mx-auto mb-4" />
+          <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '72px', width: 'auto', margin: '0 auto 1rem' }} />
           <h1 style={{
             fontFamily: "'Montserrat', sans-serif",
             fontWeight: 700,
@@ -212,7 +212,7 @@ function LoginPage() {
             textTransform: 'uppercase' as const,
             color: '#111111',
           }}>
-            VAULT<span style={{ color: '#C8961A' }}>.</span>SUITE
+            Adler<span style={{ color: '#C8961A' }}>.</span>Pro
           </h1>
           <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.85rem', color: '#999999', marginTop: '0.5rem' }}>
             Portal do Cliente Empresarial

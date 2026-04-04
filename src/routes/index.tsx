@@ -13,10 +13,10 @@ function LandingPage() {
       {/* Header / Nav */}
       <header className="flex items-center justify-between" style={{ padding: '1.25rem 2.5rem', borderBottom: '1.5px solid #111111' }}>
         <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="Adler & Rochefort" className="h-10 w-auto" />
+          <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '52px', width: 'auto' }} />
           <div>
             <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '1.1rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' as const, color: '#111111' }}>
-              VAULT<span style={{ color: '#C8961A' }}>.</span>SUITE
+              Adler<span style={{ color: '#C8961A' }}>.</span>Pro
             </h1>
           </div>
         </div>

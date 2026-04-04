@@ -8,29 +8,34 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Adler & Rochefort — VaultSuite' },
+      { title: 'Adler Pro' },
       { name: 'description', content: 'Portal seguro para clientes de corretagem de seguros empresariais' },
+      { name: 'theme-color', content: '#111111' },
     ],
-      links: [
-        {
-          rel: 'preconnect',
-          href: 'https://fonts.googleapis.com',
-        },
-        {
-          rel: 'preconnect',
-          href: 'https://fonts.gstatic.com',
-          crossOrigin: 'anonymous',
-        },
-        {
-          rel: 'preload',
-          href: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap',
-          as: 'style',
-        },
-        {
-          rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap',
-        },
-      ],
+    links: [
+      { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+      { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon.png' },
+      { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/favicon-192.png' },
+      { rel: 'apple-touch-icon', sizes: '512x512', href: '/favicon-512.png' },
+      {
+        rel: 'preconnect',
+        href: 'https://fonts.googleapis.com',
+      },
+      {
+        rel: 'preconnect',
+        href: 'https://fonts.gstatic.com',
+        crossOrigin: 'anonymous',
+      },
+      {
+        rel: 'preload',
+        href: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap',
+        as: 'style',
+      },
+      {
+        rel: 'stylesheet',
+        href: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap',
+      },
+    ],
   }),
   component: RootComponent,
   shellComponent: RootDocument,
