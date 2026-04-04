@@ -187,6 +187,10 @@ function buildEmailHTML(companyName: string, policies: any[]): string {
 </html>`
 }
 
+export const config = {
+  path: '/api/send-renewal-alerts',
+}
+
 export default async function handler(req: Request, context: Context) {
   // Verificar autorização — aceita pedidos do Netlify Scheduled Functions ou com token admin
   const authHeader = req.headers.get('authorization')

@@ -436,46 +436,120 @@ function AdminPage() {
 
             {tab === 'api' && (
               <div>
-                <h2 className="text-lg font-semibold text-navy-700 mb-4">Estado das Ligações API</h2>
+                <h2 className="text-lg font-semibold text-navy-700 mb-2">API & Ligações</h2>
+                <p className="text-sm text-navy-500 mb-6">Serviços externos integrados na plataforma Adler Pro. Todas as chaves são configuradas como variáveis de ambiente no Netlify.</p>
                 <div className="grid gap-4">
-                  {apiConnections.map((api) => (
-                    <div key={api.id} className="bg-white rounded-[4px] border border-navy-200 p-5">
-                      <div className="flex flex-wrap items-center justify-between gap-4">
+
+                  {/* Anthropic Claude */}
+                  <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div style={{width:36,height:36,borderRadius:4,background:'#111',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          <span style={{color:'#C8961A',fontWeight:700,fontSize:13}}>AI</span>
+                        </div>
                         <div>
-                          <h3 className="font-bold text-navy-700">{api.service}</h3>
-                          <p className="text-xs text-navy-500">Endpoint: {api.endpoint}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={api.status}
-                            onChange={async (e) => {
-                              await adminUpdateApiConnection({ data: { id: api.id, updates: { status: e.target.value } } })
-                              await reload()
-                            }}
-                            className="px-2 py-1 text-xs border border-navy-200 rounded"
-                          >
-                            <option value="connected">Ligado</option>
-                            <option value="degraded">Degradado</option>
-                            <option value="error">Erro</option>
-                          </select>
-                          <button
-                            onClick={async () => {
-                              await adminRefreshApiConnection({ data: { id: api.id } })
-                              await reload()
-                            }}
-                            className="px-3 py-1.5 text-xs bg-gold-400 text-navy-700 rounded hover:bg-gold-300"
-                          >
-                            Atualizar Dados
-                          </button>
+                          <h3 className="font-bold text-navy-700">Anthropic Claude</h3>
+                          <p className="text-xs text-navy-500">Modelo: claude-3-5-haiku-20241022 · api.anthropic.com/v1</p>
                         </div>
                       </div>
-                      <div className="mt-3 text-sm text-navy-600 grid sm:grid-cols-3 gap-2">
-                        <p><strong>Estado:</strong> {api.status}</p>
-                        <p><strong>Latência:</strong> {api.latency}</p>
-                        <p><strong>Última Sincronização:</strong> {formatDate(api.lastSync)}</p>
-                      </div>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
+                      </span>
                     </div>
-                  ))}
+                    <div className="mt-3 text-xs text-navy-500 bg-navy-50 rounded p-3">
+                      <strong>Utilização:</strong> Extracção de dados de apólices por IA, comparativo de cotações, análise de risco de parceiros.<br/>
+                      <strong>Variável Netlify:</strong> <code className="bg-navy-100 px-1 rounded">ANTHROPIC_API_KEY</code>
+                    </div>
+                  </div>
+
+                  {/* IPMA */}
+                  <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div style={{width:36,height:36,borderRadius:4,background:'#2563eb',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          <span style={{color:'#fff',fontWeight:700,fontSize:13}}>☁</span>
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-navy-700">IPMA — Instituto Português do Mar e da Atmosfera</h3>
+                          <p className="text-xs text-navy-500">API pública gratuita · api.ipma.pt/open-data</p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
+                      </span>
+                    </div>
+                    <div className="mt-3 text-xs text-navy-500 bg-navy-50 rounded p-3">
+                      <strong>Utilização:</strong> Previsão meteorológica por localidade (36 cidades), avaliação de risco climático, certificados meteorológicos para sinistros.<br/>
+                      <strong>Variável Netlify:</strong> Nenhuma (API pública sem chave)
+                    </div>
+                  </div>
+
+                  {/* BizAPIs */}
+                  <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div style={{width:36,height:36,borderRadius:4,background:'#C8961A',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          <span style={{color:'#fff',fontWeight:700,fontSize:13}}>BZ</span>
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-navy-700">BizAPIs — Dados Empresariais AT & Registo Comercial</h3>
+                          <p className="text-xs text-navy-500">nifName (AT) + CPRC (Registo Comercial) + Matrículas · apigwws.bizapis.com</p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
+                      </span>
+                    </div>
+                    <div className="mt-3 text-xs text-navy-500 bg-navy-50 rounded p-3">
+                      <strong>Utilização:</strong> Risco de Parceiros (validação NIF, sócios, capital, CAE, penhoras) e consulta de Matrículas (marca, modelo, ano, combustível).<br/>
+                      <strong>Variável Netlify:</strong> <code className="bg-navy-100 px-1 rounded">BIZAPIS_KEY</code>
+                    </div>
+                  </div>
+
+                  {/* Resend */}
+                  <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div style={{width:36,height:36,borderRadius:4,background:'#111',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          <span style={{color:'#fff',fontWeight:700,fontSize:13}}>✉</span>
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-navy-700">Resend — Email Transaccional</h3>
+                          <p className="text-xs text-navy-500">Remetente: noreply@adlerrochefort.com · api.resend.com/v1</p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
+                      </span>
+                    </div>
+                    <div className="mt-3 text-xs text-navy-500 bg-navy-50 rounded p-3">
+                      <strong>Utilização:</strong> Alertas automáticos de renovação de apólices por email. Disparado a partir do painel Admin → Alertas.<br/>
+                      <strong>Variável Netlify:</strong> <code className="bg-navy-100 px-1 rounded">RESEND_API_KEY</code>
+                    </div>
+                  </div>
+
+                  {/* Supabase */}
+                  <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div style={{width:36,height:36,borderRadius:4,background:'#059669',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                          <span style={{color:'#fff',fontWeight:700,fontSize:13}}>SB</span>
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-navy-700">Supabase — Base de Dados & Autenticação</h3>
+                          <p className="text-xs text-navy-500">PostgreSQL + Auth + Storage · VITE_SUPABASE_URL</p>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
+                      </span>
+                    </div>
+                    <div className="mt-3 text-xs text-navy-500 bg-navy-50 rounded p-3">
+                      <strong>Utilização:</strong> Toda a persistência de dados — empresas, utilizadores, apólices, sinistros, documentos, alertas.<br/>
+                      <strong>Variáveis Netlify:</strong> <code className="bg-navy-100 px-1 rounded">VITE_SUPABASE_URL</code> · <code className="bg-navy-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> · <code className="bg-navy-100 px-1 rounded">SUPABASE_SERVICE_ROLE_KEY</code>
+                    </div>
+                  </div>
+
                 </div>
               </div>
             )}
