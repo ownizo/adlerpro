@@ -56,7 +56,8 @@ function LoginPage() {
   }
 
   if (user && !isPasswordSetupMode) {
-    return <Navigate to="/dashboard" />
+    const isAdmin = user.roles?.includes('admin')
+    return <Navigate to={isAdmin ? '/admin' : '/dashboard'} />
   }
 
   const resetLocalAuthForm = () => {
@@ -81,9 +82,12 @@ function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      navigate({ to: '/dashboard' })
+      // Redirecionar com base no role (app_metadata.roles)
+      const roles: string[] = (data.user?.app_metadata?.roles as string[]) ?? []
+      const isAdmin = roles.includes('admin')
+      navigate({ to: isAdmin ? '/admin' : '/dashboard' })
     } catch (err: any) {
       setError(formatLoginError(err))
     } finally {

@@ -24,14 +24,17 @@ function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([fetchDashboardStats(), fetchAlerts(), fetchPolicies()]).then(
-      ([s, a, p]) => {
+    Promise.all([fetchDashboardStats(), fetchAlerts(), fetchPolicies()])
+      .then(([s, a, p]) => {
         setStats(s)
         setAlerts(a)
         setPolicies(p)
         setLoading(false)
-      }
-    )
+      })
+      .catch((err) => {
+        console.error('Erro ao carregar dashboard:', err)
+        setLoading(false)
+      })
   }, [])
 
   return (
