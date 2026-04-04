@@ -11,32 +11,46 @@ function extractAccessToken(): string | null {
     }
 
     const cookies = getCookies()
-    for (const [name, value] of Object.entries(cookies)) {
-      if (name.match(/^sb-[^-]+-auth-token$/) && value) {
-        try {
-          const decoded = decodeURIComponent(value)
-          const parsed = JSON.parse(decoded)
-          if (typeof parsed === 'string') return parsed
-          if (Array.isArray(parsed) && parsed[0]) return parsed[0]
+
+    // Helper to parse a cookie value from @supabase/ssr
+    // @supabase/ssr stores cookies with "base64-" prefix followed by base64-encoded JSON
+    function parseCookieValue(value: string): string | null {
+      try {
+        const decoded = decodeURIComponent(value)
+        // @supabase/ssr stores cookies as "base64-<base64encodedJSON>"
+        if (decoded.startsWith('base64-')) {
+          const b64 = decoded.slice(7)
+          const json = atob(b64)
+          const parsed = JSON.parse(json)
           if (parsed?.access_token) return parsed.access_token
-        } catch {
-          return value
+          return null
         }
+        // Legacy format: plain JSON
+        const parsed = JSON.parse(decoded)
+        if (typeof parsed === 'string') return parsed
+        if (Array.isArray(parsed) && parsed[0]) return parsed[0]
+        if (parsed?.access_token) return parsed.access_token
+        return null
+      } catch {
+        return value
       }
     }
 
+    for (const [name, value] of Object.entries(cookies)) {
+      if (name.match(/^sb-[^-]+-auth-token$/) && value) {
+        const token = parseCookieValue(value)
+        if (token) return token
+      }
+    }
+
+    // Handle chunked cookies (sb-xxx-auth-token.0, .1, etc.)
     const chunkNames = Object.keys(cookies)
       .filter((name) => name.match(/^sb-[^-]+-auth-token\.\d+$/))
       .sort()
     if (chunkNames.length > 0) {
       const full = chunkNames.map((n) => cookies[n]).join('')
-      try {
-        const decoded = decodeURIComponent(full)
-        const parsed = JSON.parse(atob(decoded))
-        if (parsed?.access_token) return parsed.access_token
-      } catch {
-        // Not base64
-      }
+      const token = parseCookieValue(full)
+      if (token) return token
     }
 
     return null
