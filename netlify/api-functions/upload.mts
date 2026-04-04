@@ -1,70 +1,89 @@
 import type { Config } from '@netlify/functions'
-import { getStore } from '@netlify/blobs'
-import { getUser } from '@netlify/identity'
+import { createClient } from '@supabase/supabase-js'
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || ''
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+
+function getSupabaseAdmin() {
+  return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
+
+function extractToken(req: Request): string | null {
+  const auth = req.headers.get('authorization')
+  if (auth?.startsWith('Bearer ')) return auth.slice(7)
+  const cookie = req.headers.get('cookie') || ''
+  const match = cookie.match(/sb-[^=]+-auth-token=([^;]+)/)
+  if (!match) return null
+  try {
+    const raw = decodeURIComponent(match[1])
+    const value = raw.startsWith('base64-')
+      ? Buffer.from(raw.slice(7), 'base64').toString('utf-8')
+      : raw
+    const parsed = JSON.parse(value)
+    return parsed.access_token || null
+  } catch {
+    return null
+  }
+}
 
 export default async (req: Request) => {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405,
-      headers: { 'Content-Type': 'application/json' },
-    })
+    return Response.json({ error: 'Method not allowed' }, { status: 405 })
   }
 
   try {
-    const identityUser = await getUser()
+    const token = extractToken(req)
+    if (!token) {
+      return Response.json({ error: 'Nao autenticado' }, { status: 401 })
+    }
+
+    const supabase = getSupabaseAdmin()
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) {
+      return Response.json({ error: 'Token invalido' }, { status: 401 })
+    }
+
     const formData = await req.formData()
     const file = formData.get('file') as File | null
-    const usersStore = getStore({ name: 'portal-data', consistency: 'strong' })
-    const companyUsers = (await usersStore.get('company-users', { type: 'json' })) as Array<{ id: string; email: string; companyId: string }> | null
-    const companyUser = companyUsers?.find((u) => u.email.toLowerCase() === identityUser?.email?.toLowerCase())
-
-    const companyId = (formData.get('companyId') as string) || companyUser?.companyId || 'comp_001'
-    const category = formData.get('category') as string || 'other'
+    const uploadType = (formData.get('type') as string) || 'document'
 
     if (!file) {
-      return Response.json({ error: 'Ficheiro não fornecido' }, { status: 400 })
+      return Response.json({ error: 'Ficheiro nao fornecido' }, { status: 400 })
     }
 
-    const fileStore = getStore('portal-files')
-    const blobKey = `documents/${companyId}/doc_${Date.now()}_${file.name}`
+    const bucket = uploadType === 'avatar' ? 'avatars' : 'documents'
+    const ext = file.name.split('.').pop() || 'bin'
+    const path = uploadType === 'avatar'
+      ? `${user.id}/avatar.${ext}`
+      : `${user.user_metadata?.company_id || 'general'}/${Date.now()}_${file.name}`
 
     const buffer = await file.arrayBuffer()
-    await fileStore.set(blobKey, buffer)
-
-    // Add document metadata
-    const dataStore = usersStore
-    const documents = (await dataStore.get('documents', { type: 'json' })) as any[] || []
-    const now = new Date().toISOString()
-    const newDoc = {
-      id: `doc_${Date.now()}`,
-      companyId,
-      name: file.name,
-      category,
-      size: file.size,
-      uploadedBy: identityUser?.email || 'Utilizador',
-      uploadedAt: now,
-      blobKey,
-    }
-    documents.push(newDoc)
-    await dataStore.setJSON('documents', documents)
-
-    if (companyUser) {
-      const events = (await dataStore.get('user-metric-events', { type: 'json' })) as any[] || []
-      events.push({
-        id: `evt_${Date.now()}_${Math.random().toString(16).slice(2, 7)}`,
-        companyId,
-        userId: companyUser.id,
-        timestamp: now,
-        type: 'document_upload',
-        description: `Upload do documento ${file.name}`,
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(path, buffer, {
+        contentType: file.type || 'application/octet-stream',
+        upsert: uploadType === 'avatar',
       })
-      await dataStore.setJSON('user-metric-events', events)
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError)
+      return Response.json({ error: 'Erro ao guardar ficheiro: ' + uploadError.message }, { status: 500 })
     }
 
-    return Response.json({ document: newDoc })
+    const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(uploadData.path)
+
+    return Response.json({
+      url: publicUrl,
+      path: uploadData.path,
+      name: file.name,
+      size: file.size,
+      type: file.type,
+    })
   } catch (error: any) {
     console.error('Upload error:', error)
-    return Response.json({ error: 'Erro ao carregar ficheiro' }, { status: 500 })
+    return Response.json({ error: 'Erro ao carregar ficheiro', details: error.message }, { status: 500 })
   }
 }
 
