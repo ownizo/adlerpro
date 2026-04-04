@@ -10,8 +10,3 @@
   command = "npm run dev"
   targetPort = 3000
   port = 8888
-
-[functions]
-  directory = "netlify/functions"
-
-# Admin role checks are handled in the app via Supabase auth
