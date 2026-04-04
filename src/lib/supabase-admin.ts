@@ -1,15 +1,15 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-// No TanStack Start (Vite SSR), as variáveis VITE_ estão disponíveis via import.meta.env
-// As variáveis sem prefixo VITE_ (server-only) estão disponíveis via process.env
-const supabaseUrl =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL as string) ||
-  process.env.VITE_SUPABASE_URL ||
-  ''
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? ''
+// Lazy initialization — garante que process.env está disponível quando o cliente é criado,
+// evitando o problema de singleton criado antes das variáveis de ambiente estarem disponíveis.
+let _supabaseAdmin: SupabaseClient | null = null
 
-function createSafeAdminClient(): SupabaseClient {
-  if (!supabaseUrl || !supabaseServiceRoleKey) {
+function createAdminClient(): SupabaseClient {
+  // Usar process.env directamente (sem import.meta.env que é substituído por {} no SSR bundle)
+  const url = process.env['VITE_SUPABASE_URL'] ?? ''
+  const key = process.env['SUPABASE_SERVICE_ROLE_KEY'] ?? ''
+
+  if (!url || !key) {
     return createClient('https://placeholder.supabase.co', 'placeholder', {
       auth: {
         autoRefreshToken: false,
@@ -17,7 +17,8 @@ function createSafeAdminClient(): SupabaseClient {
       },
     })
   }
-  return createClient(supabaseUrl, supabaseServiceRoleKey, {
+
+  return createClient(url, key, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
@@ -25,4 +26,12 @@ function createSafeAdminClient(): SupabaseClient {
   })
 }
 
-export const supabaseAdmin = createSafeAdminClient()
+// Proxy lazy para garantir que as env vars estão disponíveis no momento da primeira chamada
+export const supabaseAdmin: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    if (!_supabaseAdmin) {
+      _supabaseAdmin = createAdminClient()
+    }
+    return (_supabaseAdmin as any)[prop]
+  },
+})
