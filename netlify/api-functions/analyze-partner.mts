@@ -53,12 +53,14 @@ ${JSON.stringify(bizapisData, null, 2)}
 Por favor, escreve um relatório de análise de risco em formato HTML (usa apenas tags semânticas como <h3>, <p>, <ul>, <li>, <strong>) analisando a exposição ao risco desta empresa, destacando as dívidas e o risco de crédito. O relatório deve mencionar o nome da empresa.`
 
     const message = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5',
+      model: 'claude-opus-4-5',
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const report = message.content[0].type === 'text' ? message.content[0].text : ''
+    let report = message.content[0].type === 'text' ? message.content[0].text : ''
+    // Remover marcadores de código markdown se presentes (```html ... ``` ou ``` ... ```)
+    report = report.replace(/^```(?:html)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
 
     return Response.json({ report })
   } catch (error: any) {
