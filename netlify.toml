@@ -11,6 +11,9 @@
   directory = "netlify/api-functions"
   node_bundler = "esbuild"
 
+[functions."compare-quotes"]
+  timeout = 120
+
 [dev]
   command = "npm run dev"
   targetPort = 3000

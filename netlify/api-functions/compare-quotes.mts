@@ -1,6 +1,65 @@
 import type { Config } from '@netlify/functions'
 import Anthropic from '@anthropic-ai/sdk'
 
+/**
+ * Extrai texto de um PDF sem dependências externas.
+ * Lê os content streams BT/ET do PDF (funciona para PDFs gerados electronicamente).
+ * PDFs digitalizados/scanned não têm texto extraível — nesses casos retorna string vazia.
+ */
+function extractPdfText(buffer: Buffer): string {
+  const str = buffer.toString('latin1')
+  const parts: string[] = []
+
+  // Extrair blocos de texto entre BT (Begin Text) e ET (End Text)
+  const btEtRegex = /BT([\s\S]*?)ET/g
+  let block: RegExpExecArray | null
+
+  while ((block = btEtRegex.exec(str)) !== null) {
+    const content = block[1]
+
+    // Operador Tj: (texto) Tj
+    const tjRegex = /\(((?:[^()\\]|\\[\s\S])*)\)\s*Tj/g
+    let m: RegExpExecArray | null
+    while ((m = tjRegex.exec(content)) !== null) {
+      parts.push(decodePdfString(m[1]))
+    }
+
+    // Operador TJ: [(texto) -kern (texto)] TJ
+    const tjArrRegex = /\[([\s\S]*?)\]\s*TJ/g
+    while ((m = tjArrRegex.exec(content)) !== null) {
+      const arr = m[1]
+      const itemRegex = /\(((?:[^()\\]|\\[\s\S])*)\)/g
+      let item: RegExpExecArray | null
+      while ((item = itemRegex.exec(arr)) !== null) {
+        parts.push(decodePdfString(item[1]))
+      }
+    }
+
+    // Operador ' (newline + texto): (texto) '
+    const quoteRegex = /\(((?:[^()\\]|\\[\s\S])*)\)\s*'/g
+    while ((m = quoteRegex.exec(content)) !== null) {
+      parts.push('\n' + decodePdfString(m[1]))
+    }
+  }
+
+  return parts
+    .join(' ')
+    .replace(/\\n/g, '\n')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .substring(0, 25000)
+}
+
+function decodePdfString(s: string): string {
+  return s
+    .replace(/\\n/g, '\n')
+    .replace(/\\r/g, '')
+    .replace(/\\t/g, ' ')
+    .replace(/\\\(/g, '(')
+    .replace(/\\\)/g, ')')
+    .replace(/\\\\/g, '\\')
+}
+
 export default async (req: Request) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -28,7 +87,6 @@ export default async (req: Request) => {
 
     const client = new Anthropic({ apiKey })
 
-    // Build content parts for Claude
     const messageParts: Anthropic.MessageParam['content'] = []
     const fileLabels: string[] = []
 
@@ -39,7 +97,7 @@ export default async (req: Request) => {
 
       const arrayBuffer = await file.arrayBuffer()
       const bytes = new Uint8Array(arrayBuffer)
-      const base64 = Buffer.from(arrayBuffer).toString('base64')
+      const buffer = Buffer.from(arrayBuffer)
 
       messageParts.push({ type: 'text', text: `\n--- ${label} ---\n` })
 
@@ -48,13 +106,22 @@ export default async (req: Request) => {
       const isImage = file.type.startsWith('image/')
 
       if (isPdf && bytes.length > 100) {
-        messageParts.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any)
+        // Extrair texto do PDF em vez de enviar o binário base64
+        const extracted = extractPdfText(buffer)
+        if (extracted.length > 50) {
+          messageParts.push({ type: 'text', text: extracted })
+        } else {
+          // PDF sem texto extraível (scanned) — enviar como document base64 como fallback
+          const base64 = buffer.toString('base64')
+          messageParts.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } } as any)
+        }
       } else if (isImage && bytes.length > 100) {
         const mimeType = (file.type || 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
-        messageParts.push({ type: 'image', source: { type: 'base64', media_type: mimeType, data: base64 } })
+        messageParts.push({ type: 'image', source: { type: 'base64', media_type: mimeType, data: buffer.toString('base64') } })
       } else {
-        const text = Buffer.from(arrayBuffer).toString('utf-8')
-        const cleanText = text.replace(/[^\x20-\x7E\u00A0-\uFFFF\n\r\t]/g, ' ').substring(0, 30000)
+        const cleanText = buffer.toString('utf-8')
+          .replace(/[^\x20-\x7E\u00A0-\uFFFF\n\r\t]/g, ' ')
+          .substring(0, 25000)
         messageParts.push({ type: 'text', text: cleanText.trim().length > 0 ? cleanText : '[Ficheiro sem conteúdo legível]' })
       }
     }
@@ -100,4 +167,5 @@ export default async (req: Request) => {
 
 export const config: Config = {
   path: '/api/compare-quotes',
+  timeout: 120,
 }
