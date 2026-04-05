@@ -23,6 +23,8 @@ function LoginPage() {
   const [recoveryLoading, setRecoveryLoading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [signupSuccess, setSignupSuccess] = useState(false)
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [termsExpanded, setTermsExpanded] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -98,6 +100,10 @@ function LoginPage() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (!termsAccepted) {
+      setError('Deve aceitar os Termos e Condições para criar conta.')
+      return
+    }
     setLoading(true)
     try {
       const { error } = await supabase.auth.signUp({
@@ -339,26 +345,94 @@ function LoginPage() {
                 </div>
               )}
 
+              {mode === 'signup' && (
+                <div style={{ marginTop: '0.5rem' }}>
+                  <div className="flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="terms-checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      style={{ marginTop: '3px', accentColor: '#C8961A', cursor: 'pointer', minWidth: '16px' }}
+                    />
+                    <label htmlFor="terms-checkbox" style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#666666', cursor: 'pointer', lineHeight: '1.4' }}>
+                      Li e aceito os{' '}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); setTermsExpanded(!termsExpanded) }}
+                        style={{ fontWeight: 600, color: '#C8961A', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', textDecoration: 'underline' }}
+                      >
+                        Termos e Condi\u00e7\u00f5es
+                      </button>
+                      {' '}e a{' '}
+                      <Link
+                        to="/privacy-policy"
+                        target="_blank"
+                        style={{ fontWeight: 600, color: '#C8961A', textDecoration: 'underline', fontSize: '0.75rem' }}
+                      >
+                        Pol\u00edtica de Privacidade
+                      </Link>
+                    </label>
+                  </div>
+
+                  {termsExpanded && (
+                    <div style={{
+                      marginTop: '0.75rem',
+                      padding: '1rem',
+                      background: '#f9f9f9',
+                      border: '1px solid #eeeeee',
+                      borderRadius: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto' as const,
+                      fontSize: '0.7rem',
+                      fontFamily: "'Montserrat', sans-serif",
+                      color: '#555555',
+                      lineHeight: '1.6',
+                    }}>
+                      <p style={{ fontWeight: 700, marginBottom: '0.5rem', color: '#111111', fontSize: '0.75rem' }}>Termos e Condi\u00e7\u00f5es de Utiliza\u00e7\u00e3o \u2014 Adler Pro</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>1. Objecto.</strong> O Adler Pro \u00e9 uma plataforma digital de gest\u00e3o de seguros empresariais operada pela Adler & Rochefort, Lda., mediador de seguros registado na ASF. A utiliza\u00e7\u00e3o da plataforma est\u00e1 sujeita \u00e0 aceita\u00e7\u00e3o integral destes termos.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>2. Registo e Acesso.</strong> O utilizador compromete-se a fornecer informa\u00e7\u00f5es verdadeiras e actualizadas. As credenciais de acesso s\u00e3o pessoais e intransmiss\u00edveis. O utilizador \u00e9 respons\u00e1vel por toda a actividade realizada com as suas credenciais.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>3. Servi\u00e7os Disponibilizados.</strong> A plataforma disponibiliza funcionalidades de gest\u00e3o de ap\u00f3lices, an\u00e1lise comparativa por IA, gest\u00e3o de sinistros, alertas de renova\u00e7\u00e3o e an\u00e1lise de risco. Os resultados gerados por IA t\u00eam car\u00e1cter informativo e n\u00e3o substituem aconselhamento profissional.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>4. Protec\u00e7\u00e3o de Dados.</strong> Os dados pessoais s\u00e3o tratados em conformidade com o RGPD (Regulamento UE 2016/679). Os dados s\u00e3o armazenados em servidores seguros e utilizados exclusivamente para a presta\u00e7\u00e3o dos servi\u00e7os contratados. O utilizador pode exercer os seus direitos de acesso, rectifica\u00e7\u00e3o e elimina\u00e7\u00e3o contactando insurance@adlerrochefort.com.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>5. Propriedade Intelectual.</strong> Todo o conte\u00fado, design, c\u00f3digo e funcionalidades da plataforma s\u00e3o propriedade exclusiva da Adler & Rochefort, Lda. \u00c9 proibida a reprodu\u00e7\u00e3o, distribui\u00e7\u00e3o ou utiliza\u00e7\u00e3o n\u00e3o autorizada.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>6. Limita\u00e7\u00e3o de Responsabilidade.</strong> A Adler & Rochefort n\u00e3o se responsabiliza por decis\u00f5es tomadas com base nas an\u00e1lises geradas pela plataforma. A informa\u00e7\u00e3o apresentada n\u00e3o constitui aconselhamento jur\u00eddico, financeiro ou de seguros.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>7. Disponibilidade.</strong> A plataforma \u00e9 disponibilizada \u201cas is\u201d. A Adler & Rochefort reserva-se o direito de suspender ou descontinuar funcionalidades mediante aviso pr\u00e9vio de 30 dias.</p>
+                      <p style={{ marginBottom: '0' }}><strong>8. Lei Aplic\u00e1vel.</strong> Estes termos s\u00e3o regidos pela lei portuguesa. Para resolu\u00e7\u00e3o de lit\u00edgios \u00e9 competente o foro da comarca de Lisboa.</p>
+                    </div>
+                  )}
+
+                  {termsExpanded && (
+                    <button
+                      type="button"
+                      onClick={() => setTermsExpanded(false)}
+                      style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.7rem', color: '#999999', background: 'none', border: 'none', cursor: 'pointer', marginTop: '0.25rem' }}
+                    >
+                      Fechar termos
+                    </button>
+                  )}
+                </div>
+              )}
+
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || (mode === 'signup' && !termsAccepted)}
                 className="w-full disabled:opacity-50"
                 style={{
                   fontFamily: "'Montserrat', sans-serif",
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   padding: '0.7rem 1.75rem',
-                  background: '#111111',
+                  background: (mode === 'signup' && !termsAccepted) ? '#cccccc' : '#111111',
                   color: '#ffffff',
                   borderRadius: '2px',
                   border: 'none',
-                  cursor: 'pointer',
+                  cursor: (mode === 'signup' && !termsAccepted) ? 'not-allowed' : 'pointer',
                 }}
               >
                 {loading
                   ? 'A processar...'
                   : mode === 'login'
-                    ? 'Iniciar Sessão'
+                    ? 'Iniciar Sess\u00e3o'
                     : 'Criar Conta'}
               </button>
             </form>
