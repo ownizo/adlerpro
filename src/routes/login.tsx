@@ -362,7 +362,7 @@ function LoginPage() {
                         onClick={(e) => { e.preventDefault(); setTermsExpanded(!termsExpanded) }}
                         style={{ fontWeight: 600, color: '#C8961A', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', textDecoration: 'underline' }}
                       >
-                        Termos e Condi\u00e7\u00f5es
+                        Termos e Condições
                       </button>
                       {' '}e a{' '}
                       <Link
@@ -370,7 +370,7 @@ function LoginPage() {
                         target="_blank"
                         style={{ fontWeight: 600, color: '#C8961A', textDecoration: 'underline', fontSize: '0.75rem' }}
                       >
-                        Pol\u00edtica de Privacidade
+                        Política de Privacidade
                       </Link>
                     </label>
                   </div>
@@ -389,15 +389,15 @@ function LoginPage() {
                       color: '#555555',
                       lineHeight: '1.6',
                     }}>
-                      <p style={{ fontWeight: 700, marginBottom: '0.5rem', color: '#111111', fontSize: '0.75rem' }}>Termos e Condi\u00e7\u00f5es de Utiliza\u00e7\u00e3o \u2014 Adler Pro</p>
-                      <p style={{ marginBottom: '0.5rem' }}><strong>1. Objecto.</strong> O Adler Pro \u00e9 uma plataforma digital de gest\u00e3o de seguros empresariais operada pela Adler & Rochefort, Lda., mediador de seguros registado na ASF. A utiliza\u00e7\u00e3o da plataforma est\u00e1 sujeita \u00e0 aceita\u00e7\u00e3o integral destes termos.</p>
-                      <p style={{ marginBottom: '0.5rem' }}><strong>2. Registo e Acesso.</strong> O utilizador compromete-se a fornecer informa\u00e7\u00f5es verdadeiras e actualizadas. As credenciais de acesso s\u00e3o pessoais e intransmiss\u00edveis. O utilizador \u00e9 respons\u00e1vel por toda a actividade realizada com as suas credenciais.</p>
-                      <p style={{ marginBottom: '0.5rem' }}><strong>3. Servi\u00e7os Disponibilizados.</strong> A plataforma disponibiliza funcionalidades de gest\u00e3o de ap\u00f3lices, an\u00e1lise comparativa por IA, gest\u00e3o de sinistros, alertas de renova\u00e7\u00e3o e an\u00e1lise de risco. Os resultados gerados por IA t\u00eam car\u00e1cter informativo e n\u00e3o substituem aconselhamento profissional.</p>
-                      <p style={{ marginBottom: '0.5rem' }}><strong>4. Protec\u00e7\u00e3o de Dados.</strong> Os dados pessoais s\u00e3o tratados em conformidade com o RGPD (Regulamento UE 2016/679). Os dados s\u00e3o armazenados em servidores seguros e utilizados exclusivamente para a presta\u00e7\u00e3o dos servi\u00e7os contratados. O utilizador pode exercer os seus direitos de acesso, rectifica\u00e7\u00e3o e elimina\u00e7\u00e3o contactando insurance@adlerrochefort.com.</p>
-                      <p style={{ marginBottom: '0.5rem' }}><strong>5. Propriedade Intelectual.</strong> Todo o conte\u00fado, design, c\u00f3digo e funcionalidades da plataforma s\u00e3o propriedade exclusiva da Adler & Rochefort, Lda. \u00c9 proibida a reprodu\u00e7\u00e3o, distribui\u00e7\u00e3o ou utiliza\u00e7\u00e3o n\u00e3o autorizada.</p>
-                      <p style={{ marginBottom: '0.5rem' }}><strong>6. Limita\u00e7\u00e3o de Responsabilidade.</strong> A Adler & Rochefort n\u00e3o se responsabiliza por decis\u00f5es tomadas com base nas an\u00e1lises geradas pela plataforma. A informa\u00e7\u00e3o apresentada n\u00e3o constitui aconselhamento jur\u00eddico, financeiro ou de seguros.</p>
-                      <p style={{ marginBottom: '0.5rem' }}><strong>7. Disponibilidade.</strong> A plataforma \u00e9 disponibilizada \u201cas is\u201d. A Adler & Rochefort reserva-se o direito de suspender ou descontinuar funcionalidades mediante aviso pr\u00e9vio de 30 dias.</p>
-                      <p style={{ marginBottom: '0' }}><strong>8. Lei Aplic\u00e1vel.</strong> Estes termos s\u00e3o regidos pela lei portuguesa. Para resolu\u00e7\u00e3o de lit\u00edgios \u00e9 competente o foro da comarca de Lisboa.</p>
+                      <p style={{ fontWeight: 700, marginBottom: '0.5rem', color: '#111111', fontSize: '0.75rem' }}>Termos e Condições de Utilização — Adler Pro</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>1. Objecto.</strong> O Adler Pro é uma plataforma digital de gestão de seguros empresariais operada pela Adler & Rochefort, Lda., mediador de seguros registado na ASF. A utilização da plataforma está sujeita à aceitação integral destes termos.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>2. Registo e Acesso.</strong> O utilizador compromete-se a fornecer informações verdadeiras e actualizadas. As credenciais de acesso são pessoais e intransmissíveis. O utilizador é responsável por toda a actividade realizada com as suas credenciais.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>3. Serviços Disponibilizados.</strong> A plataforma disponibiliza funcionalidades de gestão de apólices, análise comparativa por IA, gestão de sinistros, alertas de renovação e análise de risco. Os resultados gerados por IA têm carácter informativo e não substituem aconselhamento profissional.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>4. Protecção de Dados.</strong> Os dados pessoais são tratados em conformidade com o RGPD (Regulamento UE 2016/679). Os dados são armazenados em servidores seguros e utilizados exclusivamente para a prestação dos serviços contratados. O utilizador pode exercer os seus direitos de acesso, rectificação e eliminação contactando insurance@adlerrochefort.com.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>5. Propriedade Intelectual.</strong> Todo o conteúdo, design, código e funcionalidades da plataforma são propriedade exclusiva da Adler & Rochefort, Lda. É proibida a reprodução, distribuição ou utilização não autorizada.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>6. Limitação de Responsabilidade.</strong> A Adler & Rochefort não se responsabiliza por decisões tomadas com base nas análises geradas pela plataforma. A informação apresentada não constitui aconselhamento jurídico, financeiro ou de seguros.</p>
+                      <p style={{ marginBottom: '0.5rem' }}><strong>7. Disponibilidade.</strong> A plataforma é disponibilizada "as is". A Adler & Rochefort reserva-se o direito de suspender ou descontinuar funcionalidades mediante aviso prévio de 30 dias.</p>
+                      <p style={{ marginBottom: '0' }}><strong>8. Lei Aplicável.</strong> Estes termos são regidos pela lei portuguesa. Para resolução de litígios é competente o foro da comarca de Lisboa.</p>
                     </div>
                   )}
 
@@ -432,7 +432,7 @@ function LoginPage() {
                 {loading
                   ? 'A processar...'
                   : mode === 'login'
-                    ? 'Iniciar Sess\u00e3o'
+                    ? 'Iniciar Sessão'
                     : 'Criar Conta'}
               </button>
             </form>
