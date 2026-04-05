@@ -1,6 +1,101 @@
 import type { Config } from '@netlify/functions'
 import Anthropic from '@anthropic-ai/sdk'
 
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024 // 10MB
+
+type UserFacingError = {
+  status: number
+  error: string
+  details: string
+}
+
+function mapExtractPolicyError(error: any): UserFacingError {
+  const rawMessage = String(error?.message ?? '').trim()
+  const errMsg = rawMessage.toLowerCase()
+  const statusFromProvider = Number(error?.status || error?.statusCode || 0)
+
+  if (statusFromProvider === 401 || statusFromProvider === 403) {
+    return {
+      status: 502,
+      error: 'Serviço de IA indisponível neste momento. Tente novamente mais tarde.',
+      details: rawMessage || 'Provider authentication error',
+    }
+  }
+
+  if (
+    statusFromProvider === 429 ||
+    errMsg.includes('rate_limit') ||
+    errMsg.includes('rate limit') ||
+    errMsg.includes('overloaded') ||
+    errMsg.includes('too many requests')
+  ) {
+    return {
+      status: 429,
+      error: 'Serviço temporariamente sobrecarregado. Tente novamente em alguns segundos.',
+      details: rawMessage || 'Rate limit',
+    }
+  }
+
+  if (
+    statusFromProvider === 413 ||
+    errMsg.includes('too large') ||
+    errMsg.includes('file size') ||
+    errMsg.includes('request too large') ||
+    errMsg.includes('content too large') ||
+    errMsg.includes('maximum')
+  ) {
+    return {
+      status: 413,
+      error: 'Ficheiro demasiado grande. O limite é 10MB.',
+      details: rawMessage || 'Payload too large',
+    }
+  }
+
+  if (
+    errMsg.includes('unsupported') ||
+    errMsg.includes('media_type') ||
+    errMsg.includes('mime') ||
+    errMsg.includes('invalid image')
+  ) {
+    return {
+      status: 400,
+      error: 'Formato de ficheiro não suportado. Use PDF, JPG, PNG ou WEBP.',
+      details: rawMessage || 'Unsupported media type',
+    }
+  }
+
+  if (
+    errMsg.includes('no pages') ||
+    errMsg.includes('empty') ||
+    errMsg.includes('corrupt') ||
+    errMsg.includes('failed to parse pdf')
+  ) {
+    return {
+      status: 400,
+      error: 'O ficheiro enviado parece estar vazio ou corrompido. Verifique e tente novamente.',
+      details: rawMessage || 'Invalid PDF content',
+    }
+  }
+
+  if (
+    errMsg.includes('json_parse_failed') ||
+    errMsg.includes('json') ||
+    errMsg.includes('unexpected token')
+  ) {
+    return {
+      status: 422,
+      error: 'Não foi possível extrair os dados da apólice. O documento pode não estar em formato reconhecível.',
+      details: rawMessage || 'Unable to parse structured data',
+    }
+  }
+
+  return {
+    status: 500,
+    error: 'Erro ao processar o documento. Verifique se o ficheiro é uma apólice de seguro válida.',
+    details: rawMessage || 'Unknown processing error',
+  }
+}
+
 export default async (req: Request) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -17,6 +112,14 @@ export default async (req: Request) => {
       return Response.json({ error: 'Nenhum ficheiro fornecido.' }, { status: 400 })
     }
 
+    if (file.size <= 0) {
+      return Response.json({ error: 'O ficheiro enviado está vazio.' }, { status: 400 })
+    }
+
+    if (file.size > MAX_UPLOAD_BYTES) {
+      return Response.json({ error: 'Ficheiro demasiado grande. O limite é 10MB.' }, { status: 413 })
+    }
+
     const apiKey = process.env.ANTHROPIC_API_KEY
     if (!apiKey) {
       return Response.json({ error: 'Serviço de IA não configurado. Contacte o suporte.' }, { status: 500 })
@@ -31,6 +134,15 @@ export default async (req: Request) => {
     const isPdf = file.type === 'application/pdf' ||
       (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46)
     const isImage = file.type.startsWith('image/')
+    const isSupportedImageType = ['image/jpeg', 'image/png', 'image/webp'].includes(file.type)
+
+    if (!isPdf && !isImage) {
+      return Response.json({ error: 'Formato de ficheiro não suportado. Use PDF, JPG, PNG ou WEBP.' }, { status: 400 })
+    }
+
+    if (isImage && !isSupportedImageType) {
+      return Response.json({ error: 'Tipo de imagem não suportado. Use JPG, PNG ou WEBP.' }, { status: 400 })
+    }
 
     const prompt = `Analisa este documento de apólice de seguro e extrai as seguintes informações em formato JSON estrito, sem texto adicional, sem marcadores de código:
 {
@@ -79,30 +191,25 @@ Se não conseguires extrair um campo, usa null para strings e 0 para números. R
     // Extrair JSON da resposta
     const jsonMatch = contentText.match(/\{[\s\S]*\}/)
     if (!jsonMatch) {
-      throw new Error('Não foi possível extrair os dados em formato JSON do documento.')
+      throw new Error('json_parse_failed: Não foi possível extrair os dados em formato JSON do documento.')
     }
 
-    const extractedData = JSON.parse(jsonMatch[0])
+    let extractedData: unknown
+    try {
+      extractedData = JSON.parse(jsonMatch[0])
+    } catch {
+      throw new Error('json_parse_failed: resposta da IA não estava em JSON válido.')
+    }
+
     return Response.json(extractedData)
 
   } catch (error: any) {
     console.error('[extract-policy] Error:', error)
-    let userMessage = 'Erro ao processar o documento. Verifique se o ficheiro é uma apólice de seguro válida.'
-    const errMsg = error?.message ?? ''
-
-    if (errMsg.includes('no pages') || errMsg.includes('No pages')) {
-      userMessage = 'O PDF enviado parece estar vazio ou corrompido. Por favor verifique o ficheiro.'
-    } else if (errMsg.includes('rate_limit') || errMsg.includes('overloaded')) {
-      userMessage = 'Serviço temporariamente sobrecarregado. Tente novamente em alguns segundos.'
-    } else if (errMsg.includes('too large') || errMsg.includes('size')) {
-      userMessage = 'Ficheiro demasiado grande. Por favor reduza o tamanho e tente novamente.'
-    } else if (errMsg.includes('JSON')) {
-      userMessage = 'Não foi possível extrair os dados da apólice. O documento pode não estar em formato reconhecível.'
-    }
+    const mapped = mapExtractPolicyError(error)
 
     return Response.json(
-      { error: userMessage, details: errMsg },
-      { status: 500 }
+      { error: mapped.error, details: mapped.details },
+      { status: mapped.status }
     )
   }
 }
