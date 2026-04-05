@@ -86,9 +86,10 @@ Se não conseguires extrair um campo, usa null para strings e 0 para números. R
     return Response.json(extractedData)
 
   } catch (error: any) {
-    console.error('[extract-policy] Error:', error)
+    const errMsg = error?.error?.message ?? error?.message ?? String(error)
+    const errStatus = error?.status ?? 500
+    console.error('[extract-policy] status:', errStatus, '| detalhe:', errMsg, '| raw:', error)
     let userMessage = 'Erro ao processar o documento. Verifique se o ficheiro é uma apólice de seguro válida.'
-    const errMsg = error?.message ?? ''
 
     if (errMsg.includes('no pages') || errMsg.includes('No pages')) {
       userMessage = 'O PDF enviado parece estar vazio ou corrompido. Por favor verifique o ficheiro.'
@@ -101,7 +102,7 @@ Se não conseguires extrair um campo, usa null para strings e 0 para números. R
     }
 
     return Response.json(
-      { error: userMessage, details: errMsg },
+      { error: userMessage, details: errMsg, status: errStatus },
       { status: 500 }
     )
   }
