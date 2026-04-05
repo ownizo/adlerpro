@@ -135,7 +135,7 @@ Elabora um relatório profissional de análise de risco em HTML semântico (usa 
 Usa uma linguagem profissional e técnica adequada ao sector segurador. Não incluías marcadores de código. Responde apenas com HTML puro.`
 
     const aiResponse = await claude.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5',
       max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
     })
