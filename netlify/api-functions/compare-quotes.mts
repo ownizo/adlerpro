@@ -78,11 +78,10 @@ export default async (req: Request) => {
     return Response.json({ report })
 
   } catch (error: any) {
-    console.error('[compare-quotes] Error:', error)
-
-    // Mensagens de erro amigáveis para erros comuns do Gemini
+    const errMsg = error?.error?.message ?? error?.message ?? String(error)
+    const errStatus = error?.status ?? 500
+    console.error('[compare-quotes] status:', errStatus, '| detalhe:', errMsg, '| raw:', error)
     let userMessage = 'Erro ao analisar as cotações. Tente novamente.'
-    const errMsg = error?.message ?? ''
 
     if (errMsg.includes('no pages') || errMsg.includes('No pages')) {
       userMessage = 'O PDF enviado parece estar vazio ou corrompido. Por favor verifique o ficheiro e tente novamente.'
@@ -93,7 +92,7 @@ export default async (req: Request) => {
     }
 
     return Response.json(
-      { error: userMessage, details: errMsg },
+      { error: userMessage, details: errMsg, status: errStatus },
       { status: 500 }
     )
   }
