@@ -111,7 +111,10 @@ function PoliciesPage() {
       const ct = res.headers.get('content-type') ?? ''
       if (!ct.includes('application/json')) throw new Error('O servidor devolveu uma resposta inesperada. Tente novamente.')
       const result = await res.json()
-      if (!res.ok) throw new Error(result.error || 'Erro ao processar ficheiro.')
+      if (!res.ok) {
+        console.error('[extract-policy] erro:', result.error, '| detalhes:', result.details)
+        throw new Error(result.error || 'Erro ao processar ficheiro.')
+      }
       setFormData({ ...result, description: `Apólice extraída de ${file.name}` })
       setShowForm(true)
     } catch (err: any) { setUploadError(err.message) }
