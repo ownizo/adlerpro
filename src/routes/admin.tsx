@@ -10,8 +10,6 @@ import {
   adminCreateCompanyUser,
   adminDeleteCompanyUser,
   adminUpdateCompanyUser,
-  adminRefreshApiConnection,
-  adminUpdateApiConnection,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type {
@@ -37,7 +35,7 @@ function AdminPage() {
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
   const [userEvents, setUserEvents] = useState<UserMetricEvent[]>([])
-  const [apiConnections, setApiConnections] = useState<ApiConnection[]>([])
+  const [_apiConnections, setApiConnections] = useState<ApiConnection[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
   const [claims, setClaims] = useState<Claim[]>([])
   const [documents, setDocuments] = useState<DocType[]>([])
