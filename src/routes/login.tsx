@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { useIdentity } from '@/lib/identity-context'
 import { useEffect, useState } from 'react'
 
+const TERMS_VERSION = '2025-01'
+
 type AuthMode = 'login' | 'signup' | 'forgot' | 'recovery'
 
 export const Route = createFileRoute('/login')({
@@ -106,14 +108,33 @@ function LoginPage() {
     }
     setLoading(true)
     try {
-      const { error } = await supabase.auth.signUp({
+      const termsAcceptedAt = new Date().toISOString()
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: { full_name: name },
+          data: {
+            full_name: name,
+            terms_accepted_at: termsAcceptedAt,
+            terms_version: TERMS_VERSION,
+          },
         },
       })
       if (error) throw error
+
+      // Registar aceitação dos termos na tabela de auditoria
+      if (data.user?.id) {
+        try {
+          await fetch('/api/record-terms-acceptance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: data.user.id, terms_version: TERMS_VERSION }),
+          })
+        } catch {
+          // Falha silenciosa — os dados já ficaram em user_metadata
+        }
+      }
+
       setSignupSuccess(true)
     } catch (err: any) {
       setError(err?.message || 'Erro ao criar conta.')
