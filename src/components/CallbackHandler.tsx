@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 
 export function CallbackHandler({ children }: { children: React.ReactNode }) {
   useEffect(() => {

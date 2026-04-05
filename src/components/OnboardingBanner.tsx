@@ -1,5 +1,4 @@
 import { Link } from '@tanstack/react-router'
-import type { Policy } from '@/lib/types'
 
 interface OnboardingBannerProps {
   hasPolicies: boolean

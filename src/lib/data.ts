@@ -20,7 +20,7 @@ import type {
 // Cliente Supabase (server-side — usa service_role key)
 // Singleton: criado uma vez e reutilizado em todas as chamadas
 // ============================================================
-let _sbAdmin: ReturnType<typeof createClient> | null = null
+let _sbAdmin: ReturnType<typeof createClient<any>> | null = null
 
 function getSupabaseAdmin() {
   if (_sbAdmin) return _sbAdmin
@@ -32,7 +32,7 @@ function getSupabaseAdmin() {
     process.env['SUPABASE_SERVICE_ROLE_KEY'] ||
     (typeof import.meta !== 'undefined' && import.meta.env?.SUPABASE_SERVICE_ROLE_KEY) ||
     ''
-  _sbAdmin = createClient(url, key, {
+  _sbAdmin = createClient<any>(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   return _sbAdmin
@@ -57,7 +57,7 @@ function objectToSnake(obj: Record<string, unknown>): Record<string, unknown> {
   return result
 }
 
-function objectToCamel(obj: Record<string, unknown>): Record<string, unknown> {
+function objectToCamel(obj: Record<string, unknown>): unknown {
   const result: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(obj)) {
     result[toCamel(k)] = v
