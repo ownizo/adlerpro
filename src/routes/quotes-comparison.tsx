@@ -21,8 +21,8 @@ function QuotesComparisonPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const selectedFiles = Array.from(e.target.files)
-      if (selectedFiles.length + files.length > 3) {
-        setError('Pode enviar no máximo 3 cotações.')
+      if (selectedFiles.length + files.length > 2) {
+        setError('Pode enviar no máximo 2 cotações.')
         return
       }
       setFiles([...files, ...selectedFiles])
@@ -99,7 +99,7 @@ function QuotesComparisonPage() {
             Comparativo de Cotações
           </h1>
           <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.9rem', color: '#666666', marginTop: '0.35rem' }}>
-            Carregue até 3 cotações (PDF ou imagem) para uma análise comparativa detalhada pela nossa IA.
+            Carregue até 2 cotações (PDF ou imagem) para uma análise comparativa detalhada pela nossa IA.
           </p>
         </div>
 
@@ -121,8 +121,8 @@ function QuotesComparisonPage() {
               e.preventDefault()
               e.currentTarget.style.borderColor = '#dddddd'
               const dropped = Array.from(e.dataTransfer.files)
-              if (dropped.length + files.length > 3) {
-                setError('Pode enviar no máximo 3 cotações.')
+              if (dropped.length + files.length > 2) {
+                setError('Pode enviar no máximo 2 cotações.')
                 return
               }
               setFiles([...files, ...dropped])
@@ -134,7 +134,7 @@ function QuotesComparisonPage() {
               Arraste os ficheiros ou clique para selecionar
             </p>
             <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.8rem', color: '#999999' }}>
-              Até 3 ficheiros · PDF, imagens (JPG, PNG) ou texto
+              Até 2 ficheiros · PDF, imagens (JPG, PNG) ou texto
             </p>
             <input
               type="file"
