@@ -2,7 +2,7 @@ import type { Config } from '@netlify/functions'
 import Anthropic from '@anthropic-ai/sdk'
 
 // Recebe dados já extraídos (JSON) — não PDFs.
-// O frontend usa /api/extract-policy por cada ficheiro e envia aqui apenas os resultados.
+// Devolve { recommendedIndex, reason, justification } para o frontend construir a UI.
 export default async (req: Request) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
@@ -28,37 +28,40 @@ export default async (req: Request) => {
     }
 
     const quoteSummaries = quotes.map((q, i) =>
-      `Cotação ${i + 1} — ${q.name}:\n${JSON.stringify(q.data, null, 2)}`
+      `Cotação ${i} (índice ${i}) — ${q.name}:\n${JSON.stringify(q.data, null, 2)}`
     ).join('\n\n')
 
-    const prompt = `Tens os dados estruturados de ${quotes.length} cotações de seguro:
+    const prompt = `Analisa estas ${quotes.length} cotações de seguro e responde APENAS com JSON válido, sem mais nada:
 
 ${quoteSummaries}
 
-Compara estas cotações em Português de Portugal. Para cada uma apresenta um resumo claro com seguradora, prémio anual, coberturas principais e exclusões. Depois faz uma comparação directa e dá uma recomendação fundamentada.
-
-Responde em HTML usando estas classes Tailwind:
-- Secções: <div class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-- Títulos: <h3 class="text-lg font-semibold mt-4 mb-2 text-gray-900">
-- Parágrafos: <p class="mb-2 text-gray-700">
-- Listas: <ul class="list-disc pl-5 mb-3 space-y-1"><li class="text-gray-700">
-- Destaques positivos: <span class="text-green-700 font-semibold">
-- Destaques negativos: <span class="text-red-700 font-semibold">
-- Recomendação: <div class="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-Apenas HTML puro, sem marcadores de código.`
+Responde com este JSON exacto (sem markdown, sem texto extra):
+{
+  "recommendedIndex": <número 0, 1 ou 2 — índice da cotação recomendada>,
+  "reason": "<frase curta e directa com a razão principal da recomendação, em Português de Portugal>",
+  "highlights": [
+    "<ponto forte da cotação recomendada>",
+    "<segundo ponto forte>",
+    "<terceiro ponto forte se aplicável>"
+  ],
+  "warnings": {
+    "<índice das outras cotações como string>": "<razão breve porque não é a melhor escolha>"
+  }
+}`
 
     const client = new Anthropic({ apiKey })
     const response = await client.messages.create({
       model: 'claude-sonnet-4-5',
-      max_tokens: 1500,
+      max_tokens: 512,
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const report = (response.content[0].type === 'text' ? response.content[0].text : '')
-      .replace(/```html\n?|\n?```/g, '')
-      .trim()
+    const text = response.content[0].type === 'text' ? response.content[0].text : '{}'
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error('Resposta da IA não contém JSON válido.')
 
-    return Response.json({ report })
+    const result = JSON.parse(jsonMatch[0])
+    return Response.json(result)
 
   } catch (error: any) {
     const errMsg = error?.error?.message ?? error?.message ?? String(error)

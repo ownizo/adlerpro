@@ -21,12 +21,11 @@ interface QuoteEntry {
   error: string | null
 }
 
-const POLICY_TYPE_LABELS: Record<string, string> = {
-  auto: 'Automóvel', health: 'Saúde', home: 'Habitação', life: 'Vida',
-  liability: 'Responsabilidade Civil', property: 'Propriedade',
-  workers_comp: 'Acidentes de Trabalho', cyber: 'Ciber-Risco',
-  directors_officers: 'D&O', business_interruption: 'Interrupção de Negócio',
-  other: 'Outro',
+interface CompareResult {
+  recommendedIndex: number
+  reason: string
+  highlights: string[]
+  warnings: Record<string, string>
 }
 
 function formatFileSize(bytes: number) {
@@ -35,8 +34,9 @@ function formatFileSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+const font = "'Montserrat', sans-serif"
+
 function ExtractedDataCard({ data, name }: { data: Record<string, any>; name: string }) {
-  const font = "'Montserrat', sans-serif"
   return (
     <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '4px', padding: '1rem', marginTop: '0.75rem' }}>
       <p style={{ fontFamily: font, fontSize: '0.65rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.6rem' }}>
@@ -76,19 +76,178 @@ function ExtractedDataCard({ data, name }: { data: Record<string, any>; name: st
   )
 }
 
+function ComparisonTable({ quotes, recommendedIndex }: { quotes: QuoteEntry[]; recommendedIndex: number }) {
+  const done = quotes.filter(q => q.status === 'done' && q.data)
+
+  // Determinar melhor valor em cada métrica (para highlight)
+  const premiums = done.map(q => q.data!.annualPremium || 0)
+  const capitals = done.map(q => q.data!.insuredValue || 0)
+  const deductibles = done.map(q => q.data!.deductible || 0)
+  const coverageCounts = done.map(q => q.data!.coverages?.length || 0)
+
+  const minPremium = Math.min(...premiums.filter(v => v > 0))
+  const maxCapital = Math.max(...capitals)
+  const minDeductible = Math.min(...deductibles.filter(v => v > 0))
+  const maxCoverages = Math.max(...coverageCounts)
+
+  const colWidth = `${100 / (done.length + 1)}%`
+
+  return (
+    <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: font }}>
+        <thead>
+          <tr style={{ background: '#f8f8f8' }}>
+            <th style={{ padding: '0.6rem 0.85rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #eee', width: colWidth }}>
+              Métrica
+            </th>
+            {done.map((q, i) => {
+              const isRec = i === recommendedIndex
+              return (
+                <th key={i} style={{ padding: '0.6rem 0.85rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 700, color: isRec ? '#166534' : '#333', borderBottom: `2px solid ${isRec ? '#22C55E' : '#eee'}`, background: isRec ? '#F0FDF4' : '#f8f8f8', width: colWidth }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
+                    {isRec && (
+                      <span style={{ background: '#16A34A', color: '#fff', fontSize: '0.55rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '20px', letterSpacing: '0.06em' }}>
+                        RECOMENDADO
+                      </span>
+                    )}
+                    <span>{q.data?.insurer || `Cotação ${i + 1}`}</span>
+                    <span style={{ fontWeight: 300, fontSize: '0.65rem', color: '#999' }}>{q.file.name}</span>
+                  </div>
+                </th>
+              )
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {[
+            {
+              label: 'Prémio Anual',
+              values: premiums,
+              format: (v: number) => v > 0 ? formatCurrency(v) : '—',
+              best: (v: number) => v === minPremium && v > 0,
+              bestLabel: 'mais baixo',
+            },
+            {
+              label: 'Capital Segurado',
+              values: capitals,
+              format: (v: number) => v > 0 ? formatCurrency(v) : '—',
+              best: (v: number) => v === maxCapital && v > 0,
+              bestLabel: 'mais alto',
+            },
+            {
+              label: 'Franquia',
+              values: deductibles,
+              format: (v: number) => v > 0 ? formatCurrency(v) : '—',
+              best: (v: number) => v === minDeductible && v > 0,
+              bestLabel: 'mais baixa',
+            },
+            {
+              label: 'N.º Coberturas',
+              values: coverageCounts,
+              format: (v: number) => v > 0 ? String(v) : '—',
+              best: (v: number) => v === maxCoverages && v > 0,
+              bestLabel: 'mais coberturas',
+            },
+          ].map((row, ri) => (
+            <tr key={ri} style={{ borderBottom: '1px solid #f5f5f5' }}>
+              <td style={{ padding: '0.6rem 0.85rem', fontSize: '0.72rem', fontWeight: 600, color: '#555' }}>
+                {row.label}
+              </td>
+              {row.values.map((v, ci) => {
+                const isBest = row.best(v)
+                const isRec = ci === recommendedIndex
+                return (
+                  <td key={ci} style={{ padding: '0.6rem 0.85rem', textAlign: 'center', background: isRec ? '#FAFFF7' : 'transparent' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: isBest ? 700 : 400, color: isBest ? '#166534' : '#333' }}>
+                      {row.format(v)}
+                    </span>
+                    {isBest && (
+                      <span style={{ display: 'block', fontSize: '0.55rem', color: '#16A34A', fontWeight: 600, marginTop: '0.1rem' }}>
+                        ↑ {row.bestLabel}
+                      </span>
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function RecommendationCard({ result, quotes }: { result: CompareResult; quotes: QuoteEntry[] }) {
+  const done = quotes.filter(q => q.status === 'done' && q.data)
+  const recommended = done[result.recommendedIndex]
+  if (!recommended) return null
+
+  return (
+    <div style={{ border: '2px solid #16A34A', borderRadius: '4px', overflow: 'hidden', marginBottom: '1.5rem' }}>
+      {/* Header */}
+      <div style={{ background: '#16A34A', padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <span style={{ fontSize: '1.25rem' }}>✦</span>
+        <div>
+          <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.9rem', color: '#fff', margin: 0 }}>
+            Recomendação: {recommended.data?.insurer || `Cotação ${result.recommendedIndex + 1}`}
+          </p>
+          <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.75rem', color: 'rgba(255,255,255,0.85)', margin: 0 }}>
+            {recommended.file.name}
+          </p>
+        </div>
+      </div>
+
+      <div style={{ padding: '1rem 1.25rem', background: '#F0FDF4' }}>
+        {/* Razão principal */}
+        <p style={{ fontFamily: font, fontSize: '0.82rem', color: '#166534', fontWeight: 500, margin: '0 0 0.75rem', lineHeight: 1.5 }}>
+          {result.reason}
+        </p>
+
+        {/* Pontos fortes */}
+        {result.highlights?.length > 0 && (
+          <ul style={{ margin: '0 0 0.75rem', paddingLeft: 0, listStyle: 'none' }}>
+            {result.highlights.map((h, i) => (
+              <li key={i} style={{ fontFamily: font, fontSize: '0.78rem', color: '#166534', marginBottom: '0.3rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
+                <span style={{ flexShrink: 0, marginTop: '0.1rem' }}>✓</span>
+                {h}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Avisos sobre as outras */}
+        {result.warnings && Object.keys(result.warnings).length > 0 && (
+          <div style={{ borderTop: '1px solid #BBF7D0', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
+            <p style={{ fontFamily: font, fontSize: '0.65rem', fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.4rem' }}>
+              Outras opções
+            </p>
+            {Object.entries(result.warnings).map(([idx, warning]) => {
+              const q = done[Number(idx)]
+              return (
+                <p key={idx} style={{ fontFamily: font, fontSize: '0.75rem', color: '#666', margin: '0 0 0.2rem' }}>
+                  <strong>{q?.data?.insurer || `Cotação ${Number(idx) + 1}`}:</strong> {warning}
+                </p>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function QuotesComparisonPage() {
-  const font = "'Montserrat', sans-serif"
   const [quotes, setQuotes] = useState<QuoteEntry[]>([])
   const [comparing, setComparing] = useState(false)
-  const [report, setReport] = useState<string | null>(null)
+  const [compareResult, setCompareResult] = useState<CompareResult | null>(null)
   const [compareError, setCompareError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
 
   const doneQuotes = quotes.filter(q => q.status === 'done')
   const isAnalyzing = quotes.some(q => q.status === 'analyzing')
-  const canAddMore = doneQuotes.length < 3 && !isAnalyzing && !report
-  const canCompare = doneQuotes.length >= 2 && !isAnalyzing
+  const canAddMore = doneQuotes.length < 3 && !isAnalyzing && !compareResult
+  const canCompare = doneQuotes.length >= 2 && !isAnalyzing && !compareResult
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -100,9 +259,9 @@ function QuotesComparisonPage() {
   const handleAnalyze = async () => {
     if (!pendingFile) return
     const entry: QuoteEntry = { file: pendingFile, status: 'analyzing', data: null, error: null }
+    const idx = quotes.length
     setQuotes(prev => [...prev, entry])
     setPendingFile(null)
-    const idx = quotes.length
 
     try {
       const fd = new FormData()
@@ -122,9 +281,7 @@ function QuotesComparisonPage() {
     setComparing(true)
     setCompareError(null)
     try {
-      const payload = {
-        quotes: doneQuotes.map(q => ({ name: q.file.name, data: q.data })),
-      }
+      const payload = { quotes: doneQuotes.map(q => ({ name: q.file.name, data: q.data })) }
       const res = await fetch('/api/compare-quotes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -134,7 +291,8 @@ function QuotesComparisonPage() {
       if (!ct.includes('application/json')) throw new Error('Resposta inesperada do servidor.')
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Erro na comparação.')
-      setReport(data.report)
+      if (data.recommendedIndex === undefined) throw new Error('Resposta inválida da IA.')
+      setCompareResult(data)
     } catch (err: any) {
       setCompareError(err.message)
     } finally {
@@ -145,7 +303,7 @@ function QuotesComparisonPage() {
   const handleReset = () => {
     setQuotes([])
     setPendingFile(null)
-    setReport(null)
+    setCompareResult(null)
     setCompareError(null)
   }
 
@@ -153,42 +311,25 @@ function QuotesComparisonPage() {
     setQuotes(prev => prev.filter((_, i) => i !== idx))
   }
 
-  if (report) {
-    return (
-      <AppLayout>
-        <div className="max-w-4xl mx-auto">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-            <div>
-              <h1 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: '#111', margin: 0 }}>Comparativo de Cotações</h1>
-              <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.82rem', color: '#888', marginTop: '0.25rem' }}>{doneQuotes.length} cotações analisadas</p>
-            </div>
-            <button onClick={handleReset} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', padding: '0.5rem 1rem', background: 'none', color: '#666', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer' }}>
-              Nova análise
-            </button>
-          </div>
-          <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '4px', padding: '1.5rem' }}>
-            <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.82rem', color: '#C8961A', margin: '0 0 1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              ✦ Análise Comparativa IA
-            </p>
-            <div style={{ fontFamily: font }} dangerouslySetInnerHTML={{ __html: report }} />
-          </div>
-        </div>
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </AppLayout>
-    )
-  }
-
   return (
     <AppLayout>
       <div className="max-w-3xl mx-auto">
-        <div style={{ marginBottom: '1.75rem' }}>
-          <h1 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: '#111', margin: 0 }}>Comparativo de Cotações</h1>
-          <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.85rem', color: '#666', marginTop: '0.35rem' }}>
-            Analise cada cotação individualmente e compare no final. Mínimo 2, máximo 3 cotações.
-          </p>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.75rem', gap: '1rem' }}>
+          <div>
+            <h1 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: '#111', margin: 0 }}>Comparativo de Cotações</h1>
+            <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.85rem', color: '#666', marginTop: '0.35rem' }}>
+              Analise cada cotação individualmente e compare no final. Mínimo 2, máximo 3 cotações.
+            </p>
+          </div>
+          {(quotes.length > 0 || compareResult) && (
+            <button onClick={handleReset} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.78rem', padding: '0.45rem 0.85rem', background: 'none', color: '#666', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              Recomeçar
+            </button>
+          )}
         </div>
 
-        {/* Lista de cotações já adicionadas */}
+        {/* Cotações já adicionadas */}
         {quotes.map((q, idx) => (
           <div key={idx} style={{ background: '#fff', border: '1px solid #eee', borderRadius: '4px', padding: '1rem 1.25rem', marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -218,25 +359,26 @@ function QuotesComparisonPage() {
                 {q.status === 'error' && (
                   <span style={{ fontFamily: font, fontSize: '0.72rem', color: '#dc2626' }}>{q.error}</span>
                 )}
-                {(q.status === 'done' || q.status === 'error') && !isAnalyzing && (
+                {(q.status === 'done' || q.status === 'error') && !isAnalyzing && !compareResult && (
                   <button onClick={() => handleRemoveQuote(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: '1.1rem', lineHeight: 1, padding: '0.1rem' }} title="Remover">×</button>
                 )}
               </div>
             </div>
-
             {q.status === 'done' && q.data && (
               <ExtractedDataCard data={q.data} name={q.file.name} />
             )}
           </div>
         ))}
 
-        {/* Área para adicionar próxima cotação */}
+        {/* Adicionar próxima cotação */}
         {canAddMore && (
           <div style={{ background: '#fff', border: '1.5px dashed #ddd', borderRadius: '4px', padding: '1.25rem', marginBottom: '0.75rem' }}>
             <p style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', color: '#555', margin: '0 0 0.75rem' }}>
-              Cotação {quotes.length + 1}{quotes.length === 0 ? ' (obrigatória)' : quotes.length === 1 ? ' (obrigatória)' : ' (opcional)'}
+              Cotação {quotes.length + 1}
+              <span style={{ fontWeight: 300, color: '#999' }}>
+                {quotes.length < 2 ? ' (obrigatória)' : ' (opcional)'}
+              </span>
             </p>
-
             {!pendingFile ? (
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontFamily: font, fontWeight: 600, fontSize: '0.82rem', padding: '0.55rem 1rem', background: '#f5f5f5', color: '#333', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer' }}>
                 📎 Seleccionar ficheiro
@@ -252,10 +394,7 @@ function QuotesComparisonPage() {
                   </div>
                   <button onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: '1.1rem', lineHeight: 1, marginLeft: '0.25rem' }}>×</button>
                 </div>
-                <button
-                  onClick={handleAnalyze}
-                  style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', padding: '0.55rem 1.1rem', background: '#111', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}
-                >
+                <button onClick={handleAnalyze} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', padding: '0.55rem 1.1rem', background: '#111', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   ✦ Analisar
                 </button>
               </div>
@@ -263,38 +402,58 @@ function QuotesComparisonPage() {
           </div>
         )}
 
-        {/* Erro de comparação */}
-        {compareError && (
-          <div style={{ padding: '0.75rem 1rem', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '4px', fontFamily: font, fontSize: '0.82rem', color: '#dc2626', marginBottom: '0.75rem' }}>
-            ⚠️ {compareError}
-          </div>
+        {/* Indicação de progresso */}
+        {!canCompare && doneQuotes.length < 2 && quotes.length > 0 && !isAnalyzing && !compareResult && (
+          <p style={{ fontFamily: font, fontSize: '0.78rem', color: '#999', margin: '0.25rem 0 0.75rem' }}>
+            Adicione mais {2 - doneQuotes.length} cotação(ões) para poder comparar.
+          </p>
         )}
 
         {/* Botão comparar */}
         {canCompare && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.5rem 0 1.5rem' }}>
             <button
               onClick={handleCompare}
               disabled={comparing}
               style={{ fontFamily: font, fontWeight: 600, fontSize: '0.9rem', padding: '0.75rem 2rem', background: comparing ? '#ccc' : '#C8961A', color: '#fff', border: 'none', borderRadius: '4px', cursor: comparing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
-              {comparing ? (
-                <><span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />A comparar...</>
-              ) : (
-                <>✦ Comparar {doneQuotes.length} cotações</>
-              )}
+              {comparing
+                ? <><span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />A comparar...</>
+                : <>✦ Comparar {doneQuotes.length} cotações</>}
             </button>
-            {comparing && (
-              <span style={{ fontFamily: font, fontSize: '0.78rem', color: '#999' }}>Normalmente demora 5–10 segundos</span>
-            )}
+            {comparing && <span style={{ fontFamily: font, fontSize: '0.78rem', color: '#999' }}>Normalmente demora 5–10 segundos</span>}
           </div>
         )}
 
-        {/* Indicação de progresso */}
-        {!canCompare && doneQuotes.length < 2 && quotes.length > 0 && !isAnalyzing && (
-          <p style={{ fontFamily: font, fontSize: '0.78rem', color: '#999', marginTop: '0.5rem' }}>
-            Adicione mais {2 - doneQuotes.length} cotação(ões) para poder comparar.
-          </p>
+        {/* Erro de comparação */}
+        {compareError && (
+          <div style={{ padding: '0.75rem 1rem', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '4px', fontFamily: font, fontSize: '0.82rem', color: '#dc2626', marginBottom: '1rem' }}>
+            ⚠️ {compareError}
+          </div>
+        )}
+
+        {/* ── Resumo e Recomendação ── */}
+        {compareResult && (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0 1.25rem' }}>
+              <div style={{ flex: 1, height: '1px', background: '#eee' }} />
+              <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.72rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0, whiteSpace: 'nowrap' }}>
+                Resumo e Recomendação
+              </p>
+              <div style={{ flex: 1, height: '1px', background: '#eee' }} />
+            </div>
+
+            {/* Tabela comparativa */}
+            <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '4px', padding: '1.25rem', marginBottom: '1rem' }}>
+              <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.72rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 1rem' }}>
+                Tabela Comparativa
+              </p>
+              <ComparisonTable quotes={quotes} recommendedIndex={compareResult.recommendedIndex} />
+            </div>
+
+            {/* Card de recomendação */}
+            <RecommendationCard result={compareResult} quotes={quotes} />
+          </div>
         )}
       </div>
 
