@@ -139,6 +139,11 @@ function LicensePlatesPage() {
           >
             {loading || loadingSeguro ? t('licensePlates.searching') : t('licensePlates.searchBtn')}
           </button>
+          {loadingSeguro && (
+            <p className="text-sm mt-3" style={{ color: '#666666', fontFamily: "'Montserrat', sans-serif" }}>
+              ℹ️ A consulta de dados de seguro pode demorar até 120 segundos.
+            </p>
+          )}
           {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
           {seguroError && <p className="text-red-500 text-sm mt-2">Seguro: {seguroError}</p>}
         </form>
