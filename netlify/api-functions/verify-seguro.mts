@@ -44,9 +44,9 @@ export default async (req: Request) => {
     url.searchParams.set('licensePlate', matricula)
     url.searchParams.set('date', formattedDate)
 
-    // Timeout de 20 segundos para o pedido à BizAPIs
+    // Timeout de 120 segundos para o pedido à BizAPIs
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 20000)
+    const timeoutId = setTimeout(() => controller.abort(), 120000)
 
     let response: Response
     try {
