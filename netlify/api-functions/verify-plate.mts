@@ -68,7 +68,18 @@ export default async (req: Request) => {
       method: 'GET',
     })
 
-    const xml = await apiResponse.text()
+    const contentType = apiResponse.headers.get('content-type') ?? ''
+    const responseText = await apiResponse.text()
+
+    if (!contentType.includes('xml') && !contentType.includes('json') && !contentType.includes('text/plain')) {
+      console.error('verify-plate: resposta inesperada (não XML/JSON). Content-Type:', contentType, '— Body:', responseText.substring(0, 500))
+      return Response.json(
+        { error: 'Serviço de verificação de seguro temporariamente indisponível.' },
+        { status: 503 },
+      )
+    }
+
+    const xml = responseText
 
     if (!apiResponse.ok) {
       throw new Error(`Erro HTTP na API RegCheck (${apiResponse.status})`)
