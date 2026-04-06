@@ -720,12 +720,19 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
         {/* ── Resumo e Recomendação ── */}
         {compareResult && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0.5rem 0 1.25rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.5rem 0 1.25rem' }}>
               <div style={{ flex: 1, height: '1px', background: '#eee' }} />
               <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.72rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0, whiteSpace: 'nowrap' }}>
                 Resumo e Recomendação
               </p>
               <div style={{ flex: 1, height: '1px', background: '#eee' }} />
+              <button
+                onClick={exportPdf}
+                disabled={exporting}
+                style={{ fontFamily: font, fontWeight: 600, fontSize: '0.72rem', padding: '0.35rem 0.75rem', background: exporting ? '#ccc' : '#111', color: '#fff', border: 'none', borderRadius: '4px', cursor: exporting ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
+              >
+                {exporting ? 'A gerar...' : '↓ Exportar PDF'}
+              </button>
             </div>
 
             {/* Tabela comparativa */}
