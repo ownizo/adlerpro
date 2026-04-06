@@ -161,21 +161,26 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3">
             {/* Language switcher */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0', fontFamily: font }}>
-              {(['pt', 'en'] as LangCode[]).map((l, i) => (
-                <span key={l} style={{ display: 'flex', alignItems: 'center' }}>
-                  {i > 0 && <span style={{ color: '#dddddd', padding: '0 0.15rem', fontSize: '0.7rem' }}>|</span>}
-                  <button
-                    onClick={() => handleLang(l)}
-                    style={{
-                      background: 'none', border: 'none', cursor: 'pointer', padding: '0.15rem 0.3rem',
-                      fontFamily: font, fontSize: '0.7rem', fontWeight: lang === l ? 700 : 400,
-                      color: lang === l ? '#111111' : '#aaaaaa', letterSpacing: '0.06em',
-                    }}
-                  >
-                    {l.toUpperCase()}
-                  </button>
-                </span>
+            <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #dddddd', borderRadius: '4px', overflow: 'hidden', fontFamily: font }}>
+              {(['pt', 'en'] as LangCode[]).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => handleLang(l)}
+                  style={{
+                    background: lang === l ? '#111111' : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.25rem 0.6rem',
+                    fontFamily: font,
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    color: lang === l ? '#ffffff' : '#888888',
+                    transition: 'background 0.15s, color 0.15s',
+                  }}
+                >
+                  {l.toUpperCase()}
+                </button>
               ))}
             </div>
 
