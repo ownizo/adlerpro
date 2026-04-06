@@ -375,7 +375,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
 
       // ── Página 1: Header ──
       // Fundo header
-      doc.setFillColor(17, 17, 17)
+      doc.setFillColor(10, 22, 40)
       doc.rect(0, 0, pageW, 38, 'F')
 
       // Tentar carregar logo
@@ -480,7 +480,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
         body: tableBody,
         margin: { left: marginL, right: marginR },
         styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 3.5 },
-        headStyles: { fillColor: [17, 17, 17], textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+        headStyles: { fillColor: [10, 22, 40], textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
         columnStyles: { 0: { fontStyle: 'bold', textColor: [85, 85, 85] } },
         didParseCell: (data) => {
           if (data.section === 'body' && data.column.index > 0) {
