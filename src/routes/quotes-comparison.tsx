@@ -246,7 +246,7 @@ function QuotesComparisonPage() {
 
   const doneQuotes = quotes.filter(q => q.status === 'done')
   const isAnalyzing = quotes.some(q => q.status === 'analyzing')
-  const canAddMore = doneQuotes.length < 3 && !isAnalyzing && !compareResult
+  const canAddMore = doneQuotes.length < 2 && !isAnalyzing && !compareResult
   const canCompare = doneQuotes.length >= 2 && !isAnalyzing && !compareResult
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -357,7 +357,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
           <div>
             <h1 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: '#111', margin: 0 }}>Comparativo de Cotações</h1>
             <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.85rem', color: '#666', marginTop: '0.35rem' }}>
-              Analise cada cotação individualmente e compare no final. Mínimo 2, máximo 3 cotações.
+              Analise cada cotação individualmente e compare no final. Mínimo 2, máximo 2 cotações.
             </p>
           </div>
           {(quotes.length > 0 || compareResult) && (
@@ -414,7 +414,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
             <p style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', color: '#555', margin: '0 0 0.75rem' }}>
               Cotação {quotes.length + 1}
               <span style={{ fontWeight: 300, color: '#999' }}>
-                {quotes.length < 2 ? ' (obrigatória)' : ' (opcional)'}
+                {quotes.length === 0 ? ' (obrigatória)' : ' (obrigatória)'}
               </span>
             </p>
             {!pendingFile ? (
@@ -491,6 +491,11 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
 
             {/* Card de recomendação */}
             <RecommendationCard result={compareResult} quotes={quotes} />
+
+            {/* Disclaimer */}
+            <p style={{ fontFamily: font, fontSize: '0.68rem', fontWeight: 300, color: '#aaaaaa', lineHeight: 1.6, marginTop: '1rem', padding: '0 0.25rem' }}>
+              Esta análise foi gerada automaticamente por inteligência artificial com base nos documentos fornecidos. Os resultados têm carácter meramente informativo e não constituem aconselhamento profissional de seguros. A Adler & Rochefort recomenda a consulta com um mediador certificado antes de tomar qualquer decisão.
+            </p>
           </div>
         )}
       </div>
