@@ -11,10 +11,11 @@ export default async (req: Request) => {
 
   try {
     const body = await req.json()
-    const { nif, cprc } = body
+    const { nif, cprc, lang } = body
+    const isEnglish = lang === 'en'
 
     if (!nif && !cprc) {
-      return Response.json({ error: 'NIF ou código CPRC obrigatório' }, { status: 400 })
+      return Response.json({ error: isEnglish ? 'NIF or CPRC code required' : 'NIF ou código CPRC obrigatório' }, { status: 400 })
     }
 
     // 1. Obter dados reais via BizAPIs — nifName (identidade fiscal)
@@ -116,7 +117,25 @@ export default async (req: Request) => {
 
     const claude = new Anthropic({ apiKey })
 
-    const prompt = `Actua como consultor sénior de risco da Adler & Rochefort, mediadora de seguros. Recebeste os seguintes dados reais da empresa "${companyName}" (NIF: ${nif || nipc}) obtidos via Registo Comercial e Autoridade Tributária:
+    const prompt = isEnglish
+      ? `You are a senior risk consultant at Adler & Rochefort, an insurance brokerage. You have received the following real data for the company "${companyName}" (NIF: ${nif || nipc}) obtained from the Commercial Registry and Tax Authority:
+
+${JSON.stringify(companyProfile, null, 2)}
+
+Produce a professional risk analysis report in semantic HTML (use only <h3>, <h4>, <p>, <ul>, <li>, <strong>, <table>, <tr>, <td>, <th>, <div>). The report must include:
+
+1. **Company Identification** — Full name, NIF/NIPC, legal form, share capital, incorporation date, and CAE with activity description
+2. **Tax Status** — Analyse the VAT framework and current tax status
+3. **Governance Structure** — Identify shareholders/directors and capital structure
+4. **Risk Assessment** — Classify overall risk (Low/Medium/High) with justification based on real data, including:
+   - Credit risk (based on share capital and structure)
+   - Operational risk (based on legal form and CAE)
+   - Active alerts (pending facts, liens, revitalisation proceedings)
+5. **Insurance Recommendations** — Suggest insurance types suitable for the company profile (e.g. Professional Liability, Multi-risk, D&O, Cyber)
+6. **Conclusion** — Final opinion on viability as a partner/client
+
+Use professional and technical language appropriate to the insurance sector. Do not include code markers. Respond with pure HTML only.`
+      : `Actua como consultor sénior de risco da Adler & Rochefort, mediadora de seguros. Recebeste os seguintes dados reais da empresa "${companyName}" (NIF: ${nif || nipc}) obtidos via Registo Comercial e Autoridade Tributária:
 
 ${JSON.stringify(companyProfile, null, 2)}
 

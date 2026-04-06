@@ -3,12 +3,14 @@ import { useIdentity } from '@/lib/identity-context'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { fetchCurrentUserCompanyProfile } from '@/lib/server-fns'
+import { useTranslation } from 'react-i18next'
 
 export const Route = createFileRoute('/profile')({
   component: ProfilePage,
 })
 
 function ProfilePage() {
+  const { t } = useTranslation()
   const { user, ready, logout } = useIdentity()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
@@ -16,7 +18,7 @@ function ProfilePage() {
   const [uploading, setUploading] = useState(false)
   const [companyName, setCompanyName] = useState<string>('-')
 
-  if (!ready) return <div className="p-8">A carregar...</div>
+  if (!ready) return <div className="p-8">{t('profile.loading')}</div>
   if (!user) {
     navigate({ to: '/login' })
     return null
@@ -38,10 +40,10 @@ function ProfilePage() {
     try {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
-      setMessage('Password alterada com sucesso!')
+      setMessage(t('profile.passwordChanged'))
       setPassword('')
     } catch (err: any) {
-      setMessage('Erro ao alterar password: ' + (err.message || 'Erro desconhecido'))
+      setMessage(t('profile.errors.passwordChange', { msg: err.message || t('common.nd') }))
     }
   }
 
@@ -62,7 +64,7 @@ function ProfilePage() {
         body: formData,
       })
 
-      if (!res.ok) throw new Error('Falha no upload da imagem')
+      if (!res.ok) throw new Error(t('profile.errors.imageUpload'))
 
       const data = await res.json()
 
@@ -71,10 +73,10 @@ function ProfilePage() {
       })
       if (error) throw error
 
-      setMessage('Imagem de perfil atualizada com sucesso!')
+      setMessage(t('profile.imageUpdated'))
       window.location.reload()
     } catch (err: any) {
-      setMessage('Erro ao atualizar imagem: ' + err.message)
+      setMessage(t('profile.errors.imageChange', { msg: err.message }))
     } finally {
       setUploading(false)
     }
@@ -92,11 +94,11 @@ function ProfilePage() {
           <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
           </svg>
-          Voltar para o Portal do Cliente
+          {t('profile.backToPortal')}
         </button>
       </div>
 
-      <h1 className="text-2xl font-bold mb-8" style={{ fontFamily: "'Montserrat', sans-serif" }}>Perfil de Utilizador</h1>
+      <h1 className="text-2xl font-bold mb-8" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t('profile.title')}</h1>
 
       {message && (
         <div className="mb-6 p-4 rounded bg-blue-50 text-blue-800">
@@ -105,7 +107,7 @@ function ProfilePage() {
       )}
 
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm mb-8">
-        <h2 className="text-lg font-semibold mb-4">Informação da Conta</h2>
+        <h2 className="text-lg font-semibold mb-4">{t('profile.accountInfo')}</h2>
         <div className="flex items-center gap-6 mb-6">
           <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border">
             {avatarUrl ? (
@@ -115,12 +117,12 @@ function ProfilePage() {
             )}
           </div>
           <div>
-            <p className="font-medium text-lg">{user.name || 'Sem nome'}</p>
+            <p className="font-medium text-lg">{user.name || t('profile.noName')}</p>
             <p className="text-gray-500 mb-3">{user.email}</p>
-            <p className="text-sm text-gray-500 mb-3">Empresa associada: <strong>{companyName}</strong></p>
+            <p className="text-sm text-gray-500 mb-3">{t('profile.company')} <strong>{companyName}</strong></p>
             <div>
               <label className="cursor-pointer bg-[#111111] text-white px-4 py-2 rounded text-sm hover:bg-black transition-colors">
-                {uploading ? 'A enviar...' : 'Alterar Imagem'}
+                {uploading ? t('profile.uploading') : t('profile.changeImage')}
                 <input
                   type="file"
                   className="hidden"
@@ -129,17 +131,17 @@ function ProfilePage() {
                   disabled={uploading}
                 />
               </label>
-              <p className="text-xs text-gray-400 mt-2">Formatos suportados: PNG, JPG, WEBP. Tamanho ideal: 256x256.</p>
+              <p className="text-xs text-gray-400 mt-2">{t('profile.supportedFormats')}</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm mb-8">
-        <h2 className="text-lg font-semibold mb-4">Alterar Password</h2>
+        <h2 className="text-lg font-semibold mb-4">{t('profile.changePassword')}</h2>
         <form onSubmit={handlePasswordChange} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nova Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">{t('profile.newPassword')}</label>
             <input
               type="password"
               value={password}
@@ -153,19 +155,19 @@ function ProfilePage() {
             type="submit"
             className="bg-[#111111] text-white px-4 py-2 rounded text-sm hover:bg-black transition-colors"
           >
-            Atualizar Password
+            {t('profile.updatePassword')}
           </button>
         </form>
       </div>
 
       <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h2 className="text-lg font-semibold text-red-600 mb-4">Sessão</h2>
-        <p className="text-sm text-gray-500 mb-4">Termine a sessão no seu dispositivo atual.</p>
+        <h2 className="text-lg font-semibold text-red-600 mb-4">{t('profile.session')}</h2>
+        <p className="text-sm text-gray-500 mb-4">{t('profile.sessionDesc')}</p>
         <button
           onClick={handleLogout}
           className="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded text-sm hover:bg-red-100 transition-colors"
         >
-          Terminar Sessão
+          {t('profile.logout')}
         </button>
       </div>
     </div>

@@ -7,6 +7,7 @@ import type { DashboardStats, Alert, Policy } from '@/lib/types'
 import { POLICY_TYPE_LABELS } from '@/lib/types'
 import { useState, useEffect, useMemo } from 'react'
 import { useIdentity } from '@/lib/identity-context'
+import { useTranslation } from 'react-i18next'
 
 export const Route = createFileRoute('/dashboard')({
   component: DashboardPage,
@@ -36,6 +37,7 @@ function daysUntil(dateStr: string): number {
 
 function DashboardPage() {
   const { user, ready } = useIdentity()
+  const { t } = useTranslation()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
@@ -86,10 +88,10 @@ function DashboardPage() {
       const days = daysUntil(p.endDate)
       return {
         icon: '⏰',
-        title: `Renovar ${POLICY_TYPE_LABELS[p.type] || p.type}`,
-        description: `A apólice ${p.policyNumber} da ${p.insurer} expira em ${days} dia${days !== 1 ? 's' : ''}. Compare cotações agora.`,
+        title: t('dashboard.nextActionRenewal_title', { type: POLICY_TYPE_LABELS[p.type] || p.type }),
+        description: t('dashboard.nextActionRenewal_desc', { number: p.policyNumber, insurer: p.insurer, days, plural: days !== 1 ? 's' : '' }),
         link: '/quotes-comparison',
-        linkLabel: 'Comparar cotações →',
+        linkLabel: t('dashboard.compareQuotes'),
         color: days <= 30 ? '#FFF1F2' : '#FFFBEB',
         borderColor: days <= 30 ? '#FECDD3' : '#FDE68A',
       }
@@ -97,20 +99,20 @@ function DashboardPage() {
     if (policies.length === 0) {
       return {
         icon: '📋',
-        title: 'Adicione a sua primeira apólice',
-        description: 'Carregue um PDF ou imagem de uma apólice e a IA extrai os dados automaticamente.',
+        title: t('dashboard.nextActionEmpty_title'),
+        description: t('dashboard.nextActionEmpty_desc'),
         link: '/policies',
-        linkLabel: 'Adicionar apólice →',
+        linkLabel: t('dashboard.addPolicyLink'),
         color: '#F0F9FF',
         borderColor: '#BAE6FD',
       }
     }
     return {
       icon: '✦',
-      title: 'Portfólio em dia',
-      description: 'Não há renovações urgentes. Use o Comparativo IA para optimizar as suas coberturas.',
+      title: t('dashboard.nextActionOk_title'),
+      description: t('dashboard.nextActionOk_desc'),
       link: '/quotes-comparison',
-      linkLabel: 'Analisar cotações →',
+      linkLabel: t('dashboard.analyzeQuotes'),
       color: '#F0FDF4',
       borderColor: '#BBF7D0',
     }
@@ -142,10 +144,10 @@ function DashboardPage() {
         {/* Page title */}
         <div className="mb-6">
           <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1.4rem', color: '#111111', margin: 0 }}>
-            Painel de Controlo
+            {t('dashboard.title')}
           </h1>
           <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.85rem', color: '#888888', marginTop: '0.25rem' }}>
-            Visão geral do seu programa de seguros
+            {t('dashboard.subtitle')}
           </p>
         </div>
 
@@ -157,32 +159,10 @@ function DashboardPage() {
           <>
             {/* KPI Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <KPICard
-                label="Apólices Activas"
-                value={String(stats?.activePolicies ?? 0)}
-                icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                accent="#3B82F6"
-              />
-              <KPICard
-                label="Prémios Anuais"
-                value={formatCurrency(stats?.annualPremiums ?? 0)}
-                icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                accent="#22C55E"
-              />
-              <KPICard
-                label="Renovações 90d"
-                value={String(stats?.renewalsIn90Days ?? 0)}
-                icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                accent="#F59E0B"
-                highlight={(stats?.renewalsIn90Days ?? 0) > 0}
-              />
-              <KPICard
-                label="Sinistros Abertos"
-                value={String(stats?.openClaims ?? 0)}
-                icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                accent="#EF4444"
-                highlight={(stats?.openClaims ?? 0) > 0}
-              />
+              <KPICard label={t('dashboard.activePolicies')} value={String(stats?.activePolicies ?? 0)} icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" accent="#3B82F6" />
+              <KPICard label={t('dashboard.annualPremiums')} value={formatCurrency(stats?.annualPremiums ?? 0)} icon="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" accent="#22C55E" />
+              <KPICard label={t('dashboard.renewals90d')} value={String(stats?.renewalsIn90Days ?? 0)} icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" accent="#F59E0B" highlight={(stats?.renewalsIn90Days ?? 0) > 0} />
+              <KPICard label={t('dashboard.openClaims')} value={String(stats?.openClaims ?? 0)} icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" accent="#EF4444" highlight={(stats?.openClaims ?? 0) > 0} />
             </div>
 
             {/* Próxima acção recomendada */}
@@ -232,10 +212,10 @@ function DashboardPage() {
                   <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', overflow: 'hidden' }}>
                     <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eeeeee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#111111', margin: 0 }}>
-                        ⏰ Renovações Próximas
+                        {t('dashboard.upcomingRenewals')}
                       </h2>
                       <Link to="/policies" style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#C8961A', fontWeight: 600, textDecoration: 'none' }}>
-                        Ver todas →
+                        {t('dashboard.seeAll')}
                       </Link>
                     </div>
                     <div>
@@ -268,7 +248,7 @@ function DashboardPage() {
                                 {POLICY_TYPE_LABELS[policy.type] || policy.type} — {policy.insurer}
                               </p>
                               <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.72rem', color: '#888888', margin: 0 }}>
-                                {policy.policyNumber} · {formatCurrency(policy.annualPremium)}/ano
+                                {policy.policyNumber} · {formatCurrency(policy.annualPremium)}{t('dashboard.perYear')}
                               </p>
                             </div>
                             <div style={{ textAlign: 'right', flexShrink: 0 }}>
@@ -290,7 +270,7 @@ function DashboardPage() {
                 {premiumByType.length > 0 && (
                   <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', padding: '1.25rem' }}>
                     <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#111111', margin: '0 0 1rem' }}>
-                      Distribuição de Prémios por Tipo
+                      {t('dashboard.premiumDistribution')}
                     </h2>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                       {premiumByType.map(({ type, value, pct }) => {
@@ -327,31 +307,19 @@ function DashboardPage() {
                 <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', overflow: 'hidden' }}>
                   <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eeeeee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#111111', margin: 0 }}>
-                      Apólices Recentes
+                      {t('dashboard.recentPolicies')}
                     </h2>
                     <Link to="/policies" style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#C8961A', fontWeight: 600, textDecoration: 'none' }}>
-                      Ver todas →
+                      {t('dashboard.seeAll')}
                     </Link>
                   </div>
                   {policies.length === 0 ? (
                     <div style={{ padding: '2rem', textAlign: 'center' }}>
                       <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.85rem', color: '#aaaaaa', margin: '0 0 0.75rem' }}>
-                        Ainda não tem apólices registadas.
+                        {t('dashboard.noPolicies')}
                       </p>
-                      <Link
-                        to="/policies"
-                        style={{
-                          fontFamily: "'Montserrat', sans-serif",
-                          fontWeight: 600,
-                          fontSize: '0.8rem',
-                          color: '#ffffff',
-                          background: '#111111',
-                          padding: '0.5rem 1rem',
-                          borderRadius: '4px',
-                          textDecoration: 'none',
-                        }}
-                      >
-                        + Adicionar apólice
+                      <Link to="/policies" style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.8rem', color: '#ffffff', background: '#111111', padding: '0.5rem 1rem', borderRadius: '4px', textDecoration: 'none' }}>
+                        {t('dashboard.addPolicy')}
                       </Link>
                     </div>
                   ) : (
@@ -409,12 +377,12 @@ function DashboardPage() {
               <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', overflow: 'hidden', alignSelf: 'start' }}>
                 <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eeeeee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#111111', margin: 0 }}>
-                    Alertas
+                    {t('dashboard.alerts')}
                   </h2>
                   {alerts.length > 0 && (
                     <button
                       onClick={async () => {
-                        if (confirm('Tem a certeza que deseja limpar os alertas?')) {
+                        if (confirm(t('dashboard.clearAlertsConfirm'))) {
                           const { clearAlerts } = await import('@/lib/server-fns')
                           await clearAlerts()
                           setAlerts([])
@@ -422,7 +390,7 @@ function DashboardPage() {
                       }}
                       style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
                     >
-                      Limpar
+                      {t('dashboard.clearAlerts')}
                     </button>
                   )}
                 </div>
@@ -430,7 +398,7 @@ function DashboardPage() {
                   {alerts.length === 0 ? (
                     <div style={{ padding: '2rem', textAlign: 'center' }}>
                       <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', color: '#aaaaaa', margin: 0 }}>
-                        Sem alertas no momento.
+                        {t('dashboard.noAlerts')}
                       </p>
                     </div>
                   ) : (
@@ -526,29 +494,21 @@ function KPICard({
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation()
   const styles: Record<string, { bg: string; color: string }> = {
     active:    { bg: '#EAF3DE', color: '#3B6D11' },
     expiring:  { bg: '#FAEEDA', color: '#854F0B' },
     expired:   { bg: '#FEE2E2', color: '#991B1B' },
     cancelled: { bg: '#F3F4F6', color: '#6B7280' },
   }
-  const labels: Record<string, string> = {
-    active: 'Activa', expiring: 'A Expirar', expired: 'Expirada', cancelled: 'Cancelada',
+  const labelKeys: Record<string, string> = {
+    active: 'dashboard.statusActive', expiring: 'dashboard.statusExpiring',
+    expired: 'dashboard.statusExpired', cancelled: 'dashboard.statusCancelled',
   }
   const s = styles[status] || { bg: '#F3F4F6', color: '#6B7280' }
   return (
-    <span style={{
-      display: 'inline-block',
-      fontFamily: "'Montserrat', sans-serif",
-      fontSize: '0.65rem',
-      fontWeight: 600,
-      padding: '0.15rem 0.5rem',
-      borderRadius: '20px',
-      background: s.bg,
-      color: s.color,
-      marginTop: '0.15rem',
-    }}>
-      {labels[status] || status}
+    <span style={{ display: 'inline-block', fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 600, padding: '0.15rem 0.5rem', borderRadius: '20px', background: s.bg, color: s.color, marginTop: '0.15rem' }}>
+      {labelKeys[status] ? t(labelKeys[status]) : status}
     </span>
   )
 }

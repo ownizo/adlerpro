@@ -2,6 +2,8 @@ import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-r
 import { IdentityProvider } from '../lib/identity-context'
 import { CallbackHandler } from '../components/CallbackHandler'
 import '../styles.css'
+// Initialise i18n before any component renders
+import '../lib/i18n'
 
 export const Route = createRootRoute({
   head: () => ({

@@ -5,6 +5,8 @@ import { getServerUser } from '@/lib/auth'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { useTranslation } from 'react-i18next'
+import i18n from '@/lib/i18n'
 
 export const Route = createFileRoute('/quotes-comparison')({
   beforeLoad: async () => {
@@ -38,39 +40,39 @@ function formatFileSize(bytes: number) {
 
 const font = "'Montserrat', sans-serif"
 
-function ExtractedDataCard({ data, name }: { data: Record<string, any>; name: string }) {
+function ExtractedDataCard({ data, name, t }: { data: Record<string, any>; name: string; t: (k: string, opts?: any) => string }) {
   return (
     <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '4px', padding: '1rem', marginTop: '0.75rem' }}>
       <p style={{ fontFamily: font, fontSize: '0.65rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.6rem' }}>
-        ✓ Dados extraídos — {name}
+        {t('comparison.extracted', { name })}
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem 1rem', marginBottom: '0.6rem' }}>
-        {data.insurer && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>SEGURADORA</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{data.insurer}</p></div>}
-        {data.policyNumber && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>N.º APÓLICE</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{data.policyNumber}</p></div>}
-        {data.annualPremium > 0 && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>PRÉMIO ANUAL</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 700, color: '#111', margin: 0 }}>{formatCurrency(data.annualPremium)}</p></div>}
-        {data.insuredValue > 0 && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>CAPITAL SEGURADO</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{formatCurrency(data.insuredValue)}</p></div>}
-        {data.startDate && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>INÍCIO</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{formatDate(data.startDate)}</p></div>}
-        {data.endDate && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>FIM</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{formatDate(data.endDate)}</p></div>}
+        {data.insurer && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.insurer')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{data.insurer}</p></div>}
+        {data.policyNumber && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.policyNumber')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{data.policyNumber}</p></div>}
+        {data.annualPremium > 0 && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.annualPremium')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 700, color: '#111', margin: 0 }}>{formatCurrency(data.annualPremium)}</p></div>}
+        {data.insuredValue > 0 && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.insuredValue')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{formatCurrency(data.insuredValue)}</p></div>}
+        {data.startDate && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.startDate')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{formatDate(data.startDate)}</p></div>}
+        {data.endDate && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.endDate')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{formatDate(data.endDate)}</p></div>}
       </div>
       {data.coverages?.length > 0 && (
         <div style={{ marginBottom: '0.4rem' }}>
-          <p style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 700, color: '#166534', margin: '0 0 0.25rem' }}>COBERTURAS</p>
+          <p style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 700, color: '#166534', margin: '0 0 0.25rem' }}>{t('comparison.coverages')}</p>
           <ul style={{ margin: 0, paddingLeft: '1rem' }}>
             {data.coverages.slice(0, 4).map((c: string, i: number) => (
               <li key={i} style={{ fontFamily: font, fontSize: '0.72rem', color: '#333', marginBottom: '0.15rem' }}>{c}</li>
             ))}
-            {data.coverages.length > 4 && <li style={{ fontFamily: font, fontSize: '0.72rem', color: '#999' }}>+{data.coverages.length - 4} mais</li>}
+            {data.coverages.length > 4 && <li style={{ fontFamily: font, fontSize: '0.72rem', color: '#999' }}>{t('comparison.moreItems', { count: data.coverages.length - 4 })}</li>}
           </ul>
         </div>
       )}
       {data.exclusions?.length > 0 && (
         <div>
-          <p style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 700, color: '#991B1B', margin: '0 0 0.25rem' }}>EXCLUSÕES</p>
+          <p style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 700, color: '#991B1B', margin: '0 0 0.25rem' }}>{t('comparison.exclusions')}</p>
           <ul style={{ margin: 0, paddingLeft: '1rem' }}>
             {data.exclusions.slice(0, 3).map((e: string, i: number) => (
               <li key={i} style={{ fontFamily: font, fontSize: '0.72rem', color: '#555', marginBottom: '0.15rem' }}>{e}</li>
             ))}
-            {data.exclusions.length > 3 && <li style={{ fontFamily: font, fontSize: '0.72rem', color: '#999' }}>+{data.exclusions.length - 3} mais</li>}
+            {data.exclusions.length > 3 && <li style={{ fontFamily: font, fontSize: '0.72rem', color: '#999' }}>{t('comparison.moreItems', { count: data.exclusions.length - 3 })}</li>}
           </ul>
         </div>
       )}
@@ -78,10 +80,9 @@ function ExtractedDataCard({ data, name }: { data: Record<string, any>; name: st
   )
 }
 
-function ComparisonTable({ quotes, recommendedIndex }: { quotes: QuoteEntry[]; recommendedIndex: number }) {
+function ComparisonTable({ quotes, recommendedIndex, t }: { quotes: QuoteEntry[]; recommendedIndex: number; t: (k: string, opts?: any) => string }) {
   const done = quotes.filter(q => q.status === 'done' && q.data)
 
-  // Determinar melhor valor em cada métrica (para highlight)
   const premiums = done.map(q => q.data!.annualPremium || 0)
   const capitals = done.map(q => q.data!.insuredValue || 0)
   const deductibles = done.map(q => q.data!.deductible || 0)
@@ -100,7 +101,7 @@ function ComparisonTable({ quotes, recommendedIndex }: { quotes: QuoteEntry[]; r
         <thead>
           <tr style={{ background: '#f8f8f8' }}>
             <th style={{ padding: '0.6rem 0.85rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #eee', width: colWidth }}>
-              Métrica
+              {t('comparison.metric')}
             </th>
             {done.map((q, i) => {
               const isRec = i === recommendedIndex
@@ -109,10 +110,10 @@ function ComparisonTable({ quotes, recommendedIndex }: { quotes: QuoteEntry[]; r
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
                     {isRec && (
                       <span style={{ background: '#16A34A', color: '#fff', fontSize: '0.55rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '20px', letterSpacing: '0.06em' }}>
-                        RECOMENDADO
+                        {t('comparison.recommended')}
                       </span>
                     )}
-                    <span>{q.data?.insurer || `Cotação ${i + 1}`}</span>
+                    <span>{q.data?.insurer || `${t('comparison.quote')} ${i + 1}`}</span>
                     <span style={{ fontWeight: 300, fontSize: '0.65rem', color: '#999' }}>{q.file.name}</span>
                   </div>
                 </th>
@@ -123,32 +124,32 @@ function ComparisonTable({ quotes, recommendedIndex }: { quotes: QuoteEntry[]; r
         <tbody>
           {[
             {
-              label: 'Prémio Anual',
+              label: t('comparison.metricPremium'),
               values: premiums,
               format: (v: number) => v > 0 ? formatCurrency(v) : '—',
               best: (v: number) => v === minPremium && v > 0,
-              bestLabel: 'mais baixo',
+              bestLabel: t('comparison.bestLowest'),
             },
             {
-              label: 'Capital Segurado',
+              label: t('comparison.metricCapital'),
               values: capitals,
               format: (v: number) => v > 0 ? formatCurrency(v) : '—',
               best: (v: number) => v === maxCapital && v > 0,
-              bestLabel: 'mais alto',
+              bestLabel: t('comparison.bestHighest'),
             },
             {
-              label: 'Franquia',
+              label: t('comparison.metricDeductible'),
               values: deductibles,
               format: (v: number) => v > 0 ? formatCurrency(v) : '—',
               best: (v: number) => v === minDeductible && v > 0,
-              bestLabel: 'mais baixa',
+              bestLabel: t('comparison.bestLowestF'),
             },
             {
-              label: 'N.º Coberturas',
+              label: t('comparison.metricCoverages'),
               values: coverageCounts,
               format: (v: number) => v > 0 ? String(v) : '—',
               best: (v: number) => v === maxCoverages && v > 0,
-              bestLabel: 'mais coberturas',
+              bestLabel: t('comparison.bestMoreCov'),
             },
           ].map((row, ri) => (
             <tr key={ri} style={{ borderBottom: '1px solid #f5f5f5' }}>
@@ -179,19 +180,18 @@ function ComparisonTable({ quotes, recommendedIndex }: { quotes: QuoteEntry[]; r
   )
 }
 
-function RecommendationCard({ result, quotes }: { result: CompareResult; quotes: QuoteEntry[] }) {
+function RecommendationCard({ result, quotes, t }: { result: CompareResult; quotes: QuoteEntry[]; t: (k: string, opts?: any) => string }) {
   const done = quotes.filter(q => q.status === 'done' && q.data)
   const recommended = done[result.recommendedIndex]
   if (!recommended) return null
 
   return (
     <div style={{ border: '2px solid #16A34A', borderRadius: '4px', overflow: 'hidden', marginBottom: '1.5rem' }}>
-      {/* Header */}
       <div style={{ background: '#16A34A', padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         <span style={{ fontSize: '1.25rem' }}>✦</span>
         <div>
           <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.9rem', color: '#fff', margin: 0 }}>
-            Recomendação: {recommended.data?.insurer || `Cotação ${result.recommendedIndex + 1}`}
+            {t('comparison.recommendationTitle', { name: recommended.data?.insurer || `${t('comparison.quote')} ${result.recommendedIndex + 1}` })}
           </p>
           <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.75rem', color: 'rgba(255,255,255,0.85)', margin: 0 }}>
             {recommended.file.name}
@@ -200,12 +200,10 @@ function RecommendationCard({ result, quotes }: { result: CompareResult; quotes:
       </div>
 
       <div style={{ padding: '1rem 1.25rem', background: '#F0FDF4' }}>
-        {/* Razão principal */}
         <p style={{ fontFamily: font, fontSize: '0.82rem', color: '#166534', fontWeight: 500, margin: '0 0 0.75rem', lineHeight: 1.5 }}>
           {result.reason}
         </p>
 
-        {/* Pontos fortes */}
         {result.highlights?.length > 0 && (
           <ul style={{ margin: '0 0 0.75rem', paddingLeft: 0, listStyle: 'none' }}>
             {result.highlights.map((h, i) => (
@@ -217,17 +215,16 @@ function RecommendationCard({ result, quotes }: { result: CompareResult; quotes:
           </ul>
         )}
 
-        {/* Avisos sobre as outras */}
         {result.warnings && Object.keys(result.warnings).length > 0 && (
           <div style={{ borderTop: '1px solid #BBF7D0', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
             <p style={{ fontFamily: font, fontSize: '0.65rem', fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.4rem' }}>
-              Outras opções
+              {t('comparison.otherOptions')}
             </p>
             {Object.entries(result.warnings).map(([idx, warning]) => {
               const q = done[Number(idx)]
               return (
                 <p key={idx} style={{ fontFamily: font, fontSize: '0.75rem', color: '#666', margin: '0 0 0.2rem' }}>
-                  <strong>{q?.data?.insurer || `Cotação ${Number(idx) + 1}`}:</strong> {warning}
+                  <strong>{q?.data?.insurer || `${t('comparison.quote')} ${Number(idx) + 1}`}:</strong> {warning}
                 </p>
               )
             })}
@@ -239,6 +236,7 @@ function RecommendationCard({ result, quotes }: { result: CompareResult; quotes:
 }
 
 function QuotesComparisonPage() {
+  const { t } = useTranslation()
   const [quotes, setQuotes] = useState<QuoteEntry[]>([])
   const [comparing, setComparing] = useState(false)
   const [compareResult, setCompareResult] = useState<CompareResult | null>(null)
@@ -285,27 +283,32 @@ function QuotesComparisonPage() {
     setCompareError(null)
     try {
       const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
-      if (!apiKey) throw new Error('Chave da API Anthropic não configurada (VITE_ANTHROPIC_API_KEY).')
+      if (!apiKey) throw new Error(t('comparison.errors.noApiKey'))
+
+      const lang = i18n.language
+      const langInstruction = lang === 'en'
+        ? 'Answer in English.'
+        : 'Responde em Português de Portugal.'
 
       const quoteSummaries = doneQuotes.map((q, i) =>
-        `Cotação ${i} (índice ${i}) — ${q.file.name}:\n${JSON.stringify(q.data, null, 2)}`
+        `Quote ${i} (index ${i}) — ${q.file.name}:\n${JSON.stringify(q.data, null, 2)}`
       ).join('\n\n')
 
-      const prompt = `Analisa estas ${doneQuotes.length} cotações de seguro e responde APENAS com JSON válido, sem mais nada:
+      const prompt = `Analyse these ${doneQuotes.length} insurance quotes and respond ONLY with valid JSON, nothing else. ${langInstruction}
 
 ${quoteSummaries}
 
-Responde com este JSON exacto (sem markdown, sem texto extra):
+Respond with this exact JSON (no markdown, no extra text):
 {
-  "recommendedIndex": <número 0, 1 ou 2 — índice da cotação recomendada>,
-  "reason": "<frase curta e directa com a razão principal da recomendação, em Português de Portugal>",
+  "recommendedIndex": <number 0, 1 or 2 — index of the recommended quote>,
+  "reason": "<short direct sentence with the main reason for the recommendation>",
   "highlights": [
-    "<ponto forte da cotação recomendada>",
-    "<segundo ponto forte>",
-    "<terceiro ponto forte se aplicável>"
+    "<strength of the recommended quote>",
+    "<second strength>",
+    "<third strength if applicable>"
   ],
   "warnings": {
-    "<índice das outras cotações como string>": "<razão breve porque não é a melhor escolha>"
+    "<index of other quotes as string>": "<brief reason why it is not the best choice>"
   }
 }`
 
@@ -329,7 +332,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
 
       const text: string = data.content?.[0]?.text ?? ''
       const jsonMatch = text.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) throw new Error('Resposta da IA não contém JSON válido.')
+      if (!jsonMatch) throw new Error(t('comparison.errors.invalidResponse'))
 
       const result = JSON.parse(jsonMatch[0])
       if (result.recommendedIndex === undefined) throw new Error('Resposta inválida da IA.')
@@ -337,11 +340,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
     } catch (err: any) {
       const msg: string = err.message ?? String(err)
       const isRateLimit = /rate.?limit|50[,.]?000/i.test(msg)
-      setCompareError(
-        isRateLimit
-          ? '⏳ O serviço está temporariamente ocupado. Aguarde 1-2 minutos e tente novamente.'
-          : 'Ocorreu um erro inesperado. Por favor tente novamente.'
-      )
+      setCompareError(isRateLimit ? t('comparison.errors.rateLimit') : t('comparison.errors.generic'))
     } finally {
       setComparing(false)
     }
@@ -430,7 +429,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(7.5)
       doc.setTextColor(136, 136, 136)
-      doc.text('COTAÇÕES ANALISADAS', marginL, y)
+      doc.text(t('comparison.title').toUpperCase(), marginL, y)
       y += 5
 
       done.forEach((q, i) => {
@@ -464,15 +463,15 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(7.5)
       doc.setTextColor(136, 136, 136)
-      doc.text('TABELA COMPARATIVA', marginL, y)
+      doc.text(t('comparison.comparisonTable').toUpperCase(), marginL, y)
       y += 4
 
-      const headers = ['Métrica', ...done.map((q, i) => q.data?.insurer || `Cotação ${i + 1}`)]
+      const headers = [t('comparison.metric'), ...done.map((q, i) => q.data?.insurer || `${t('comparison.quote')} ${i + 1}`)]
       const metrics = [
-        { label: 'Prémio Anual', key: 'annualPremium', format: (v: number) => v > 0 ? formatCurrency(v) : '—' },
-        { label: 'Capital Segurado', key: 'insuredValue', format: (v: number) => v > 0 ? formatCurrency(v) : '—' },
-        { label: 'Franquia', key: 'deductible', format: (v: number) => v > 0 ? formatCurrency(v) : '—' },
-        { label: 'N.º Coberturas', key: 'coverages', format: (_: any, d: any) => d?.coverages?.length > 0 ? String(d.coverages.length) : '—' },
+        { label: t('comparison.metricPremium'), key: 'annualPremium', format: (v: number) => v > 0 ? formatCurrency(v) : '—' },
+        { label: t('comparison.metricCapital'), key: 'insuredValue', format: (v: number) => v > 0 ? formatCurrency(v) : '—' },
+        { label: t('comparison.metricDeductible'), key: 'deductible', format: (v: number) => v > 0 ? formatCurrency(v) : '—' },
+        { label: t('comparison.metricCoverages'), key: 'coverages', format: (_: any, d: any) => d?.coverages?.length > 0 ? String(d.coverages.length) : '—' },
       ]
 
       const tableBody = metrics.map(m => [
@@ -509,8 +508,8 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
       doc.setFont('helvetica', 'bold')
       doc.setFontSize(9)
       doc.setTextColor(255, 255, 255)
-      const recName = done[compareResult.recommendedIndex]?.data?.insurer || `Cotação ${compareResult.recommendedIndex + 1}`
-      doc.text(`✦  Recomendação: ${recName}`, marginL + 4, y + 5.2)
+      const recName = done[compareResult.recommendedIndex]?.data?.insurer || `${t('comparison.quote')} ${compareResult.recommendedIndex + 1}`
+      doc.text(`✦  ${t('comparison.recommendationTitle', { name: recName })}`, marginL + 4, y + 5.2)
       y += 13
 
       // Razão
@@ -539,7 +538,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
         doc.setFont('helvetica', 'bold')
         doc.setFontSize(7.5)
         doc.setTextColor(136, 136, 136)
-        doc.text('OUTRAS OPÇÕES', marginL + 2, y)
+        doc.text(t('comparison.otherOptions').toUpperCase(), marginL + 2, y)
         y += 5
         doc.setFont('helvetica', 'normal')
         doc.setFontSize(8)
@@ -556,7 +555,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
       y += 8
 
       // ── Disclaimer ──
-      const disclaimer = 'Esta análise foi gerada automaticamente por inteligência artificial com base nos documentos fornecidos. Os resultados têm carácter meramente informativo e não constituem aconselhamento profissional de seguros. A Adler & Rochefort recomenda a consulta com um mediador certificado antes de tomar qualquer decisão.'
+      const disclaimer = t('comparison.disclaimer')
       doc.setDrawColor(238, 238, 238)
       doc.line(marginL, y, pageW - marginR, y)
       y += 5
@@ -597,9 +596,9 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.75rem', gap: '1rem' }}>
           <div>
-            <h1 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: '#111', margin: 0 }}>Comparativo de Cotações</h1>
+            <h1 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: '#111', margin: 0 }}>{t('comparison.title')}</h1>
             <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.85rem', color: '#666', marginTop: '0.35rem' }}>
-              Analise cada cotação individualmente e compare no final. Mínimo 2, máximo 2 cotações.
+              {t('comparison.subtitle')}
             </p>
           </div>
           {(quotes.length > 0 || compareResult) && (
@@ -610,11 +609,11 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
                   disabled={exporting}
                   style={{ fontFamily: font, fontWeight: 600, fontSize: '0.78rem', padding: '0.45rem 0.85rem', background: exporting ? '#ccc' : '#111', color: '#fff', border: 'none', borderRadius: '4px', cursor: exporting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
                 >
-                  {exporting ? 'A gerar PDF...' : '↓ Exportar PDF'}
+                  {exporting ? t('comparison.exportingPdf') : t('comparison.exportPdf')}
                 </button>
               )}
               <button onClick={handleReset} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.78rem', padding: '0.45rem 0.85rem', background: 'none', color: '#666', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                Recomeçar
+                {t('comparison.reset')}
               </button>
             </div>
           )}
@@ -641,11 +640,11 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
                 {q.status === 'analyzing' && (
                   <span style={{ fontFamily: font, fontSize: '0.72rem', color: '#C8961A', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #C8961A', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                    A analisar...
+                    {t('comparison.analyzing')}
                   </span>
                 )}
                 {q.status === 'done' && (
-                  <span style={{ fontFamily: font, fontSize: '0.72rem', fontWeight: 600, color: '#166534' }}>Analisado</span>
+                  <span style={{ fontFamily: font, fontSize: '0.72rem', fontWeight: 600, color: '#166534' }}>{t('comparison.analyzed')}</span>
                 )}
                 {q.status === 'error' && (
                   <span style={{ fontFamily: font, fontSize: '0.72rem', color: '#dc2626' }}>{q.error}</span>
@@ -656,7 +655,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
               </div>
             </div>
             {q.status === 'done' && q.data && (
-              <ExtractedDataCard data={q.data} name={q.file.name} />
+              <ExtractedDataCard data={q.data} name={q.file.name} t={t} />
             )}
           </div>
         ))}
@@ -665,14 +664,12 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
         {canAddMore && (
           <div style={{ background: '#fff', border: '1.5px dashed #ddd', borderRadius: '4px', padding: '1.25rem', marginBottom: '0.75rem' }}>
             <p style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', color: '#555', margin: '0 0 0.75rem' }}>
-              Cotação {quotes.length + 1}
-              <span style={{ fontWeight: 300, color: '#999' }}>
-                {quotes.length === 0 ? ' (obrigatória)' : ' (obrigatória)'}
-              </span>
+              {t('comparison.quote')} {quotes.length + 1}
+              <span style={{ fontWeight: 300, color: '#999' }}> {t('comparison.quoteMandatory')}</span>
             </p>
             {!pendingFile ? (
               <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontFamily: font, fontWeight: 600, fontSize: '0.82rem', padding: '0.55rem 1rem', background: '#f5f5f5', color: '#333', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer' }}>
-                📎 Seleccionar ficheiro
+                {t('comparison.selectFile')}
                 <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleFileSelect} style={{ display: 'none' }} />
               </label>
             ) : (
@@ -686,7 +683,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
                   <button onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: '1.1rem', lineHeight: 1, marginLeft: '0.25rem' }}>×</button>
                 </div>
                 <button onClick={handleAnalyze} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', padding: '0.55rem 1.1rem', background: '#111', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  ✦ Analisar
+                  {t('comparison.analyze')}
                 </button>
               </div>
             )}
@@ -696,7 +693,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
         {/* Indicação de progresso */}
         {!canCompare && doneQuotes.length < 2 && quotes.length > 0 && !isAnalyzing && !compareResult && (
           <p style={{ fontFamily: font, fontSize: '0.78rem', color: '#999', margin: '0.25rem 0 0.75rem' }}>
-            Adicione mais {2 - doneQuotes.length} cotação(ões) para poder comparar.
+            {t('comparison.canCompareHint', { count: 2 - doneQuotes.length })}
           </p>
         )}
 
@@ -709,10 +706,10 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
               style={{ fontFamily: font, fontWeight: 600, fontSize: '0.9rem', padding: '0.75rem 2rem', background: comparing ? '#ccc' : '#C8961A', color: '#fff', border: 'none', borderRadius: '4px', cursor: comparing ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               {comparing
-                ? <><span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />A comparar...</>
-                : <>✦ Comparar {doneQuotes.length} cotações</>}
+                ? <><span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />{t('comparison.comparing')}</>
+                : <>{t('comparison.compare', { count: doneQuotes.length })}</>}
             </button>
-            {comparing && <span style={{ fontFamily: font, fontSize: '0.78rem', color: '#999' }}>Normalmente demora 5–10 segundos</span>}
+            {comparing && <span style={{ fontFamily: font, fontSize: '0.78rem', color: '#999' }}>{t('comparison.comparingHint')}</span>}
           </div>
         )}
 
@@ -729,7 +726,7 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.5rem 0 1.25rem' }}>
               <div style={{ flex: 1, height: '1px', background: '#eee' }} />
               <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.72rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0, whiteSpace: 'nowrap' }}>
-                Resumo e Recomendação
+                {t('comparison.summaryTitle')}
               </p>
               <div style={{ flex: 1, height: '1px', background: '#eee' }} />
               <button
@@ -737,24 +734,24 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
                 disabled={exporting}
                 style={{ fontFamily: font, fontWeight: 600, fontSize: '0.72rem', padding: '0.35rem 0.75rem', background: exporting ? '#ccc' : '#111', color: '#fff', border: 'none', borderRadius: '4px', cursor: exporting ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap', flexShrink: 0 }}
               >
-                {exporting ? 'A gerar...' : '↓ Exportar PDF'}
+                {exporting ? t('comparison.exportingShort') : t('comparison.exportPdf')}
               </button>
             </div>
 
             {/* Tabela comparativa */}
             <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '4px', padding: '1.25rem', marginBottom: '1rem' }}>
               <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.72rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 1rem' }}>
-                Tabela Comparativa
+                {t('comparison.comparisonTable')}
               </p>
-              <ComparisonTable quotes={quotes} recommendedIndex={compareResult.recommendedIndex} />
+              <ComparisonTable quotes={quotes} recommendedIndex={compareResult.recommendedIndex} t={t} />
             </div>
 
             {/* Card de recomendação */}
-            <RecommendationCard result={compareResult} quotes={quotes} />
+            <RecommendationCard result={compareResult} quotes={quotes} t={t} />
 
             {/* Disclaimer */}
             <p style={{ fontFamily: font, fontSize: '0.68rem', fontWeight: 300, color: '#aaaaaa', lineHeight: 1.6, marginTop: '1rem', padding: '0 0.25rem' }}>
-              Esta análise foi gerada automaticamente por inteligência artificial com base nos documentos fornecidos. Os resultados têm carácter meramente informativo e não constituem aconselhamento profissional de seguros. A Adler & Rochefort recomenda a consulta com um mediador certificado antes de tomar qualquer decisão.
+              {t('comparison.disclaimer')}
             </p>
           </div>
         )}

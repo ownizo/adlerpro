@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { useState } from 'react'
 import { Sun, CloudRain, Cloud, CloudSun, CloudLightning, Wind, Droplets, MapPin, AlertTriangle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 
 export const Route = createFileRoute('/weather-alerts')({
   component: WeatherAlertsPage,
@@ -64,14 +65,6 @@ function getWeatherIcon(id: number) {
   return <Cloud className="w-9 h-9 text-gray-500" />
 }
 
-function getRiskLabel(precipitaProb: string, windClass: number) {
-  const prob = parseFloat(precipitaProb || '0')
-  if (windClass >= 4 || prob >= 80) return { label: 'Risco Elevado', color: '#dc2626' }
-  if (windClass >= 3 || prob >= 60) return { label: 'Atenção', color: '#d97706' }
-  if (windClass >= 2 || prob >= 40) return { label: 'Aviso', color: '#C8961A' }
-  return { label: 'Normal', color: '#16a34a' }
-}
-
 function findLocationByName(query: string) {
   const q = query.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   const exact = IPMA_LOCATIONS.find(loc =>
@@ -89,12 +82,21 @@ function findLocationByName(query: string) {
 }
 
 function WeatherAlertsPage() {
+  const { t } = useTranslation()
   const [address, setAddress] = useState('')
   const [loading, setLoading] = useState(false)
   const [weatherData, setWeatherData] = useState<any[] | null>(null)
   const [foundLocation, setFoundLocation] = useState<(typeof IPMA_LOCATIONS)[0] | null>(null)
   const [error, setError] = useState('')
   const [suggestions, setSuggestions] = useState<typeof IPMA_LOCATIONS>([])
+
+  const getRiskLabel = (precipitaProb: string, windClass: number) => {
+    const prob = parseFloat(precipitaProb || '0')
+    if (windClass >= 4 || prob >= 80) return { label: t('weatherAlerts.riskHighLabel'), color: '#dc2626' }
+    if (windClass >= 3 || prob >= 60) return { label: t('weatherAlerts.riskAttention'), color: '#d97706' }
+    if (windClass >= 2 || prob >= 40) return { label: t('weatherAlerts.riskWarning'), color: '#C8961A' }
+    return { label: t('weatherAlerts.riskNormal'), color: '#16a34a' }
+  }
 
   const handleInputChange = (value: string) => {
     setAddress(value)
@@ -117,14 +119,14 @@ function WeatherAlertsPage() {
     setFoundLocation(location)
     try {
       const res = await fetch(`https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/${location.id}.json`)
-      if (!res.ok) throw new Error(`Não foi possível obter dados para ${location.name}`)
+      if (!res.ok) throw new Error(t('weatherAlerts.fetchError', { name: location.name }))
       const data = await res.json()
       const sorted = (data.data || [])
         .sort((a: any, b: any) => new Date(a.forecastDate).getTime() - new Date(b.forecastDate).getTime())
         .slice(0, 7)
       setWeatherData(sorted)
     } catch (err: any) {
-      setError(err.message || 'Erro ao obter dados meteorológicos')
+      setError(err.message || t('weatherAlerts.genericError'))
     } finally {
       setLoading(false)
     }
@@ -135,7 +137,7 @@ function WeatherAlertsPage() {
     if (!address.trim()) return
     const location = findLocationByName(address)
     if (!location) {
-      setError(`Localidade "${address}" não encontrada. Tente com o nome do distrito (ex: Lisboa, Porto, Faro) ou seleccione uma sugestão.`)
+      setError(t('weatherAlerts.locationNotFound', { name: address }))
       return
     }
     await fetchWeatherForLocation(location)
@@ -146,17 +148,17 @@ function WeatherAlertsPage() {
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1.5rem 1rem' }}>
         <div style={{ marginBottom: '2rem' }}>
           <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '1.75rem', fontWeight: 700, color: '#111111', margin: '0 0 0.5rem' }}>
-            Alertas Meteorológicos
+            {t('weatherAlerts.title')}
           </h1>
-          <p style={{ color: '#666666', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}>
-            Consulte as previsões do tempo por localidade para avaliar o risco meteorológico associado a propriedades e activos segurados. Dados fornecidos pelo <strong>IPMA</strong>.
-          </p>
+          <p style={{ color: '#666666', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}
+            dangerouslySetInnerHTML={{ __html: t('weatherAlerts.subtitle') }}
+          />
         </div>
 
         <div style={{ background: '#fff', border: '1.5px solid #111', borderRadius: '4px', padding: '1.5rem', marginBottom: '2rem', position: 'relative' }}>
           <form onSubmit={handleSubmit}>
             <label style={{ display: 'block', fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#111', marginBottom: '0.75rem' }}>
-              Localidade ou Distrito
+              {t('weatherAlerts.locationLabel')}
             </label>
             <div style={{ display: 'flex', gap: '0.75rem', position: 'relative' }}>
               <div style={{ flex: 1, position: 'relative' }}>
@@ -166,7 +168,7 @@ function WeatherAlertsPage() {
                 <input
                   type="text"
                   style={{ width: '100%', padding: '0.625rem 0.75rem 0.625rem 2.25rem', border: '1px solid #ddd', borderRadius: '4px', fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem', color: '#111', outline: 'none', boxSizing: 'border-box' }}
-                  placeholder="Ex: Lisboa, Porto, Faro, Braga, Funchal..."
+                  placeholder={t('weatherAlerts.locationPlaceholder')}
                   value={address}
                   onChange={(e) => handleInputChange(e.target.value)}
                   autoComplete="off"
@@ -190,7 +192,7 @@ function WeatherAlertsPage() {
               </div>
               <button type="submit" disabled={loading}
                 style={{ background: '#111', color: '#fff', padding: '0.625rem 1.5rem', borderRadius: '4px', border: 'none', fontFamily: "'Montserrat', sans-serif", fontSize: '0.875rem', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, whiteSpace: 'nowrap' }}>
-                {loading ? 'A pesquisar...' : 'Ver Previsão'}
+                {loading ? t('weatherAlerts.searching') : t('weatherAlerts.searchBtn')}
               </button>
             </div>
             {error && (
@@ -211,13 +213,13 @@ function WeatherAlertsPage() {
                   <span style={{ color: '#C8961A', marginLeft: '0.5rem', fontSize: '0.9rem', fontWeight: 400 }}>{foundLocation.district}</span>
                 </h2>
                 <p style={{ color: '#888', fontSize: '0.8rem', margin: '0.25rem 0 0', fontFamily: "'Montserrat', sans-serif" }}>
-                  Previsão para os próximos 7 dias · Fonte: IPMA
+                  {t('weatherAlerts.forecastSubtitle')}
                 </p>
               </div>
               <button type="button"
-                onClick={() => alert(`Local "${foundLocation.name}" guardado!`)}
+                onClick={() => alert(t('weatherAlerts.locationSaved', { name: foundLocation.name }))}
                 style={{ background: 'transparent', border: '1.5px solid #C8961A', color: '#C8961A', padding: '0.5rem 1rem', borderRadius: '4px', fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}>
-                Gravar Local
+                {t('weatherAlerts.saveLocation')}
               </button>
             </div>
 
@@ -227,7 +229,7 @@ function WeatherAlertsPage() {
                 return (
                   <div key={i} style={{ background: '#fff', border: i === 0 ? '2px solid #111' : '1px solid #eee', borderRadius: '4px', padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
                     {i === 0 && (
-                      <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: '#111', color: '#fff', fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', fontFamily: "'Montserrat', sans-serif", letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Hoje</span>
+                      <span style={{ position: 'absolute', top: '-10px', left: '50%', transform: 'translateX(-50%)', background: '#111', color: '#fff', fontSize: '0.65rem', fontWeight: 700, padding: '2px 8px', borderRadius: '10px', fontFamily: "'Montserrat', sans-serif", letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>{t('weatherAlerts.today')}</span>
                     )}
                     <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', fontWeight: 700, color: '#111', margin: '0 0 0.5rem', textTransform: 'capitalize' }}>
                       {new Date(item.forecastDate + 'T12:00:00').toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
@@ -259,14 +261,30 @@ function WeatherAlertsPage() {
 
             <div style={{ background: '#f8f8f8', border: '1px solid #eee', borderRadius: '4px', padding: '1.25rem 1.5rem' }}>
               <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#111', margin: '0 0 0.75rem' }}>
-                Avaliação de Risco para Seguros — Hoje
+                {t('weatherAlerts.riskTitle')}
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '0.75rem' }}>
                 {[
-                  { label: 'Risco de Inundação', value: parseFloat(weatherData[0]?.precipitaProb || '0') >= 60 ? 'Elevado' : 'Baixo', color: parseFloat(weatherData[0]?.precipitaProb || '0') >= 60 ? '#dc2626' : '#16a34a' },
-                  { label: 'Risco de Vento', value: (weatherData[0]?.classWindSpeed || 1) >= 3 ? 'Elevado' : 'Baixo', color: (weatherData[0]?.classWindSpeed || 1) >= 3 ? '#dc2626' : '#16a34a' },
-                  { label: 'Risco de Granizo', value: [13, 17].includes(weatherData[0]?.idWeatherType) ? 'Presente' : 'Baixo', color: [13, 17].includes(weatherData[0]?.idWeatherType) ? '#d97706' : '#16a34a' },
-                  { label: 'Risco de Neve', value: [14, 15, 24, 25].includes(weatherData[0]?.idWeatherType) ? 'Presente' : 'Baixo', color: [14, 15, 24, 25].includes(weatherData[0]?.idWeatherType) ? '#d97706' : '#16a34a' },
+                  {
+                    label: t('weatherAlerts.riskFlood'),
+                    value: parseFloat(weatherData[0]?.precipitaProb || '0') >= 60 ? t('weatherAlerts.riskHigh') : t('weatherAlerts.riskLow'),
+                    color: parseFloat(weatherData[0]?.precipitaProb || '0') >= 60 ? '#dc2626' : '#16a34a',
+                  },
+                  {
+                    label: t('weatherAlerts.riskWind'),
+                    value: (weatherData[0]?.classWindSpeed || 1) >= 3 ? t('weatherAlerts.riskHigh') : t('weatherAlerts.riskLow'),
+                    color: (weatherData[0]?.classWindSpeed || 1) >= 3 ? '#dc2626' : '#16a34a',
+                  },
+                  {
+                    label: t('weatherAlerts.riskHail'),
+                    value: [13, 17].includes(weatherData[0]?.idWeatherType) ? t('weatherAlerts.riskPresent') : t('weatherAlerts.riskLow'),
+                    color: [13, 17].includes(weatherData[0]?.idWeatherType) ? '#d97706' : '#16a34a',
+                  },
+                  {
+                    label: t('weatherAlerts.riskSnow'),
+                    value: [14, 15, 24, 25].includes(weatherData[0]?.idWeatherType) ? t('weatherAlerts.riskPresent') : t('weatherAlerts.riskLow'),
+                    color: [14, 15, 24, 25].includes(weatherData[0]?.idWeatherType) ? '#d97706' : '#16a34a',
+                  },
                 ].map((risk, i) => (
                   <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.5rem 0.75rem', background: '#fff', borderRadius: '4px', border: '1px solid #eee' }}>
                     <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', color: '#555' }}>{risk.label}</span>
@@ -274,9 +292,9 @@ function WeatherAlertsPage() {
                   </div>
                 ))}
               </div>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#888', margin: '0.75rem 0 0', lineHeight: 1.5 }}>
-                Avaliação baseada na previsão de hoje para <strong>{foundLocation.name}</strong>. Para análise detalhada, consulte o histórico meteorológico e as condições locais do imóvel ou activo segurado.
-              </p>
+              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#888', margin: '0.75rem 0 0', lineHeight: 1.5 }}
+                dangerouslySetInnerHTML={{ __html: t('weatherAlerts.riskBasedon', { name: foundLocation.name }) }}
+              />
             </div>
           </div>
         )}
@@ -285,10 +303,10 @@ function WeatherAlertsPage() {
           <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#888' }}>
             <Cloud style={{ width: '64px', height: '64px', margin: '0 auto 1rem', color: '#e5e7eb' }} />
             <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.95rem', fontWeight: 600, color: '#555', marginBottom: '0.5rem' }}>
-              Pesquise uma localidade para ver a previsão
+              {t('weatherAlerts.emptyTitle')}
             </p>
             <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.85rem', color: '#888' }}>
-              Sugestões: Lisboa, Porto, Faro, Braga, Coimbra, Funchal, Ponta Delgada
+              {t('weatherAlerts.emptyHint')}
             </p>
           </div>
         )}
@@ -302,40 +320,38 @@ function WeatherAlertsPage() {
               </svg>
             </div>
             <div>
-              <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>Certificados Meteorológicos IPMA</h3>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#888', margin: 0 }}>Documentos oficiais para processos de sinistro junto das seguradoras</p>
+              <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#111', margin: 0 }}>{t('weatherAlerts.certTitle')}</h3>
+              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#888', margin: 0 }}>{t('weatherAlerts.certSubtitle')}</p>
             </div>
           </div>
 
-          {/* Explicação */}
           <div style={{ background: '#f9f9f9', border: '1px solid #eee', borderRadius: '4px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1.25rem' }}>
               <div>
-                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#C8961A', marginBottom: '0.5rem' }}>O que é</p>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#C8961A', marginBottom: '0.5rem' }}>{t('weatherAlerts.certWhat')}</p>
                 <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', color: '#555', lineHeight: 1.6, margin: 0 }}>
-                  Um certificado meteorológico é um documento oficial emitido pelo IPMA (Instituto Português do Mar e da Atmosfera) que atesta as condições climáticas verificadas numa determinada data e localidade.
+                  {t('weatherAlerts.certWhatDesc')}
                 </p>
               </div>
               <div>
-                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#C8961A', marginBottom: '0.5rem' }}>Para que serve</p>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#C8961A', marginBottom: '0.5rem' }}>{t('weatherAlerts.certUse')}</p>
                 <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', color: '#555', lineHeight: 1.6, margin: 0 }}>
-                  É exigido pelas seguradoras como prova de evento meteorológico em sinistros de tempestade, granizo, vento forte, inundação ou queda de árvores. Sem este documento, a seguradora pode rejeitar ou atrasar a indemnização.
+                  {t('weatherAlerts.certUseDesc')}
                 </p>
               </div>
               <div>
-                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#C8961A', marginBottom: '0.5rem' }}>Como obter</p>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.78rem', textTransform: 'uppercase' as const, letterSpacing: '0.08em', color: '#C8961A', marginBottom: '0.5rem' }}>{t('weatherAlerts.certHow')}</p>
                 <ol style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', color: '#555', lineHeight: 1.8, margin: 0, paddingLeft: '1.1rem' }}>
-                  <li>Aceda ao formulário de contacto do IPMA</li>
-                  <li>Seleccione <strong>"Certidões e Declarações"</strong> como assunto</li>
-                  <li>Indique a data, hora e localidade do evento</li>
-                  <li>Descreva o tipo de fenómeno (vento, granizo, etc.)</li>
-                  <li>Aguarde resposta em 5–10 dias úteis</li>
+                  <li>{t('weatherAlerts.certHow1')}</li>
+                  <li dangerouslySetInnerHTML={{ __html: t('weatherAlerts.certHow2') }} />
+                  <li>{t('weatherAlerts.certHow3')}</li>
+                  <li>{t('weatherAlerts.certHow4')}</li>
+                  <li>{t('weatherAlerts.certHow5')}</li>
                 </ol>
               </div>
             </div>
           </div>
 
-          {/* Botão de acção */}
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' as const, alignItems: 'center' }}>
             <a
               href="https://www.ipma.pt/pt/siteinfo/contactar.jsp"
@@ -358,19 +374,18 @@ function WeatherAlertsPage() {
               <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
-              Pedir Certificado ao IPMA
+              {t('weatherAlerts.certButton')}
             </a>
             <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#888', margin: 0 }}>
-              Será rediricionado para o formulário oficial do IPMA em nova janela.
+              {t('weatherAlerts.certRedirect')}
             </p>
           </div>
 
-          {/* Aviso */}
           <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '4px', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
             <AlertTriangle style={{ width: '16px', height: '16px', color: '#d97706', flexShrink: 0, marginTop: '2px' }} />
-            <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#92400e', margin: 0, lineHeight: 1.5 }}>
-              <strong>Importante:</strong> Solicite o certificado o mais rapidamente possível após o evento. O IPMA pode não ter registos detalhados para datas muito antigas. Guarde sempre o número de processo atribuído pelo IPMA para acompanhamento.
-            </p>
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#92400e', margin: 0, lineHeight: 1.5 }}
+              dangerouslySetInnerHTML={{ __html: t('weatherAlerts.certWarning') }}
+            />
           </div>
         </div>
 

@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate, Navigate, Link } from '@tanstack/react-ro
 import { supabase } from '@/lib/supabase'
 import { useIdentity } from '@/lib/identity-context'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const TERMS_VERSION = '2025-01'
 
@@ -12,6 +13,7 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
+  const { t } = useTranslation()
   const { user, ready, logout } = useIdentity()
   const navigate = useNavigate()
   const [mode, setMode] = useState<AuthMode>('login')
@@ -34,14 +36,14 @@ function LoginPage() {
     if (params.get('recovery') === '1') {
       setMode('recovery')
       setError('')
-      setRecoveryMessage('Defina uma nova palavra-passe para concluir a recuperação.')
+      setRecoveryMessage(t('auth.recoveryTitle'))
     } else if (params.get('forgot') === '1') {
       setMode('forgot')
       setError('')
     }
 
     if (params.get('email_confirmed') === '1') {
-      setConfirmationMessage('Email validado com sucesso. Inicie sessão para continuar.')
+      setConfirmationMessage(t('auth.emailValidated'))
       params.delete('email_confirmed')
       const query = params.toString()
       const cleaned = `${window.location.pathname}${query ? `?${query}` : ''}`
@@ -54,7 +56,7 @@ function LoginPage() {
   if (!ready) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
-        <div style={{ color: '#666666', fontFamily: "'Montserrat', sans-serif" }}>A carregar...</div>
+        <div style={{ color: '#666666', fontFamily: "'Montserrat', sans-serif" }}>{t('common.loading')}</div>
       </div>
     )
   }
@@ -73,12 +75,12 @@ function LoginPage() {
   const formatLoginError = (err: any) => {
     const message = typeof err?.message === 'string' ? err.message : ''
     if (/invalid.*credentials/i.test(message) || /invalid login/i.test(message)) {
-      return 'Email ou palavra-passe inválidos.'
+      return t('auth.errors.invalidCredentials')
     }
     if (/email not confirmed/i.test(message)) {
-      return 'O email ainda não foi confirmado. Abra o link de confirmação enviado para o seu email.'
+      return t('auth.errors.emailNotConfirmed')
     }
-    return message || 'Erro ao iniciar sessão.'
+    return message || t('auth.errors.signInError')
   }
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -88,7 +90,6 @@ function LoginPage() {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      // Redirecionar com base no role (app_metadata.roles)
       const roles: string[] = (data.user?.app_metadata?.roles as string[]) ?? []
       const isAdmin = roles.includes('admin')
       navigate({ to: isAdmin ? '/admin' : '/dashboard' })
@@ -103,7 +104,7 @@ function LoginPage() {
     e.preventDefault()
     setError('')
     if (!termsAccepted) {
-      setError('Deve aceitar os Termos e Condições para criar conta.')
+      setError(t('auth.errors.termsRequired'))
       return
     }
     setLoading(true)
@@ -122,7 +123,6 @@ function LoginPage() {
       })
       if (error) throw error
 
-      // Registar aceitação dos termos na tabela de auditoria
       if (data.user?.id) {
         try {
           await fetch('/api/record-terms-acceptance', {
@@ -131,13 +131,13 @@ function LoginPage() {
             body: JSON.stringify({ user_id: data.user.id, terms_version: TERMS_VERSION }),
           })
         } catch {
-          // Falha silenciosa — os dados já ficaram em user_metadata
+          // Falha silenciosa
         }
       }
 
       setSignupSuccess(true)
     } catch (err: any) {
-      setError(err?.message || 'Erro ao criar conta.')
+      setError(err?.message || t('auth.errors.signUpError'))
     } finally {
       setLoading(false)
     }
@@ -147,7 +147,7 @@ function LoginPage() {
     e.preventDefault()
 
     if (!email) {
-      setError('Introduza o email para recuperar a palavra-passe.')
+      setError(t('auth.errors.emailRequired'))
       return
     }
 
@@ -161,9 +161,9 @@ function LoginPage() {
         redirectTo: `${siteUrl}/login?recovery=1`,
       })
       if (error) throw error
-      setRecoveryMessage('Foi enviado um email com instruções para redefinir a palavra-passe.')
+      setRecoveryMessage(t('auth.linkSent'))
     } catch (err: any) {
-      setError(err?.message || 'Não foi possível enviar o email de recuperação.')
+      setError(err?.message || t('auth.errors.sendLinkFailed'))
     } finally {
       setRecoveryLoading(false)
     }
@@ -174,12 +174,12 @@ function LoginPage() {
     setError('')
 
     if (password.length < 6) {
-      setError('A palavra-passe deve ter pelo menos 6 caracteres.')
+      setError(t('auth.errors.passwordTooShort'))
       return
     }
 
     if (password !== passwordConfirmation) {
-      setError('A confirmação da palavra-passe não coincide.')
+      setError(t('auth.errors.passwordMismatch'))
       return
     }
 
@@ -190,10 +190,10 @@ function LoginPage() {
 
       await logout().catch(() => undefined)
       setMode('login')
-      setRecoveryMessage('Palavra-passe redefinida com sucesso. Inicie sessão com a nova credencial.')
+      setRecoveryMessage(t('auth.passwordReset'))
       resetLocalAuthForm()
     } catch (err: any) {
-      setError(err?.message || 'Não foi possível definir a palavra-passe.')
+      setError(err?.message || t('auth.errors.passwordChangeFailed'))
     } finally {
       setLoading(false)
     }
@@ -209,17 +209,16 @@ function LoginPage() {
             </svg>
           </div>
           <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1.75rem', color: '#111111', marginBottom: '0.5rem' }}>
-            Conta Criada
+            {t('auth.accountCreated')}
           </h2>
           <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, color: '#555555', marginBottom: '1.5rem' }}>
-            Foi enviado um email de confirmação para <strong>{email}</strong>.
-            Clique no link no email para ativar a sua conta.
+            {t('auth.confirmationSent', { email })}
           </p>
           <button
             onClick={() => { setSignupSuccess(false); setMode('login') }}
             style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: '#C8961A', background: 'none', border: 'none', cursor: 'pointer' }}
           >
-            Voltar ao início de sessão
+            {t('auth.backToSignIn')}
           </button>
         </div>
       </div>
@@ -242,7 +241,7 @@ function LoginPage() {
             Adler<span style={{ color: '#C8961A' }}>.</span>Pro
           </h1>
           <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.85rem', color: '#999999', marginTop: '0.5rem' }}>
-            Portal do Cliente Empresarial
+            {t('common.portal')}
           </p>
         </div>
 
@@ -261,7 +260,7 @@ function LoginPage() {
                     : { background: 'transparent', color: '#666666' }),
                 }}
               >
-                Iniciar Sessão
+                {t('auth.signIn')}
               </button>
               <button
                 onClick={() => { setMode('signup'); setError('') }}
@@ -275,7 +274,7 @@ function LoginPage() {
                     : { background: 'transparent', color: '#666666' }),
                 }}
               >
-                Criar Conta
+                {t('auth.createAccount')}
               </button>
             </div>
           )}
@@ -285,7 +284,7 @@ function LoginPage() {
               {mode === 'signup' && (
                 <div>
                   <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
-                    Nome completo
+                    {t('auth.fullName')}
                   </label>
                   <input
                     type="text"
@@ -293,14 +292,14 @@ function LoginPage() {
                     onChange={(e) => setName(e.target.value)}
                     className="w-full px-4 py-2.5 text-sm"
                     style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
-                    placeholder="Ana Ferreira"
+                    placeholder={t('auth.namePlaceholder')}
                     required
                   />
                 </div>
               )}
               <div>
                 <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
-                  Email
+                  {t('auth.email')}
                 </label>
                 <input
                   type="email"
@@ -308,13 +307,13 @@ function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
                   style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
-                  placeholder="nome@empresa.pt"
+                  placeholder={t('auth.emailPlaceholder')}
                   required
                 />
               </div>
               <div>
                 <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
-                  Palavra-passe
+                  {t('auth.password')}
                 </label>
                 <input
                   type="password"
@@ -322,7 +321,7 @@ function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
                   style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
-                  placeholder="••••••••"
+                  placeholder={t('auth.passwordPlaceholder')}
                   required
                   minLength={6}
                 />
@@ -355,13 +354,13 @@ function LoginPage() {
                     }}
                     style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: '#C8961A', background: 'none', border: 'none', cursor: 'pointer' }}
                   >
-                    Esqueceu-se da palavra-passe?
+                    {t('auth.forgotPassword')}
                   </button>
                   <Link
                     to="/"
                     style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: '#666666', textDecoration: 'none' }}
                   >
-                    Voltar à página inicial
+                    {t('auth.backToHome')}
                   </Link>
                 </div>
               )}
@@ -377,21 +376,21 @@ function LoginPage() {
                       style={{ marginTop: '3px', accentColor: '#C8961A', cursor: 'pointer', minWidth: '16px' }}
                     />
                     <label htmlFor="terms-checkbox" style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#666666', cursor: 'pointer', lineHeight: '1.4' }}>
-                      Li e aceito os{' '}
+                      {t('auth.termsAccept')}{' '}
                       <button
                         type="button"
                         onClick={(e) => { e.preventDefault(); setTermsExpanded(!termsExpanded) }}
                         style={{ fontWeight: 600, color: '#C8961A', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', textDecoration: 'underline' }}
                       >
-                        Termos e Condições
+                        {t('auth.termsLink')}
                       </button>
-                      {' '}e a{' '}
+                      {' '}{t('auth.and')}{' '}
                       <Link
                         to="/privacy-policy"
                         target="_blank"
                         style={{ fontWeight: 600, color: '#C8961A', textDecoration: 'underline', fontSize: '0.75rem' }}
                       >
-                        Política de Privacidade
+                        {t('auth.privacyLink')}
                       </Link>
                     </label>
                   </div>
@@ -429,7 +428,7 @@ function LoginPage() {
                       onClick={() => setTermsExpanded(false)}
                       style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.7rem', color: '#999999', background: 'none', border: 'none', cursor: 'pointer', marginTop: '0.25rem' }}
                     >
-                      Fechar termos
+                      {t('auth.closeTerms')}
                     </button>
                   )}
                 </div>
@@ -452,10 +451,10 @@ function LoginPage() {
                 }}
               >
                 {loading
-                  ? 'A processar...'
+                  ? t('common.processing')
                   : mode === 'login'
-                    ? 'Iniciar Sessão'
-                    : 'Criar Conta'}
+                    ? t('auth.signIn')
+                    : t('auth.createAccount')}
               </button>
             </form>
           )}
@@ -463,11 +462,11 @@ function LoginPage() {
           {mode === 'forgot' && (
             <form onSubmit={handlePasswordRecovery} className="space-y-4">
               <p className="text-sm" style={{ color: '#666666', fontFamily: "'Montserrat', sans-serif" }}>
-                Introduza o email da conta para receber o link de redefinição.
+                {t('auth.forgotTitle')}
               </p>
               <div>
                 <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
-                  Email
+                  {t('auth.email')}
                 </label>
                 <input
                   type="email"
@@ -475,7 +474,7 @@ function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
                   style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
-                  placeholder="nome@empresa.pt"
+                  placeholder={t('auth.emailPlaceholder')}
                   required
                 />
               </div>
@@ -501,7 +500,7 @@ function LoginPage() {
                   }}
                   style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: '#666666', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
-                  Voltar ao login
+                  {t('auth.backToLogin')}
                 </button>
                 <button
                   type="submit"
@@ -519,7 +518,7 @@ function LoginPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  {recoveryLoading ? 'A enviar...' : 'Enviar link'}
+                  {recoveryLoading ? t('common.sending') : t('auth.sendLink')}
                 </button>
               </div>
             </form>
@@ -528,12 +527,12 @@ function LoginPage() {
           {isPasswordSetupMode && (
             <form onSubmit={handlePasswordSetup} className="space-y-4">
               <p className="text-sm" style={{ color: '#666666', fontFamily: "'Montserrat', sans-serif" }}>
-                Defina a nova palavra-passe para concluir a recuperação.
+                {t('auth.recoveryTitle')}
               </p>
 
               <div>
                 <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
-                  Nova palavra-passe
+                  {t('auth.newPassword')}
                 </label>
                 <input
                   type="password"
@@ -541,14 +540,14 @@ function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
                   style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
-                  placeholder="••••••••"
+                  placeholder={t('auth.passwordPlaceholder')}
                   required
                   minLength={6}
                 />
               </div>
               <div>
                 <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
-                  Confirmar palavra-passe
+                  {t('auth.confirmPassword')}
                 </label>
                 <input
                   type="password"
@@ -556,7 +555,7 @@ function LoginPage() {
                   onChange={(e) => setPasswordConfirmation(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
                   style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
-                  placeholder="••••••••"
+                  placeholder={t('auth.passwordPlaceholder')}
                   required
                   minLength={6}
                 />
@@ -589,7 +588,7 @@ function LoginPage() {
                   cursor: 'pointer',
                 }}
               >
-                {loading ? 'A processar...' : 'Guardar nova palavra-passe'}
+                {loading ? t('common.processing') : t('auth.saveNewPassword')}
               </button>
             </form>
           )}

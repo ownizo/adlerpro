@@ -6,6 +6,7 @@ import type { Policy } from '@/lib/types'
 import { POLICY_TYPE_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef } from 'react'
 import { getServerUser } from '@/lib/auth'
+import { useTranslation } from 'react-i18next'
 
 export const Route = createFileRoute('/policies')({
   beforeLoad: async () => {
@@ -41,8 +42,11 @@ function daysUntil(dateStr: string): number {
   return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-function statusLabel(s: string): string {
-  const m: Record<string, string> = { active: 'Activa', expiring: 'A Expirar', expired: 'Expirada', cancelled: 'Cancelada' }
+function statusLabel(s: string, t: (k: string) => string): string {
+  const m: Record<string, string> = {
+    active: t('policies.statusActive'), expiring: t('policies.statusExpiring'),
+    expired: t('policies.statusExpired'), cancelled: t('policies.statusCancelled'),
+  }
   return m[s] || s
 }
 
@@ -64,12 +68,13 @@ function FormField({ label, required, children }: { label: string; required?: bo
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation()
   const m: Record<string, { bg: string; color: string }> = {
     active: { bg: '#EAF3DE', color: '#3B6D11' }, expiring: { bg: '#FAEEDA', color: '#854F0B' },
     expired: { bg: '#FEE2E2', color: '#991B1B' }, cancelled: { bg: '#F3F4F6', color: '#6B7280' },
   }
   const s = m[status] || { bg: '#F3F4F6', color: '#6B7280' }
-  return <span style={{ display: 'inline-block', fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 600, padding: '0.15rem 0.5rem', borderRadius: '20px', background: s.bg, color: s.color }}>{statusLabel(status)}</span>
+  return <span style={{ display: 'inline-block', fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 600, padding: '0.15rem 0.5rem', borderRadius: '20px', background: s.bg, color: s.color }}>{statusLabel(status, t)}</span>
 }
 
 function DetailItem({ label, value }: { label: string; value: string }) {
@@ -81,13 +86,14 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   )
 }
 
-function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, formatDate }: {
+function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, formatDate, t }: {
   policy: Policy
   onClose: () => void
   onEdit: (p: Policy) => void
   onDelete: (id: string) => void
   formatCurrency: (v: number) => string
   formatDate: (s: string) => string
+  t: (k: string, opts?: any) => string
 }) {
   const c = POLICY_TYPE_COLORS[policy.type] || POLICY_TYPE_COLORS.other
   const icon = POLICY_TYPE_ICONS[policy.type] || '📋'
@@ -120,12 +126,12 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
         <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto' }}>
           {/* Campos principais */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
-            <DetailItem label="N.º Apólice" value={policy.policyNumber || '—'} />
-            <DetailItem label="Prémio Anual" value={formatCurrency(policy.annualPremium)} />
-            <DetailItem label="Capital Segurado" value={policy.insuredValue > 0 ? formatCurrency(policy.insuredValue) : '—'} />
-            <DetailItem label="Franquia" value={policy.deductible ? formatCurrency(policy.deductible) : '—'} />
-            <DetailItem label="Início" value={formatDate(policy.startDate)} />
-            <DetailItem label="Fim" value={
+            <DetailItem label={t('policies.policyNumber')} value={policy.policyNumber || '—'} />
+            <DetailItem label={t('policies.annualPremium')} value={formatCurrency(policy.annualPremium)} />
+            <DetailItem label={t('policies.insuredValue')} value={policy.insuredValue > 0 ? formatCurrency(policy.insuredValue) : '—'} />
+            <DetailItem label={t('policies.deductible')} value={policy.deductible ? formatCurrency(policy.deductible) : '—'} />
+            <DetailItem label={t('policies.startDate')} value={formatDate(policy.startDate)} />
+            <DetailItem label={t('policies.endDate')} value={
               days >= 0 && days <= 90
                 ? `${formatDate(policy.endDate)} (${days}d)`
                 : formatDate(policy.endDate)
@@ -142,7 +148,7 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
           {policy.coverages && policy.coverages.length > 0 && (
             <div style={{ marginBottom: '1.25rem' }}>
               <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: '0 0 0.5rem' }}>
-                Coberturas ({policy.coverages.length})
+                {t('policies.coverages')} ({policy.coverages.length})
               </p>
               <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyle: 'none' }}>
                 {policy.coverages.map((cov: string, i: number) => (
@@ -159,7 +165,7 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
           {policy.exclusions && policy.exclusions.length > 0 && (
             <div style={{ marginBottom: '1.25rem' }}>
               <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#991B1B', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: '0 0 0.5rem' }}>
-                Exclusões ({policy.exclusions.length})
+                {t('policies.exclusions')} ({policy.exclusions.length})
               </p>
               <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyle: 'none' }}>
                 {policy.exclusions.map((exc: string, i: number) => (
@@ -181,26 +187,17 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
               target="_blank" rel="noreferrer"
               style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: '4px', textDecoration: 'none' }}
             >
-              Ver Documento
+              {t('policies.viewDocument')}
             </a>
           )}
-          <button
-            onClick={() => { onClose(); onEdit(policy) }}
-            style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#ffffff', color: '#333333', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            Editar
+          <button onClick={() => { onClose(); onEdit(policy) }} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#ffffff', color: '#333333', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>
+            {t('policies.edit')}
           </button>
-          <button
-            onClick={() => onDelete(policy.id)}
-            style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#FFF1F2', color: '#9F1239', border: '1px solid #FECDD3', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            Eliminar
+          <button onClick={() => onDelete(policy.id)} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#FFF1F2', color: '#9F1239', border: '1px solid #FECDD3', borderRadius: '4px', cursor: 'pointer' }}>
+            {t('policies.delete')}
           </button>
-          <button
-            onClick={onClose}
-            style={{ marginLeft: 'auto', fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}
-          >
-            Fechar
+          <button onClick={onClose} style={{ marginLeft: 'auto', fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>
+            {t('policies.close')}
           </button>
         </div>
       </div>
@@ -209,6 +206,7 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
 }
 
 function PoliciesPage() {
+  const { t } = useTranslation()
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState('all')
@@ -251,16 +249,16 @@ function PoliciesPage() {
         if (/JSON|extrair|reconhecível/i.test(raw)) throw new Error('__jsonparse__')
         throw new Error('__generic__')
       }
-      setFormData({ ...result, description: `Apólice extraída de ${file.name}` })
+      setFormData({ ...result, description: `${t('policies.aiExtracted').replace('✦ ', '')} ${file.name}` })
       setShowForm(true)
     } catch (err: any) {
       const msg: string = err.message ?? ''
       if (msg === '__ratelimit__')
-        setUploadError('⏳ Serviço temporariamente ocupado. Aguarde 1-2 minutos e tente novamente.')
+        setUploadError(t('policies.errors.rateLimitError'))
       else if (msg === '__jsonparse__')
-        setUploadError('Não foi possível ler os dados da apólice. Tente com outro ficheiro.')
+        setUploadError(t('policies.errors.parseError'))
       else
-        setUploadError('Ocorreu um erro. Por favor tente novamente.')
+        setUploadError(t('policies.errors.genericError'))
     }
     finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = '' }
   }
@@ -271,15 +269,15 @@ function PoliciesPage() {
       if (editMode && selected) await updatePolicy({ data: { id: selected.id, updates: formData } })
       else await createPolicy({ data: { ...formData, companyId: 'comp_001' } })
       setShowForm(false); setEditMode(false); setSelected(null); load()
-    } catch { alert('Erro ao guardar apólice'); setLoading(false) }
+    } catch { alert(t('policies.errors.saveFailed')); setLoading(false) }
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem a certeza que deseja eliminar esta apólice?')) return
+    if (!confirm(t('policies.deleteConfirm'))) return
     setLoading(true)
     setDetailPolicy(null)
     try { await deletePolicy({ data: id }); setSelected(null); load() }
-    catch { alert('Erro ao eliminar apólice'); setLoading(false) }
+    catch { alert(t('policies.errors.deleteFailed')); setLoading(false) }
   }
 
   const openEdit = (p: Policy) => { setFormData(p); setEditMode(true); setShowForm(true); setSelected(p) }
@@ -292,17 +290,17 @@ function PoliciesPage() {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap' as const, gap: '0.75rem' }}>
           <div>
-            <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1.4rem', color: '#111111', margin: 0 }}>Portfólio de Apólices</h1>
-            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.85rem', color: '#888888', marginTop: '0.25rem' }}>{policies.length} apólice{policies.length !== 1 ? 's' : ''} registada{policies.length !== 1 ? 's' : ''}</p>
+            <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1.4rem', color: '#111111', margin: 0 }}>{t('policies.title')}</h1>
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.85rem', color: '#888888', marginTop: '0.25rem' }}>{t(policies.length === 1 ? 'policies.subtitle_one' : 'policies.subtitle_other', { count: policies.length })}</p>
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' as const }}>
             <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: uploading ? '#cccccc' : '#C8961A', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               {uploading
-                ? <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />A extrair...</>
-                : <>✦ Extrair via IA</>}
+                ? <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />{t('policies.extracting')}</>
+                : <>{t('policies.extractViaAI')}</>}
               <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleUpload} style={{ display: 'none' }} disabled={uploading} />
             </label>
-            <button onClick={() => { setFormData({}); setEditMode(false); setShowForm(true) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>+ Adicionar</button>
+            <button onClick={() => { setFormData({}); setEditMode(false); setShowForm(true) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.addManual')}</button>
           </div>
         </div>
 
@@ -316,15 +314,15 @@ function PoliciesPage() {
         {/* Filters + View toggle */}
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' as const, alignItems: 'center' }}>
           <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={selectStyle}>
-            <option value="all">Todos os tipos</option>
+            <option value="all">{t('policies.allTypes')}</option>
             {Object.entries(POLICY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
-            <option value="all">Todos os estados</option>
-            <option value="active">Activa</option>
-            <option value="expiring">A Expirar</option>
-            <option value="expired">Expirada</option>
-            <option value="cancelled">Cancelada</option>
+            <option value="all">{t('policies.allStatuses')}</option>
+            <option value="active">{t('policies.statusActive')}</option>
+            <option value="expiring">{t('policies.statusExpiring')}</option>
+            <option value="expired">{t('policies.statusExpired')}</option>
+            <option value="cancelled">{t('policies.statusCancelled')}</option>
           </select>
           <div style={{ marginLeft: 'auto', display: 'flex', border: '1px solid #dddddd', borderRadius: '4px', overflow: 'hidden' }}>
             <button onClick={() => setViewMode('cards')} style={{ padding: '0.4rem 0.65rem', background: viewMode === 'cards' ? '#111111' : '#ffffff', color: viewMode === 'cards' ? '#ffffff' : '#666666', border: 'none', cursor: 'pointer' }}>
@@ -343,8 +341,8 @@ function PoliciesPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', padding: '3rem', textAlign: 'center' as const }}>
-            <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem', color: '#aaaaaa', marginBottom: '0.5rem' }}>{policies.length === 0 ? 'Ainda não tem apólices registadas.' : 'Nenhuma apólice encontrada.'}</p>
-            {policies.length === 0 && <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', color: '#cccccc' }}>Use "Extrair via IA" para carregar um PDF ou imagem de uma apólice.</p>}
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem', color: '#aaaaaa', marginBottom: '0.5rem' }}>{policies.length === 0 ? t('policies.noPolicies') : t('policies.noResults')}</p>
+            {policies.length === 0 && <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', color: '#cccccc' }}>{t('policies.noPoliciesHint')}</p>}
           </div>
         ) : viewMode === 'cards' ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
@@ -379,13 +377,13 @@ function PoliciesPage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#888888', margin: 0 }}>Válida até {formatDate(policy.endDate)}</p>
+                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#888888', margin: 0 }}>{t('policies.validUntil')} {formatDate(policy.endDate)}</p>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         {days >= 0 && days <= 90 && (
                           <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: days <= 14 ? '#dc2626' : days <= 30 ? '#d97706' : '#C8961A', background: days <= 14 ? '#FEE2E2' : days <= 30 ? '#FEF3C7' : '#FFFBEB', padding: '0.15rem 0.5rem', borderRadius: '20px' }}>{days}d</span>
                         )}
                         {policy.coverages && policy.coverages.length > 0 && (
-                          <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', color: '#aaaaaa' }}>{policy.coverages.length} coberturas</span>
+                          <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', color: '#aaaaaa' }}>{t('policies.coveragesCount', { count: policy.coverages.length })}</span>
                         )}
                       </div>
                     </div>
@@ -409,7 +407,7 @@ function PoliciesPage() {
                     <div style={{ width: '36px', height: '36px', borderRadius: '4px', background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '1.1rem' }}>{icon}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', color: '#111111', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{POLICY_TYPE_LABELS[policy.type] || policy.type} — {policy.insurer}</p>
-                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.72rem', color: '#888888', margin: 0 }}>{policy.policyNumber} · Válida até {formatDate(policy.endDate)}</p>
+                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.72rem', color: '#888888', margin: 0 }}>{policy.policyNumber} · {t('policies.validUntil')} {formatDate(policy.endDate)}</p>
                     </div>
                     <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
                       <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.85rem', color: '#111111', margin: 0 }}>{formatCurrency(policy.annualPremium)}</p>
@@ -433,6 +431,7 @@ function PoliciesPage() {
           onDelete={handleDelete}
           formatCurrency={formatCurrency}
           formatDate={formatDate}
+          t={t}
         />
       )}
 
@@ -441,36 +440,36 @@ function PoliciesPage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#ffffff', borderRadius: '4px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #eeeeee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#111111', margin: 0 }}>{editMode ? 'Editar Apólice' : 'Nova Apólice'}</h2>
+              <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#111111', margin: 0 }}>{editMode ? t('policies.editPolicy') : t('policies.newPolicy')}</h2>
               <button onClick={() => { setShowForm(false); setEditMode(false); setFormData({}) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888888', fontSize: '1.25rem', lineHeight: 1 }}>×</button>
             </div>
             {formData.description?.includes('extraída') && (
               <div style={{ margin: '1rem 1.5rem 0', padding: '0.75rem 1rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '4px' }}>
-                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', fontWeight: 600, color: '#166534', margin: '0 0 0.25rem' }}>✦ Dados extraídos via IA</p>
-                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#555555', margin: 0 }}>Capital: {formatCurrency(formData.insuredValue || 0)} · Prémio: {formatCurrency(formData.annualPremium || 0)} · Franquia: {formatCurrency(formData.deductible || 0)}</p>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', fontWeight: 600, color: '#166534', margin: '0 0 0.25rem' }}>{t('policies.aiExtracted')}</p>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#555555', margin: 0 }}>{t('policies.aiExtractedDetails', { capital: formatCurrency(formData.insuredValue || 0), premium: formatCurrency(formData.annualPremium || 0), deductible: formatCurrency(formData.deductible || 0) })}</p>
               </div>
             )}
             <form onSubmit={handleSave} style={{ padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div style={{ gridColumn: '1 / -1' }}>
-                <FormField label="Tipo de Seguro" required>
+                <FormField label={t('policies.policyType')} required>
                   <select value={formData.type || ''} onChange={(e) => setFormData({ ...formData, type: e.target.value })} required style={inputStyle}>
-                    <option value="">Seleccionar tipo...</option>
+                    <option value="">{t('policies.selectType')}</option>
                     {Object.entries(POLICY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </FormField>
               </div>
-              <FormField label="Seguradora" required><input type="text" value={formData.insurer || ''} onChange={(e) => setFormData({ ...formData, insurer: e.target.value })} required style={inputStyle} placeholder="Ex: Fidelidade" /></FormField>
-              <FormField label="N.º Apólice"><input type="text" value={formData.policyNumber || ''} onChange={(e) => setFormData({ ...formData, policyNumber: e.target.value })} style={inputStyle} /></FormField>
-              <FormField label="Data de Início" required><input type="date" value={formData.startDate || ''} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} required style={inputStyle} /></FormField>
-              <FormField label="Data de Fim" required><input type="date" value={formData.endDate || ''} onChange={(e) => setFormData({ ...formData, endDate: e.target.value })} required style={inputStyle} /></FormField>
-              <FormField label="Prémio Anual (€)"><input type="number" value={formData.annualPremium || ''} onChange={(e) => setFormData({ ...formData, annualPremium: parseFloat(e.target.value) || 0 })} style={inputStyle} placeholder="0.00" min="0" step="0.01" /></FormField>
-              <FormField label="Capital Segurado (€)"><input type="number" value={formData.insuredValue || ''} onChange={(e) => setFormData({ ...formData, insuredValue: parseFloat(e.target.value) || 0 })} style={inputStyle} placeholder="0.00" min="0" step="0.01" /></FormField>
+              <FormField label={t('policies.insurer')} required><input type="text" value={formData.insurer || ''} onChange={(e) => setFormData({ ...formData, insurer: e.target.value })} required style={inputStyle} placeholder={t('policies.insurerPlaceholder')} /></FormField>
+              <FormField label={t('policies.policyNumber')}><input type="text" value={formData.policyNumber || ''} onChange={(e) => setFormData({ ...formData, policyNumber: e.target.value })} style={inputStyle} /></FormField>
+              <FormField label={t('policies.startDate')} required><input type="date" value={formData.startDate || ''} onChange={(e) => setFormData({ ...formData, startDate: e.target.value })} required style={inputStyle} /></FormField>
+              <FormField label={t('policies.endDate')} required><input type="date" value={formData.endDate || ''} onChange={(e) => setFormData({ ...formData, endDate: e.target.value })} required style={inputStyle} /></FormField>
+              <FormField label={`${t('policies.annualPremium')} (€)`}><input type="number" value={formData.annualPremium || ''} onChange={(e) => setFormData({ ...formData, annualPremium: parseFloat(e.target.value) || 0 })} style={inputStyle} placeholder="0.00" min="0" step="0.01" /></FormField>
+              <FormField label={`${t('policies.insuredValue')} (€)`}><input type="number" value={formData.insuredValue || ''} onChange={(e) => setFormData({ ...formData, insuredValue: parseFloat(e.target.value) || 0 })} style={inputStyle} placeholder="0.00" min="0" step="0.01" /></FormField>
               <div style={{ gridColumn: '1 / -1' }}>
-                <FormField label="Descrição"><input type="text" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} style={inputStyle} /></FormField>
+                <FormField label={t('policies.description')}><input type="text" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} style={inputStyle} /></FormField>
               </div>
               <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
-                <button type="button" onClick={() => { setShowForm(false); setEditMode(false); setFormData({}) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>Cancelar</button>
-                <button type="submit" style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{editMode ? 'Guardar Alterações' : 'Criar Apólice'}</button>
+                <button type="button" onClick={() => { setShowForm(false); setEditMode(false); setFormData({}) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.cancel')}</button>
+                <button type="submit" style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{editMode ? t('policies.saveChanges') : t('policies.createPolicy')}</button>
               </div>
             </form>
           </div>

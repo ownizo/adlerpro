@@ -5,6 +5,7 @@ import { fetchClaims, fetchPolicies, submitClaim } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Claim, Policy } from '@/lib/types'
 import { CLAIM_STATUS_LABELS, POLICY_TYPE_LABELS } from '@/lib/types'
+import { useTranslation } from 'react-i18next'
 
 export const Route = createFileRoute('/claims')({
   component: ClaimsPage,
@@ -37,6 +38,7 @@ const STATUS_COLORS: Record<string, string> = {
 const STATUS_STEPS = ['submitted', 'under_review', 'documentation', 'assessment', 'approved', 'paid']
 
 function ClaimsPage() {
+  const { t } = useTranslation()
   const [claims, setClaims] = useState<Claim[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading, setLoading] = useState(true)
@@ -93,7 +95,7 @@ function ClaimsPage() {
 
   // Exportar CSV
   const exportCSV = () => {
-    const headers = ['Referência', 'Tipo', 'Data Incidente', 'Data Participação', 'Valor Estimado (€)', 'Estado', 'Apólice']
+    const headers = [t('claims.refLabel').replace(':', ''), t('claims.claimType').replace(' *', ''), t('claims.incidentDateLabel').replace(' *', ''), t('claims.claimDate').replace(':', ''), `${t('claims.estimatedValue')}`, t('claims.allStatuses').replace('All ', '').replace('Todos os ', ''), 'Apólice']
     const rows = filteredClaims.map(c => {
       const policy = policies.find(p => p.id === c.policyId)
       return [
@@ -132,8 +134,8 @@ function ClaimsPage() {
         {/* Cabeçalho */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-navy-700">Gestão de Sinistros</h1>
-            <p className="text-navy-500 mt-1">Registo e acompanhamento de processos de sinistro</p>
+            <h1 className="text-3xl font-bold text-navy-700">{t('claims.title')}</h1>
+            <p className="text-navy-500 mt-1">{t('claims.subtitle')}</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -143,7 +145,7 @@ function ClaimsPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              Exportar CSV
+              {t('claims.exportCSV')}
             </button>
             <button
               onClick={() => { setShowForm(true); setSelectedClaim(null) }}
@@ -152,7 +154,7 @@ function ClaimsPage() {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              Novo Sinistro
+              {t('claims.newClaim')}
             </button>
           </div>
         </div>
@@ -160,10 +162,10 @@ function ClaimsPage() {
         {/* KPIs */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Total de Processos', value: stats.total, color: 'text-navy-700' },
-            { label: 'Em Aberto', value: stats.open, color: 'text-orange-600' },
-            { label: 'Aprovados / Pagos', value: stats.approved, color: 'text-green-600' },
-            { label: 'Valor Total Estimado', value: formatCurrency(stats.totalValue), color: 'text-navy-700' },
+            { label: t('claims.total'), value: stats.total, color: 'text-navy-700' },
+            { label: t('claims.open'), value: stats.open, color: 'text-orange-600' },
+            { label: t('claims.approved'), value: stats.approved, color: 'text-green-600' },
+            { label: t('claims.totalValue'), value: formatCurrency(stats.totalValue), color: 'text-navy-700' },
           ].map(kpi => (
             <div key={kpi.label} className="bg-white rounded-[4px] border border-navy-200 p-4">
               <p className="text-xs text-navy-500 mb-1">{kpi.label}</p>
@@ -177,31 +179,31 @@ function ClaimsPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <input
               type="text"
-              placeholder="Pesquisar..."
+              placeholder={t('claims.searchPlaceholder')}
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
               className="col-span-2 sm:col-span-1 px-3 py-2 text-sm border border-navy-200 rounded focus:outline-none focus:ring-1 focus:ring-gold-400"
             />
             <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 text-sm border border-navy-200 rounded focus:outline-none focus:ring-1 focus:ring-gold-400">
-              <option value="all">Todos os estados</option>
+              <option value="all">{t('claims.allStatuses')}</option>
               {Object.entries(CLAIM_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
             <select value={filterType} onChange={e => setFilterType(e.target.value)} className="px-3 py-2 text-sm border border-navy-200 rounded focus:outline-none focus:ring-1 focus:ring-gold-400">
-              <option value="all">Todos os tipos</option>
+              <option value="all">{t('claims.allTypes')}</option>
               {CLAIM_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
             <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className="px-3 py-2 text-sm border border-navy-200 rounded focus:outline-none focus:ring-1 focus:ring-gold-400">
-              <option value="all">Todos os anos</option>
+              <option value="all">{t('claims.allYears')}</option>
               {availableYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
             </select>
             <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="px-3 py-2 text-sm border border-navy-200 rounded focus:outline-none focus:ring-1 focus:ring-gold-400">
-              <option value="all">Todos os meses</option>
-              {['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'].map((m, i) => (
-                <option key={i+1} value={(i+1).toString()}>{m}</option>
+              <option value="all">{t('claims.allMonths')}</option>
+              {[1,2,3,4,5,6,7,8,9,10,11,12].map((m) => (
+                <option key={m} value={m.toString()}>{t(`claims.months.${m}`)}</option>
               ))}
             </select>
             <button onClick={() => { setFilterStatus('all'); setFilterType('all'); setFilterYear('all'); setFilterMonth('all'); setSearchText('') }} className="px-3 py-2 text-sm text-navy-500 border border-navy-200 rounded hover:bg-navy-50">
-              Limpar
+              {t('claims.clear')}
             </button>
           </div>
         </div>
@@ -225,8 +227,8 @@ function ClaimsPage() {
             <svg className="w-12 h-12 text-navy-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            <p className="text-navy-500 font-medium">Nenhum sinistro encontrado</p>
-            <p className="text-navy-400 text-sm mt-1">Ajuste os filtros ou registe um novo processo</p>
+            <p className="text-navy-500 font-medium">{t('claims.noResults')}</p>
+            <p className="text-navy-400 text-sm mt-1">{t('claims.noResultsHint')}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -249,14 +251,14 @@ function ClaimsPage() {
                         </div>
                         <p className="text-sm text-navy-500 mt-1 truncate">{claim.description}</p>
                         <div className="flex flex-wrap gap-3 mt-2 text-xs text-navy-400">
-                          <span>Incidente: {formatDate(claim.incidentDate)}</span>
-                          <span>Participado: {formatDate(claim.claimDate)}</span>
-                          {policy && <span>Apólice: {policy.policyNumber} ({POLICY_TYPE_LABELS[policy.type] || policy.type})</span>}
+                          <span>{t('claims.incidentDate')} {formatDate(claim.incidentDate)}</span>
+                          <span>{t('claims.claimDate')} {formatDate(claim.claimDate)}</span>
+                          {policy && <span>{t('claims.policyLabel')} {policy.policyNumber} ({POLICY_TYPE_LABELS[policy.type] || policy.type})</span>}
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">
                         <p className="font-bold text-navy-700">{formatCurrency(claim.estimatedValue)}</p>
-                        <p className="text-xs text-navy-400 mt-1">Ref: {claim.id.slice(-8).toUpperCase()}</p>
+                        <p className="text-xs text-navy-400 mt-1">{t('claims.refLabel')} {claim.id.slice(-8).toUpperCase()}</p>
                       </div>
                     </div>
                   </button>
@@ -265,7 +267,7 @@ function ClaimsPage() {
                   {isSelected && (
                     <div className="border-t border-navy-100 bg-navy-50/30 p-5">
                       {/* Timeline de estados */}
-                      <h4 className="text-xs font-semibold text-navy-500 uppercase tracking-wide mb-3">Progresso do Processo</h4>
+                      <h4 className="text-xs font-semibold text-navy-500 uppercase tracking-wide mb-3">{t('claims.progress')}</h4>
                       <div className="flex items-center gap-0 mb-6 overflow-x-auto pb-2">
                         {STATUS_STEPS.map((step, idx) => {
                           const stepOrder = STATUS_STEPS.indexOf(claim.status)
@@ -296,7 +298,7 @@ function ClaimsPage() {
                         {claim.status === 'denied' && (
                           <div className="ml-4 flex-shrink-0">
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                              ✗ Recusado
+                              {t('claims.denied')}
                             </span>
                           </div>
                         )}
@@ -305,7 +307,7 @@ function ClaimsPage() {
                       {/* Histórico de passos */}
                       {claim.steps && claim.steps.length > 0 && (
                         <div>
-                          <h4 className="text-xs font-semibold text-navy-500 uppercase tracking-wide mb-3">Histórico</h4>
+                          <h4 className="text-xs font-semibold text-navy-500 uppercase tracking-wide mb-3">{t('claims.history')}</h4>
                           <div className="space-y-2">
                             {[...claim.steps].reverse().map((step, idx) => (
                               <div key={idx} className="flex items-start gap-3 text-sm">
@@ -341,6 +343,7 @@ function NewClaimForm({
   onClose: () => void
   onSubmit: (data: { policyId: string; companyId: string; title: string; description: string; incidentDate: string; estimatedValue: number }) => Promise<void>
 }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState({
     claimType: '',
     customTitle: '',
@@ -357,9 +360,9 @@ function NewClaimForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    if (!form.policyId) { setError('Seleccione uma apólice associada ao sinistro.'); return }
-    if (!form.claimType) { setError('Seleccione o tipo de sinistro.'); return }
-    if (!form.description.trim()) { setError('Descreva o sinistro.'); return }
+    if (!form.policyId) { setError(t('claims.errors.noPolicy')); return }
+    if (!form.claimType) { setError(t('claims.errors.noType')); return }
+    if (!form.description.trim()) { setError(t('claims.errors.noDescription')); return }
     const title = form.claimType === 'Outro' ? (form.customTitle || 'Outro Sinistro') : form.claimType
     setSubmitting(true)
     try {
@@ -372,7 +375,7 @@ function NewClaimForm({
         estimatedValue: parseFloat(form.estimatedValue) || 0,
       })
     } catch (err) {
-      setError('Erro ao registar o sinistro. Tente novamente.')
+      setError(t('claims.errors.submitFailed'))
       setSubmitting(false)
     }
   }
@@ -381,8 +384,8 @@ function NewClaimForm({
     <div className="bg-white rounded-[4px] border border-gold-400 shadow-lg p-6 mb-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-bold text-navy-700">Registar Novo Sinistro</h2>
-          <p className="text-sm text-navy-500 mt-0.5">Preencha os dados do processo de sinistro</p>
+          <h2 className="text-lg font-bold text-navy-700">{t('claims.registerTitle')}</h2>
+          <p className="text-sm text-navy-500 mt-0.5">{t('claims.registerSubtitle')}</p>
         </div>
         <button onClick={onClose} className="text-navy-400 hover:text-navy-600">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -395,27 +398,27 @@ function NewClaimForm({
         <div className="grid sm:grid-cols-2 gap-5">
           {/* Tipo de sinistro */}
           <div>
-            <label className="block text-sm font-medium text-navy-700 mb-1">Tipo de Sinistro *</label>
+            <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.claimType')}</label>
             <select
               value={form.claimType}
               onChange={e => setForm(f => ({ ...f, claimType: e.target.value }))}
               className="w-full px-3 py-2 border border-navy-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gold-400"
               required
             >
-              <option value="">Seleccionar tipo...</option>
-              {CLAIM_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              <option value="">{t('claims.selectType')}</option>
+              {CLAIM_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
             </select>
           </div>
 
           {/* Título personalizado se "Outro" */}
           {form.claimType === 'Outro' && (
             <div>
-              <label className="block text-sm font-medium text-navy-700 mb-1">Descrição do Tipo *</label>
+              <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.customTitle')}</label>
               <input
                 type="text"
                 value={form.customTitle}
                 onChange={e => setForm(f => ({ ...f, customTitle: e.target.value }))}
-                placeholder="Ex: Danos por vandalismo"
+                placeholder={t('claims.customTitlePlaceholder')}
                 className="w-full px-3 py-2 border border-navy-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gold-400"
               />
             </div>
@@ -423,14 +426,14 @@ function NewClaimForm({
 
           {/* Apólice */}
           <div>
-            <label className="block text-sm font-medium text-navy-700 mb-1">Apólice Associada *</label>
+            <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.associatedPolicy')}</label>
             <select
               value={form.policyId}
               onChange={e => setForm(f => ({ ...f, policyId: e.target.value }))}
               className="w-full px-3 py-2 border border-navy-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gold-400"
               required
             >
-              <option value="">Seleccionar apólice...</option>
+              <option value="">{t('claims.selectPolicy')}</option>
               {policies.filter(p => p.status === 'active' || p.status === 'expiring').map(p => (
                 <option key={p.id} value={p.id}>
                   {p.policyNumber} — {POLICY_TYPE_LABELS[p.type] || p.type} ({p.insurer})
@@ -441,7 +444,7 @@ function NewClaimForm({
 
           {/* Data do incidente */}
           <div>
-            <label className="block text-sm font-medium text-navy-700 mb-1">Data do Incidente *</label>
+            <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.incidentDateLabel')}</label>
             <input
               type="date"
               value={form.incidentDate}
@@ -454,7 +457,7 @@ function NewClaimForm({
 
           {/* Valor estimado */}
           <div>
-            <label className="block text-sm font-medium text-navy-700 mb-1">Valor Estimado do Dano (€)</label>
+            <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.estimatedValue')}</label>
             <input
               type="number"
               value={form.estimatedValue}
@@ -469,11 +472,11 @@ function NewClaimForm({
 
         {/* Descrição */}
         <div>
-          <label className="block text-sm font-medium text-navy-700 mb-1">Descrição do Sinistro *</label>
+          <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.descriptionLabel')}</label>
           <textarea
             value={form.description}
             onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            placeholder="Descreva o que aconteceu, quando, onde e as circunstâncias do sinistro..."
+            placeholder={t('claims.descriptionPlaceholder')}
             rows={4}
             className="w-full px-3 py-2 border border-navy-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gold-400 resize-none"
             required
@@ -482,11 +485,11 @@ function NewClaimForm({
 
         {/* Informação sobre próximos passos */}
         <div className="bg-navy-50 rounded p-4 text-sm text-navy-600">
-          <p className="font-medium mb-1">Após submeter o sinistro:</p>
+          <p className="font-medium mb-1">{t('claims.afterSubmitTitle')}</p>
           <ol className="list-decimal list-inside space-y-1 text-navy-500">
-            <li>O processo será registado com estado <strong>Submetido</strong></li>
-            <li>A equipa Adler & Rochefort irá contactá-lo para recolha de documentação</li>
-            <li>Pode acompanhar o progresso neste módulo em tempo real</li>
+            <li dangerouslySetInnerHTML={{ __html: t('claims.afterSubmit1') }} />
+            <li>{t('claims.afterSubmit2')}</li>
+            <li>{t('claims.afterSubmit3')}</li>
           </ol>
         </div>
 
@@ -498,7 +501,7 @@ function NewClaimForm({
 
         <div className="flex gap-3 justify-end">
           <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-navy-200 text-navy-600 rounded hover:bg-navy-50">
-            Cancelar
+            {t('claims.cancel')}
           </button>
           <button
             type="submit"
@@ -508,9 +511,9 @@ function NewClaimForm({
             {submitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-navy-700 border-t-transparent rounded-full animate-spin" />
-                A registar...
+                {t('claims.registering')}
               </>
-            ) : 'Registar Sinistro'}
+            ) : t('claims.register')}
           </button>
         </div>
       </form>

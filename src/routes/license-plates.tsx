@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export const Route = createFileRoute('/license-plates')({
   component: LicensePlatesPage,
@@ -35,6 +36,7 @@ interface SeguroResult {
 }
 
 function LicensePlatesPage() {
+  const { t } = useTranslation()
   const [plate, setPlate] = useState('')
   const [date, setDate] = useState('')
   const [loading, setLoading] = useState(false)
@@ -62,11 +64,11 @@ function LicensePlatesPage() {
     })
       .then(async (response) => {
         const data = await response.json()
-        if (!response.ok) throw new Error(data?.error || 'Matrícula não encontrada')
+        if (!response.ok) throw new Error(data?.error || t('licensePlates.errors.notFound'))
         setResult(data)
       })
       .catch((err: any) => {
-        setError(err.message || 'Erro ao consultar matrícula')
+        setError(err.message || t('licensePlates.errors.query'))
       })
       .finally(() => setLoading(false))
 
@@ -80,11 +82,11 @@ function LicensePlatesPage() {
       })
         .then(async (response) => {
           const data = await response.json()
-          if (!response.ok) throw new Error(data?.error || 'Serviço de seguro indisponível. Tente novamente.')
+          if (!response.ok) throw new Error(data?.error || t('licensePlates.errors.insurance'))
           setSeguroResult(data)
         })
         .catch((err: any) => {
-          setSeguroError(err.message || 'Erro ao consultar seguro')
+          setSeguroError(err.message || t('licensePlates.errors.insuranceQuery'))
         })
         .finally(() => setLoadingSeguro(false))
 
@@ -97,21 +99,19 @@ function LicensePlatesPage() {
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-navy-700 mb-2">Consulta de Matrículas (Portugal)</h1>
-        <p className="text-navy-500 mb-8">
-          Valide dados do veículo e informação de seguro para matrículas portuguesas.
-        </p>
+        <h1 className="text-3xl font-bold text-navy-700 mb-2">{t('licensePlates.title')}</h1>
+        <p className="text-navy-500 mb-8">{t('licensePlates.subtitle')}</p>
 
         <form onSubmit={verifyPlate} className="bg-white p-6 rounded border border-navy-200 mb-8">
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium text-navy-700 mb-2">
-                Matrícula (ex: AA-00-AA)
+                {t('licensePlates.plateLabel')}
               </label>
               <input
                 type="text"
                 className="w-full p-2 border border-navy-200 rounded focus:ring-2 focus:ring-gold-400 outline-none uppercase"
-                placeholder="AA-00-AA"
+                placeholder={t('licensePlates.platePlaceholder')}
                 value={plate}
                 onChange={(e) => setPlate(e.target.value.toUpperCase())}
                 pattern="^[A-Z0-9]{2}-[A-Z0-9]{2}-[A-Z0-9]{2}$"
@@ -121,7 +121,7 @@ function LicensePlatesPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-navy-700 mb-2">
-                Data (para consulta de seguro)
+                {t('licensePlates.dateLabel')}
               </label>
               <input
                 type="date"
@@ -129,7 +129,7 @@ function LicensePlatesPage() {
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
-              <p className="text-xs text-navy-400 mt-1">Opcional — necessária para obter dados do seguro</p>
+              <p className="text-xs text-navy-400 mt-1">{t('licensePlates.dateHint')}</p>
             </div>
           </div>
           <button
@@ -137,17 +137,16 @@ function LicensePlatesPage() {
             disabled={loading || loadingSeguro}
             className="bg-[#111111] text-white px-6 py-2 rounded hover:bg-black disabled:opacity-50 w-full sm:w-auto"
           >
-            {loading || loadingSeguro ? 'A consultar...' : 'Consultar'}
+            {loading || loadingSeguro ? t('licensePlates.searching') : t('licensePlates.searchBtn')}
           </button>
           {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
           {seguroError && <p className="text-red-500 text-sm mt-2">Seguro: {seguroError}</p>}
         </form>
 
         <div className="grid gap-6">
-          {/* Vehicle Data Section */}
           {loading && (
             <div className="bg-white p-6 rounded border border-navy-200 shadow-sm text-center text-navy-500">
-              A carregar dados do veículo...
+              {t('licensePlates.loadingVehicle')}
             </div>
           )}
           {result && (
@@ -155,7 +154,7 @@ function LicensePlatesPage() {
               <div className="flex items-center justify-between mb-6 border-b border-navy-100 pb-4">
                 <h2 className="text-xl font-bold text-navy-700">
                   <span className="inline-block mr-2">🚗</span>
-                  Dados do Veículo — <span className="text-gold-600 bg-gold-50 px-2 py-1 rounded">{result.plate}</span>
+                  {t('licensePlates.vehicleData')} — <span className="text-gold-600 bg-gold-50 px-2 py-1 rounded">{result.plate}</span>
                 </h2>
                 <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2.5 py-0.5 rounded uppercase">
                   {result.source}
@@ -163,29 +162,29 @@ function LicensePlatesPage() {
               </div>
 
               <div className="grid sm:grid-cols-2 gap-4">
-                <Field label="Descrição" value={result.vehicle.description} />
-                <Field label="Marca" value={result.vehicle.make} />
-                <Field label="Modelo" value={result.vehicle.model} />
-                <Field label="Ano de Registo" value={result.vehicle.registrationYear} />
+                <Field label={t('licensePlates.fields.description')} value={result.vehicle.description} nd={t('common.nd')} />
+                <Field label={t('licensePlates.fields.make')} value={result.vehicle.make} nd={t('common.nd')} />
+                <Field label={t('licensePlates.fields.model')} value={result.vehicle.model} nd={t('common.nd')} />
+                <Field label={t('licensePlates.fields.registrationYear')} value={result.vehicle.registrationYear} nd={t('common.nd')} />
                 <Field
-                  label="Anos de Fabrico"
+                  label={t('licensePlates.fields.manufactureYears')}
                   value={[result.vehicle.manufactureYearFrom, result.vehicle.manufactureYearTo].filter(Boolean).join(' - ')}
+                  nd={t('common.nd')}
                 />
-                <Field label="Combustível" value={result.vehicle.fuelType} />
-                <Field label="Transmissão" value={result.vehicle.transmission} />
-                <Field label="Carroçaria" value={result.vehicle.bodyStyle} />
-                <Field label="Cilindrada" value={result.vehicle.engineSize} />
-                <Field label="N.º de Portas" value={result.vehicle.numberOfDoors} />
-                <Field label="N.º de Lugares" value={result.vehicle.numberOfSeats} />
-                <Field label="ABI Code" value={result.vehicle.abiCode} />
+                <Field label={t('licensePlates.fields.fuelType')} value={result.vehicle.fuelType} nd={t('common.nd')} />
+                <Field label={t('licensePlates.fields.transmission')} value={result.vehicle.transmission} nd={t('common.nd')} />
+                <Field label={t('licensePlates.fields.bodyStyle')} value={result.vehicle.bodyStyle} nd={t('common.nd')} />
+                <Field label={t('licensePlates.fields.engineSize')} value={result.vehicle.engineSize} nd={t('common.nd')} />
+                <Field label={t('licensePlates.fields.doors')} value={result.vehicle.numberOfDoors} nd={t('common.nd')} />
+                <Field label={t('licensePlates.fields.seats')} value={result.vehicle.numberOfSeats} nd={t('common.nd')} />
+                <Field label={t('licensePlates.fields.abiCode')} value={result.vehicle.abiCode} nd={t('common.nd')} />
               </div>
             </div>
           )}
 
-          {/* Insurance Data Section */}
           {loadingSeguro && (
             <div className="bg-white p-6 rounded border border-navy-200 shadow-sm text-center text-navy-500">
-              A carregar dados do seguro...
+              {t('licensePlates.loadingInsurance')}
             </div>
           )}
           {seguroResult && (
@@ -193,7 +192,7 @@ function LicensePlatesPage() {
               <div className="flex items-center justify-between mb-6 border-b border-green-100 pb-4">
                 <h2 className="text-xl font-bold text-navy-700">
                   <span className="inline-block mr-2">🛡️</span>
-                  Dados do Seguro — <span className="text-gold-600 bg-gold-50 px-2 py-1 rounded">{seguroResult.plate}</span>
+                  {t('licensePlates.insuranceData')} — <span className="text-gold-600 bg-gold-50 px-2 py-1 rounded">{seguroResult.plate}</span>
                 </h2>
                 <span className="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded uppercase">
                   {seguroResult.source}
@@ -202,12 +201,12 @@ function LicensePlatesPage() {
 
               {seguroResult.seguro === null ? (
                 <div className="text-navy-500 text-sm py-2">
-                  {seguroResult.message || 'Não foram encontrados dados de seguro para esta matrícula e data.'}
+                  {seguroResult.message || t('licensePlates.noInsurance')}
                 </div>
               ) : (
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <Field label="Data Consultada" value={seguroResult.date} />
-                  <SeguroFields data={seguroResult.seguro} />
+                  <Field label={t('licensePlates.fields.dateConsulted')} value={seguroResult.date} nd={t('common.nd')} />
+                  <SeguroFields data={seguroResult.seguro} nd={t('common.nd')} noData={t('licensePlates.noData')} />
                 </div>
               )}
             </div>
@@ -215,9 +214,9 @@ function LicensePlatesPage() {
 
           {!loading && !loadingSeguro && !result && !seguroResult && !error && !seguroError && (
             <div className="text-center text-navy-400 py-8">
-              Introduza uma matrícula para consultar os dados do veículo.
+              {t('licensePlates.emptyState')}
               <br />
-              Adicione uma data para obter também a informação do seguro.
+              {t('licensePlates.emptyStateHint')}
             </div>
           )}
         </div>
@@ -226,16 +225,16 @@ function LicensePlatesPage() {
   )
 }
 
-function Field({ label, value }: { label: string; value?: string }) {
+function Field({ label, value, nd }: { label: string; value?: string; nd: string }) {
   return (
     <div>
       <p className="text-sm text-navy-400">{label}</p>
-      <p className="font-medium text-navy-700">{value || 'N/D'}</p>
+      <p className="font-medium text-navy-700">{value || nd}</p>
     </div>
   )
 }
 
-function SeguroFields({ data }: { data: Record<string, unknown> }) {
+function SeguroFields({ data, nd, noData }: { data: Record<string, unknown>; nd: string; noData: string }) {
   if (!data || typeof data !== 'object') return null
 
   const fieldLabels: Record<string, string> = {
@@ -266,7 +265,7 @@ function SeguroFields({ data }: { data: Record<string, unknown> }) {
   if (entries.length === 0) {
     return (
       <div className="col-span-2 text-navy-400 text-sm">
-        Sem dados de seguro disponíveis.
+        {noData}
       </div>
     )
   }
@@ -287,7 +286,7 @@ function SeguroFields({ data }: { data: Record<string, unknown> }) {
           )
         }
 
-        return <Field key={key} label={label} value={String(value)} />
+        return <Field key={key} label={label} value={String(value)} nd={nd} />
       })}
     </>
   )
