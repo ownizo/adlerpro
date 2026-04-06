@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useIdentity } from '@/lib/identity-context'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import i18n from '@/lib/i18n'
 
 const TERMS_VERSION = '2025-01'
 
@@ -29,6 +30,34 @@ function LoginPage() {
   const [signupSuccess, setSignupSuccess] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
   const [termsExpanded, setTermsExpanded] = useState(false)
+  const [lang, setLang] = useState(i18n.language)
+  const handleLang = (l: string) => { i18n.changeLanguage(l); setLang(l) }
+
+  const font = "'Montserrat', sans-serif"
+  const langPill = (
+    <div style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 50, display: 'flex', alignItems: 'center', border: '1px solid #dddddd', borderRadius: '4px', overflow: 'hidden', fontFamily: font }}>
+      {(['pt', 'en'] as const).map((l) => (
+        <button
+          key={l}
+          onClick={() => handleLang(l)}
+          style={{
+            background: lang === l ? '#111111' : 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '0.25rem 0.6rem',
+            fontFamily: font,
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            letterSpacing: '0.08em',
+            color: lang === l ? '#ffffff' : '#888888',
+            transition: 'background 0.15s, color 0.15s',
+          }}
+        >
+          {l.toUpperCase()}
+        </button>
+      ))}
+    </div>
+  )
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -56,6 +85,7 @@ function LoginPage() {
   if (!ready) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
+        {langPill}
         <div style={{ color: '#666666', fontFamily: "'Montserrat', sans-serif" }}>{t('common.loading')}</div>
       </div>
     )
@@ -202,6 +232,7 @@ function LoginPage() {
   if (signupSuccess) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center px-4">
+        {langPill}
         <div className="w-full max-w-md p-8 text-center" style={{ border: '1px solid #eeeeee', borderRadius: '4px' }}>
           <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4" style={{ background: '#EAF3DE', borderRadius: '50%' }}>
             <svg className="w-8 h-8" style={{ color: '#3B6D11' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -227,6 +258,7 @@ function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
+      {langPill}
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '72px', width: 'auto', margin: '0 auto 1rem' }} />
