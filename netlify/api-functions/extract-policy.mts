@@ -93,8 +93,8 @@ Se não conseguires extrair um campo, usa null para strings e 0 para números. R
 
     if (errMsg.includes('no pages') || errMsg.includes('No pages')) {
       userMessage = 'O PDF enviado parece estar vazio ou corrompido. Por favor verifique o ficheiro.'
-    } else if (errMsg.includes('rate_limit') || errMsg.includes('overloaded')) {
-      userMessage = 'Serviço temporariamente sobrecarregado. Tente novamente em alguns segundos.'
+    } else if (/rate.?limit|overloaded|50[,.]?000/i.test(errMsg)) {
+      userMessage = '⏳ Serviço temporariamente ocupado. Aguarde 1-2 minutos e tente novamente.'
     } else if (errMsg.includes('too large') || errMsg.includes('size')) {
       userMessage = 'Ficheiro demasiado grande. Por favor reduza o tamanho e tente novamente.'
     } else if (errMsg.includes('JSON')) {

@@ -242,15 +242,26 @@ function PoliciesPage() {
       const fd = new FormData(); fd.append('file', file)
       const res = await fetch('/api/extract-policy', { method: 'POST', body: fd })
       const ct = res.headers.get('content-type') ?? ''
-      if (!ct.includes('application/json')) throw new Error('O servidor devolveu uma resposta inesperada. Tente novamente.')
+      if (!ct.includes('application/json')) throw new Error('__generic__')
       const result = await res.json()
       if (!res.ok) {
         console.error('[extract-policy] erro:', result.error, '| detalhes:', result.details)
-        throw new Error(result.error || 'Erro ao processar ficheiro.')
+        const raw: string = result.error ?? result.details ?? ''
+        if (/rate.?limit|ocupado|50[,.]?000/i.test(raw)) throw new Error('__ratelimit__')
+        if (/JSON|extrair|reconhecível/i.test(raw)) throw new Error('__jsonparse__')
+        throw new Error('__generic__')
       }
       setFormData({ ...result, description: `Apólice extraída de ${file.name}` })
       setShowForm(true)
-    } catch (err: any) { setUploadError(err.message) }
+    } catch (err: any) {
+      const msg: string = err.message ?? ''
+      if (msg === '__ratelimit__')
+        setUploadError('⏳ Serviço temporariamente ocupado. Aguarde 1-2 minutos e tente novamente.')
+      else if (msg === '__jsonparse__')
+        setUploadError('Não foi possível ler os dados da apólice. Tente com outro ficheiro.')
+      else
+        setUploadError('Ocorreu um erro. Por favor tente novamente.')
+    }
     finally { setUploading(false); if (fileInputRef.current) fileInputRef.current.value = '' }
   }
 
