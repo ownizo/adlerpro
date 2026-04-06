@@ -335,7 +335,13 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
       if (result.recommendedIndex === undefined) throw new Error('Resposta inválida da IA.')
       setCompareResult(result)
     } catch (err: any) {
-      setCompareError(err.message)
+      const msg: string = err.message ?? String(err)
+      const isRateLimit = /rate.?limit|50[,.]?000/i.test(msg)
+      setCompareError(
+        isRateLimit
+          ? '⏳ O serviço está temporariamente ocupado. Aguarde 1-2 minutos e tente novamente.'
+          : 'Ocorreu um erro inesperado. Por favor tente novamente.'
+      )
     } finally {
       setComparing(false)
     }
