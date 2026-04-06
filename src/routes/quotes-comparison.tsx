@@ -3,6 +3,8 @@ import { AppLayout } from '@/components/AppLayout'
 import { useState, useRef } from 'react'
 import { getServerUser } from '@/lib/auth'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 export const Route = createFileRoute('/quotes-comparison')({
   beforeLoad: async () => {
@@ -241,6 +243,7 @@ function QuotesComparisonPage() {
   const [comparing, setComparing] = useState(false)
   const [compareResult, setCompareResult] = useState<CompareResult | null>(null)
   const [compareError, setCompareError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
 
@@ -338,6 +341,239 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
     }
   }
 
+  const exportPdf = async () => {
+    if (!compareResult) return
+    setExporting(true)
+    try {
+      const done = quotes.filter(q => q.status === 'done' && q.data)
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW = doc.internal.pageSize.getWidth()
+      const pageH = doc.internal.pageSize.getHeight()
+      const marginL = 18
+      const marginR = 18
+      const contentW = pageW - marginL - marginR
+      const now = new Date()
+      const dateStr = now.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })
+
+      const DARK = '#111111'
+      const GOLD = '#C8961A'
+      const GREEN = '#166534'
+      const LIGHT = '#888888'
+      const FOOTER_COLOR: [number, number, number] = [136, 136, 136]
+
+      const addFooter = (pageNum: number, totalPages: number) => {
+        doc.setFillColor(248, 248, 248)
+        doc.rect(0, pageH - 14, pageW, 14, 'F')
+        doc.setDrawColor(238, 238, 238)
+        doc.line(0, pageH - 14, pageW, pageH - 14)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7)
+        doc.setTextColor(...FOOTER_COLOR)
+        doc.text('Adler & Rochefort  |  insurance@adlerrochefort.com  |  +351 928 226 570  |  adlerrochefort.com', marginL, pageH - 7)
+        doc.text(`Página ${pageNum} de ${totalPages}`, pageW - marginR, pageH - 7, { align: 'right' })
+      }
+
+      // ── Página 1: Header ──
+      // Fundo header
+      doc.setFillColor(17, 17, 17)
+      doc.rect(0, 0, pageW, 38, 'F')
+
+      // Tentar carregar logo
+      try {
+        const logoRes = await fetch('/adler-logo.png')
+        if (logoRes.ok) {
+          const blob = await logoRes.blob()
+          const dataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader()
+            reader.onload = () => resolve(reader.result as string)
+            reader.readAsDataURL(blob)
+          })
+          doc.addImage(dataUrl, 'PNG', marginL, 7, 24, 24)
+        }
+      } catch {
+        // Logo não disponível — usa texto
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(14)
+        doc.setTextColor(200, 150, 26)
+        doc.text('A&R', marginL, 22)
+      }
+
+      // Nome empresa no header
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(13)
+      doc.setTextColor(255, 255, 255)
+      doc.text('Adler & Rochefort', marginL + 28, 17)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(180, 180, 180)
+      doc.text('Mediação de Seguros', marginL + 28, 23)
+
+      // Título do documento (à direita no header)
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(200, 150, 26)
+      doc.text('COMPARATIVO DE COTAÇÕES', pageW - marginR, 17, { align: 'right' })
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7.5)
+      doc.setTextColor(180, 180, 180)
+      doc.text(`Gerado em ${dateStr}`, pageW - marginR, 23, { align: 'right' })
+
+      let y = 48
+
+      // ── Resumo das cotações ──
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7.5)
+      doc.setTextColor(136, 136, 136)
+      doc.text('COTAÇÕES ANALISADAS', marginL, y)
+      y += 5
+
+      done.forEach((q, i) => {
+        const isRec = i === compareResult.recommendedIndex
+        if (isRec) {
+          doc.setFillColor(240, 253, 244)
+          doc.roundedRect(marginL, y - 3.5, contentW, 10, 1, 1, 'F')
+        }
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.setTextColor(17, 17, 17)
+        doc.text(`${i + 1}. ${q.data?.insurer || `Cotação ${i + 1}`}`, marginL + 3, y + 2)
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7.5)
+        doc.setTextColor(136, 136, 136)
+        doc.text(q.file.name, marginL + 3, y + 6.5)
+        if (isRec) {
+          doc.setFillColor(22, 163, 74)
+          doc.roundedRect(pageW - marginR - 22, y - 2, 22, 5.5, 1, 1, 'F')
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(6)
+          doc.setTextColor(255, 255, 255)
+          doc.text('RECOMENDADO', pageW - marginR - 11, y + 1.8, { align: 'center' })
+        }
+        y += 14
+      })
+
+      y += 4
+
+      // ── Tabela comparativa ──
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(7.5)
+      doc.setTextColor(136, 136, 136)
+      doc.text('TABELA COMPARATIVA', marginL, y)
+      y += 4
+
+      const headers = ['Métrica', ...done.map((q, i) => q.data?.insurer || `Cotação ${i + 1}`)]
+      const metrics = [
+        { label: 'Prémio Anual', key: 'annualPremium', format: (v: number) => v > 0 ? formatCurrency(v) : '—' },
+        { label: 'Capital Segurado', key: 'insuredValue', format: (v: number) => v > 0 ? formatCurrency(v) : '—' },
+        { label: 'Franquia', key: 'deductible', format: (v: number) => v > 0 ? formatCurrency(v) : '—' },
+        { label: 'N.º Coberturas', key: 'coverages', format: (_: any, d: any) => d?.coverages?.length > 0 ? String(d.coverages.length) : '—' },
+      ]
+
+      const tableBody = metrics.map(m => [
+        m.label,
+        ...done.map(q => m.format((q.data as any)?.[m.key], q.data)),
+      ])
+
+      autoTable(doc, {
+        startY: y,
+        head: [headers],
+        body: tableBody,
+        margin: { left: marginL, right: marginR },
+        styles: { font: 'helvetica', fontSize: 8.5, cellPadding: 3.5 },
+        headStyles: { fillColor: [17, 17, 17], textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+        columnStyles: { 0: { fontStyle: 'bold', textColor: [85, 85, 85] } },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index > 0) {
+            const colIdx = data.column.index - 1
+            if (colIdx === compareResult.recommendedIndex) {
+              data.cell.styles.fillColor = [240, 253, 244]
+              data.cell.styles.textColor = [22, 100, 52]
+              data.cell.styles.fontStyle = 'bold'
+            }
+          }
+        },
+        theme: 'grid',
+      })
+
+      y = (doc as any).lastAutoTable.finalY + 10
+
+      // ── Recomendação ──
+      doc.setFillColor(22, 163, 74)
+      doc.roundedRect(marginL, y, contentW, 8, 1.5, 1.5, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(9)
+      doc.setTextColor(255, 255, 255)
+      const recName = done[compareResult.recommendedIndex]?.data?.insurer || `Cotação ${compareResult.recommendedIndex + 1}`
+      doc.text(`✦  Recomendação: ${recName}`, marginL + 4, y + 5.2)
+      y += 13
+
+      // Razão
+      doc.setFont('helvetica', 'italic')
+      doc.setFontSize(9)
+      doc.setTextColor(22, 100, 52)
+      const reasonLines = doc.splitTextToSize(compareResult.reason, contentW - 4)
+      doc.text(reasonLines, marginL + 2, y)
+      y += reasonLines.length * 5 + 4
+
+      // Highlights
+      if (compareResult.highlights?.length > 0) {
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8.5)
+        doc.setTextColor(50, 50, 50)
+        compareResult.highlights.forEach(h => {
+          const lines = doc.splitTextToSize(`✓  ${h}`, contentW - 6)
+          doc.text(lines, marginL + 2, y)
+          y += lines.length * 5 + 1.5
+        })
+        y += 3
+      }
+
+      // Warnings
+      if (compareResult.warnings && Object.keys(compareResult.warnings).length > 0) {
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(7.5)
+        doc.setTextColor(136, 136, 136)
+        doc.text('OUTRAS OPÇÕES', marginL + 2, y)
+        y += 5
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8)
+        doc.setTextColor(100, 100, 100)
+        Object.entries(compareResult.warnings).forEach(([idx, warning]) => {
+          const q = done[Number(idx)]
+          const name = q?.data?.insurer || `Cotação ${Number(idx) + 1}`
+          const lines = doc.splitTextToSize(`${name}: ${warning}`, contentW - 6)
+          doc.text(lines, marginL + 2, y)
+          y += lines.length * 4.5 + 1.5
+        })
+      }
+
+      y += 8
+
+      // ── Disclaimer ──
+      const disclaimer = 'Esta análise foi gerada automaticamente por inteligência artificial com base nos documentos fornecidos. Os resultados têm carácter meramente informativo e não constituem aconselhamento profissional de seguros. A Adler & Rochefort recomenda a consulta com um mediador certificado antes de tomar qualquer decisão.'
+      doc.setDrawColor(238, 238, 238)
+      doc.line(marginL, y, pageW - marginR, y)
+      y += 5
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(7)
+      doc.setTextColor(170, 170, 170)
+      const disclaimerLines = doc.splitTextToSize(disclaimer, contentW)
+      doc.text(disclaimerLines, marginL, y)
+
+      // ── Rodapés ──
+      const totalPages = doc.getNumberOfPages()
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p)
+        addFooter(p, totalPages)
+      }
+
+      const fileName = `adler-comparativo-${now.toISOString().slice(0, 10)}.pdf`
+      doc.save(fileName)
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const handleReset = () => {
     setQuotes([])
     setPendingFile(null)
@@ -361,9 +597,20 @@ Responde com este JSON exacto (sem markdown, sem texto extra):
             </p>
           </div>
           {(quotes.length > 0 || compareResult) && (
-            <button onClick={handleReset} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.78rem', padding: '0.45rem 0.85rem', background: 'none', color: '#666', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
-              Recomeçar
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+              {compareResult && (
+                <button
+                  onClick={exportPdf}
+                  disabled={exporting}
+                  style={{ fontFamily: font, fontWeight: 600, fontSize: '0.78rem', padding: '0.45rem 0.85rem', background: exporting ? '#ccc' : '#111', color: '#fff', border: 'none', borderRadius: '4px', cursor: exporting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem', whiteSpace: 'nowrap' }}
+                >
+                  {exporting ? 'A gerar PDF...' : '↓ Exportar PDF'}
+                </button>
+              )}
+              <button onClick={handleReset} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.78rem', padding: '0.45rem 0.85rem', background: 'none', color: '#666', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                Recomeçar
+              </button>
+            </div>
           )}
         </div>
 

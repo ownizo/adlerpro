@@ -19,6 +19,8 @@
     "@tanstack/react-store": "^0.9.1",
     "@tanstack/router-plugin": "^1.164.0",
     "@tanstack/store": "^0.9.1",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.576.0",
     "openai": "^6.33.0",
     "react": "^19.2.0",
