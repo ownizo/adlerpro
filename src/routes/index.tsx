@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useIdentity } from '@/lib/identity-context'
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import i18n from '@/lib/i18n'
 
 export const Route = createFileRoute('/')({
@@ -41,6 +42,7 @@ function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string })
 
 /* ───────── main ───────── */
 function LandingPage() {
+  const { t } = useTranslation()
   const { user, ready } = useIdentity()
   const portalLink = ready && user ? '/dashboard' : '/login'
   const [lang, setLang] = useState(i18n.language)
@@ -70,6 +72,7 @@ function LandingPage() {
           <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '56px', width: 'auto' }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem' }}>
+          {/* Language switcher */}
           <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #dddddd', borderRadius: '4px', overflow: 'hidden', fontFamily: "'Montserrat', sans-serif" }}>
             {(['pt', 'en'] as const).map((l) => (
               <button
@@ -93,16 +96,16 @@ function LandingPage() {
             ))}
           </div>
           <a href="#funcionalidades" style={{ ...font(600, '0.78rem'), color: '#555', textDecoration: 'none', padding: '0.5rem 0.75rem' }}>
-            Funcionalidades
+            {t('landing.navFeatures')}
           </a>
           <a href="#vantagens" style={{ ...font(600, '0.78rem'), color: '#555', textDecoration: 'none', padding: '0.5rem 0.75rem' }}>
-            Vantagens
+            {t('landing.navAdvantages')}
           </a>
           <Link to="/contact" style={{ ...font(600, '0.82rem'), padding: '0.6rem 1rem', background: gold, color: '#fff', borderRadius: '2px', textDecoration: 'none' }}>
-            Contacto
+            {t('landing.navContact')}
           </Link>
           <Link to={portalLink} style={{ ...font(600, '0.82rem'), padding: '0.6rem 1rem', background: dark, color: '#fff', borderRadius: '2px', textDecoration: 'none' }}>
-            {ready && user ? 'Aceder ao Portal' : 'Login'}
+            {ready && user ? t('landing.navPortal') : t('landing.navLogin')}
           </Link>
         </div>
       </header>
@@ -116,31 +119,30 @@ function LandingPage() {
         <div className="max-w-5xl mx-auto" style={{ position: 'relative' as const, zIndex: 1 }}>
           <div style={{ display: 'inline-block', background: gold, padding: '0.35rem 1rem', marginBottom: '1.5rem' }}>
             <span style={{ ...font(700, '0.7rem'), textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: dark }}>
-              Insurtech &mdash; Lançamento Nacional 2025
+              {t('landing.heroBadge')}
             </span>
           </div>
 
           <h2 style={{ ...font(700, 'clamp(2.5rem, 5vw, 4.5rem)'), lineHeight: 1.05, letterSpacing: '-0.03em', color: '#fff', marginBottom: '1.5rem', maxWidth: '48rem' }}>
-            A gestão de seguros<br />
-            empresariais nunca mais<br />
-            será a <span style={{ color: gold }}>mesma.</span>
+            {t('landing.heroTitle1')}<br />
+            {t('landing.heroTitle2')}<br />
+            {t('landing.heroTitle3')} <span style={{ color: gold }}>{t('landing.heroTitleHighlight')}</span>
           </h2>
 
-          <p style={{ ...font(300, '1.1rem'), lineHeight: 1.8, color: '#999', maxWidth: '36rem', marginBottom: '2.5rem' }}>
-            O <strong style={{ color: '#fff', fontWeight: 600 }}>Adler Pro</strong> é o primeiro portal português de gestão de seguros empresariais
-            com <strong style={{ color: gold, fontWeight: 600 }}>Inteligência Artificial</strong> integrada.
-            Centraliza apólices, automatiza comparativos, gere sinistros e antecipa renovações &mdash; tudo numa única plataforma.
-          </p>
+          <p
+            style={{ ...font(300, '1.1rem'), lineHeight: 1.8, color: '#999', maxWidth: '36rem', marginBottom: '2.5rem' }}
+            dangerouslySetInnerHTML={{ __html: t('landing.heroDesc') }}
+          />
 
           <div className="flex flex-col sm:flex-row gap-4">
             <Link to={portalLink} style={{ ...font(600, '0.9rem'), padding: '0.85rem 2rem', background: gold, color: '#fff', borderRadius: '2px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-              Pedir Demonstração
+              {t('landing.heroCta1')}
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
             </Link>
             <a href="#funcionalidades" style={{ ...font(600, '0.9rem'), padding: '0.85rem 2rem', background: 'transparent', color: '#fff', border: '1.5px solid #333', borderRadius: '2px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>
-              Explorar Funcionalidades
+              {t('landing.heroCta2')}
             </a>
           </div>
         </div>
@@ -149,10 +151,10 @@ function LandingPage() {
       {/* ══════════ TRUST BAR ══════════ */}
       <section style={{ borderBottom: `1.5px solid ${dark}`, background: '#fafafa' }}>
         <div className="grid grid-cols-2 lg:grid-cols-4 max-w-6xl mx-auto">
-          <TrustMetric value={<AnimatedCounter end={6} />} label="Módulos com IA Integrada" />
-          <TrustMetric value={<AnimatedCounter end={100} suffix="%" />} label="Digital — Zero Papel" />
-          <TrustMetric value="24/7" label="Acesso ao Portal" />
-          <TrustMetric value={<AnimatedCounter end={90} suffix=" dias" />} label="Antecipação de Renovações" isLast />
+          <TrustMetric value={<AnimatedCounter end={6} />} label={t('landing.trustModules')} />
+          <TrustMetric value={<AnimatedCounter end={100} suffix="%" />} label={t('landing.trustDigital')} />
+          <TrustMetric value="24/7" label={t('landing.trustAccess')} />
+          <TrustMetric value={<AnimatedCounter end={90} suffix={t('landing.trustDays')} />} label={t('landing.trustRenewals')} isLast />
         </div>
       </section>
 
@@ -163,35 +165,35 @@ function LandingPage() {
             {/* Problema */}
             <div>
               <span style={{ ...font(700, '0.7rem'), textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: '#CC2200' }}>
-                O Problema
+                {t('landing.problemBadge')}
               </span>
               <h3 style={{ ...font(700, '1.75rem'), color: dark, marginTop: '0.75rem', marginBottom: '1.5rem', lineHeight: 1.2 }}>
-                A gestão de seguros empresariais está presa ao passado.
+                {t('landing.problemTitle')}
               </h3>
               <div className="space-y-4">
-                <ProblemItem text="Apólices dispersas por dezenas de emails e pastas" />
-                <ProblemItem text="Renovações que passam despercebidas até ser tarde" />
-                <ProblemItem text="Comparação de cotações feita manualmente em Excel" />
-                <ProblemItem text="Sinistros sem acompanhamento estruturado" />
-                <ProblemItem text="Nenhuma visibilidade sobre o risco de parceiros" />
-                <ProblemItem text="Zero integração entre mediador e empresa" />
+                <ProblemItem text={t('landing.problem1')} />
+                <ProblemItem text={t('landing.problem2')} />
+                <ProblemItem text={t('landing.problem3')} />
+                <ProblemItem text={t('landing.problem4')} />
+                <ProblemItem text={t('landing.problem5')} />
+                <ProblemItem text={t('landing.problem6')} />
               </div>
             </div>
             {/* Solução */}
             <div>
               <span style={{ ...font(700, '0.7rem'), textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: gold }}>
-                A Solução
+                {t('landing.solutionBadge')}
               </span>
               <h3 style={{ ...font(700, '1.75rem'), color: dark, marginTop: '0.75rem', marginBottom: '1.5rem', lineHeight: 1.2 }}>
-                O Adler Pro transforma a forma como a sua empresa gere seguros.
+                {t('landing.solutionTitle')}
               </h3>
               <div className="space-y-4">
-                <SolutionItem text="Todas as apólices centralizadas num portal seguro e acessível" />
-                <SolutionItem text="Alertas automáticos de renovação a 90, 60 e 30 dias" />
-                <SolutionItem text="IA que lê, interpreta e compara cotações em segundos" />
-                <SolutionItem text="Registo e acompanhamento de sinistros com timeline" />
-                <SolutionItem text="Análise de risco de parceiros com dados do Registo Comercial" />
-                <SolutionItem text="Portal dedicado que liga a empresa ao mediador" />
+                <SolutionItem text={t('landing.solution1')} />
+                <SolutionItem text={t('landing.solution2')} />
+                <SolutionItem text={t('landing.solution3')} />
+                <SolutionItem text={t('landing.solution4')} />
+                <SolutionItem text={t('landing.solution5')} />
+                <SolutionItem text={t('landing.solution6')} />
               </div>
             </div>
           </div>
@@ -203,50 +205,50 @@ function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center" style={{ marginBottom: '3.5rem' }}>
             <span style={{ ...font(700, '0.7rem'), textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: gold }}>
-              Funcionalidades
+              {t('landing.featuresBadge')}
             </span>
             <h2 style={{ ...font(700, '2.25rem'), color: dark, marginTop: '0.75rem', letterSpacing: '-0.02em' }}>
-              Tudo o que a sua empresa precisa. Numa só plataforma.
+              {t('landing.featuresTitle')}
             </h2>
             <p style={{ ...font(300, '1rem'), color: '#666', marginTop: '1rem', maxWidth: '36rem', marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.8 }}>
-              Do portfólio de apólices à gestão de sinistros, cada módulo foi desenhado para resolver um problema real do dia-a-dia empresarial.
+              {t('landing.featuresDesc')}
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             <FeatureCard
               icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              title="Portfólio de Apólices"
-              desc="Centralize todas as apólices da sua empresa. Visualize coberturas, prémios, datas de renovação e documentos associados num único local."
+              title={t('landing.feat1Title')}
+              desc={t('landing.feat1Desc')}
               badge="IA"
             />
             <FeatureCard
               icon="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-              title="Extracção Automática"
-              desc="Carregue o PDF da apólice e a Inteligência Artificial extrai automaticamente todos os dados: seguradora, coberturas, prémios, datas e condições."
+              title={t('landing.feat2Title')}
+              desc={t('landing.feat2Desc')}
               badge="IA"
             />
             <FeatureCard
               icon="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-              title="Comparativo Inteligente"
-              desc="Compare até 3 cotações em simultâneo. A IA analisa coberturas, exclusões, franquias e preço, gerando um relatório detalhado com recomendação."
+              title={t('landing.feat3Title')}
+              desc={t('landing.feat3Desc')}
               badge="IA"
             />
             <FeatureCard
               icon="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              title="Gestão de Sinistros"
-              desc="Registe e acompanhe sinistros de acidentes de trabalho, patrimoniais, frota, RC e mais. Timeline de progresso, filtros por tipo e exportação CSV."
+              title={t('landing.feat4Title')}
+              desc={t('landing.feat4Desc')}
             />
             <FeatureCard
               icon="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-              title="Risco de Parceiros"
-              desc="Analise o risco financeiro de parceiros e fornecedores com dados da Autoridade Tributária e do Registo Comercial. Capital social, sócios, alertas."
+              title={t('landing.feat5Title')}
+              desc={t('landing.feat5Desc')}
               badge="IA"
             />
             <FeatureCard
               icon="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-              title="Alertas Proactivos"
-              desc="Receba alertas automáticos de renovação a 90, 60 e 30 dias por email. Alertas meteorológicos geolocalizados com ligação ao IPMA."
+              title={t('landing.feat6Title')}
+              desc={t('landing.feat6Desc')}
             />
           </div>
         </div>
@@ -258,35 +260,34 @@ function LandingPage() {
           <div className="grid md:grid-cols-2 gap-12 items-center">
             <div>
               <span style={{ ...font(700, '0.7rem'), textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: gold }}>
-                Inteligência Artificial
+                {t('landing.iaBadge')}
               </span>
               <h2 style={{ ...font(700, '2.25rem'), color: '#fff', marginTop: '0.75rem', marginBottom: '1.5rem', letterSpacing: '-0.02em', lineHeight: 1.15 }}>
-                A IA que trabalha para a sua empresa.
+                {t('landing.iaTitle')}
               </h2>
               <p style={{ ...font(300, '1rem'), color: '#999', lineHeight: 1.8, marginBottom: '2rem' }}>
-                O Adler Pro integra modelos avançados de Inteligência Artificial que automatizam tarefas que antes consumiam horas de trabalho administrativo.
-                Não é um chatbot. É um motor de análise documental treinado para o contexto segurador.
+                {t('landing.iaDesc')}
               </p>
               <div className="space-y-4">
-                <IAFeature title="Leitura de documentos" desc="Carregue um PDF ou imagem de apólice. A IA extrai seguradora, coberturas, prémios, datas e condições em segundos." />
-                <IAFeature title="Comparação de cotações" desc="Envie até 3 cotações. A IA compara coberturas, exclusões e preço, e gera um relatório com recomendação fundamentada." />
-                <IAFeature title="Análise de risco" desc="Introduza o NIF de um parceiro. A IA cruza dados do Registo Comercial e gera um perfil de risco financeiro." />
+                <IAFeature title={t('landing.iaFeat1Title')} desc={t('landing.iaFeat1Desc')} />
+                <IAFeature title={t('landing.iaFeat2Title')} desc={t('landing.iaFeat2Desc')} />
+                <IAFeature title={t('landing.iaFeat3Title')} desc={t('landing.iaFeat3Desc')} />
               </div>
             </div>
             <div style={{ background: '#1a1a1a', borderRadius: '8px', padding: '2.5rem', border: '1px solid #222' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
                 <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#27AE60' }} />
-                <span style={{ ...font(600, '0.75rem'), color: '#666', textTransform: 'uppercase' as const, letterSpacing: '0.1em' }}>IA Adler Pro — Em tempo real</span>
+                <span style={{ ...font(600, '0.75rem'), color: '#666', textTransform: 'uppercase' as const, letterSpacing: '0.1em' }}>{t('landing.iaPanelStatus')}</span>
               </div>
               <div className="space-y-4">
-                <AIStep step="01" label="Upload" desc="PDF da apólice carregado" />
-                <AIStep step="02" label="Leitura" desc="IA a processar documento..." />
-                <AIStep step="03" label="Extracção" desc="Seguradora: Zurich | Prémio: 3.200 EUR" />
-                <AIStep step="04" label="Resultado" desc="Dados estruturados prontos a usar" />
+                <AIStep step="01" label={t('landing.iaStep1Label')} desc={t('landing.iaStep1Desc')} />
+                <AIStep step="02" label={t('landing.iaStep2Label')} desc={t('landing.iaStep2Desc')} />
+                <AIStep step="03" label={t('landing.iaStep3Label')} desc={t('landing.iaStep3Desc')} />
+                <AIStep step="04" label={t('landing.iaStep4Label')} desc={t('landing.iaStep4Desc')} />
               </div>
               <div style={{ marginTop: '1.5rem', padding: '1rem', background: '#0d0d0d', borderRadius: '4px', border: '1px solid #2a2a2a' }}>
-                <p style={{ ...font(600, '0.75rem'), color: gold }}>Tempo médio de processamento</p>
-                <p style={{ ...font(700, '1.5rem'), color: '#fff' }}>{'< 8 segundos'}</p>
+                <p style={{ ...font(600, '0.75rem'), color: gold }}>{t('landing.iaTiming')}</p>
+                <p style={{ ...font(700, '1.5rem'), color: '#fff' }}>{'< 8 '}{t('landing.iaTimingUnit')}</p>
               </div>
             </div>
           </div>
@@ -298,35 +299,35 @@ function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center" style={{ marginBottom: '3.5rem' }}>
             <span style={{ ...font(700, '0.7rem'), textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: gold }}>
-              Porquê o Adler Pro
+              {t('landing.advantagesBadge')}
             </span>
             <h2 style={{ ...font(700, '2.25rem'), color: dark, marginTop: '0.75rem', letterSpacing: '-0.02em' }}>
-              A vantagem competitiva que faltava à sua empresa.
+              {t('landing.advantagesTitle')}
             </h2>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
             <ComparisonCard
-              title="Sem o Adler Pro"
+              title={t('landing.beforeTitle')}
               items={[
-                'Apólices em emails e pastas partilhadas',
-                'Renovações esquecidas ou feitas à pressa',
-                'Cotações comparadas manualmente em Excel',
-                'Sinistros acompanhados por telefone',
-                'Nenhuma visibilidade sobre risco de parceiros',
-                'Dependência total do mediador para qualquer consulta',
+                t('landing.before1'),
+                t('landing.before2'),
+                t('landing.before3'),
+                t('landing.before4'),
+                t('landing.before5'),
+                t('landing.before6'),
               ]}
               type="before"
             />
             <ComparisonCard
-              title="Com o Adler Pro"
+              title={t('landing.afterTitle')}
               items={[
-                'Portfólio digital centralizado e acessível 24/7',
-                'Alertas automáticos a 90, 60 e 30 dias por email',
-                'Comparativo inteligente com relatório IA em segundos',
-                'Gestão de sinistros com timeline e exportação',
-                'Análise de risco com dados do Registo Comercial',
-                'Portal dedicado com autonomia total para a empresa',
+                t('landing.after1'),
+                t('landing.after2'),
+                t('landing.after3'),
+                t('landing.after4'),
+                t('landing.after5'),
+                t('landing.after6'),
               ]}
               type="after"
             />
@@ -339,24 +340,24 @@ function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="text-center" style={{ marginBottom: '3rem' }}>
             <span style={{ ...font(700, '0.7rem'), textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: gold }}>
-              Para todas as empresas
+              {t('landing.sectorsBadge')}
             </span>
             <h2 style={{ ...font(700, '2.25rem'), color: dark, marginTop: '0.75rem', letterSpacing: '-0.02em' }}>
-              Independentemente do sector, os seus seguros merecem gestão inteligente.
+              {t('landing.sectorsTitle')}
             </h2>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <SectorCard icon="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" label="Hotelaria" />
-            <SectorCard icon="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" label="Imobiliário" />
-            <SectorCard icon="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" label="Contabilidade" />
-            <SectorCard icon="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" label="Indústria" />
-            <SectorCard icon="M13 10V3L4 14h7v7l9-11h-7z" label="Energia" />
-            <SectorCard icon="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" label="Serviços" />
+            <SectorCard icon="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" label={t('landing.sectorHotel')} />
+            <SectorCard icon="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" label={t('landing.sectorReal')} />
+            <SectorCard icon="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" label={t('landing.sectorAccounting')} />
+            <SectorCard icon="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" label={t('landing.sectorIndustry')} />
+            <SectorCard icon="M13 10V3L4 14h7v7l9-11h-7z" label={t('landing.sectorEnergy')} />
+            <SectorCard icon="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" label={t('landing.sectorServices')} />
           </div>
 
           <p className="text-center" style={{ ...font(300, '0.9rem'), color: '#888', marginTop: '2rem' }}>
-            Construção, restauração, retalho, transportes, saúde, tecnologia &mdash; o Adler Pro adapta-se a qualquer sector empresarial.
+            {t('landing.sectorsMore')}
           </p>
         </div>
       </section>
@@ -365,20 +366,19 @@ function LandingPage() {
       <section style={{ padding: '5rem 2.5rem' }}>
         <div className="max-w-4xl mx-auto text-center">
           <span style={{ ...font(700, '0.7rem'), textTransform: 'uppercase' as const, letterSpacing: '0.12em', color: gold }}>
-            Quem somos
+            {t('landing.aboutBadge')}
           </span>
           <h2 style={{ ...font(700, '2.25rem'), color: dark, marginTop: '0.75rem', marginBottom: '1.5rem', letterSpacing: '-0.02em' }}>
-            A Adler & Rochefort é uma insurtech portuguesa.
+            {t('landing.aboutTitle')}
           </h2>
-          <p style={{ ...font(300, '1.05rem'), color: '#555', lineHeight: 1.8, marginBottom: '1rem', maxWidth: '40rem', marginLeft: 'auto', marginRight: 'auto' }}>
-            Registada na <strong style={{ fontWeight: 600 }}>Autoridade de Supervisão de Seguros e Fundos de Pensões (ASF)</strong> com o n.º 425591790/3,
-            a Adler & Rochefort combina a experiência de mediação de seguros com tecnologia de ponta para oferecer às empresas portuguesas
-            uma experiência de gestão de risco que não existe no mercado.
-          </p>
-          <p style={{ ...font(300, '1.05rem'), color: '#555', lineHeight: 1.8, maxWidth: '40rem', marginLeft: 'auto', marginRight: 'auto' }}>
-            O Adler Pro não é apenas uma ferramenta &mdash; é a materialização da nossa visão de que a protecção do património empresarial
-            deve ser <strong style={{ fontWeight: 600, color: dark }}>transparente, inteligente e, acima de tudo, simples</strong>.
-          </p>
+          <p
+            style={{ ...font(300, '1.05rem'), color: '#555', lineHeight: 1.8, marginBottom: '1rem', maxWidth: '40rem', marginLeft: 'auto', marginRight: 'auto' }}
+            dangerouslySetInnerHTML={{ __html: t('landing.aboutP1') }}
+          />
+          <p
+            style={{ ...font(300, '1.05rem'), color: '#555', lineHeight: 1.8, maxWidth: '40rem', marginLeft: 'auto', marginRight: 'auto' }}
+            dangerouslySetInnerHTML={{ __html: t('landing.aboutP2') }}
+          />
         </div>
       </section>
 
@@ -387,15 +387,14 @@ function LandingPage() {
         <div className="max-w-3xl mx-auto text-center">
           <img src="/logo.png" alt="Adler Pro" style={{ height: '80px', width: 'auto', margin: '0 auto 2rem' }} />
           <h2 style={{ ...font(700, '2.5rem'), color: '#fff', marginBottom: '1rem', letterSpacing: '-0.02em' }}>
-            Pronto para transformar a gestão de seguros da sua empresa?
+            {t('landing.ctaTitle')}
           </h2>
           <p style={{ ...font(300, '1.05rem'), color: '#999', lineHeight: 1.8, marginBottom: '2.5rem' }}>
-            Peça uma demonstração gratuita e descubra como o Adler Pro pode simplificar as suas operações,
-            reduzir o risco e poupar tempo à sua equipa.
+            {t('landing.ctaDesc')}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/contact" style={{ ...font(600, '0.9rem'), padding: '0.85rem 2.5rem', background: gold, color: '#fff', borderRadius: '2px', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
-              Pedir Demonstração Gratuita
+              {t('landing.ctaBtn')}
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
               </svg>
@@ -412,16 +411,16 @@ function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-6">
-              <Link to="/contact" style={{ ...font(600, '0.78rem'), color: '#666', textDecoration: 'none' }}>Contacto</Link>
-              <Link to="/terms-and-conditions" style={{ ...font(600, '0.78rem'), color: '#666', textDecoration: 'none' }}>Termos e Condições</Link>
-              <Link to="/privacy-policy" style={{ ...font(600, '0.78rem'), color: '#666', textDecoration: 'none' }}>Política de Privacidade</Link>
+              <Link to="/contact" style={{ ...font(600, '0.78rem'), color: '#666', textDecoration: 'none' }}>{t('landing.footerContact')}</Link>
+              <Link to="/terms-and-conditions" style={{ ...font(600, '0.78rem'), color: '#666', textDecoration: 'none' }}>{t('landing.footerTerms')}</Link>
+              <Link to="/privacy-policy" style={{ ...font(600, '0.78rem'), color: '#666', textDecoration: 'none' }}>{t('landing.footerPrivacy')}</Link>
             </div>
             <div className="text-center md:text-right">
               <p style={{ ...font(400, '0.75rem'), color: '#bbb' }}>
-                Adler & Rochefort é uma marca comercial da Ownizo Unipessoal LDA.
+                {t('landing.footerCompany')}
               </p>
               <p style={{ ...font(400, '0.75rem'), color: '#bbb', marginTop: '0.25rem' }}>
-                Registada na ASF com o n.º 425591790/3.
+                {t('landing.footerAsf')}
               </p>
             </div>
           </div>
