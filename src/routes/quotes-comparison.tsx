@@ -281,18 +281,56 @@ function QuotesComparisonPage() {
     setComparing(true)
     setCompareError(null)
     try {
-      const payload = { quotes: doneQuotes.map(q => ({ name: q.file.name, data: q.data })) }
-      const res = await fetch('/api/compare-quotes', {
+      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
+      if (!apiKey) throw new Error('Chave da API Anthropic não configurada (VITE_ANTHROPIC_API_KEY).')
+
+      const quoteSummaries = doneQuotes.map((q, i) =>
+        `Cotação ${i} (índice ${i}) — ${q.file.name}:\n${JSON.stringify(q.data, null, 2)}`
+      ).join('\n\n')
+
+      const prompt = `Analisa estas ${doneQuotes.length} cotações de seguro e responde APENAS com JSON válido, sem mais nada:
+
+${quoteSummaries}
+
+Responde com este JSON exacto (sem markdown, sem texto extra):
+{
+  "recommendedIndex": <número 0, 1 ou 2 — índice da cotação recomendada>,
+  "reason": "<frase curta e directa com a razão principal da recomendação, em Português de Portugal>",
+  "highlights": [
+    "<ponto forte da cotação recomendada>",
+    "<segundo ponto forte>",
+    "<terceiro ponto forte se aplicável>"
+  ],
+  "warnings": {
+    "<índice das outras cotações como string>": "<razão breve porque não é a melhor escolha>"
+  }
+}`
+
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        headers: {
+          'content-type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 512,
+          messages: [{ role: 'user', content: prompt }],
+        }),
       })
-      const ct = res.headers.get('content-type') ?? ''
-      if (!ct.includes('application/json')) throw new Error('Resposta inesperada do servidor.')
+
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Erro na comparação.')
-      if (data.recommendedIndex === undefined) throw new Error('Resposta inválida da IA.')
-      setCompareResult(data)
+      if (!res.ok) throw new Error(data.error?.message || `Erro da API Anthropic (${res.status}).`)
+
+      const text: string = data.content?.[0]?.text ?? ''
+      const jsonMatch = text.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) throw new Error('Resposta da IA não contém JSON válido.')
+
+      const result = JSON.parse(jsonMatch[0])
+      if (result.recommendedIndex === undefined) throw new Error('Resposta inválida da IA.')
+      setCompareResult(result)
     } catch (err: any) {
       setCompareError(err.message)
     } finally {
