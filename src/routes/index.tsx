@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useIdentity } from '@/lib/identity-context'
 import { useState, useEffect, useRef } from 'react'
+import i18n from '@/lib/i18n'
 
 export const Route = createFileRoute('/')({
   component: LandingPage,
@@ -42,6 +43,8 @@ function AnimatedCounter({ end, suffix = '' }: { end: number; suffix?: string })
 function LandingPage() {
   const { user, ready } = useIdentity()
   const portalLink = ready && user ? '/dashboard' : '/login'
+  const [lang, setLang] = useState(i18n.language)
+  const handleLang = (l: string) => { i18n.changeLanguage(l); setLang(l) }
 
   return (
     <div className="min-h-screen bg-white text-primary" style={{ overflowX: 'hidden' as const }}>
@@ -67,6 +70,28 @@ function LandingPage() {
           <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '56px', width: 'auto' }} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #dddddd', borderRadius: '4px', overflow: 'hidden', fontFamily: "'Montserrat', sans-serif" }}>
+            {(['pt', 'en'] as const).map((l) => (
+              <button
+                key={l}
+                onClick={() => handleLang(l)}
+                style={{
+                  background: lang === l ? '#111111' : 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.25rem 0.6rem',
+                  fontFamily: "'Montserrat', sans-serif",
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.08em',
+                  color: lang === l ? '#ffffff' : '#888888',
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+              >
+                {l.toUpperCase()}
+              </button>
+            ))}
+          </div>
           <a href="#funcionalidades" style={{ ...font(600, '0.78rem'), color: '#555', textDecoration: 'none', padding: '0.5rem 0.75rem' }}>
             Funcionalidades
           </a>
