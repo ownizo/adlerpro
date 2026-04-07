@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 
 export const Route = createFileRoute('/one/login')({
   component: OnLoginPage,
+  ssr: false,
 })
 
 const navy = '#0A1628'

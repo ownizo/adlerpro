@@ -5,6 +5,7 @@ import { OneLayout } from './__root'
 
 export const Route = createFileRoute('/one/dashboard')({
   component: OneDashboard,
+  ssr: false,
 })
 
 const navy = '#0A1628'
