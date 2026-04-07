@@ -24,8 +24,12 @@ import { Route as ClaimsRouteImport } from './routes/claims'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OneProfileRouteImport } from './routes/one/profile'
+import { Route as OnePoliciesRouteImport } from './routes/one/policies'
 import { Route as OneLoginRouteImport } from './routes/one/login'
+import { Route as OneDocumentsRouteImport } from './routes/one/documents'
 import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
+import { Route as OneClaimsRouteImport } from './routes/one/claims'
 
 const WeatherAlertsRoute = WeatherAlertsRouteImport.update({
   id: '/weather-alerts',
@@ -102,14 +106,34 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OneProfileRoute = OneProfileRouteImport.update({
+  id: '/one/profile',
+  path: '/one/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnePoliciesRoute = OnePoliciesRouteImport.update({
+  id: '/one/policies',
+  path: '/one/policies',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OneLoginRoute = OneLoginRouteImport.update({
   id: '/one/login',
   path: '/one/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OneDocumentsRoute = OneDocumentsRouteImport.update({
+  id: '/one/documents',
+  path: '/one/documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OneDashboardRoute = OneDashboardRouteImport.update({
   id: '/one/dashboard',
   path: '/one/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OneClaimsRoute = OneClaimsRouteImport.update({
+  id: '/one/claims',
+  path: '/one/claims',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -129,8 +153,12 @@ export interface FileRoutesByFullPath {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/weather-alerts': typeof WeatherAlertsRoute
+  '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
+  '/one/documents': typeof OneDocumentsRoute
   '/one/login': typeof OneLoginRoute
+  '/one/policies': typeof OnePoliciesRoute
+  '/one/profile': typeof OneProfileRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -148,8 +176,12 @@ export interface FileRoutesByTo {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/weather-alerts': typeof WeatherAlertsRoute
+  '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
+  '/one/documents': typeof OneDocumentsRoute
   '/one/login': typeof OneLoginRoute
+  '/one/policies': typeof OnePoliciesRoute
+  '/one/profile': typeof OneProfileRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -168,8 +200,12 @@ export interface FileRoutesById {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/weather-alerts': typeof WeatherAlertsRoute
+  '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
+  '/one/documents': typeof OneDocumentsRoute
   '/one/login': typeof OneLoginRoute
+  '/one/policies': typeof OnePoliciesRoute
+  '/one/profile': typeof OneProfileRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -189,8 +225,12 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/weather-alerts'
+    | '/one/claims'
     | '/one/dashboard'
+    | '/one/documents'
     | '/one/login'
+    | '/one/policies'
+    | '/one/profile'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -208,8 +248,12 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/weather-alerts'
+    | '/one/claims'
     | '/one/dashboard'
+    | '/one/documents'
     | '/one/login'
+    | '/one/policies'
+    | '/one/profile'
   id:
     | '__root__'
     | '/'
@@ -227,8 +271,12 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/weather-alerts'
+    | '/one/claims'
     | '/one/dashboard'
+    | '/one/documents'
     | '/one/login'
+    | '/one/policies'
+    | '/one/profile'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -247,8 +295,12 @@ export interface RootRouteChildren {
   QuotesComparisonRoute: typeof QuotesComparisonRoute
   TermsAndConditionsRoute: typeof TermsAndConditionsRoute
   WeatherAlertsRoute: typeof WeatherAlertsRoute
+  OneClaimsRoute: typeof OneClaimsRoute
   OneDashboardRoute: typeof OneDashboardRoute
+  OneDocumentsRoute: typeof OneDocumentsRoute
   OneLoginRoute: typeof OneLoginRoute
+  OnePoliciesRoute: typeof OnePoliciesRoute
+  OneProfileRoute: typeof OneProfileRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -358,6 +410,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/one/profile': {
+      id: '/one/profile'
+      path: '/one/profile'
+      fullPath: '/one/profile'
+      preLoaderRoute: typeof OneProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/one/policies': {
+      id: '/one/policies'
+      path: '/one/policies'
+      fullPath: '/one/policies'
+      preLoaderRoute: typeof OnePoliciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/one/login': {
       id: '/one/login'
       path: '/one/login'
@@ -365,11 +431,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OneLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/one/documents': {
+      id: '/one/documents'
+      path: '/one/documents'
+      fullPath: '/one/documents'
+      preLoaderRoute: typeof OneDocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/one/dashboard': {
       id: '/one/dashboard'
       path: '/one/dashboard'
       fullPath: '/one/dashboard'
       preLoaderRoute: typeof OneDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/one/claims': {
+      id: '/one/claims'
+      path: '/one/claims'
+      fullPath: '/one/claims'
+      preLoaderRoute: typeof OneClaimsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -391,8 +471,12 @@ const rootRouteChildren: RootRouteChildren = {
   QuotesComparisonRoute: QuotesComparisonRoute,
   TermsAndConditionsRoute: TermsAndConditionsRoute,
   WeatherAlertsRoute: WeatherAlertsRoute,
+  OneClaimsRoute: OneClaimsRoute,
   OneDashboardRoute: OneDashboardRoute,
+  OneDocumentsRoute: OneDocumentsRoute,
   OneLoginRoute: OneLoginRoute,
+  OnePoliciesRoute: OnePoliciesRoute,
+  OneProfileRoute: OneProfileRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
