@@ -358,7 +358,8 @@ export const adminCreatePolicy = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator(
     (d: {
-      companyId: string
+      companyId?: string
+      individualClientId?: string
       type: string
       insurer: string
       policyNumber: string
@@ -374,6 +375,8 @@ export const adminCreatePolicy = createServerFn({ method: 'POST' })
     await db.createPolicy({
       id,
       ...data,
+      companyId: data.companyId || undefined,
+      individualClientId: data.individualClientId || undefined,
       type: data.type as any,
       status: 'active',
       createdAt: new Date().toISOString(),

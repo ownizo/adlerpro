@@ -554,6 +554,7 @@ function AdminPage() {
                 {showNewPolicy && (
                   <NewPolicyForm
                     companies={companies}
+                    individualClients={individualClients}
                     onSubmit={async (data) => {
                       await adminCreatePolicy({ data })
                       await reload()
@@ -1093,9 +1094,10 @@ function getStatusColor(status: string): string {
   return colors[status] || 'bg-gray-100 text-gray-600'
 }
 
-function NewPolicyForm({ companies, onSubmit }: { companies: Company[]; onSubmit: (data: any) => Promise<void> }) {
+function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: Company[]; individualClients: IndividualClient[]; onSubmit: (data: any) => Promise<void> }) {
+  const [clientType, setClientType] = useState<'company' | 'individual'>('company')
   const [form, setForm] = useState({
-    companyId: '', type: '', insurer: '', policyNumber: '', description: '', startDate: '', endDate: '', annualPremium: '', insuredValue: '',
+    companyId: '', individualClientId: '', type: '', insurer: '', policyNumber: '', description: '', startDate: '', endDate: '', annualPremium: '', insuredValue: '',
   })
   const [submitting, setSubmitting] = useState(false)
 
@@ -1106,6 +1108,8 @@ function NewPolicyForm({ companies, onSubmit }: { companies: Company[]; onSubmit
     setSubmitting(true)
     await onSubmit({
       ...form,
+      companyId: clientType === 'company' ? form.companyId : undefined,
+      individualClientId: clientType === 'individual' ? form.individualClientId : undefined,
       annualPremium: Number(form.annualPremium),
       insuredValue: Number(form.insuredValue),
     })
@@ -1116,12 +1120,38 @@ function NewPolicyForm({ companies, onSubmit }: { companies: Company[]; onSubmit
     <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
       <h3 className="text-lg font-semibold text-navy-700 mb-4">Nova Apólice</h3>
       <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-4">
+        <div className="sm:col-span-2">
+          <label className="block text-sm font-medium text-navy-600 mb-1">Tipo de Cliente</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setClientType('company')}
+              className={`px-4 py-2 rounded-[2px] text-sm font-medium border transition-colors ${clientType === 'company' ? 'bg-navy-700 text-white border-navy-700' : 'bg-white text-navy-600 border-navy-200 hover:border-navy-400'}`}
+            >
+              Empresa
+            </button>
+            <button
+              type="button"
+              onClick={() => setClientType('individual')}
+              className={`px-4 py-2 rounded-[2px] text-sm font-medium border transition-colors ${clientType === 'individual' ? 'bg-navy-700 text-white border-navy-700' : 'bg-white text-navy-600 border-navy-200 hover:border-navy-400'}`}
+            >
+              Cliente Individual
+            </button>
+          </div>
+        </div>
         <div>
-          <label className="block text-sm font-medium text-navy-600 mb-1">Empresa</label>
-          <select value={form.companyId} onChange={(e) => update('companyId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400" required>
-            <option value="">Selecionar</option>
-            {companies.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-          </select>
+          <label className="block text-sm font-medium text-navy-600 mb-1">{clientType === 'company' ? 'Empresa' : 'Cliente Individual'}</label>
+          {clientType === 'company' ? (
+            <select value={form.companyId} onChange={(e) => update('companyId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400" required>
+              <option value="">Selecionar empresa</option>
+              {companies.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+            </select>
+          ) : (
+            <select value={form.individualClientId} onChange={(e) => update('individualClientId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400" required>
+              <option value="">Selecionar cliente</option>
+              {individualClients.map((c) => (<option key={c.id} value={c.id}>{c.fullName}{c.nif ? ` · ${c.nif}` : ''}</option>))}
+            </select>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium text-navy-600 mb-1">Tipo</label>
