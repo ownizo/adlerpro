@@ -12,6 +12,9 @@ import {
   adminUpdateCompanyUser,
   adminRefreshApiConnection,
   adminUpdateApiConnection,
+  adminCreateIndividualClient,
+  adminUpdateIndividualClient,
+  adminDeleteIndividualClient,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type {
@@ -22,6 +25,7 @@ import type {
   CompanyUser,
   UserMetricEvent,
   ApiConnection,
+  IndividualClient,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect } from 'react'
@@ -33,7 +37,7 @@ export const Route = createFileRoute('/admin')({
 
 function AdminPage() {
   const { user, ready } = useIdentity()
-  const [tab, setTab] = useState<'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts'>('companies')
+  const [tab, setTab] = useState<'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts' | 'individual_clients'>('companies')
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
   const [userEvents, setUserEvents] = useState<UserMetricEvent[]>([])
@@ -41,16 +45,20 @@ function AdminPage() {
   const [policies, setPolicies] = useState<Policy[]>([])
   const [claims, setClaims] = useState<Claim[]>([])
   const [documents, setDocuments] = useState<DocType[]>([])
+  const [individualClients, setIndividualClients] = useState<IndividualClient[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewCompany, setShowNewCompany] = useState(false)
   const [showNewPolicy, setShowNewPolicy] = useState(false)
+  const [showNewIndividualClient, setShowNewIndividualClient] = useState(false)
+  const [editingIndividualClientId, setEditingIndividualClientId] = useState<string | null>(null)
+  const [expandedIndividualClientId, setExpandedIndividualClientId] = useState<string | null>(null)
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null)
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null)
   const [showUserFormForCompanyId, setShowUserFormForCompanyId] = useState<string | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
 
   const reload = async () => {
-    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d } = await fetchAdminAll()
+    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d, individualClients: ic } = await fetchAdminAll()
     setCompanies(c)
     setCompanyUsers(u)
     setUserEvents(e)
@@ -58,6 +66,7 @@ function AdminPage() {
     setPolicies(p)
     setClaims(cl)
     setDocuments(d)
+    setIndividualClients(ic ?? [])
   }
 
   useEffect(() => {
@@ -83,6 +92,7 @@ function AdminPage() {
 
   const tabs = [
     { key: 'companies' as const, label: 'Empresas' },
+    { key: 'individual_clients' as const, label: 'Clientes Individuais' },
     { key: 'policies' as const, label: 'Apólices e Docs' },
     { key: 'claims' as const, label: 'Sinistros' },
     { key: 'api' as const, label: 'API & Ligações' },
@@ -354,6 +364,158 @@ function AdminPage() {
                       </div>
                     )
                   })}
+                </div>
+              </div>
+            )}
+
+            {tab === 'individual_clients' && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-navy-700">Clientes Individuais ({individualClients.length})</h2>
+                  <button
+                    onClick={() => {
+                      setEditingIndividualClientId(null)
+                      setShowNewIndividualClient(!showNewIndividualClient)
+                    }}
+                    className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm"
+                  >
+                    {showNewIndividualClient ? 'Cancelar' : 'Novo Cliente'}
+                  </button>
+                </div>
+
+                {showNewIndividualClient && (
+                  <IndividualClientForm
+                    title={editingIndividualClientId ? 'Editar Cliente' : 'Novo Cliente Individual'}
+                    initial={editingIndividualClientId ? individualClients.find((c) => c.id === editingIndividualClientId) : undefined}
+                    onSubmit={async (data) => {
+                      if (editingIndividualClientId) {
+                        await adminUpdateIndividualClient({ data: { id: editingIndividualClientId, updates: data } })
+                      } else {
+                        await adminCreateIndividualClient({ data })
+                      }
+                      await reload()
+                      setShowNewIndividualClient(false)
+                      setEditingIndividualClientId(null)
+                    }}
+                  />
+                )}
+
+                <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-navy-50 border-b border-navy-200">
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Nome</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">NIF</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Email</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Telefone</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Estado</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Ações</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-navy-100">
+                      {individualClients.map((client) => {
+                        const clientPolicies = policies.filter((p) => p.individualClientId === client.id)
+                        const isExpanded = expandedIndividualClientId === client.id
+                        return (
+                          <>
+                            <tr
+                              key={client.id}
+                              className="hover:bg-navy-50/50 cursor-pointer"
+                              onClick={() => setExpandedIndividualClientId(isExpanded ? null : client.id)}
+                            >
+                              <td className="px-4 py-3 text-sm font-medium text-navy-700">
+                                <span className="mr-1 text-navy-400">{isExpanded ? '▾' : '▸'}</span>
+                                {client.fullName}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-navy-500">{client.nif || '—'}</td>
+                              <td className="px-4 py-3 text-sm text-navy-500">{client.email || '—'}</td>
+                              <td className="px-4 py-3 text-sm text-navy-500">{client.phone || '—'}</td>
+                              <td className="px-4 py-3">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  client.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {client.status === 'active' ? 'Ativo' : client.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => {
+                                      setEditingIndividualClientId(client.id)
+                                      setShowNewIndividualClient(true)
+                                      setExpandedIndividualClientId(null)
+                                    }}
+                                    className="px-2 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                                  >
+                                    Editar
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (!confirm(`Eliminar cliente ${client.fullName}?`)) return
+                                      await adminDeleteIndividualClient({ data: client.id })
+                                      await reload()
+                                      setExpandedIndividualClientId(null)
+                                    }}
+                                    className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                  >
+                                    Eliminar
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr key={`${client.id}-detail`}>
+                                <td colSpan={6} className="bg-navy-50/50 px-6 py-4 border-b border-navy-100">
+                                  <div className="mb-2">
+                                    <p className="text-xs text-navy-500 mb-1">
+                                      <strong>Morada:</strong> {client.address || '—'}
+                                    </p>
+                                  </div>
+                                  <h4 className="text-sm font-semibold text-navy-700 mb-3">
+                                    Apólices ({clientPolicies.length})
+                                  </h4>
+                                  {clientPolicies.length === 0 ? (
+                                    <p className="text-sm text-navy-400">Sem apólices associadas.</p>
+                                  ) : (
+                                    <div className="grid gap-2">
+                                      {clientPolicies.map((p) => (
+                                        <div key={p.id} className="bg-white rounded border border-navy-200 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                                          <div>
+                                            <p className="text-sm font-medium text-navy-700">
+                                              {POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type}
+                                              {' — '}{p.insurer}
+                                            </p>
+                                            <p className="text-xs text-navy-500">
+                                              Apólice {p.policyNumber} · {p.startDate} → {p.endDate}
+                                            </p>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="text-sm font-semibold text-navy-700">{formatCurrency(p.annualPremium)}/ano</p>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                              p.status === 'active' ? 'bg-green-100 text-green-700' :
+                                              p.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
+                                              'bg-red-100 text-red-700'
+                                            }`}>{p.status}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        )
+                      })}
+                      {individualClients.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-sm text-navy-400 text-center">
+                            Sem clientes individuais registados.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -963,6 +1125,66 @@ function NewPolicyForm({ companies, onSubmit }: { companies: Company[]; onSubmit
         <div className="sm:col-span-2">
           <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 text-sm">
             {submitting ? 'A criar...' : 'Criar Apólice'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function IndividualClientForm({
+  title,
+  initial,
+  onSubmit,
+}: {
+  title: string
+  initial?: Partial<IndividualClient>
+  onSubmit: (data: any) => Promise<void>
+}) {
+  const [form, setForm] = useState({
+    fullName: initial?.fullName || '',
+    nif: initial?.nif || '',
+    email: initial?.email || '',
+    phone: initial?.phone || '',
+    address: initial?.address || '',
+    status: initial?.status || 'active',
+  })
+  const [submitting, setSubmitting] = useState(false)
+
+  const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }))
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitting(true)
+    await onSubmit(form)
+    setSubmitting(false)
+  }
+
+  return (
+    <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
+      <h3 className="text-lg font-semibold text-navy-700 mb-4">{title}</h3>
+      <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-4">
+        <FormField label="Nome Completo" value={form.fullName} onChange={(v) => update('fullName', v)} required />
+        <FormField label="NIF" value={form.nif} onChange={(v) => update('nif', v)} />
+        <FormField label="Email" value={form.email} onChange={(v) => update('email', v)} type="email" />
+        <FormField label="Telefone" value={form.phone} onChange={(v) => update('phone', v)} />
+        <div className="sm:col-span-2">
+          <FormField label="Morada" value={form.address} onChange={(v) => update('address', v)} />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-navy-600 mb-1">Estado</label>
+          <select
+            value={form.status}
+            onChange={(e) => update('status', e.target.value)}
+            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+          >
+            <option value="active">Ativo</option>
+            <option value="inactive">Inativo</option>
+          </select>
+        </div>
+        <div className="sm:col-span-2">
+          <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 text-sm">
+            {submitting ? 'A guardar...' : 'Guardar Cliente'}
           </button>
         </div>
       </form>

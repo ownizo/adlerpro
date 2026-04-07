@@ -14,6 +14,7 @@ import type {
   RiskReport,
   ApiConnection,
   UserMetricEvent,
+  IndividualClient,
 } from './types'
 
 // ============================================================
@@ -330,6 +331,42 @@ export async function createUserMetricEvent(event: UserMetricEvent): Promise<voi
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('user_metric_events').insert(objectToSnake(event as unknown as Record<string, unknown>))
   if (error) console.error('createUserMetricEvent error:', error)
+}
+
+// ============================================================
+// Individual Clients
+// ============================================================
+export async function getIndividualClients(): Promise<IndividualClient[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('individual_clients').select('*').order('full_name', { ascending: true })
+  if (error) { console.error('getIndividualClients error:', error); return [] }
+  return rowsToCamel<IndividualClient>(data ?? [])
+}
+
+export async function createIndividualClient(client: Omit<IndividualClient, 'id' | 'createdAt'>): Promise<{ id: string }> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('individual_clients')
+    .insert(objectToSnake(client as unknown as Record<string, unknown>))
+    .select('id')
+    .single()
+  if (error) throw error
+  return { id: data.id }
+}
+
+export async function updateIndividualClient(id: string, updates: Partial<IndividualClient>): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb
+    .from('individual_clients')
+    .update(objectToSnake(updates as Record<string, unknown>))
+    .eq('id', id)
+  if (error) console.error('updateIndividualClient error:', error)
+}
+
+export async function deleteIndividualClient(id: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('individual_clients').delete().eq('id', id)
+  if (error) console.error('deleteIndividualClient error:', error)
 }
 
 // ============================================================

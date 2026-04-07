@@ -340,7 +340,7 @@ export const fetchApiConnections = createServerFn({ method: 'GET' })
 export const fetchAdminAll = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
-    const [companies, companyUsers, userEvents, apiConnections, policies, claims, documents] = await Promise.all([
+    const [companies, companyUsers, userEvents, apiConnections, policies, claims, documents, individualClients] = await Promise.all([
       db.getCompanies(),
       db.getCompanyUsers(),
       db.getUserMetricEvents(),
@@ -348,8 +348,9 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       db.getPolicies(),
       db.getClaims(),
       db.getDocuments(),
+      db.getIndividualClients(),
     ])
-    return { companies, companyUsers, userEvents, apiConnections, policies, claims, documents }
+    return { companies, companyUsers, userEvents, apiConnections, policies, claims, documents, individualClients }
   })
 
 // Admin functions
@@ -560,6 +561,27 @@ export const adminRefreshApiConnection = createServerFn({ method: 'POST' })
       lastSync: now,
     })
 
+    return { success: true }
+  })
+
+export const adminCreateIndividualClient = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { fullName: string; nif?: string; email?: string; phone?: string; address?: string; status: string }) => d)
+  .handler(async ({ data }) => db.createIndividualClient(data))
+
+export const adminUpdateIndividualClient = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { id: string; updates: any }) => d)
+  .handler(async ({ data }) => {
+    await db.updateIndividualClient(data.id, data.updates)
+    return { success: true }
+  })
+
+export const adminDeleteIndividualClient = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    await db.deleteIndividualClient(id)
     return { success: true }
   })
 

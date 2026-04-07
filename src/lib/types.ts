@@ -61,6 +61,7 @@ export interface Policy {
   deductible?: number
   coverages?: string[]
   exclusions?: string[]
+  individualClientId?: string
 }
 
 export type PolicyType =
@@ -183,4 +184,15 @@ export interface RiskReport {
   generatedAt: string
   content: string
   summary: string
+}
+
+export interface IndividualClient {
+  id: string
+  fullName: string
+  nif?: string
+  email?: string
+  phone?: string
+  address?: string
+  status: string
+  createdAt?: string
 }
