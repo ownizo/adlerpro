@@ -12,13 +12,14 @@ const navy = '#0A1628'
 const gold  = '#C9A84C'
 
 function OnLoginPage() {
-  const [tab,        setTab]        = useState<'login' | 'register'>('login')
-  const [email,      setEmail]      = useState('')
-  const [password,   setPassword]   = useState('')
-  const [loading,    setLoading]    = useState(false)
-  const [error,      setError]      = useState('')
-  const [info,       setInfo]       = useState('')
-  const [checking,   setChecking]   = useState(true)
+  const [tab,          setTab]        = useState<'login' | 'register'>('login')
+  const [email,        setEmail]      = useState('')
+  const [password,     setPassword]   = useState('')
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [loading,      setLoading]    = useState(false)
+  const [error,        setError]      = useState('')
+  const [info,         setInfo]       = useState('')
+  const [checking,     setChecking]   = useState(true)
 
   // Already authenticated → go straight to dashboard
   useEffect(() => {
@@ -44,12 +45,16 @@ function OnLoginPage() {
         return
       }
     } else {
-      const { error: err } = await supabase.auth.signUp({ email, password })
+      const { error: err } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { terms_accepted_at: new Date().toISOString() } },
+      })
       if (err) {
         setError(err.message)
       } else {
         setInfo('Conta criada! Verifique o seu email para confirmar o registo antes de entrar.')
-        setEmail(''); setPassword('')
+        setEmail(''); setPassword(''); setTermsAccepted(false)
       }
     }
 
@@ -163,13 +168,33 @@ function OnLoginPage() {
             </div>
           )}
 
+          {tab === 'register' && (
+            <div style={{ marginBottom: '1.25rem', display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+              <input
+                type="checkbox"
+                id="terms"
+                required
+                checked={termsAccepted}
+                onChange={e => setTermsAccepted(e.target.checked)}
+                style={{ marginTop: 3, flexShrink: 0, accentColor: navy, width: 14, height: 14, cursor: 'pointer' }}
+              />
+              <label htmlFor="terms" style={{ fontSize: '0.68rem', color: '#555', lineHeight: 1.55, cursor: 'pointer' }}>
+                Li e aceito os{' '}
+                <a href="https://adlerrochefort.com/termos-e-condicoes" target="_blank" rel="noopener noreferrer" style={{ color: navy, fontWeight: 600, textDecoration: 'underline' }}>
+                  Termos de Serviço
+                </a>{' '}
+                do Adler One. Autorizo a Adler &amp; Rochefort — Mediadores de Seguros, Lda. (registada na ASF com o n.º 425591790/3) a aceder e tratar os dados das minhas apólices, documentos, contactos, moradas, idades, prémios e datas de renovação, no âmbito da actividade de mediação de seguros. Aceito receber propostas de renovação e cotações relativas às apólices registadas na plataforma.
+              </label>
+            </div>
+          )}
+
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (tab === 'register' && !termsAccepted)}
             style={{
               width: '100%',
               padding: '0.75rem',
-              background: loading ? '#e5c97a' : gold,
+              background: loading || (tab === 'register' && !termsAccepted) ? '#e5c97a' : gold,
               color: navy,
               fontFamily: "'Montserrat', sans-serif",
               fontWeight: 700,
@@ -177,12 +202,13 @@ function OnLoginPage() {
               letterSpacing: '0.06em',
               border: 'none',
               borderRadius: 4,
-              cursor: loading ? 'not-allowed' : 'pointer',
+              cursor: loading || (tab === 'register' && !termsAccepted) ? 'not-allowed' : 'pointer',
+              opacity: tab === 'register' && !termsAccepted ? 0.5 : 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '0.5rem',
-              transition: 'background 0.15s',
+              transition: 'background 0.15s, opacity 0.15s',
             }}
           >
             {loading && (

@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { OneLayout } from './__root'
 
 export const Route = createFileRoute('/one/documents')({
@@ -52,9 +52,12 @@ function formatDate(s: string) {
 }
 
 function OneDocuments() {
-  const [documents, setDocuments] = useState<Document[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [error,     setError]     = useState('')
+  const [documents,    setDocuments]    = useState<Document[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [error,        setError]        = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const fileRef   = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -109,6 +112,74 @@ function OneDocuments() {
             <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>
               {documents.length} documento{documents.length !== 1 ? 's' : ''}
             </p>
+          </div>
+
+          {/* ── Upload area ── */}
+          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, padding: '1.25rem', marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.85rem' }}>
+              Adicionar Documento
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {/* Camera button (mobile) */}
+              <button
+                type="button"
+                onClick={() => cameraRef.current?.click()}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.1rem', background: navy, color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Montserrat', sans-serif" }}
+              >
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Tirar Foto
+              </button>
+              {/* File picker button */}
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.1rem', background: '#F8FAFC', color: navy, border: '1px solid #E2E8F0', borderRadius: 6, fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Montserrat', sans-serif" }}
+              >
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
+                </svg>
+                Escolher Ficheiro
+              </button>
+            </div>
+
+            {/* Hidden inputs */}
+            <input
+              ref={cameraRef}
+              type="file"
+              accept="image/*,application/pdf"
+              capture="environment"
+              style={{ display: 'none' }}
+              onChange={e => setSelectedFile(e.target.files?.[0] ?? null)}
+            />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,application/pdf"
+              style={{ display: 'none' }}
+              onChange={e => setSelectedFile(e.target.files?.[0] ?? null)}
+            />
+
+            {/* Selected file preview */}
+            {selectedFile && (
+              <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.85rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 6 }}>
+                <span style={{ fontSize: '1.2rem' }}>{selectedFile.type.startsWith('image/') ? '🖼️' : '📄'}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 600, color: navy, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedFile.name}</p>
+                  <p style={{ fontSize: '0.7rem', color: '#64748B', margin: '0.1rem 0 0' }}>{formatSize(selectedFile.size)}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedFile(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: '1rem', padding: '0 0.25rem' }}
+                  aria-label="Remover"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
           </div>
 
           {documents.length === 0 ? (

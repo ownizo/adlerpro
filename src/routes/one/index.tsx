@@ -150,6 +150,13 @@ function OneLanding() {
         </div>
       </section>
 
+      {/* ── Disclaimer ── */}
+      <div style={{ background: '#0D1B2F', padding: '1.5rem', textAlign: 'center' }}>
+        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 400, fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', margin: '0 auto', maxWidth: 760, lineHeight: 1.65 }}>
+          Ao criar conta, o utilizador aceita que a Adler &amp; Rochefort — Mediadores de Seguros, Lda., no exercício da sua actividade regulada pela ASF, aceda e trate os dados das suas apólices, documentos, contactos e datas de renovação, podendo contactá-lo com propostas de renovação ou melhoria de coberturas.
+        </p>
+      </div>
+
       {/* ── Footer ── */}
       <footer style={{ background: '#060F1E', padding: '3rem 1.5rem 2rem', color: 'rgba(255,255,255,0.45)', fontFamily: "'Montserrat', sans-serif" }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
