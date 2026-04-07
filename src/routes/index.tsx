@@ -49,10 +49,15 @@ function LandingPage() {
   const handleLang = (l: string) => { i18n.changeLanguage(l); setLang(l) }
 
   // Redirecionar admin.adlerrochefort.com → /admin (ou /login se não autenticado)
+  // Redirecionar one.adlerrochefort.com   → /one/dashboard (ou /one/login se não autenticado)
   useEffect(() => {
     if (!ready) return
-    if (typeof window !== 'undefined' && window.location.hostname === 'admin.adlerrochefort.com') {
+    if (typeof window === 'undefined') return
+    const host = window.location.hostname
+    if (host === 'admin.adlerrochefort.com') {
       window.location.replace(user ? '/admin' : '/login')
+    } else if (host === 'one.adlerrochefort.com') {
+      window.location.replace(user ? '/one/dashboard' : '/one/login')
     }
   }, [ready, user])
 

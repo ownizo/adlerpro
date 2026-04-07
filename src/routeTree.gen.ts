@@ -20,9 +20,12 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LicensePlatesRouteImport } from './routes/license-plates'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as ClaimsRouteImport } from './routes/claims'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OneLoginRouteImport } from './routes/one/login'
+import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
 
 const WeatherAlertsRoute = WeatherAlertsRouteImport.update({
   id: '/weather-alerts',
@@ -79,6 +82,11 @@ const ContactRoute = ContactRouteImport.update({
   path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClaimsRoute = ClaimsRouteImport.update({
+  id: '/claims',
+  path: '/claims',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AlertsRoute = AlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
@@ -94,11 +102,22 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OneLoginRoute = OneLoginRouteImport.update({
+  id: '/one/login',
+  path: '/one/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OneDashboardRoute = OneDashboardRouteImport.update({
+  id: '/one/dashboard',
+  path: '/one/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
+  '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/license-plates': typeof LicensePlatesRoute
@@ -110,11 +129,14 @@ export interface FileRoutesByFullPath {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/weather-alerts': typeof WeatherAlertsRoute
+  '/one/dashboard': typeof OneDashboardRoute
+  '/one/login': typeof OneLoginRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
+  '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/license-plates': typeof LicensePlatesRoute
@@ -126,12 +148,15 @@ export interface FileRoutesByTo {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/weather-alerts': typeof WeatherAlertsRoute
+  '/one/dashboard': typeof OneDashboardRoute
+  '/one/login': typeof OneLoginRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
+  '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/license-plates': typeof LicensePlatesRoute
@@ -143,6 +168,8 @@ export interface FileRoutesById {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/weather-alerts': typeof WeatherAlertsRoute
+  '/one/dashboard': typeof OneDashboardRoute
+  '/one/login': typeof OneLoginRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -150,6 +177,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/alerts'
+    | '/claims'
     | '/contact'
     | '/dashboard'
     | '/license-plates'
@@ -161,11 +189,14 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/weather-alerts'
+    | '/one/dashboard'
+    | '/one/login'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/admin'
     | '/alerts'
+    | '/claims'
     | '/contact'
     | '/dashboard'
     | '/license-plates'
@@ -177,11 +208,14 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/weather-alerts'
+    | '/one/dashboard'
+    | '/one/login'
   id:
     | '__root__'
     | '/'
     | '/admin'
     | '/alerts'
+    | '/claims'
     | '/contact'
     | '/dashboard'
     | '/license-plates'
@@ -193,12 +227,15 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/weather-alerts'
+    | '/one/dashboard'
+    | '/one/login'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AlertsRoute: typeof AlertsRoute
+  ClaimsRoute: typeof ClaimsRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
   LicensePlatesRoute: typeof LicensePlatesRoute
@@ -210,6 +247,8 @@ export interface RootRouteChildren {
   QuotesComparisonRoute: typeof QuotesComparisonRoute
   TermsAndConditionsRoute: typeof TermsAndConditionsRoute
   WeatherAlertsRoute: typeof WeatherAlertsRoute
+  OneDashboardRoute: typeof OneDashboardRoute
+  OneLoginRoute: typeof OneLoginRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -291,6 +330,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/claims': {
+      id: '/claims'
+      path: '/claims'
+      fullPath: '/claims'
+      preLoaderRoute: typeof ClaimsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/alerts': {
       id: '/alerts'
       path: '/alerts'
@@ -312,6 +358,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/one/login': {
+      id: '/one/login'
+      path: '/one/login'
+      fullPath: '/one/login'
+      preLoaderRoute: typeof OneLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/one/dashboard': {
+      id: '/one/dashboard'
+      path: '/one/dashboard'
+      fullPath: '/one/dashboard'
+      preLoaderRoute: typeof OneDashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -319,6 +379,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AlertsRoute: AlertsRoute,
+  ClaimsRoute: ClaimsRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
   LicensePlatesRoute: LicensePlatesRoute,
@@ -330,6 +391,8 @@ const rootRouteChildren: RootRouteChildren = {
   QuotesComparisonRoute: QuotesComparisonRoute,
   TermsAndConditionsRoute: TermsAndConditionsRoute,
   WeatherAlertsRoute: WeatherAlertsRoute,
+  OneDashboardRoute: OneDashboardRoute,
+  OneLoginRoute: OneLoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
