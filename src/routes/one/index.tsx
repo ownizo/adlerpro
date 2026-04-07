@@ -16,12 +16,18 @@ function OneLanding() {
     <div style={{ fontFamily: "'Montserrat', sans-serif", overflowX: 'hidden' }}>
 
       {/* ── Nav ── */}
-      <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: navy, padding: '0 1.5rem', height: 56, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 8px rgba(0,0,0,0.3)' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-          <span style={{ ...f(700, '1rem'), color: gold, letterSpacing: '0.06em' }}>ADLER</span>
-          <span style={{ ...f(300, '1rem'), color: 'rgba(255,255,255,0.85)', letterSpacing: '0.14em', marginLeft: 4 }}>ONE</span>
+      <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: navy, padding: '0 1.5rem', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 8px rgba(0,0,0,0.3)' }}>
+        {/* Left: ADLER ONE wordmark */}
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 100 }}>
+          <span style={{ ...f(700, '0.95rem'), color: gold, letterSpacing: '0.06em' }}>ADLER</span>
+          <span style={{ ...f(300, '0.95rem'), color: 'rgba(255,255,255,0.85)', letterSpacing: '0.14em', marginLeft: 3 }}>ONE</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        {/* Centre: logo */}
+        <a href="https://adlerrochefort.com" target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+          <img src="/logo.png" alt="Adler & Rochefort" style={{ height: 40, width: 'auto', display: 'block', filter: 'brightness(0) invert(1)' }} />
+        </a>
+        {/* Right: auth links */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 100, justifyContent: 'flex-end' }}>
           <Link to="/one/login" style={{ ...f(500, '0.8rem'), color: 'rgba(255,255,255,0.7)', textDecoration: 'none', letterSpacing: '0.03em' }}>
             Entrar
           </Link>
@@ -145,13 +151,69 @@ function OneLanding() {
       </section>
 
       {/* ── Footer ── */}
-      <footer style={{ background: '#060F1E', padding: '2rem 1.5rem', textAlign: 'center' }}>
-        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 400, fontSize: '0.72rem', color: 'rgba(255,255,255,0.3)', margin: 0, letterSpacing: '0.04em' }}>
-          © {new Date().getFullYear()} Adler &amp; Rochefort · Mediadores de Seguros ·{' '}
-          <a href="https://adlerrochefort.com" style={{ color: 'rgba(255,255,255,0.4)', textDecoration: 'none' }} target="_blank" rel="noopener noreferrer">
-            adlerrochefort.com
-          </a>
-        </p>
+      <footer style={{ background: '#060F1E', padding: '3rem 1.5rem 2rem', color: 'rgba(255,255,255,0.45)', fontFamily: "'Montserrat', sans-serif" }}>
+        <div style={{ maxWidth: 900, margin: '0 auto' }}>
+
+          {/* Top row: brand + contact */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
+            <div>
+              <p style={{ fontWeight: 700, fontSize: '0.82rem', color: 'rgba(255,255,255,0.8)', margin: '0 0 0.4rem', letterSpacing: '0.04em' }}>
+                Adler &amp; Rochefort
+              </p>
+              <p style={{ fontSize: '0.72rem', margin: '0 0 0.5rem', lineHeight: 1.6 }}>
+                Mediadores de Seguros, Lda.<br />
+                Marca comercial da Ownizo Unipessoal LDA
+              </p>
+              <p style={{ fontSize: '0.7rem', margin: 0, lineHeight: 1.6 }}>
+                Registada na ASF com o n.º <span style={{ color: 'rgba(255,255,255,0.6)' }}>425591790/3</span>
+              </p>
+            </div>
+
+            <div>
+              <p style={{ fontWeight: 600, fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', margin: '0 0 0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Contacto</p>
+              <p style={{ fontSize: '0.72rem', margin: '0 0 0.3rem', lineHeight: 1.6 }}>
+                <a href="mailto:insurance@adlerrochefort.com" style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none' }}>
+                  insurance@adlerrochefort.com
+                </a>
+              </p>
+              <p style={{ fontSize: '0.72rem', margin: '0 0 0.3rem' }}>
+                <a href="tel:+351928226570" style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none' }}>
+                  +351 928 226 570
+                </a>
+              </p>
+              <p style={{ fontSize: '0.72rem', margin: 0 }}>
+                Av. do Atlântico 16, Esc. 5.07<br />
+                1990-019 Lisboa, Portugal
+              </p>
+            </div>
+
+            <div>
+              <p style={{ fontWeight: 600, fontSize: '0.72rem', color: 'rgba(255,255,255,0.6)', margin: '0 0 0.6rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Legal</p>
+              {[
+                { label: 'Política de Privacidade', href: 'https://adlerrochefort.com/politica-de-privacidade' },
+                { label: 'Termos e Condições',      href: 'https://adlerrochefort.com/termos-e-condicoes' },
+                { label: 'Livro de Reclamações',    href: 'https://www.livroreclamacoes.pt/Inicio/' },
+                { label: 'Canal de Denúncias ASF',  href: 'https://www.asf.com.pt/canal-de-den%C3%BAncias' },
+              ].map(l => (
+                <p key={l.label} style={{ fontSize: '0.72rem', margin: '0 0 0.3rem' }}>
+                  <a href={l.href} target="_blank" rel="noopener noreferrer" style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none' }}>
+                    {l.label}
+                  </a>
+                </p>
+              ))}
+            </div>
+          </div>
+
+          {/* Bottom bar */}
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'space-between', alignItems: 'center' }}>
+            <p style={{ fontSize: '0.68rem', margin: 0 }}>
+              © {new Date().getFullYear()} Adler &amp; Rochefort · Mediadores de Seguros · Autorizado pela ASF
+            </p>
+            <a href="https://adlerrochefort.com" target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.68rem', color: 'rgba(255,255,255,0.35)', textDecoration: 'none' }}>
+              adlerrochefort.com →
+            </a>
+          </div>
+        </div>
       </footer>
 
       <style>{`
