@@ -48,6 +48,14 @@ function LandingPage() {
   const [lang, setLang] = useState(i18n.language)
   const handleLang = (l: string) => { i18n.changeLanguage(l); setLang(l) }
 
+  // Redirecionar admin.adlerrochefort.com → /admin (ou /login se não autenticado)
+  useEffect(() => {
+    if (!ready) return
+    if (typeof window !== 'undefined' && window.location.hostname === 'admin.adlerrochefort.com') {
+      window.location.replace(user ? '/admin' : '/login')
+    }
+  }, [ready, user])
+
   return (
     <div className="min-h-screen bg-white text-primary" style={{ overflowX: 'hidden' as const }}>
 
