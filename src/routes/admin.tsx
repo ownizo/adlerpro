@@ -36,11 +36,6 @@ export const Route = createFileRoute('/admin')({
 })
 
 function AdminPage() {
-  if (typeof window !== 'undefined' && window.location.hostname === 'pro.adlerrochefort.com') {
-    window.location.replace('https://admin.adlerrochefort.com')
-    return null
-  }
-
   const { user, ready } = useIdentity()
   const [tab, setTab] = useState<'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts' | 'individual_clients'>('companies')
   const [companies, setCompanies] = useState<Company[]>([])

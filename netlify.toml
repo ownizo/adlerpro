@@ -14,6 +14,18 @@
 [functions."compare-quotes"]
   timeout = 120
 
+[[redirects]]
+  from = "https://pro.adlerrochefort.com/admin"
+  to = "https://admin.adlerrochefort.com"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://pro.adlerrochefort.com/admin/*"
+  to = "https://admin.adlerrochefort.com"
+  status = 301
+  force = true
+
 [dev]
   command = "npm run dev"
   targetPort = 3000
