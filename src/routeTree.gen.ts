@@ -24,6 +24,7 @@ import { Route as ClaimsRouteImport } from './routes/claims'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OneIndexRouteImport } from './routes/one/index'
 import { Route as OneProfileRouteImport } from './routes/one/profile'
 import { Route as OnePoliciesRouteImport } from './routes/one/policies'
 import { Route as OneLoginRouteImport } from './routes/one/login'
@@ -106,6 +107,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OneIndexRoute = OneIndexRouteImport.update({
+  id: '/one/',
+  path: '/one/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OneProfileRoute = OneProfileRouteImport.update({
   id: '/one/profile',
   path: '/one/profile',
@@ -159,6 +165,7 @@ export interface FileRoutesByFullPath {
   '/one/login': typeof OneLoginRoute
   '/one/policies': typeof OnePoliciesRoute
   '/one/profile': typeof OneProfileRoute
+  '/one/': typeof OneIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -182,6 +189,7 @@ export interface FileRoutesByTo {
   '/one/login': typeof OneLoginRoute
   '/one/policies': typeof OnePoliciesRoute
   '/one/profile': typeof OneProfileRoute
+  '/one': typeof OneIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -206,6 +214,7 @@ export interface FileRoutesById {
   '/one/login': typeof OneLoginRoute
   '/one/policies': typeof OnePoliciesRoute
   '/one/profile': typeof OneProfileRoute
+  '/one/': typeof OneIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
     | '/one/login'
     | '/one/policies'
     | '/one/profile'
+    | '/one/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -254,6 +264,7 @@ export interface FileRouteTypes {
     | '/one/login'
     | '/one/policies'
     | '/one/profile'
+    | '/one'
   id:
     | '__root__'
     | '/'
@@ -277,6 +288,7 @@ export interface FileRouteTypes {
     | '/one/login'
     | '/one/policies'
     | '/one/profile'
+    | '/one/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -301,6 +313,7 @@ export interface RootRouteChildren {
   OneLoginRoute: typeof OneLoginRoute
   OnePoliciesRoute: typeof OnePoliciesRoute
   OneProfileRoute: typeof OneProfileRoute
+  OneIndexRoute: typeof OneIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -410,6 +423,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/one/': {
+      id: '/one/'
+      path: '/one'
+      fullPath: '/one/'
+      preLoaderRoute: typeof OneIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/one/profile': {
       id: '/one/profile'
       path: '/one/profile'
@@ -477,6 +497,7 @@ const rootRouteChildren: RootRouteChildren = {
   OneLoginRoute: OneLoginRoute,
   OnePoliciesRoute: OnePoliciesRoute,
   OneProfileRoute: OneProfileRoute,
+  OneIndexRoute: OneIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

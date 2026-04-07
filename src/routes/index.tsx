@@ -57,7 +57,7 @@ function LandingPage() {
     if (host === 'admin.adlerrochefort.com') {
       window.location.replace(user ? '/admin' : '/login')
     } else if (host === 'one.adlerrochefort.com') {
-      window.location.replace(user ? '/one/dashboard' : '/one/login')
+      window.location.replace(user ? '/one/dashboard' : '/one/')
     }
   }, [ready, user])
 
