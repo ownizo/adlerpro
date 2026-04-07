@@ -88,6 +88,7 @@ function OneDashboard() {
     try {
       // 1. Get current auth user
       const { data: { user }, error: authError } = await supabase.auth.getUser()
+      console.log('auth user:', user, 'authError:', authError)
       if (authError || !user) {
         window.location.replace('/one/login')
         return
@@ -122,6 +123,7 @@ function OneDashboard() {
         }
       }
 
+      console.log('client:', clientData)
       setClient(clientData)
 
       // 3. Fetch policies for this client
@@ -132,6 +134,7 @@ function OneDashboard() {
           .eq('individual_client_id', clientData.id)
           .order('end_date', { ascending: true })
 
+        console.log('policies error:', pErr, 'policies data:', policyData)
         if (pErr) console.error('policies fetch:', pErr)
         setPolicies(policyData ?? [])
       }
