@@ -33,6 +33,7 @@ import { useIdentity } from '@/lib/identity-context'
 
 export const Route = createFileRoute('/admin')({
   component: AdminPage,
+  head: () => ({ meta: [{ title: 'Adler Admin' }] }),
 })
 
 function AdminPage() {
