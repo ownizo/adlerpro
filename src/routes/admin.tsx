@@ -531,7 +531,16 @@ function AdminPage() {
                       className="px-4 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 min-w-48"
                     >
                       <option value="">Todos os Clientes</option>
-                      {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      {companies.length > 0 && (
+                        <optgroup label="── Empresas ──">
+                          {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </optgroup>
+                      )}
+                      {individualClients.length > 0 && (
+                        <optgroup label="── Clientes Individuais ──">
+                          {individualClients.map((c) => <option key={c.id} value={`ic:${c.id}`}>{c.fullName}</option>)}
+                        </optgroup>
+                      )}
                     </select>
                   </div>
                   <button
@@ -557,14 +566,22 @@ function AdminPage() {
                   <SimpleCollection
                     title={`Apólices ${selectedCompanyId ? 'do Cliente' : 'Globais'}`}
                     rows={policies
-                      .filter((p) => selectedCompanyId ? p.companyId === selectedCompanyId : true)
-                      .map((p) => `${POLICY_TYPE_LABELS[p.type]} · ${p.policyNumber} · ${formatCurrency(p.annualPremium)}`)}
+                      .filter((p) => {
+                        if (!selectedCompanyId) return true
+                        if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
+                        return p.companyId === selectedCompanyId
+                      })
+                      .map((p) => `${POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type} · ${p.policyNumber} · ${formatCurrency(p.annualPremium)}`)}
                     emptyMessage="Sem apólices para o filtro selecionado."
                   />
                   <SimpleCollection
                     title={`Documentos ${selectedCompanyId ? 'do Cliente' : 'Globais'}`}
                     rows={documents
-                      .filter((d) => selectedCompanyId ? d.companyId === selectedCompanyId : true)
+                      .filter((d) => {
+                        if (!selectedCompanyId) return true
+                        if (selectedCompanyId.startsWith('ic:')) return false
+                        return d.companyId === selectedCompanyId
+                      })
                       .map((d) => `${d.name} · ${d.category} · ${formatDate(d.uploadedAt)}`)}
                     emptyMessage="Sem documentos para o filtro selecionado."
                   />
