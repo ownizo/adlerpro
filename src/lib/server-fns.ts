@@ -767,36 +767,52 @@ Responde APENAS com um JSON válido neste formato exato (sem markdown, sem texto
       throw new Error('Erro ao processar resposta da IA')
     }
 
-    // Generate image with Google Imagen 3
-    let imageBase64: string | undefined
-    const geminiKey = process.env['GEMINI_API_KEY']
-    if (geminiKey) {
-      try {
-        const imagePrompt = `Professional insurance photography for a prestigious Portuguese insurance brokerage, Adler & Rochefort. Topic: ${topic}. Style: elegant, minimalist, high-end corporate photography. Color palette: deep navy blue (#0A1628) and gold (#C9A84C). Clean composition, premium feel, subtle lighting. No text overlays. Square format.`
-        const imgResponse = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict`,
-          {
-            method: 'POST',
-            headers: {
-              'x-goog-api-key': geminiKey,
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify({
-              instances: [{ prompt: imagePrompt }],
-              parameters: { sampleCount: 1, aspectRatio: '1:1' },
-            }),
-          }
-        )
-        if (imgResponse.ok) {
-          const imgResult = await imgResponse.json() as any
-          imageBase64 = imgResult.predictions?.[0]?.bytesBase64Encoded
-        } else {
-          console.error('Imagen error:', imgResponse.status, await imgResponse.text())
-        }
-      } catch (e) {
-        console.error('Imagen error:', e)
+    // Generate Instagram carousel SVG
+    let carouselSvg: string | undefined
+    try {
+      // Extract a short phrase (max 2 lines) from the instagram content
+      const instagramText = parsed.instagram || ''
+      const firstSentence = instagramText.split(/[.!?]\s/)[0]?.slice(0, 80) ?? topic
+
+      const svgPrompt = `Generate a single valid SVG image, 1080x1080px, for an Instagram post for Adler & Rochefort, a premium Portuguese insurance brokerage.
+
+Requirements:
+- Background: linear gradient from #0A1628 (top) to #1B2B4B (bottom), full 1080x1080
+- Top area: "Adler & Rochefort" in gold (#C9A84C), elegant serif-style font, font-size 42px, letter-spacing 3px, centered, y≈120
+- Decorative thin gold horizontal line (stroke #C9A84C, stroke-width 1.5) spanning 600px wide, centered, y≈160
+- Topic title in white (#FFFFFF), bold, font-size 52px, centered, wrapped to max 2 lines, y≈400 (adjust for centering)
+- Key phrase below title in white (#E8E8E8), font-size 32px, font-weight 300, centered, italic, max 2 lines: "${firstSentence}"
+- Another decorative thin gold line, 400px wide, centered, y≈700
+- Footer: "adlerrochefort.com" in gold (#C9A84C), opacity 0.7, font-size 28px, centered, y≈980
+- Topic to display: "${topic}"
+- Design: minimalist, premium, dark luxury aesthetic
+- Output ONLY the raw SVG code starting with <svg and ending with </svg>, no markdown, no explanation`
+
+      const svgResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 4000,
+          messages: [{ role: 'user', content: svgPrompt }],
+        }),
+      })
+
+      if (svgResponse.ok) {
+        const svgResult = await svgResponse.json() as any
+        const svgText = svgResult.content?.[0]?.text ?? ''
+        const svgMatch = svgText.match(/<svg[\s\S]*<\/svg>/)
+        if (svgMatch) carouselSvg = svgMatch[0]
+      } else {
+        console.error('SVG generation error:', svgResponse.status, await svgResponse.text())
       }
+    } catch (e) {
+      console.error('SVG generation error:', e)
     }
 
-    return { ...parsed, imageBase64 }
+    return { ...parsed, carouselSvg }
   })
