@@ -758,11 +758,43 @@ Responde APENAS com um JSON válido neste formato exato:
     const result = await response.json() as any
     const text = result.content?.[0]?.text ?? ''
 
+    let parsed: { instagram: string; linkedin: string; facebook: string }
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/)
       if (!jsonMatch) throw new Error('No JSON found')
-      return JSON.parse(jsonMatch[0]) as { instagram: string; linkedin: string; facebook: string }
+      parsed = JSON.parse(jsonMatch[0])
     } catch {
       throw new Error('Erro ao processar resposta da IA')
     }
+
+    // Generate image with Google Imagen 3
+    let imageBase64: string | undefined
+    const geminiKey = process.env['GEMINI_API_KEY']
+    if (geminiKey) {
+      try {
+        const imagePrompt = `Professional insurance photography for a prestigious Portuguese insurance brokerage, Adler & Rochefort. Topic: ${topic}. Style: elegant, minimalist, high-end corporate photography. Color palette: deep navy blue (#0A1628) and gold (#C9A84C). Clean composition, premium feel, subtle lighting. No text overlays. Square format.`
+        const imgResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict`,
+          {
+            method: 'POST',
+            headers: {
+              'x-goog-api-key': geminiKey,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              instances: [{ prompt: imagePrompt }],
+              parameters: { sampleCount: 1, aspectRatio: '1:1' },
+            }),
+          }
+        )
+        if (imgResponse.ok) {
+          const imgResult = await imgResponse.json() as any
+          imageBase64 = imgResult.predictions?.[0]?.bytesBase64Encoded
+        }
+      } catch {
+        // Image generation is best-effort — don't fail the whole request
+      }
+    }
+
+    return { ...parsed, imageBase64 }
   })

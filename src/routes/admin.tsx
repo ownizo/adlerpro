@@ -1390,6 +1390,8 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [genError, setGenError] = useState('')
+  const [pendingImageBase64, setPendingImageBase64] = useState<string | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(initial?.imageUrl ?? null)
 
   const toggleNetwork = (n: string) => {
     setNetworks((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n])
@@ -1397,12 +1399,13 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
 
   const handleGenerate = async () => {
     if (!topic.trim()) { setGenError('Introduz um tópico primeiro.'); return }
-    setGenError(''); setGenerating(true)
+    setGenError(''); setGenerating(true); setPendingImageBase64(null)
     try {
       const res = await adminGenerateSocialContent({ data: { topic } })
       if (res.instagram) setContentInstagram(res.instagram)
       if (res.linkedin) setContentLinkedin(res.linkedin)
       if (res.facebook) setContentFacebook(res.facebook)
+      if (res.imageBase64) setPendingImageBase64(res.imageBase64)
     } catch (e: any) {
       setGenError(e?.message ?? 'Erro ao gerar conteúdo.')
     } finally {
@@ -1420,6 +1423,7 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
       contentInstagram,
       contentLinkedin,
       contentFacebook,
+      imageUrl: imageUrl ?? undefined,
       scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
       updatedAt: now,
     }
@@ -1527,6 +1531,40 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
           />
         )}
       </div>
+
+      {/* Image preview */}
+      {(pendingImageBase64 || imageUrl) && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-navy-600 mb-2">Imagem</label>
+          <div className="flex items-start gap-4">
+            <img
+              src={pendingImageBase64 ? `data:image/png;base64,${pendingImageBase64}` : imageUrl!}
+              alt="Imagem gerada"
+              className="w-40 h-40 object-cover rounded-[4px] border border-navy-200"
+            />
+            <div className="flex flex-col gap-2">
+              {pendingImageBase64 && (
+                <button
+                  type="button"
+                  onClick={() => { setImageUrl(`data:image/png;base64,${pendingImageBase64}`); setPendingImageBase64(null) }}
+                  className="px-4 py-2 bg-gold-400 text-navy-700 text-xs font-semibold rounded-[2px] hover:bg-gold-300"
+                >
+                  Usar esta imagem
+                </button>
+              )}
+              {imageUrl && (
+                <button
+                  type="button"
+                  onClick={() => setImageUrl(null)}
+                  className="px-4 py-2 border border-navy-200 text-navy-500 text-xs rounded-[2px] hover:bg-navy-50"
+                >
+                  Remover imagem
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Schedule */}
       <div className="mb-6">
