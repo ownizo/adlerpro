@@ -40,7 +40,7 @@ import type {
   SocialPost,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
 import { AdminDashboard } from '@/components/AdminDashboard'
@@ -73,6 +73,12 @@ function AdminPage() {
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null)
   const [showUserFormForCompanyId, setShowUserFormForCompanyId] = useState<string | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
+
+  // Filter out individual clients whose NIF matches a company's NIF to avoid duplication
+  const filteredIndividualClients = useMemo(() => {
+    const companyNifs = new Set(companies.map((c) => c.nif).filter(Boolean))
+    return individualClients.filter((client) => !client.nif || !companyNifs.has(client.nif))
+  }, [individualClients, companies])
 
   const reload = async () => {
     const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d, individualClients: ic } = await fetchAdminAll()
@@ -392,7 +398,7 @@ function AdminPage() {
             {tab === 'individual_clients' && (
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-navy-700">Clientes Individuais ({individualClients.length})</h2>
+                  <h2 className="text-lg font-semibold text-navy-700">Clientes Individuais ({filteredIndividualClients.length})</h2>
                   <button
                     onClick={() => {
                       setEditingIndividualClientId(null)
@@ -407,7 +413,7 @@ function AdminPage() {
                 {showNewIndividualClient && (
                   <IndividualClientForm
                     title={editingIndividualClientId ? 'Editar Cliente' : 'Novo Cliente Individual'}
-                    initial={editingIndividualClientId ? individualClients.find((c) => c.id === editingIndividualClientId) : undefined}
+                    initial={editingIndividualClientId ? filteredIndividualClients.find((c) => c.id === editingIndividualClientId) : undefined}
                     onSubmit={async (data) => {
                       if (editingIndividualClientId) {
                         await adminUpdateIndividualClient({ data: { id: editingIndividualClientId, updates: data } })
@@ -436,7 +442,7 @@ function AdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-navy-100">
-                      {individualClients.map((client) => {
+                      {filteredIndividualClients.map((client) => {
                         const clientPolicies = policies.filter((p) => p.individualClientId === client.id)
                         const isExpanded = expandedIndividualClientId === client.id
                         return (
@@ -536,7 +542,7 @@ function AdminPage() {
                           </>
                         )
                       })}
-                      {individualClients.length === 0 && (
+                      {filteredIndividualClients.length === 0 && (
                         <tr>
                           <td colSpan={6} className="px-4 py-8 text-sm text-navy-400 text-center">
                             Sem clientes individuais registados.
