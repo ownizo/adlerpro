@@ -1727,39 +1727,43 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
         const isExpanded = expandedId === policy.id
 
         return (
-          <div key={policy.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
+          <div key={policy.id} className="bg-white rounded-[4px] border border-navy-200">
             {/* Summary row */}
-            <div className="flex items-center gap-3 px-4 py-3">
-              <button onClick={() => setExpandedId(isExpanded ? null : policy.id)} className="text-navy-400 hover:text-navy-600 text-xs">
-                {isExpanded ? '▾' : '▸'}
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-navy-700">{POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${POLICY_STATUS_CLASS[policy.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {POLICY_STATUS_LABEL[policy.status] ?? policy.status}
-                  </span>
-                  <span className="text-xs text-navy-500">{clientName}</span>
-                  <span className="text-xs text-navy-400">{policy.insurer} · {policy.policyNumber}</span>
+            <div className="px-4 py-3">
+              <div className="flex items-start gap-3">
+                <button onClick={() => setExpandedId(isExpanded ? null : policy.id)} className="text-navy-400 hover:text-navy-600 text-xs mt-1 shrink-0">
+                  {isExpanded ? '▾' : '▸'}
+                </button>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-navy-700">{POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type}</span>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${POLICY_STATUS_CLASS[policy.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {POLICY_STATUS_LABEL[policy.status] ?? policy.status}
+                    </span>
+                    <span className="text-xs text-navy-500">{clientName}</span>
+                    <span className="text-xs text-navy-400">{policy.insurer} · {policy.policyNumber}</span>
+                  </div>
+                  <p className="text-xs text-navy-400 mt-0.5">{formatCurrency(policy.annualPremium)}/ano · {formatDate(policy.endDate)}</p>
                 </div>
-                <p className="text-xs text-navy-400 mt-0.5">{formatCurrency(policy.annualPremium)}/ano · {formatDate(policy.endDate)}</p>
               </div>
-              <button
-                onClick={() => setEditingId(isEditing ? null : policy.id)}
-                className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 whitespace-nowrap"
-              >
-                {isEditing ? 'Cancelar' : 'Editar'}
-              </button>
-              <button
-                onClick={async () => {
-                  if (!confirm(`Eliminar apólice ${policy.policyNumber}?`)) return
-                  await adminDeletePolicy({ data: policy.id })
-                  await onReload()
-                }}
-                className="px-2.5 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 whitespace-nowrap"
-              >
-                Eliminar
-              </button>
+              <div className="flex gap-2 mt-2 ml-6">
+                <button
+                  onClick={() => setEditingId(isEditing ? null : policy.id)}
+                  className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                >
+                  {isEditing ? 'Cancelar' : 'Editar'}
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!confirm(`Eliminar apólice ${policy.policyNumber}?`)) return
+                    await adminDeletePolicy({ data: policy.id })
+                    await onReload()
+                  }}
+                  className="px-2.5 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                >
+                  Eliminar
+                </button>
+              </div>
             </div>
 
             {/* Edit form */}
