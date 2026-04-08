@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate } from '@tanstack/react-router'
-import { AppLayout } from '@/components/AppLayout'
+import { AppLayout, type AdminSubTab } from '@/components/AppLayout'
 import {
   fetchAdminAll,
   adminCreatePolicy,
@@ -114,17 +114,17 @@ function AdminPage() {
   if (!user) return <Navigate to="/login" />
   if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
-  const tabs = [
-    { key: 'dashboard_analytics' as const, label: 'Dashboard' },
-    { key: 'companies' as const, label: 'Empresas' },
-    { key: 'individual_clients' as const, label: 'Clientes Individuais' },
-    { key: 'policies' as const, label: 'Apólices e Docs' },
-    { key: 'claims' as const, label: 'Sinistros' },
-    { key: 'social' as const, label: '✦ Social Hub' },
-    { key: 'api' as const, label: 'API & Ligações' },
-    { key: 'profiles' as const, label: 'Perfis e Métricas' },
-    { key: 'alerts' as const, label: 'Alertas (60 dias)' },
-    { key: 'billing' as const, label: 'Faturação' },
+  const tabs: AdminSubTab[] = [
+    { key: 'dashboard_analytics', label: 'Dashboard' },
+    { key: 'companies', label: 'Empresas' },
+    { key: 'individual_clients', label: 'Clientes Individuais' },
+    { key: 'policies', label: 'Apólices e Docs' },
+    { key: 'claims', label: 'Sinistros' },
+    { key: 'social', label: '✦ Social Hub' },
+    { key: 'api', label: 'API & Ligações' },
+    { key: 'profiles', label: 'Perfis e Métricas' },
+    { key: 'alerts', label: 'Alertas (60 dias)' },
+    { key: 'billing', label: 'Faturação' },
   ]
 
   const expiringPolicies = policies.filter((p) => {
@@ -153,25 +153,11 @@ function AdminPage() {
   })
 
   return (
-    <AppLayout>
+    <AppLayout adminTabs={tabs} activeAdminTab={tab} onAdminTabChange={(key) => setTab(key as typeof tab)}>
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-navy-700">Painel de Administração</h1>
           <p className="text-navy-500 mt-1">Gestão de empresas, acessos, apólices, sinistros e integrações</p>
-        </div>
-
-        <div className="flex flex-wrap gap-1 bg-navy-100 p-1 rounded-[2px] mb-8 w-fit">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                tab === t.key ? 'bg-white text-navy-700 shadow-sm' : 'text-navy-500 hover:text-navy-700'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
         </div>
 
         {loading ? (
