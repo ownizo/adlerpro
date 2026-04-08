@@ -1,84 +1,15 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
 import type { DashboardStats } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
+import type { User } from '@/lib/identity-context'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
 
-function extractAccessToken(): string | null {
-  try {
-    const authHeader = getRequestHeader('authorization')
-    if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7)
-
-    const cookies = getCookies()
-
-    // Helper to parse a cookie value from @supabase/ssr
-    // @supabase/ssr stores cookies with "base64-" prefix followed by base64-encoded JSON
-    function parseCookieValue(value: string): string | null {
-      try {
-        const decoded = decodeURIComponent(value)
-        // @supabase/ssr stores cookies as "base64-<base64encodedJSON>"
-        if (decoded.startsWith('base64-')) {
-          const b64 = decoded.slice(7)
-          const json = atob(b64)
-          const parsed = JSON.parse(json)
-          if (parsed?.access_token) return parsed.access_token
-          return null
-        }
-        // Legacy format: plain JSON
-        const parsed = JSON.parse(decoded)
-        if (typeof parsed === 'string') return parsed
-        if (Array.isArray(parsed) && parsed[0]) return parsed[0]
-        if (parsed?.access_token) return parsed.access_token
-        return null
-      } catch {
-        return value
-      }
-    }
-
-    for (const [name, value] of Object.entries(cookies)) {
-      if (name.match(/^sb-[^-]+-auth-token$/) && value) {
-        const token = parseCookieValue(value)
-        if (token) return token
-      }
-    }
-
-    // Handle chunked cookies (sb-xxx-auth-token.0, .1, etc.)
-    const chunkNames = Object.keys(cookies)
-      .filter((name) => name.match(/^sb-[^-]+-auth-token\.\d+$/))
-      .sort()
-    if (chunkNames.length > 0) {
-      const full = chunkNames.map((n) => cookies[n]).join('')
-      const token = parseCookieValue(full)
-      if (token) return token
-    }
-
-    return null
-  } catch {
-    return null
-  }
-}
-
-// Cache em memória por token para evitar chamadas repetidas ao Supabase Auth na mesma request
-const _scopeCache = new Map<string, { scope: Awaited<ReturnType<typeof _resolveScope>>; ts: number }>()
-
-async function _resolveScope(token: string) {
-  const { data: { user: supaUser }, error } = await supabaseAdmin.auth.getUser(token)
-  if (error || !supaUser) throw new Error('Authentication required')
-
-  const meta = supaUser.user_metadata ?? {}
-  const appMeta = supaUser.app_metadata ?? {}
-  const user = {
-    id: supaUser.id,
-    email: supaUser.email,
-    name: meta.full_name ?? meta.name ?? supaUser.email,
-    roles: appMeta.roles as string[] | undefined,
-  }
-
+async function getViewerScope(user?: User | null) {
+  if (!user) throw new Error('Authentication required')
   const isAdmin = user.roles?.includes('admin')
   if (isAdmin) return { user, isAdmin: true as const, companyId: null as string | null }
-
   if (!user.email) return { user, isAdmin: false as const, companyId: null as string | null }
 
   const companyUser = await db.getCompanyUserByEmail(user.email)
@@ -89,31 +20,27 @@ async function _resolveScope(token: string) {
   }
 }
 
-async function getViewerScope() {
-  const token = extractAccessToken()
-  if (!token) throw new Error('Authentication required')
+type ViewerScope = Awaited<ReturnType<typeof getViewerScope>>
 
-  // Cache válido por 30 segundos para evitar chamadas duplicadas na mesma navegação
-  const cached = _scopeCache.get(token)
-  if (cached && Date.now() - cached.ts < 30_000) return cached.scope
-
-  const scope = await _resolveScope(token)
-  _scopeCache.set(token, { scope, ts: Date.now() })
-  // Limpar entradas antigas (> 2 min) para não acumular memória
-  if (_scopeCache.size > 50) {
-    const cutoff = Date.now() - 120_000
-    for (const [k, v] of _scopeCache) {
-      if (v.ts < cutoff) _scopeCache.delete(k)
-    }
+function resolveScopedCompanyId(scope: ViewerScope, requestedCompanyId?: string | null): string {
+  if (scope.companyId) {
+    return scope.companyId
   }
-  return scope
+  if (!requestedCompanyId) throw new Error('Empresa não associada ao utilizador')
+  return requestedCompanyId
+}
+
+function ensureTenantAccess(scope: ViewerScope, resourceCompanyId?: string | null) {
+  if (scope.companyId && resourceCompanyId !== scope.companyId) {
+    throw new Error('Operação não autorizada para esta empresa')
+  }
 }
 
 // Dashboard — endpoint unificado: retorna stats + alertas + apólices numa só chamada
 export const fetchDashboardAll = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     const companyId = scope.companyId ?? undefined
 
     const [policies, claims, alerts] = await Promise.all([
@@ -146,8 +73,8 @@ export const fetchDashboardAll = createServerFn({ method: 'GET' })
 export const fetchDashboardStats = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(
-  async (): Promise<DashboardStats> => {
-    const scope = await getViewerScope()
+  async ({ context }): Promise<DashboardStats> => {
+    const scope = await getViewerScope(context?.user)
     const [policies, claims] = await Promise.all([
       db.getPolicies(scope.companyId ?? undefined),
       db.getClaims(scope.companyId ?? undefined),
@@ -175,16 +102,16 @@ export const fetchDashboardStats = createServerFn({ method: 'GET' })
 
 export const fetchPolicies = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     return db.getPolicies(scope.companyId ?? undefined)
   })
 
 export const fetchPolicy = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: string) => d)
-  .handler(async ({ data: id }) => {
-    const scope = await getViewerScope()
+  .handler(async ({ data: id, context }) => {
+    const scope = await getViewerScope(context?.user)
     const policy = await db.getPolicy(id)
     if (!policy) return undefined
     if (scope.companyId && policy.companyId !== scope.companyId) return undefined
@@ -193,16 +120,16 @@ export const fetchPolicy = createServerFn({ method: 'GET' })
 
 export const fetchClaims = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     return db.getClaims(scope.companyId ?? undefined)
   })
 
 export const fetchClaim = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: string) => d)
-  .handler(async ({ data: id }) => {
-    const scope = await getViewerScope()
+  .handler(async ({ data: id, context }) => {
+    const scope = await getViewerScope(context?.user)
     const claim = await db.getClaim(id)
     if (!claim) return undefined
     if (scope.companyId && claim.companyId !== scope.companyId) return undefined
@@ -221,10 +148,15 @@ export const submitClaim = createServerFn({ method: 'POST' })
       estimatedValue: number
     }) => d
   )
-  .handler(async ({ data }) => {
-    const scope = await getViewerScope()
-    const companyId = scope.companyId ?? data.companyId
-    if (!companyId) throw new Error('Empresa não associada ao utilizador')
+  .handler(async ({ data, context }) => {
+    const scope = await getViewerScope(context?.user)
+    const companyId = resolveScopedCompanyId(scope, data.companyId)
+
+    const policy = await db.getPolicy(data.policyId)
+    if (!policy) throw new Error('Apólice não encontrada')
+    if (policy.companyId !== companyId) {
+      throw new Error('A apólice não pertence à empresa autenticada')
+    }
 
     const id = `clm_${Date.now()}`
     const now = new Date().toISOString()
@@ -246,26 +178,28 @@ export const submitClaim = createServerFn({ method: 'POST' })
 
 export const fetchDocuments = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     return db.getDocuments(scope.companyId ?? undefined)
   })
 
 export const fetchAlerts = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     return db.getAlerts(scope.companyId ?? undefined)
   })
 
 export const clearAlerts = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     if (scope.companyId) {
       await db.clearAlertsForCompany(scope.companyId)
-    } else {
+    } else if (scope.isAdmin) {
       await db.clearAlerts()
+    } else {
+      throw new Error('Empresa não associada ao utilizador')
     }
     return { success: true }
   })
@@ -273,15 +207,19 @@ export const clearAlerts = createServerFn({ method: 'POST' })
 export const markAlertAsRead = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: string) => d)
-  .handler(async ({ data: id }) => {
+  .handler(async ({ data: id, context }) => {
+    const scope = await getViewerScope(context?.user)
+    const alert = await db.getAlert(id)
+    if (!alert) throw new Error('Alerta não encontrado')
+    ensureTenantAccess(scope, alert.companyId)
     await db.markAlertRead(id)
     return { success: true }
   })
 
 export const fetchCompanies = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     if (scope.companyId) {
       const company = await db.getCompany(scope.companyId)
       return company ? [company] : []
@@ -292,37 +230,37 @@ export const fetchCompanies = createServerFn({ method: 'GET' })
 export const fetchCompany = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: string) => d)
-  .handler(async ({ data: id }) => {
-    const scope = await getViewerScope()
+  .handler(async ({ data: id, context }) => {
+    const scope = await getViewerScope(context?.user)
     if (scope.companyId && scope.companyId !== id) return undefined
     return db.getCompany(id)
   })
 
 export const fetchRiskReports = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     return db.getRiskReports(scope.companyId ?? undefined)
   })
 
 export const fetchCompanyUsers = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     return db.getCompanyUsers(scope.companyId ?? undefined)
   })
 
 export const fetchUserMetricEvents = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     return db.getUserMetricEvents(scope.companyId ?? undefined)
   })
 
 export const fetchCurrentUserCompanyProfile = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    const scope = await getViewerScope()
+  .handler(async ({ context }) => {
+    const scope = await getViewerScope(context?.user)
     const email = scope.user.email?.toLowerCase()
     const companyUser = email ? await db.getCompanyUserByEmail(email) : undefined
     const company = companyUser ? await db.getCompany(companyUser.companyId) : undefined
@@ -738,10 +676,9 @@ export const createPolicy = createServerFn({ method: 'POST' })
       blobKey?: string
     }) => d
   )
-  .handler(async ({ data }) => {
-    const scope = await getViewerScope()
-    const companyId = scope.companyId ?? data.companyId
-    if (!companyId) throw new Error('Empresa não associada ao utilizador')
+  .handler(async ({ data, context }) => {
+    const scope = await getViewerScope(context?.user)
+    const companyId = resolveScopedCompanyId(scope, data.companyId)
 
     const id = `pol_${Date.now()}`
     await db.createPolicy({
@@ -763,16 +700,34 @@ export const updatePolicy = createServerFn({ method: 'POST' })
       updates: any
     }) => d
   )
-  .handler(async ({ data }) => {
-    await db.updatePolicy(data.id, data.updates)
+  .handler(async ({ data, context }) => {
+    const scope = await getViewerScope(context?.user)
+    const policy = await db.getPolicy(data.id)
+    if (!policy) throw new Error('Apólice não encontrada')
+    ensureTenantAccess(scope, policy.companyId)
+
+    const updates = { ...(data.updates ?? {}) }
+    if (scope.companyId) {
+      delete updates.companyId
+      delete updates.company_id
+    }
+
+    const updated = await db.updatePolicy(data.id, updates, scope.companyId ?? undefined)
+    if (!updated) throw new Error('Falha ao atualizar apólice para a empresa autenticada')
     return { success: true }
   })
 
 export const deletePolicy = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((id: string) => id)
-  .handler(async ({ data: id }) => {
-    await db.deletePolicy(id)
+  .handler(async ({ data: id, context }) => {
+    const scope = await getViewerScope(context?.user)
+    const policy = await db.getPolicy(id)
+    if (!policy) throw new Error('Apólice não encontrada')
+    ensureTenantAccess(scope, policy.companyId)
+
+    const deleted = await db.deletePolicy(id, scope.companyId ?? undefined)
+    if (!deleted) throw new Error('Falha ao apagar apólice para a empresa autenticada')
     return { success: true }
   })
 
@@ -967,4 +922,3 @@ Responde APENAS com um JSON válido neste formato exato (sem markdown, sem texto
 
     return { ...parsed, carouselSlides }
   })
-

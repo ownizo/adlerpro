@@ -185,16 +185,28 @@ export async function createPolicy(policy: Policy): Promise<void> {
   if (error) console.error('createPolicy error:', error)
 }
 
-export async function updatePolicy(id: string, updates: Partial<Policy>): Promise<void> {
+export async function updatePolicy(id: string, updates: Partial<Policy>, companyId?: string): Promise<boolean> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('policies').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
-  if (error) console.error('updatePolicy error:', error)
+  let query = sb.from('policies').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query.select('id')
+  if (error) {
+    console.error('updatePolicy error:', error)
+    return false
+  }
+  return Boolean(data?.length)
 }
 
-export async function deletePolicy(id: string): Promise<void> {
+export async function deletePolicy(id: string, companyId?: string): Promise<boolean> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('policies').delete().eq('id', id)
-  if (error) console.error('deletePolicy error:', error)
+  let query = sb.from('policies').delete().eq('id', id)
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query.select('id')
+  if (error) {
+    console.error('deletePolicy error:', error)
+    return false
+  }
+  return Boolean(data?.length)
 }
 
 // ============================================================
@@ -268,6 +280,13 @@ export async function getAlerts(companyId?: string): Promise<Alert[]> {
   const { data, error } = await query
   if (error) { console.error('getAlerts error:', error); return [] }
   return rowsToCamel<Alert>(data ?? [])
+}
+
+export async function getAlert(id: string): Promise<Alert | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('alerts').select('*').eq('id', id).single()
+  if (error) return undefined
+  return objectToCamel(data) as Alert
 }
 
 export async function markAlertRead(id: string): Promise<void> {
