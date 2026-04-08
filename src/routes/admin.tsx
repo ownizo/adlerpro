@@ -41,7 +41,7 @@ import type {
   SocialPost,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, Fragment } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
 
@@ -449,9 +449,8 @@ function AdminPage() {
                         const clientPolicies = policies.filter((p) => p.individualClientId === client.id)
                         const isExpanded = expandedIndividualClientId === client.id
                         return (
-                          <>
+                          <Fragment key={client.id}>
                             <tr
-                              key={client.id}
                               className="hover:bg-navy-50/50 cursor-pointer"
                               onClick={() => setExpandedIndividualClientId(isExpanded ? null : client.id)}
                             >
@@ -502,7 +501,7 @@ function AdminPage() {
                               </td>
                             </tr>
                             {isExpanded && (
-                              <tr key={`${client.id}-detail`}>
+                              <tr>
                                 <td colSpan={8} className="bg-navy-50/50 px-6 py-4 border-b border-navy-100">
                                   <div className="mb-2">
                                     <p className="text-xs text-navy-500 mb-1">
@@ -526,7 +525,7 @@ function AdminPage() {
                                 </td>
                               </tr>
                             )}
-                          </>
+                          </Fragment>
                         )
                       })}
                       {individualClients.length === 0 && (
@@ -1730,22 +1729,27 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
           <div key={policy.id} className="bg-white rounded-[4px] border border-navy-200">
             {/* Summary row */}
             <div className="px-4 py-3">
-              <div className="flex items-start gap-3">
-                <button onClick={() => setExpandedId(isExpanded ? null : policy.id)} className="text-navy-400 hover:text-navy-600 text-xs mt-1 shrink-0">
-                  {isExpanded ? '▾' : '▸'}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-navy-700">{POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${POLICY_STATUS_CLASS[policy.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {POLICY_STATUS_LABEL[policy.status] ?? policy.status}
-                    </span>
-                    <span className="text-xs text-navy-500">{clientName}</span>
-                    <span className="text-xs text-navy-400">{policy.insurer} · {policy.policyNumber}</span>
+              <button
+                onClick={() => setExpandedId(isExpanded ? null : policy.id)}
+                className="w-full text-left"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-navy-400 hover:text-navy-600 text-xs mt-1 shrink-0">
+                    {isExpanded ? '▾' : '▸'}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-semibold text-navy-700">{POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${POLICY_STATUS_CLASS[policy.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                        {POLICY_STATUS_LABEL[policy.status] ?? policy.status}
+                      </span>
+                      <span className="text-xs text-navy-500">{clientName}</span>
+                      <span className="text-xs text-navy-400">{policy.insurer} · {policy.policyNumber}</span>
+                    </div>
+                    <p className="text-xs text-navy-400 mt-0.5">{formatCurrency(policy.annualPremium)}/ano · {formatDate(policy.endDate)}</p>
                   </div>
-                  <p className="text-xs text-navy-400 mt-0.5">{formatCurrency(policy.annualPremium)}/ano · {formatDate(policy.endDate)}</p>
                 </div>
-              </div>
+              </button>
               <div className="flex gap-2 mt-2 ml-6">
                 <button
                   onClick={() => setEditingId(isEditing ? null : policy.id)}
@@ -1876,10 +1880,10 @@ function PolicyDocumentButtons({ storagePath, name }: { storagePath: string; nam
       <button
         disabled={loading}
         onClick={async () => { const url = await getUrl(); window.open(url, '_blank') }}
-        className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
+        className="px-2 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
         title="Preview"
       >
-        👁
+        Preview
       </button>
       <button
         disabled={loading}
@@ -1888,10 +1892,10 @@ function PolicyDocumentButtons({ storagePath, name }: { storagePath: string; nam
           const a = document.createElement('a')
           a.href = url; a.download = name; a.click()
         }}
-        className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
+        className="px-2 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
         title="Download"
       >
-        ↓
+        Download
       </button>
     </span>
   )
