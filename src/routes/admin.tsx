@@ -43,6 +43,8 @@ import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
+import { AdminDashboard } from '@/components/AdminDashboard'
+import { AdminBilling } from '@/components/AdminBilling'
 
 export const Route = createFileRoute('/admin')({
   component: AdminPage,
@@ -51,7 +53,7 @@ export const Route = createFileRoute('/admin')({
 
 function AdminPage() {
   const { user, ready } = useIdentity()
-  const [tab, setTab] = useState<'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts' | 'individual_clients' | 'social'>('companies')
+  const [tab, setTab] = useState<'dashboard_analytics' | 'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts' | 'individual_clients' | 'social' | 'billing'>('dashboard_analytics')
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
   const [userEvents, setUserEvents] = useState<UserMetricEvent[]>([])
@@ -113,6 +115,7 @@ function AdminPage() {
   if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
   const tabs = [
+    { key: 'dashboard_analytics' as const, label: 'Dashboard' },
     { key: 'companies' as const, label: 'Empresas' },
     { key: 'individual_clients' as const, label: 'Clientes Individuais' },
     { key: 'policies' as const, label: 'Apólices e Docs' },
@@ -121,6 +124,7 @@ function AdminPage() {
     { key: 'api' as const, label: 'API & Ligações' },
     { key: 'profiles' as const, label: 'Perfis e Métricas' },
     { key: 'alerts' as const, label: 'Alertas (60 dias)' },
+    { key: 'billing' as const, label: 'Faturação' },
   ]
 
   const expiringPolicies = policies.filter((p) => {
@@ -176,6 +180,14 @@ function AdminPage() {
           </div>
         ) : (
           <>
+            {tab === 'dashboard_analytics' && (
+              <AdminDashboard
+                policies={policies}
+                companies={companies}
+                individualClients={individualClients}
+              />
+            )}
+
             {tab === 'companies' && (
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -828,6 +840,10 @@ function AdminPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {tab === 'billing' && (
+              <AdminBilling />
             )}
           </>
         )}
