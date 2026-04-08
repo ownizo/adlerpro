@@ -1547,9 +1547,11 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
           <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
             {carouselSlides.map((svg, i) => (
               <div key={i} style={{ flexShrink: 0 }}>
-                <div
-                  style={{ width: 270, height: 270, overflow: 'hidden', borderRadius: 4, border: '1px solid #e2e8f0' }}
-                  dangerouslySetInnerHTML={{ __html: svg }}
+                <img
+                  src={'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)}
+                  width={270}
+                  height={270}
+                  style={{ borderRadius: 4, border: '1px solid #e2e8f0', display: 'block' }}
                 />
                 <button
                   type="button"
