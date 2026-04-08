@@ -183,7 +183,7 @@ function OnLoginPage() {
                 <a href="https://adlerrochefort.com/termos-e-condicoes" target="_blank" rel="noopener noreferrer" style={{ color: navy, fontWeight: 600, textDecoration: 'underline' }}>
                   Termos de Serviço
                 </a>{' '}
-                do Adler One. Autorizo a Adler &amp; Rochefort — Mediadores de Seguros, Lda. (registada na ASF com o n.º 425591790/3) a aceder e tratar os dados das minhas apólices, documentos, contactos, moradas, idades, prémios e datas de renovação, no âmbito da actividade de mediação de seguros. Aceito receber propostas de renovação e cotações relativas às apólices registadas na plataforma.
+                do Adler One. Autorizo a Adler &amp; Rochefort, marca comercial da Ownizo Unipessoal LDA (registada na ASF com o n.º 425591790/3), a aceder e tratar os dados das minhas apólices, documentos, contactos, moradas, idades, prémios e datas de renovação, no âmbito da actividade de mediação de seguros. Aceito receber propostas de renovação e cotações relativas às apólices registadas na plataforma.
               </label>
             </div>
           )}

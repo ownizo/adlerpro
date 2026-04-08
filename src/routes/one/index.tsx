@@ -153,7 +153,7 @@ function OneLanding() {
       {/* ── Disclaimer ── */}
       <div style={{ background: '#0D1B2F', padding: '1.5rem', textAlign: 'center' }}>
         <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 400, fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', margin: '0 auto', maxWidth: 760, lineHeight: 1.65 }}>
-          Ao criar conta, o utilizador aceita que a Adler &amp; Rochefort — Mediadores de Seguros, Lda., no exercício da sua actividade regulada pela ASF, aceda e trate os dados das suas apólices, documentos, contactos e datas de renovação, podendo contactá-lo com propostas de renovação ou melhoria de coberturas.
+          Ao criar conta, o utilizador aceita que a Adler &amp; Rochefort, marca comercial da Ownizo Unipessoal LDA, no exercício da sua actividade regulada pela ASF, aceda e trate os dados das suas apólices, documentos, contactos e datas de renovação, podendo contactá-lo com propostas de renovação ou melhoria de coberturas.
         </p>
       </div>
 
@@ -168,8 +168,7 @@ function OneLanding() {
                 Adler &amp; Rochefort
               </p>
               <p style={{ fontSize: '0.72rem', margin: '0 0 0.5rem', lineHeight: 1.6 }}>
-                Mediadores de Seguros, Lda.<br />
-                Marca comercial da Ownizo Unipessoal LDA
+                marca comercial da Ownizo Unipessoal LDA
               </p>
               <p style={{ fontSize: '0.7rem', margin: 0, lineHeight: 1.6 }}>
                 Registada na ASF com o n.º <span style={{ color: 'rgba(255,255,255,0.6)' }}>425591790/3</span>
