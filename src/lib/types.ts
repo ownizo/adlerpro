@@ -194,6 +194,7 @@ export interface IndividualClient {
   phone?: string
   address?: string
   status: string
+  authUserId?: string
   createdAt?: string
 }
 

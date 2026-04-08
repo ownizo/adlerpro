@@ -15,6 +15,7 @@ import {
   adminCreateIndividualClient,
   adminUpdateIndividualClient,
   adminDeleteIndividualClient,
+  adminActivateAdlerOne,
   fetchSocialPosts,
   adminCreateSocialPost,
   adminUpdateSocialPost,
@@ -425,6 +426,7 @@ function AdminPage() {
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Email</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Telefone</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Estado</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Adler One</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Ações</th>
                       </tr>
                     </thead>
@@ -452,6 +454,9 @@ function AdminPage() {
                                 }`}>
                                   {client.status === 'active' ? 'Ativo' : client.status}
                                 </span>
+                              </td>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <ActivateAdlerOneButton client={client} onSuccess={reload} />
                               </td>
                               <td className="px-4 py-3">
                                 <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
@@ -481,7 +486,7 @@ function AdminPage() {
                             </tr>
                             {isExpanded && (
                               <tr key={`${client.id}-detail`}>
-                                <td colSpan={6} className="bg-navy-50/50 px-6 py-4 border-b border-navy-100">
+                                <td colSpan={7} className="bg-navy-50/50 px-6 py-4 border-b border-navy-100">
                                   <div className="mb-2">
                                     <p className="text-xs text-navy-500 mb-1">
                                       <strong>Morada:</strong> {client.address || '—'}
@@ -1199,6 +1204,53 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
         </div>
       </form>
     </div>
+  )
+}
+
+function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClient; onSuccess: () => Promise<void> }) {
+  const [activating, setActivating] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+
+  if (client.authUserId) {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+        Adler One ✓
+      </span>
+    )
+  }
+
+  if (!client.email) {
+    return (
+      <span title="Sem email — edite o cliente primeiro" className="inline-block px-2 py-1 text-xs text-navy-400 border border-navy-200 rounded cursor-default">
+        Sem email
+      </span>
+    )
+  }
+
+  if (message) {
+    return <span className="text-xs text-green-700">{message}</span>
+  }
+
+  return (
+    <button
+      disabled={activating}
+      onClick={async () => {
+        if (!confirm(`Enviar convite Adler One para ${client.email}?`)) return
+        setActivating(true)
+        try {
+          await adminActivateAdlerOne({ data: { clientId: client.id, email: client.email!, fullName: client.fullName } })
+          setMessage(`Convite enviado para ${client.email}`)
+          await onSuccess()
+        } catch (e: any) {
+          setMessage(`Erro: ${e?.message ?? 'falha ao enviar convite'}`)
+        } finally {
+          setActivating(false)
+        }
+      }}
+      className="px-2 py-1 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50 whitespace-nowrap"
+    >
+      {activating ? '...' : 'Activar Adler One'}
+    </button>
   )
 }
 

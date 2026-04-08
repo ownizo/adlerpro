@@ -588,6 +588,22 @@ export const adminDeleteIndividualClient = createServerFn({ method: 'POST' })
     return { success: true }
   })
 
+export const adminActivateAdlerOne = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { clientId: string; email: string; fullName: string }) => d)
+  .handler(async ({ data }) => {
+    const { data: inviteData, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
+      data: { full_name: data.fullName },
+    })
+    if (error) throw new Error(error.message)
+    const userId = inviteData.user.id
+    await supabaseAdmin
+      .from('individual_clients')
+      .update({ auth_user_id: userId })
+      .eq('id', data.clientId)
+    return { success: true, userId }
+  })
+
 export const adminUpdateApiConnection = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: string; updates: any }) => d)
