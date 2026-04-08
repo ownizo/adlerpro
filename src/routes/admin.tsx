@@ -16,6 +16,7 @@ import {
   adminUpdateIndividualClient,
   adminDeleteIndividualClient,
   adminActivateAdlerOne,
+  adminPromoteToCompany,
   fetchSocialPosts,
   adminCreateSocialPost,
   adminUpdateSocialPost,
@@ -426,7 +427,8 @@ function AdminPage() {
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Email</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Telefone</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Estado</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Adler One</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Tipo</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Portal</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Ações</th>
                       </tr>
                     </thead>
@@ -454,6 +456,9 @@ function AdminPage() {
                                 }`}>
                                   {client.status === 'active' ? 'Ativo' : client.status}
                                 </span>
+                              </td>
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <PromoteToCompanySelect client={client} onSuccess={async () => { await reload(); setExpandedIndividualClientId(null) }} />
                               </td>
                               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                 <ActivateAdlerOneButton client={client} onSuccess={reload} />
@@ -486,7 +491,7 @@ function AdminPage() {
                             </tr>
                             {isExpanded && (
                               <tr key={`${client.id}-detail`}>
-                                <td colSpan={7} className="bg-navy-50/50 px-6 py-4 border-b border-navy-100">
+                                <td colSpan={8} className="bg-navy-50/50 px-6 py-4 border-b border-navy-100">
                                   <div className="mb-2">
                                     <p className="text-xs text-navy-500 mb-1">
                                       <strong>Morada:</strong> {client.address || '—'}
@@ -1204,6 +1209,41 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
         </div>
       </form>
     </div>
+  )
+}
+
+function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClient; onSuccess: () => Promise<void> }) {
+  const [promoting, setPromoting] = useState(false)
+
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    if (e.target.value !== 'company') return
+    e.target.value = 'individual' // reset immediately
+
+    const hasPolicies = true // we don't have the count here, warn generically
+    const authWarning = client.authUserId ? '\n⚠️ Este cliente tem acesso ao Adler One — o acesso será desligado.' : ''
+    if (!confirm(`Converter "${client.fullName}" para Empresa?\n\nIsso irá:\n• Criar um registo de Empresa\n• Mover as apólices associadas\n• Apagar o registo de cliente individual${authWarning}`)) return
+
+    setPromoting(true)
+    try {
+      await adminPromoteToCompany({ data: { clientId: client.id } })
+      await onSuccess()
+    } catch (err: any) {
+      alert(`Erro ao converter: ${err?.message ?? 'falha desconhecida'}`)
+    } finally {
+      setPromoting(false)
+    }
+  }
+
+  return (
+    <select
+      value="individual"
+      onChange={handleChange}
+      disabled={promoting}
+      className="text-xs border border-navy-200 rounded px-1.5 py-1 bg-white text-navy-700 focus:outline-none focus:ring-1 focus:ring-gold-400 disabled:opacity-50"
+    >
+      <option value="individual">Individual</option>
+      <option value="company">→ Empresa</option>
+    </select>
   )
 }
 

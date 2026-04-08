@@ -604,6 +604,47 @@ export const adminActivateAdlerOne = createServerFn({ method: 'POST' })
     return { success: true, userId }
   })
 
+export const adminPromoteToCompany = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { clientId: string }) => d)
+  .handler(async ({ data }) => {
+    const { data: client, error: readErr } = await supabaseAdmin
+      .from('individual_clients').select('*').eq('id', data.clientId).single()
+    if (readErr || !client) throw new Error('Cliente não encontrado')
+
+    const companyId = crypto.randomUUID()
+    const now = new Date().toISOString()
+    const { error: companyErr } = await supabaseAdmin.from('companies').insert({
+      id: companyId,
+      name: client.full_name,
+      nif: client.nif ?? '',
+      sector: '',
+      contact_name: client.full_name,
+      contact_email: client.email ?? '',
+      contact_phone: client.phone ?? '',
+      address: client.address ?? '',
+      created_at: now,
+    })
+    if (companyErr) throw new Error(companyErr.message)
+
+    // Move policies
+    await supabaseAdmin
+      .from('policies')
+      .update({ company_id: companyId, individual_client_id: null })
+      .eq('individual_client_id', data.clientId)
+
+    // Move documents (best-effort — column may not exist in all deployments)
+    await supabaseAdmin
+      .from('documents')
+      .update({ company_id: companyId })
+      .eq('individual_client_id', data.clientId)
+
+    // Delete individual client
+    await supabaseAdmin.from('individual_clients').delete().eq('id', data.clientId)
+
+    return { success: true, companyId }
+  })
+
 export const adminUpdateApiConnection = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: string; updates: any }) => d)
