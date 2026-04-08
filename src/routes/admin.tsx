@@ -1390,7 +1390,7 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
   const [generating, setGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
   const [genError, setGenError] = useState('')
-  const [carouselSvg, setCarouselSvg] = useState<string | null>(null)
+  const [carouselSlides, setCarouselSlides] = useState<string[]>([])
 
   const toggleNetwork = (n: string) => {
     setNetworks((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n])
@@ -1398,13 +1398,13 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
 
   const handleGenerate = async () => {
     if (!topic.trim()) { setGenError('Introduz um tópico primeiro.'); return }
-    setGenError(''); setGenerating(true); setCarouselSvg(null)
+    setGenError(''); setGenerating(true); setCarouselSlides([])
     try {
       const res = await adminGenerateSocialContent({ data: { topic } })
       if (res.instagram) setContentInstagram(res.instagram)
       if (res.linkedin) setContentLinkedin(res.linkedin)
       if (res.facebook) setContentFacebook(res.facebook)
-      if (res.carouselSvg) setCarouselSvg(res.carouselSvg)
+      if (res.carouselSlides?.length) setCarouselSlides(res.carouselSlides)
     } catch (e: any) {
       setGenError(e?.message ?? 'Erro ao gerar conteúdo.')
     } finally {
@@ -1412,24 +1412,14 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
     }
   }
 
-  const handleDownloadPng = () => {
-    if (!carouselSvg) return
-    const canvas = document.createElement('canvas')
-    canvas.width = 1080
-    canvas.height = 1080
-    const ctx = canvas.getContext('2d')!
-    const img = new Image()
-    const svgBlob = new Blob([carouselSvg], { type: 'image/svg+xml;charset=utf-8' })
-    const url = URL.createObjectURL(svgBlob)
-    img.onload = () => {
-      ctx.drawImage(img, 0, 0, 1080, 1080)
-      URL.revokeObjectURL(url)
-      const a = document.createElement('a')
-      a.download = `adler-instagram-${Date.now()}.png`
-      a.href = canvas.toDataURL('image/png')
-      a.click()
-    }
-    img.src = url
+  const downloadSvg = (svg: string, index: number) => {
+    const blob = new Blob([svg], { type: 'image/svg+xml' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `adler-carousel-${index + 1}.svg`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const handleSave = async (status: 'draft' | 'scheduled') => {
@@ -1550,26 +1540,27 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
         )}
       </div>
 
-      {/* Carousel SVG preview */}
-      {carouselSvg && (
+      {/* Carousel slides preview */}
+      {carouselSlides.length > 0 && (
         <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-navy-600">Carrossel Instagram (preview)</label>
-            <button
-              type="button"
-              onClick={handleDownloadPng}
-              className="px-3 py-1.5 bg-gold-400 text-navy-700 text-xs font-semibold rounded-[2px] hover:bg-gold-300"
-            >
-              ↓ Download PNG
-            </button>
+          <label className="block text-sm font-medium text-navy-600 mb-2">Carrossel Instagram ({carouselSlides.length} slides)</label>
+          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
+            {carouselSlides.map((svg, i) => (
+              <div key={i} style={{ flexShrink: 0 }}>
+                <div
+                  style={{ width: 270, height: 270, overflow: 'hidden', borderRadius: 4, border: '1px solid #e2e8f0' }}
+                  dangerouslySetInnerHTML={{ __html: svg }}
+                />
+                <button
+                  type="button"
+                  onClick={() => downloadSvg(svg, i)}
+                  className="mt-1.5 w-full px-2 py-1 bg-gold-400 text-navy-700 text-xs font-semibold rounded-[2px] hover:bg-gold-300"
+                >
+                  ↓ Slide {i + 1}
+                </button>
+              </div>
+            ))}
           </div>
-          <div
-            style={{ width: 270, height: 270, overflow: 'hidden', borderRadius: 4, border: '1px solid #e2e8f0' }}
-            dangerouslySetInnerHTML={{ __html: carouselSvg.replace(
-              /(<svg[^>]*)(width="[^"]*")?([^>]*)(height="[^"]*")?([^>]*>)/,
-              (_m, a, _w, b, _h, c) => `${a}width="270" ${b}height="270" viewBox="0 0 1080 1080"${c}`
-            )}}
-          />
         </div>
       )}
 

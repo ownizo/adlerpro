@@ -767,52 +767,84 @@ Responde APENAS com um JSON válido neste formato exato (sem markdown, sem texto
       throw new Error('Erro ao processar resposta da IA')
     }
 
-    // Generate Instagram carousel SVG
-    let carouselSvg: string | undefined
-    try {
-      // Extract a short phrase (max 2 lines) from the instagram content
-      const instagramText = parsed.instagram || ''
-      const firstSentence = instagramText.split(/[.!?]\s/)[0]?.slice(0, 80) ?? topic
+    // Build carousel slides programmatically
+    const instagramText = parsed.instagram || ''
+    // Split off hashtag block (lines starting with #)
+    const lines = instagramText.split('\n')
+    const hashtagLine = lines.filter(l => l.trim().startsWith('#')).join(' ')
+    const bodyLines = lines.filter(l => !l.trim().startsWith('#'))
+    const body = bodyLines.join(' ').trim()
+    const mid = Math.ceil(body.length / 2)
+    const splitAt = body.indexOf(' ', mid)
+    const bodyA = splitAt > 0 ? body.slice(0, splitAt).trim() : body
+    const bodyB = splitAt > 0 ? body.slice(splitAt).trim() : ''
 
-      const svgPrompt = `Generate a single valid SVG image, 1080x1080px, for an Instagram post for Adler & Rochefort, a premium Portuguese insurance brokerage.
+    const carouselSlides = [
+      buildCarouselSlide(topic, topic, 1, 3),
+      buildCarouselSlide(topic, bodyA || body, 2, 3),
+      buildCarouselSlide(topic, (bodyB || body) + (hashtagLine ? '\n' + hashtagLine : ''), 3, 3),
+    ]
 
-Requirements:
-- Background: linear gradient from #0A1628 (top) to #1B2B4B (bottom), full 1080x1080
-- Top area: "Adler & Rochefort" in gold (#C9A84C), elegant serif-style font, font-size 42px, letter-spacing 3px, centered, y≈120
-- Decorative thin gold horizontal line (stroke #C9A84C, stroke-width 1.5) spanning 600px wide, centered, y≈160
-- Topic title in white (#FFFFFF), bold, font-size 52px, centered, wrapped to max 2 lines, y≈400 (adjust for centering)
-- Key phrase below title in white (#E8E8E8), font-size 32px, font-weight 300, centered, italic, max 2 lines: "${firstSentence}"
-- Another decorative thin gold line, 400px wide, centered, y≈700
-- Footer: "adlerrochefort.com" in gold (#C9A84C), opacity 0.7, font-size 28px, centered, y≈980
-- Topic to display: "${topic}"
-- Design: minimalist, premium, dark luxury aesthetic
-- Output ONLY the raw SVG code starting with <svg and ending with </svg>, no markdown, no explanation`
-
-      const svgResponse = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 4000,
-          messages: [{ role: 'user', content: svgPrompt }],
-        }),
-      })
-
-      if (svgResponse.ok) {
-        const svgResult = await svgResponse.json() as any
-        const svgText = svgResult.content?.[0]?.text ?? ''
-        const svgMatch = svgText.match(/<svg[\s\S]*<\/svg>/)
-        if (svgMatch) carouselSvg = svgMatch[0]
-      } else {
-        console.error('SVG generation error:', svgResponse.status, await svgResponse.text())
-      }
-    } catch (e) {
-      console.error('SVG generation error:', e)
-    }
-
-    return { ...parsed, carouselSvg }
+    return { ...parsed, carouselSlides }
   })
+
+function wrapText(text: string, maxChars: number): string[] {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length > maxChars) {
+      if (current) lines.push(current.trim())
+      current = word
+    } else {
+      current = (current + ' ' + word).trim()
+    }
+  }
+  if (current) lines.push(current.trim())
+  return lines
+}
+
+function buildCarouselSlide(topic: string, text: string, slideNumber: number, totalSlides: number): string {
+  const W = 1080
+  const H = 1080
+  const gold = '#C9A84C'
+  const white = '#FFFFFF'
+  const navy1 = '#0A1628'
+  const navy2 = '#1B2B4B'
+  const gradId = `g${slideNumber}`
+
+  // Wrap body text at ~28 chars per line, max 6 lines
+  const rawLines = wrapText(text.replace(/\n/g, ' '), 28)
+  const bodyTextLines = rawLines.slice(0, 6)
+  const lineHeight = 56
+  const totalTextH = bodyTextLines.length * lineHeight
+  const startY = (H - totalTextH) / 2 + 20
+
+  const bodyTextSvg = bodyTextLines.map((line, i) =>
+    `<text x="540" y="${startY + i * lineHeight}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="42" font-weight="bold" fill="${white}" opacity="0.95">${escSvg(line)}</text>`
+  ).join('\n  ')
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${navy1}"/>
+      <stop offset="100%" stop-color="${navy2}"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1080" fill="url(#${gradId})"/>
+  <!-- Header -->
+  <text x="540" y="80" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="32" letter-spacing="6" fill="${gold}" font-weight="normal">ADLER &amp; ROCHEFORT</text>
+  <line x1="440" y1="110" x2="640" y2="110" stroke="${gold}" stroke-width="1.5" opacity="0.8"/>
+  <!-- Body -->
+  ${bodyTextSvg}
+  <!-- Footer -->
+  <line x1="340" y1="960" x2="740" y2="960" stroke="${gold}" stroke-width="1" opacity="0.5"/>
+  <text x="540" y="1000" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="24" fill="${gold}" opacity="0.7">adlerrochefort.com</text>
+  <!-- Slide indicator -->
+  <text x="1040" y="1060" text-anchor="end" font-family="Georgia, 'Times New Roman', serif" font-size="20" fill="${white}" opacity="0.4">${slideNumber}/${totalSlides}</text>
+</svg>`
+}
+
+function escSvg(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
