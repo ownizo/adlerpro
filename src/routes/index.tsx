@@ -58,6 +58,8 @@ function LandingPage() {
       window.location.replace(user ? '/admin' : '/login')
     } else if (host === 'one.adlerrochefort.com') {
       window.location.replace(user ? '/one/dashboard' : '/one/')
+    } else if (host === 'pro.adlerrochefort.com') {
+      window.location.replace(user ? '/dashboard' : '/login')
     }
   }, [ready, user])
 

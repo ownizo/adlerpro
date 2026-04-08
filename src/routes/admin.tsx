@@ -16,7 +16,6 @@ import {
   adminUpdateIndividualClient,
   adminDeleteIndividualClient,
   adminActivateAdlerOne,
-  adminPromoteToCompany,
   adminUpdatePolicy,
   adminAssociateDocument,
   adminUploadPolicyDocument,
@@ -1205,36 +1204,33 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
 }
 
 function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClient; onSuccess: () => Promise<void> }) {
-  const [promoting, setPromoting] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const currentType = client.clientType || 'individual'
 
   const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (e.target.value !== 'company') return
-    e.target.value = 'individual' // reset immediately
+    const newType = e.target.value as 'individual' | 'company'
+    if (newType === currentType) return
 
-    const hasPolicies = true // we don't have the count here, warn generically
-    const authWarning = client.authUserId ? '\n⚠️ Este cliente tem acesso ao Adler One — o acesso será desligado.' : ''
-    if (!confirm(`Converter "${client.fullName}" para Empresa?\n\nIsso irá:\n• Criar um registo de Empresa\n• Mover as apólices associadas\n• Apagar o registo de cliente individual${authWarning}`)) return
-
-    setPromoting(true)
+    setSaving(true)
     try {
-      await adminPromoteToCompany({ data: { clientId: client.id } })
+      await adminUpdateIndividualClient({ data: { id: client.id, updates: { clientType: newType } } })
       await onSuccess()
     } catch (err: any) {
-      alert(`Erro ao converter: ${err?.message ?? 'falha desconhecida'}`)
+      alert(`Erro ao alterar classificação: ${err?.message ?? 'falha desconhecida'}`)
     } finally {
-      setPromoting(false)
+      setSaving(false)
     }
   }
 
   return (
     <select
-      value="individual"
+      value={currentType}
       onChange={handleChange}
-      disabled={promoting}
+      disabled={saving}
       className="text-xs border border-navy-200 rounded px-1.5 py-1 bg-white text-navy-700 focus:outline-none focus:ring-1 focus:ring-gold-400 disabled:opacity-50"
     >
       <option value="individual">Individual</option>
-      <option value="company">→ Empresa</option>
+      <option value="company">Empresa</option>
     </select>
   )
 }
@@ -1243,10 +1239,13 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
   const [activating, setActivating] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
 
+  const isCompany = client.clientType === 'company'
+  const productName = isCompany ? 'Adler Pro' : 'Adler One'
+
   if (client.authUserId) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-        Adler One ✓
+        {productName} ✓
       </span>
     )
   }
@@ -1267,10 +1266,10 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
     <button
       disabled={activating}
       onClick={async () => {
-        if (!confirm(`Enviar convite Adler One para ${client.email}?`)) return
+        if (!confirm(`Enviar convite ${productName} para ${client.email}?`)) return
         setActivating(true)
         try {
-          await adminActivateAdlerOne({ data: { clientId: client.id, email: client.email!, fullName: client.fullName } })
+          await adminActivateAdlerOne({ data: { clientId: client.id, email: client.email!, fullName: client.fullName, clientType: isCompany ? 'company' : 'individual' } })
           setMessage(`Convite enviado para ${client.email}`)
           await onSuccess()
         } catch (e: any) {
@@ -1281,7 +1280,7 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
       }}
       className="px-2 py-1 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50 whitespace-nowrap"
     >
-      {activating ? '...' : 'Activar Adler One'}
+      {activating ? '...' : `Activar ${productName}`}
     </button>
   )
 }

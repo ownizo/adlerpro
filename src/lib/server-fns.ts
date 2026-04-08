@@ -635,10 +635,14 @@ export const adminDeleteIndividualClient = createServerFn({ method: 'POST' })
 
 export const adminActivateAdlerOne = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
-  .inputValidator((d: { clientId: string; email: string; fullName: string }) => d)
+  .inputValidator((d: { clientId: string; email: string; fullName: string; clientType?: 'individual' | 'company' }) => d)
   .handler(async ({ data }) => {
+    const redirectTo = data.clientType === 'company'
+      ? 'https://pro.adlerrochefort.com/login'
+      : 'https://one.adlerrochefort.com/'
     const { data: inviteData, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email, {
       data: { full_name: data.fullName },
+      redirectTo,
     })
     if (error) throw new Error(error.message)
     const userId = inviteData.user.id

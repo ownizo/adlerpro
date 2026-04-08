@@ -202,6 +202,7 @@ export interface IndividualClient {
   phone?: string
   address?: string
   status: string
+  clientType?: 'individual' | 'company'
   authUserId?: string
   createdAt?: string
 }
