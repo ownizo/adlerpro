@@ -66,10 +66,7 @@ function AdminPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
 
   const reload = async () => {
-    const [{ companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d, individualClients: ic }, sp] = await Promise.all([
-      fetchAdminAll(),
-      fetchSocialPosts(),
-    ])
+    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d, individualClients: ic } = await fetchAdminAll()
     setCompanies(c)
     setCompanyUsers(u)
     setUserEvents(e)
@@ -78,7 +75,13 @@ function AdminPage() {
     setClaims(cl)
     setDocuments(d)
     setIndividualClients(ic ?? [])
-    setSocialPosts(sp ?? [])
+    try {
+      const sp = await fetchSocialPosts()
+      setSocialPosts(sp ?? [])
+    } catch (err) {
+      console.error('[reload] fetchSocialPosts error:', err)
+      setSocialPosts([])
+    }
   }
 
   useEffect(() => {
