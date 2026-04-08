@@ -400,6 +400,35 @@ export const adminAssociateDocument = createServerFn({ method: 'POST' })
     return { success: true }
   })
 
+export const adminUploadPolicyDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { policyId: string; companyId?: string; individualClientId?: string; name: string; storagePath: string; size: number; category: string }) => d)
+  .handler(async ({ data }) => {
+    await db.createDocument({
+      id: crypto.randomUUID(),
+      companyId: data.companyId ?? '',
+      name: data.name,
+      category: data.category as any,
+      size: data.size,
+      uploadedBy: 'admin',
+      uploadedAt: new Date().toISOString(),
+      blobKey: data.storagePath,
+      policyId: data.policyId,
+    })
+    return { success: true }
+  })
+
+export const adminGetDocumentUrl = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { storagePath: string }) => d)
+  .handler(async ({ data }) => {
+    const { data: urlData, error } = await supabaseAdmin.storage
+      .from('documents')
+      .createSignedUrl(data.storagePath, 3600)
+    if (error) throw new Error(error.message)
+    return { url: urlData.signedUrl }
+  })
+
 export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { claimId: string; status: string; notes?: string }) => d)
@@ -628,37 +657,55 @@ export const adminPromoteToCompany = createServerFn({ method: 'POST' })
       .from('individual_clients').select('*').eq('id', data.clientId).single()
     if (readErr || !client) throw new Error('Cliente não encontrado')
 
-    const companyId = crypto.randomUUID()
-    const now = new Date().toISOString()
-    const { error: companyErr } = await supabaseAdmin.from('companies').insert({
-      id: companyId,
-      name: client.full_name,
-      nif: client.nif ?? '',
-      sector: '',
-      contact_name: client.full_name,
-      contact_email: client.email ?? '',
-      contact_phone: client.phone ?? '',
-      address: client.address ?? '',
-      created_at: now,
-    })
-    if (companyErr) throw new Error(companyErr.message)
+    // Check for existing company with same NIF to avoid duplicates
+    let companyId: string
+    let alreadyExisted = false
+    const nif = client.nif ?? ''
+    if (nif) {
+      const { data: existing } = await supabaseAdmin
+        .from('companies').select('id').eq('nif', nif).maybeSingle()
+      if (existing) {
+        companyId = existing.id
+        alreadyExisted = true
+      }
+    }
+
+    if (!alreadyExisted) {
+      companyId = crypto.randomUUID()
+      const now = new Date().toISOString()
+      const { error: companyErr } = await supabaseAdmin.from('companies').insert({
+        id: companyId,
+        name: client.full_name,
+        nif,
+        sector: '',
+        contact_name: client.full_name,
+        contact_email: client.email ?? '',
+        contact_phone: client.phone ?? '',
+        address: client.address ?? '',
+        created_at: now,
+      })
+      if (companyErr) throw new Error(companyErr.message)
+    }
 
     // Move policies
     await supabaseAdmin
       .from('policies')
-      .update({ company_id: companyId, individual_client_id: null })
+      .update({ company_id: companyId!, individual_client_id: null })
       .eq('individual_client_id', data.clientId)
 
-    // Move documents (best-effort — column may not exist in all deployments)
+    // Move documents (best-effort)
     await supabaseAdmin
       .from('documents')
-      .update({ company_id: companyId })
+      .update({ company_id: companyId! })
       .eq('individual_client_id', data.clientId)
 
-    // Delete individual client
-    await supabaseAdmin.from('individual_clients').delete().eq('id', data.clientId)
+    // Delete individual client — throw on error
+    const { error: delErr } = await supabaseAdmin
+      .from('individual_clients').delete().eq('id', data.clientId)
+    if (delErr) throw new Error(`Erro ao apagar individual_client: ${delErr.message}`)
+    console.log('deleted individual_client:', data.clientId)
 
-    return { success: true, companyId }
+    return { success: true, companyId: companyId!, alreadyExisted }
   })
 
 export const adminUpdateApiConnection = createServerFn({ method: 'POST' })

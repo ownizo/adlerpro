@@ -19,6 +19,8 @@ import {
   adminPromoteToCompany,
   adminUpdatePolicy,
   adminAssociateDocument,
+  adminUploadPolicyDocument,
+  adminGetDocumentUrl,
   fetchSocialPosts,
   adminCreateSocialPost,
   adminUpdateSocialPost,
@@ -38,8 +40,9 @@ import type {
   SocialPost,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useIdentity } from '@/lib/identity-context'
+import { supabase } from '@/lib/supabase'
 
 export const Route = createFileRoute('/admin')({
   component: AdminPage,
@@ -1682,6 +1685,21 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
   )
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const POLICY_STATUS_LABEL: Record<string, string> = {
+  active: 'Ativa', ativa: 'Ativa',
+  expiring: 'A Renovar',
+  expired: 'Expirada', expirada: 'Expirada',
+  cancelled: 'Cancelada', cancelada: 'Cancelada',
+}
+const POLICY_STATUS_CLASS: Record<string, string> = {
+  active: 'bg-green-100 text-green-700', ativa: 'bg-green-100 text-green-700',
+  expiring: 'bg-yellow-100 text-yellow-700',
+  expired: 'bg-red-100 text-red-700', expirada: 'bg-red-100 text-red-700',
+  cancelled: 'bg-gray-100 text-gray-600', cancelada: 'bg-gray-100 text-gray-600',
+}
+
 // ─── Admin Policy List ────────────────────────────────────────────────────────
 
 function AdminPolicyList({ policies, documents, companies, individualClients, onReload }: {
@@ -1703,10 +1721,17 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
           ?? individualClients.find(c => c.id === policy.individualClientId)?.fullName
           ?? '—'
         const policyDocs = documents.filter(d => d.policyId === policy.id)
-        const availableDocs = documents.filter(d => !d.policyId && (
-          (policy.companyId && d.companyId === policy.companyId) ||
-          (policy.individualClientId && !d.companyId)
-        ))
+        const availableDocs = documents
+          .filter(d => !d.policyId && (
+            (policy.companyId && d.companyId === policy.companyId) ||
+            (policy.individualClientId && !d.companyId)
+          ))
+          .map(d => ({
+            ...d,
+            clientLabel: companies.find(c => c.id === d.companyId)?.name
+              ?? individualClients.find(c => c.id === (d as any).individualClientId)?.fullName
+              ?? 'Sem cliente',
+          }))
         const isEditing = editingId === policy.id
         const isExpanded = expandedId === policy.id
 
@@ -1720,11 +1745,8 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-navy-700">{POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
-                    policy.status === 'active' ? 'bg-green-100 text-green-700' :
-                    policy.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-red-100 text-red-700'}`}>
-                    {policy.status}
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${POLICY_STATUS_CLASS[policy.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    {POLICY_STATUS_LABEL[policy.status] ?? policy.status}
                   </span>
                   <span className="text-xs text-navy-500">{clientName}</span>
                   <span className="text-xs text-navy-400">{policy.insurer} · {policy.policyNumber}</span>
@@ -1756,13 +1778,24 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
             {/* Expanded: documents */}
             {isExpanded && !isEditing && (
               <div className="border-t border-navy-100 bg-navy-50/30 p-4">
-                <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide mb-2">Documentos associados</p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide">Documentos associados</p>
+                  <PolicyDocumentUpload
+                    policyId={policy.id}
+                    companyId={policy.companyId}
+                    individualClientId={policy.individualClientId}
+                    onUploaded={onReload}
+                  />
+                </div>
                 {policyDocs.length === 0
                   ? <p className="text-xs text-navy-400 mb-3">Nenhum documento associado.</p>
-                  : <ul className="mb-3 space-y-1">
+                  : <ul className="mb-3 space-y-1.5">
                       {policyDocs.map(d => (
-                        <li key={d.id} className="text-xs text-navy-600 flex items-center gap-1.5">
-                          <span>📄</span> {d.name} <span className="text-navy-400">· {d.category}</span>
+                        <li key={d.id} className="text-xs text-navy-600 flex items-center gap-2 flex-wrap">
+                          <span>📄</span>
+                          <span className="font-medium">{d.name}</span>
+                          <span className="text-navy-400">· {d.category}</span>
+                          <PolicyDocumentButtons storagePath={d.blobKey} name={d.name} />
                         </li>
                       ))}
                     </ul>
@@ -1783,7 +1816,7 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
 
 function AssociateDocumentDropdown({ policyId, availableDocs, onAssociated }: {
   policyId: string
-  availableDocs: DocType[]
+  availableDocs: (DocType & { clientLabel: string })[]
   onAssociated: () => Promise<void>
 }) {
   const [selected, setSelected] = useState('')
@@ -1799,7 +1832,9 @@ function AssociateDocumentDropdown({ policyId, availableDocs, onAssociated }: {
         className="text-xs border border-navy-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gold-400"
       >
         <option value="">Associar documento...</option>
-        {availableDocs.map(d => <option key={d.id} value={d.id}>{d.name} ({d.category})</option>)}
+        {availableDocs.map(d => (
+          <option key={d.id} value={d.id}>{d.name} — {d.clientLabel} ({d.category})</option>
+        ))}
       </select>
       <button
         disabled={!selected || saving}
@@ -1814,6 +1849,98 @@ function AssociateDocumentDropdown({ policyId, availableDocs, onAssociated }: {
       >
         {saving ? '...' : 'Associar'}
       </button>
+    </div>
+  )
+}
+
+function PolicyDocumentButtons({ storagePath, name }: { storagePath: string; name: string }) {
+  const [loading, setLoading] = useState(false)
+
+  const getUrl = async () => {
+    setLoading(true)
+    try {
+      const { url } = await adminGetDocumentUrl({ data: { storagePath } })
+      return url
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <span className="flex gap-1">
+      <button
+        disabled={loading}
+        onClick={async () => { const url = await getUrl(); window.open(url, '_blank') }}
+        className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
+        title="Preview"
+      >
+        👁
+      </button>
+      <button
+        disabled={loading}
+        onClick={async () => {
+          const url = await getUrl()
+          const a = document.createElement('a')
+          a.href = url; a.download = name; a.click()
+        }}
+        className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
+        title="Download"
+      >
+        ↓
+      </button>
+    </span>
+  )
+}
+
+function PolicyDocumentUpload({ policyId, companyId, individualClientId, onUploaded }: {
+  policyId: string
+  companyId?: string
+  individualClientId?: string
+  onUploaded: () => Promise<void>
+}) {
+  const ref = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true); setError('')
+    try {
+      const storagePath = `policies/${policyId}/${Date.now()}-${file.name}`
+      const { error: upErr } = await supabase.storage.from('documents').upload(storagePath, file)
+      if (upErr) throw new Error(upErr.message)
+      await adminUploadPolicyDocument({
+        data: {
+          policyId,
+          companyId: companyId || undefined,
+          individualClientId: individualClientId || undefined,
+          name: file.name,
+          storagePath,
+          size: file.size,
+          category: file.type.startsWith('image/') ? 'certificate' : 'policy',
+        },
+      })
+      await onUploaded()
+    } catch (err: any) {
+      setError(err?.message ?? 'Erro no upload')
+    } finally {
+      setUploading(false)
+      if (ref.current) ref.current.value = ''
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      {error && <span className="text-xs text-red-500">{error}</span>}
+      <button
+        onClick={() => ref.current?.click()}
+        disabled={uploading}
+        className="px-2.5 py-1 text-xs bg-navy-700 text-white rounded hover:bg-navy-600 disabled:opacity-50 whitespace-nowrap"
+      >
+        {uploading ? 'A carregar...' : '↑ Fazer Upload'}
+      </button>
+      <input ref={ref} type="file" accept="application/pdf,image/*" className="hidden" onChange={handleFile} />
     </div>
   )
 }
@@ -1886,10 +2013,9 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
         <div>
           <label className={lbl}>Estado</label>
           <select value={form.status} onChange={e => u('status', e.target.value)} className={inp}>
-            <option value="active">Ativa</option>
-            <option value="expiring">A Renovar</option>
-            <option value="expired">Expirada</option>
-            <option value="cancelled">Cancelada</option>
+            {Object.entries(POLICY_STATUS_LABEL)
+              .filter(([k]) => ['active','expiring','expired','cancelled'].includes(k))
+              .map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </div>
         <div>
