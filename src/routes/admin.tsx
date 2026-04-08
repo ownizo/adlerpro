@@ -1,5 +1,5 @@
 import { createFileRoute, Navigate } from '@tanstack/react-router'
-import { AppLayout } from '@/components/AppLayout'
+import { AppLayout, type AdminSubTab } from '@/components/AppLayout'
 import {
   fetchAdminAll,
   adminCreatePolicy,
@@ -40,9 +40,11 @@ import type {
   SocialPost,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
+import { AdminDashboard } from '@/components/AdminDashboard'
+import { AdminBilling } from '@/components/AdminBilling'
 
 export const Route = createFileRoute('/admin')({
   component: AdminPage,
@@ -51,7 +53,7 @@ export const Route = createFileRoute('/admin')({
 
 function AdminPage() {
   const { user, ready } = useIdentity()
-  const [tab, setTab] = useState<'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts' | 'individual_clients' | 'social'>('companies')
+  const [tab, setTab] = useState<'dashboard_analytics' | 'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts' | 'individual_clients' | 'social' | 'billing'>('dashboard_analytics')
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
   const [userEvents, setUserEvents] = useState<UserMetricEvent[]>([])
@@ -71,6 +73,12 @@ function AdminPage() {
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null)
   const [showUserFormForCompanyId, setShowUserFormForCompanyId] = useState<string | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
+
+  // Filter out individual clients whose NIF matches a company's NIF to avoid duplication
+  const filteredIndividualClients = useMemo(() => {
+    const companyNifs = new Set(companies.map((c) => c.nif).filter(Boolean))
+    return individualClients.filter((client) => !client.nif || !companyNifs.has(client.nif))
+  }, [individualClients, companies])
 
   const reload = async () => {
     const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d, individualClients: ic } = await fetchAdminAll()
@@ -112,15 +120,17 @@ function AdminPage() {
   if (!user) return <Navigate to="/login" />
   if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
-  const tabs = [
-    { key: 'companies' as const, label: 'Empresas' },
-    { key: 'individual_clients' as const, label: 'Clientes Individuais' },
-    { key: 'policies' as const, label: 'Apólices e Docs' },
-    { key: 'claims' as const, label: 'Sinistros' },
-    { key: 'social' as const, label: '✦ Social Hub' },
-    { key: 'api' as const, label: 'API & Ligações' },
-    { key: 'profiles' as const, label: 'Perfis e Métricas' },
-    { key: 'alerts' as const, label: 'Alertas (60 dias)' },
+  const tabs: AdminSubTab[] = [
+    { key: 'dashboard_analytics', label: 'Dashboard' },
+    { key: 'companies', label: 'Empresas' },
+    { key: 'individual_clients', label: 'Clientes Individuais' },
+    { key: 'policies', label: 'Apólices e Docs' },
+    { key: 'claims', label: 'Sinistros' },
+    { key: 'social', label: '✦ Social Hub' },
+    { key: 'api', label: 'API & Ligações' },
+    { key: 'profiles', label: 'Perfis e Métricas' },
+    { key: 'alerts', label: 'Alertas (60 dias)' },
+    { key: 'billing', label: 'Faturação' },
   ]
 
   const expiringPolicies = policies.filter((p) => {
@@ -149,25 +159,11 @@ function AdminPage() {
   })
 
   return (
-    <AppLayout>
+    <AppLayout adminTabs={tabs} activeAdminTab={tab} onAdminTabChange={(key) => setTab(key as typeof tab)}>
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-navy-700">Painel de Administração</h1>
           <p className="text-navy-500 mt-1">Gestão de empresas, acessos, apólices, sinistros e integrações</p>
-        </div>
-
-        <div className="flex flex-wrap gap-1 bg-navy-100 p-1 rounded-[2px] mb-8 w-fit">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                tab === t.key ? 'bg-white text-navy-700 shadow-sm' : 'text-navy-500 hover:text-navy-700'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
         </div>
 
         {loading ? (
@@ -176,6 +172,14 @@ function AdminPage() {
           </div>
         ) : (
           <>
+            {tab === 'dashboard_analytics' && (
+              <AdminDashboard
+                policies={policies}
+                companies={companies}
+                individualClients={individualClients}
+              />
+            )}
+
             {tab === 'companies' && (
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -394,7 +398,7 @@ function AdminPage() {
             {tab === 'individual_clients' && (
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-navy-700">Clientes Individuais ({individualClients.length})</h2>
+                  <h2 className="text-lg font-semibold text-navy-700">Clientes Individuais ({filteredIndividualClients.length})</h2>
                   <button
                     onClick={() => {
                       setEditingIndividualClientId(null)
@@ -409,7 +413,7 @@ function AdminPage() {
                 {showNewIndividualClient && (
                   <IndividualClientForm
                     title={editingIndividualClientId ? 'Editar Cliente' : 'Novo Cliente Individual'}
-                    initial={editingIndividualClientId ? individualClients.find((c) => c.id === editingIndividualClientId) : undefined}
+                    initial={editingIndividualClientId ? filteredIndividualClients.find((c) => c.id === editingIndividualClientId) : undefined}
                     onSubmit={async (data) => {
                       if (editingIndividualClientId) {
                         await adminUpdateIndividualClient({ data: { id: editingIndividualClientId, updates: data } })
@@ -438,7 +442,7 @@ function AdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-navy-100">
-                      {individualClients.map((client) => {
+                      {filteredIndividualClients.map((client) => {
                         const clientPolicies = policies.filter((p) => p.individualClientId === client.id)
                         const isExpanded = expandedIndividualClientId === client.id
                         return (
@@ -538,7 +542,7 @@ function AdminPage() {
                           </>
                         )
                       })}
-                      {individualClients.length === 0 && (
+                      {filteredIndividualClients.length === 0 && (
                         <tr>
                           <td colSpan={6} className="px-4 py-8 text-sm text-navy-400 text-center">
                             Sem clientes individuais registados.
@@ -828,6 +832,10 @@ function AdminPage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {tab === 'billing' && (
+              <AdminBilling />
             )}
           </>
         )}
