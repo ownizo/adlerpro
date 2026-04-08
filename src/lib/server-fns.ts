@@ -728,11 +728,11 @@ Regras de escrita obrigatórias:
 
     const userPrompt = `Cria conteúdo para redes sociais sobre o seguinte tópico: "${topic}"
 
-Responde APENAS com um JSON válido neste formato exato:
+Responde APENAS com um JSON válido neste formato exato (sem markdown, sem texto antes ou depois):
 {
-  "instagram": "conteúdo para instagram (curto, impactante, com 3-5 emojis relevantes e 5-8 hashtags portuguesas no final)",
-  "linkedin": "conteúdo para linkedin (profissional, 150-200 palavras, sem emojis excessivos, foco em valor e credibilidade, pode ter 1-2 emojis no máximo)",
-  "facebook": "conteúdo para facebook (conversacional, 100-150 palavras, termina com uma pergunta ou CTA claro)"
+  "instagram": "Texto envolvente de 3 a 5 frases, elegante e impactante. No final, numa linha separada, 5 a 8 hashtags relevantes em português (ex: #SeguroAuto #AdlerRochefort #Seguros).",
+  "linkedin": "Texto profissional e estruturado de 150 a 200 palavras, dividido em parágrafos curtos. Foco em valor, credibilidade e utilidade para profissionais ou empresas. No final, numa linha separada, 2 a 3 hashtags adequados ao LinkedIn (ex: #Seguros #GestãoDeRisco #Empresas).",
+  "facebook": "Texto conversacional de 100 a 150 palavras, próximo e acessível. Termina com uma pergunta directa ao leitor ou um CTA claro. No final, numa linha separada, 3 a 4 hashtags relevantes (ex: #Seguros #AdlerRochefort #Portugal)."
 }`
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -790,9 +790,11 @@ Responde APENAS com um JSON válido neste formato exato:
         if (imgResponse.ok) {
           const imgResult = await imgResponse.json() as any
           imageBase64 = imgResult.predictions?.[0]?.bytesBase64Encoded
+        } else {
+          console.error('Imagen error:', imgResponse.status, await imgResponse.text())
         }
-      } catch {
-        // Image generation is best-effort — don't fail the whole request
+      } catch (e) {
+        console.error('Imagen error:', e)
       }
     }
 
