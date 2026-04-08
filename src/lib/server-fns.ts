@@ -655,3 +655,106 @@ export const deletePolicy = createServerFn({ method: 'POST' })
     await db.deletePolicy(id)
     return { success: true }
   })
+
+// ── Social Hub ────────────────────────────────────────────────────────────────
+
+export const fetchSocialPosts = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .handler(async () => db.getSocialPosts())
+
+export const adminCreateSocialPost = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: {
+    id: string
+    topic: string
+    networks: string[]
+    contentInstagram?: string
+    contentLinkedin?: string
+    contentFacebook?: string
+    scheduledAt?: string
+    status: string
+    createdAt: string
+    updatedAt: string
+  }) => d)
+  .handler(async ({ data }) => {
+    await db.createSocialPost({
+      id: data.id,
+      topic: data.topic,
+      networks: data.networks as any,
+      contentInstagram: data.contentInstagram,
+      contentLinkedin: data.contentLinkedin,
+      contentFacebook: data.contentFacebook,
+      scheduledAt: data.scheduledAt || undefined,
+      status: data.status as any,
+      createdAt: data.createdAt,
+      updatedAt: data.updatedAt,
+    })
+    return { success: true }
+  })
+
+export const adminUpdateSocialPost = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { id: string; updates: Partial<{ topic: string; status: string; networks: string[]; contentInstagram: string; contentLinkedin: string; contentFacebook: string; scheduledAt: string }> }) => d)
+  .handler(async ({ data }) => {
+    await db.updateSocialPost(data.id, { ...data.updates as any, updatedAt: new Date().toISOString() })
+    return { success: true }
+  })
+
+export const adminDeleteSocialPost = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data }) => {
+    await db.deleteSocialPost(data.id)
+    return { success: true }
+  })
+
+export const adminGenerateSocialContent = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { topic: string }) => d)
+  .handler(async ({ data }) => {
+    const topic = data.topic
+    const apiKey = process.env['ANTHROPIC_API_KEY'] || process.env['VITE_ANTHROPIC_API_KEY']
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY não configurada')
+
+    const systemPrompt = `És um especialista em marketing de conteúdo para a Adler & Rochefort, uma corretora de seguros portuguesa. Crias conteúdo para redes sociais em Português de Portugal (não brasileiro). O tom é profissional mas próximo, de confiança, com foco em proteger o que é mais importante para os clientes. A empresa opera em Lisboa e Lagos e trabalha com empresas e particulares.`
+
+    const userPrompt = `Cria conteúdo para redes sociais sobre o seguinte tópico: "${topic}"
+
+Responde APENAS com um JSON válido neste formato exato:
+{
+  "instagram": "conteúdo para instagram (curto, impactante, com 3-5 emojis relevantes e 5-8 hashtags portuguesas no final)",
+  "linkedin": "conteúdo para linkedin (profissional, 150-200 palavras, sem emojis excessivos, foco em valor e credibilidade, pode ter 1-2 emojis no máximo)",
+  "facebook": "conteúdo para facebook (conversacional, 100-150 palavras, termina com uma pergunta ou CTA claro)"
+}`
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      }),
+    })
+
+    if (!response.ok) {
+      const err = await response.text()
+      throw new Error(`Anthropic API error: ${err}`)
+    }
+
+    const result = await response.json() as any
+    const text = result.content?.[0]?.text ?? ''
+
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/)
+      if (!jsonMatch) throw new Error('No JSON found')
+      return JSON.parse(jsonMatch[0]) as { instagram: string; linkedin: string; facebook: string }
+    } catch {
+      throw new Error('Erro ao processar resposta da IA')
+    }
+  })
