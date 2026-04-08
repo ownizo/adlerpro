@@ -246,6 +246,12 @@ export async function createDocument(doc: Document): Promise<void> {
   if (error) console.error('createDocument error:', error)
 }
 
+export async function updateDocument(id: string, updates: Partial<Document>): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('documents').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  if (error) console.error('updateDocument error:', error)
+}
+
 export async function deleteDocument(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('documents').delete().eq('id', id)

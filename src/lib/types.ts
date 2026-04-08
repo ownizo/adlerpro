@@ -62,6 +62,13 @@ export interface Policy {
   coverages?: string[]
   exclusions?: string[]
   individualClientId?: string
+  renewalDate?: string
+  paymentFrequency?: string
+  visiblePortal?: boolean
+  notesInternal?: string
+  emergencyContacts?: string
+  commissionPercentage?: number
+  commissionValue?: number
 }
 
 export type PolicyType =
@@ -142,6 +149,7 @@ export interface Document {
   uploadedBy: string
   uploadedAt: string
   blobKey: string
+  policyId?: string
 }
 
 export type DocumentCategory =

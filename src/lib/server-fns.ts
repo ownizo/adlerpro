@@ -384,6 +384,22 @@ export const adminCreatePolicy = createServerFn({ method: 'POST' })
     return { id }
   })
 
+export const adminUpdatePolicy = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { id: string; updates: any }) => d)
+  .handler(async ({ data }) => {
+    await db.updatePolicy(data.id, data.updates)
+    return { success: true }
+  })
+
+export const adminAssociateDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { documentId: string; policyId: string }) => d)
+  .handler(async ({ data }) => {
+    await db.updateDocument(data.documentId, { policyId: data.policyId })
+    return { success: true }
+  })
+
 export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { claimId: string; status: string; notes?: string }) => d)

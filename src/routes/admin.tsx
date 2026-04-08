@@ -17,6 +17,8 @@ import {
   adminDeleteIndividualClient,
   adminActivateAdlerOne,
   adminPromoteToCompany,
+  adminUpdatePolicy,
+  adminAssociateDocument,
   fetchSocialPosts,
   adminCreateSocialPost,
   adminUpdateSocialPost,
@@ -458,7 +460,7 @@ function AdminPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                <PromoteToCompanySelect client={client} onSuccess={async () => { await reload(); setExpandedIndividualClientId(null) }} />
+                                <PromoteToCompanySelect client={client} onSuccess={async () => { setIndividualClients([]); await reload(); setExpandedIndividualClientId(null) }} />
                               </td>
                               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                 <ActivateAdlerOneButton client={client} onSuccess={reload} />
@@ -589,30 +591,17 @@ function AdminPage() {
                   />
                 )}
 
-                <div className="grid lg:grid-cols-2 gap-8">
-                  <SimpleCollection
-                    title={`Apólices ${selectedCompanyId ? 'do Cliente' : 'Globais'}`}
-                    rows={policies
-                      .filter((p) => {
-                        if (!selectedCompanyId) return true
-                        if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
-                        return p.companyId === selectedCompanyId
-                      })
-                      .map((p) => `${POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type} · ${p.policyNumber} · ${formatCurrency(p.annualPremium)}`)}
-                    emptyMessage="Sem apólices para o filtro selecionado."
-                  />
-                  <SimpleCollection
-                    title={`Documentos ${selectedCompanyId ? 'do Cliente' : 'Globais'}`}
-                    rows={documents
-                      .filter((d) => {
-                        if (!selectedCompanyId) return true
-                        if (selectedCompanyId.startsWith('ic:')) return false
-                        return d.companyId === selectedCompanyId
-                      })
-                      .map((d) => `${d.name} · ${d.category} · ${formatDate(d.uploadedAt)}`)}
-                    emptyMessage="Sem documentos para o filtro selecionado."
-                  />
-                </div>
+                <AdminPolicyList
+                  policies={policies.filter((p) => {
+                    if (!selectedCompanyId) return true
+                    if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
+                    return p.companyId === selectedCompanyId
+                  })}
+                  documents={documents}
+                  companies={companies}
+                  individualClients={individualClients}
+                  onReload={reload}
+                />
               </div>
             )}
 
@@ -1689,6 +1678,281 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
           {saving ? 'A agendar...' : 'Agendar'}
         </button>
       </div>
+    </div>
+  )
+}
+
+// ─── Admin Policy List ────────────────────────────────────────────────────────
+
+function AdminPolicyList({ policies, documents, companies, individualClients, onReload }: {
+  policies: Policy[]
+  documents: DocType[]
+  companies: Company[]
+  individualClients: IndividualClient[]
+  onReload: () => Promise<void>
+}) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  if (policies.length === 0) return <p className="text-navy-500 text-sm">Sem apólices para o filtro selecionado.</p>
+
+  return (
+    <div className="flex flex-col gap-3">
+      {policies.map((policy) => {
+        const clientName = companies.find(c => c.id === policy.companyId)?.name
+          ?? individualClients.find(c => c.id === policy.individualClientId)?.fullName
+          ?? '—'
+        const policyDocs = documents.filter(d => d.policyId === policy.id)
+        const availableDocs = documents.filter(d => !d.policyId && (
+          (policy.companyId && d.companyId === policy.companyId) ||
+          (policy.individualClientId && !d.companyId)
+        ))
+        const isEditing = editingId === policy.id
+        const isExpanded = expandedId === policy.id
+
+        return (
+          <div key={policy.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
+            {/* Summary row */}
+            <div className="flex items-center gap-3 px-4 py-3">
+              <button onClick={() => setExpandedId(isExpanded ? null : policy.id)} className="text-navy-400 hover:text-navy-600 text-xs">
+                {isExpanded ? '▾' : '▸'}
+              </button>
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-semibold text-navy-700">{POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type}</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                    policy.status === 'active' ? 'bg-green-100 text-green-700' :
+                    policy.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
+                    'bg-red-100 text-red-700'}`}>
+                    {policy.status}
+                  </span>
+                  <span className="text-xs text-navy-500">{clientName}</span>
+                  <span className="text-xs text-navy-400">{policy.insurer} · {policy.policyNumber}</span>
+                </div>
+                <p className="text-xs text-navy-400 mt-0.5">{formatCurrency(policy.annualPremium)}/ano · {formatDate(policy.endDate)}</p>
+              </div>
+              <button
+                onClick={() => setEditingId(isEditing ? null : policy.id)}
+                className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 whitespace-nowrap"
+              >
+                {isEditing ? 'Cancelar' : 'Editar'}
+              </button>
+            </div>
+
+            {/* Edit form */}
+            {isEditing && (
+              <div className="border-t border-navy-100 bg-navy-50/30 p-4">
+                <PolicyEditForm
+                  policy={policy}
+                  onSave={async (updates) => {
+                    await adminUpdatePolicy({ data: { id: policy.id, updates } })
+                    setEditingId(null)
+                    await onReload()
+                  }}
+                />
+              </div>
+            )}
+
+            {/* Expanded: documents */}
+            {isExpanded && !isEditing && (
+              <div className="border-t border-navy-100 bg-navy-50/30 p-4">
+                <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide mb-2">Documentos associados</p>
+                {policyDocs.length === 0
+                  ? <p className="text-xs text-navy-400 mb-3">Nenhum documento associado.</p>
+                  : <ul className="mb-3 space-y-1">
+                      {policyDocs.map(d => (
+                        <li key={d.id} className="text-xs text-navy-600 flex items-center gap-1.5">
+                          <span>📄</span> {d.name} <span className="text-navy-400">· {d.category}</span>
+                        </li>
+                      ))}
+                    </ul>
+                }
+                <AssociateDocumentDropdown
+                  policyId={policy.id}
+                  availableDocs={availableDocs}
+                  onAssociated={onReload}
+                />
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function AssociateDocumentDropdown({ policyId, availableDocs, onAssociated }: {
+  policyId: string
+  availableDocs: DocType[]
+  onAssociated: () => Promise<void>
+}) {
+  const [selected, setSelected] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  if (availableDocs.length === 0) return null
+
+  return (
+    <div className="flex items-center gap-2 mt-1">
+      <select
+        value={selected}
+        onChange={e => setSelected(e.target.value)}
+        className="text-xs border border-navy-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gold-400"
+      >
+        <option value="">Associar documento...</option>
+        {availableDocs.map(d => <option key={d.id} value={d.id}>{d.name} ({d.category})</option>)}
+      </select>
+      <button
+        disabled={!selected || saving}
+        onClick={async () => {
+          setSaving(true)
+          await adminAssociateDocument({ data: { documentId: selected, policyId } })
+          setSelected('')
+          setSaving(false)
+          await onAssociated()
+        }}
+        className="px-3 py-1 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50"
+      >
+        {saving ? '...' : 'Associar'}
+      </button>
+    </div>
+  )
+}
+
+function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: Partial<Policy>) => Promise<void> }) {
+  const [form, setForm] = useState({
+    type: policy.type ?? '',
+    insurer: policy.insurer ?? '',
+    policyNumber: policy.policyNumber ?? '',
+    description: policy.description ?? '',
+    startDate: policy.startDate ?? '',
+    endDate: policy.endDate ?? '',
+    renewalDate: policy.renewalDate ?? '',
+    annualPremium: String(policy.annualPremium ?? ''),
+    paymentFrequency: policy.paymentFrequency ?? '',
+    status: policy.status ?? 'active',
+    visiblePortal: policy.visiblePortal ?? true,
+    emergencyContacts: policy.emergencyContacts ?? '',
+    commissionPercentage: String(policy.commissionPercentage ?? ''),
+    commissionValue: String(policy.commissionValue ?? ''),
+    deductible: String(policy.deductible ?? ''),
+    notesInternal: policy.notesInternal ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const u = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
+
+  const handleSave = async () => {
+    setSaving(true)
+    await onSave({
+      type: form.type as any,
+      insurer: form.insurer,
+      policyNumber: form.policyNumber,
+      description: form.description,
+      startDate: form.startDate,
+      endDate: form.endDate,
+      renewalDate: form.renewalDate || undefined,
+      annualPremium: parseFloat(form.annualPremium) || 0,
+      paymentFrequency: form.paymentFrequency || undefined,
+      status: form.status as any,
+      visiblePortal: form.visiblePortal,
+      emergencyContacts: form.emergencyContacts || undefined,
+      commissionPercentage: form.commissionPercentage ? parseFloat(form.commissionPercentage) : undefined,
+      commissionValue: form.commissionValue ? parseFloat(form.commissionValue) : undefined,
+      deductible: form.deductible ? parseFloat(form.deductible) : undefined,
+      notesInternal: form.notesInternal || undefined,
+    })
+    setSaving(false)
+  }
+
+  const inp = 'w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-1 focus:ring-gold-400'
+  const lbl = 'block text-xs font-semibold text-navy-500 uppercase tracking-wide mb-1'
+
+  return (
+    <div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+        <div>
+          <label className={lbl}>Tipo</label>
+          <select value={form.type} onChange={e => u('type', e.target.value)} className={inp}>
+            {Object.entries(POLICY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className={lbl}>Seguradora</label>
+          <input className={inp} value={form.insurer} onChange={e => u('insurer', e.target.value)} />
+        </div>
+        <div>
+          <label className={lbl}>N.º Apólice</label>
+          <input className={inp} value={form.policyNumber} onChange={e => u('policyNumber', e.target.value)} />
+        </div>
+        <div>
+          <label className={lbl}>Estado</label>
+          <select value={form.status} onChange={e => u('status', e.target.value)} className={inp}>
+            <option value="active">Ativa</option>
+            <option value="expiring">A Renovar</option>
+            <option value="expired">Expirada</option>
+            <option value="cancelled">Cancelada</option>
+          </select>
+        </div>
+        <div>
+          <label className={lbl}>Início</label>
+          <input type="date" className={inp} value={form.startDate} onChange={e => u('startDate', e.target.value)} />
+        </div>
+        <div>
+          <label className={lbl}>Fim</label>
+          <input type="date" className={inp} value={form.endDate} onChange={e => u('endDate', e.target.value)} />
+        </div>
+        <div>
+          <label className={lbl}>Data Renovação</label>
+          <input type="date" className={inp} value={form.renewalDate} onChange={e => u('renewalDate', e.target.value)} />
+        </div>
+        <div>
+          <label className={lbl}>Prémio Anual (€)</label>
+          <input type="number" className={inp} value={form.annualPremium} onChange={e => u('annualPremium', e.target.value)} />
+        </div>
+        <div>
+          <label className={lbl}>Periodicidade</label>
+          <input className={inp} value={form.paymentFrequency} onChange={e => u('paymentFrequency', e.target.value)} placeholder="Mensal, Anual..." />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-3">
+          <label className={lbl}>Descrição (visível no portal)</label>
+          <input className={inp} value={form.description} onChange={e => u('description', e.target.value)} />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-3">
+          <label className={lbl}>Contactos de Emergência (visível no portal)</label>
+          <input className={inp} value={form.emergencyContacts} onChange={e => u('emergencyContacts', e.target.value)} placeholder="Linha de Assistência: 800 XXX XXX" />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
+          <input type="checkbox" id={`vp-${policy.id}`} checked={form.visiblePortal} onChange={e => u('visiblePortal', e.target.checked)} className="accent-gold-400" />
+          <label htmlFor={`vp-${policy.id}`} className="text-sm text-navy-600 cursor-pointer">Visível no Adler One</label>
+        </div>
+      </div>
+
+      <p className="text-xs font-semibold text-navy-400 uppercase tracking-wide mb-2 mt-1">Campos Internos (só admin)</p>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
+        <div>
+          <label className={lbl}>Comissão %</label>
+          <input type="number" className={inp} value={form.commissionPercentage} onChange={e => u('commissionPercentage', e.target.value)} />
+        </div>
+        <div>
+          <label className={lbl}>Comissão €</label>
+          <input type="number" className={inp} value={form.commissionValue} onChange={e => u('commissionValue', e.target.value)} />
+        </div>
+        <div>
+          <label className={lbl}>Franquia (€)</label>
+          <input type="number" className={inp} value={form.deductible} onChange={e => u('deductible', e.target.value)} />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-3">
+          <label className={lbl}>Notas Internas</label>
+          <textarea className={inp + ' resize-y'} rows={3} value={form.notesInternal} onChange={e => u('notesInternal', e.target.value)} />
+        </div>
+      </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="px-5 py-2 bg-gold-400 text-navy-700 text-sm font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50"
+      >
+        {saving ? 'A guardar...' : 'Guardar Alterações'}
+      </button>
     </div>
   )
 }

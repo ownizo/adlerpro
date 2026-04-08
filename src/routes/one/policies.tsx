@@ -24,6 +24,7 @@ interface Policy {
   status: string
   description?: string
   payment_frequency?: string
+  emergency_contacts?: string
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -96,7 +97,7 @@ function OnePolicies() {
       if (clientId) {
         const { data, error: pErr } = await supabase
           .from('policies')
-          .select('id, policy_number, type, insurer, annual_premium, start_date, end_date, renewal_date, status, description, payment_frequency')
+          .select('id, policy_number, type, insurer, annual_premium, start_date, end_date, renewal_date, status, description, payment_frequency, emergency_contacts')
           .eq('individual_client_id', clientId)
           .order('end_date', { ascending: true })
         if (pErr) throw pErr
@@ -176,12 +177,23 @@ function PolicyCard({ policy }: { policy: Policy }) {
       </button>
 
       {expanded && (
-        <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
-          {policy.start_date        && <DetailItem label="Início"     value={formatDate(policy.start_date)} />}
-          {policy.end_date          && <DetailItem label="Fim"        value={formatDate(policy.end_date)} />}
-          {policy.renewal_date      && <DetailItem label="Renovação"  value={formatDate(policy.renewal_date)} />}
-          {policy.payment_frequency && <DetailItem label="Pagamento"  value={policy.payment_frequency} />}
-          {policy.description       && <DetailItem label="Descrição"  value={policy.description} span />}
+        <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC' }}>
+          {policy.emergency_contacts && (
+            <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.85rem', background: '#FEF9EC', border: '1px solid #F3D978', borderRadius: 6, display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+              <span style={{ fontSize: '1rem' }}>📞</span>
+              <div>
+                <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#92690A', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>Assistência</p>
+                <p style={{ fontSize: '0.82rem', color: '#7A5500', fontWeight: 500, margin: '0.1rem 0 0' }}>{policy.emergency_contacts}</p>
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
+            {policy.start_date        && <DetailItem label="Início"     value={formatDate(policy.start_date)} />}
+            {policy.end_date          && <DetailItem label="Fim"        value={formatDate(policy.end_date)} />}
+            {policy.renewal_date      && <DetailItem label="Renovação"  value={formatDate(policy.renewal_date)} />}
+            {policy.payment_frequency && <DetailItem label="Pagamento"  value={policy.payment_frequency} />}
+            {policy.description       && <DetailItem label="Descrição"  value={policy.description} span />}
+          </div>
         </div>
       )}
     </div>
