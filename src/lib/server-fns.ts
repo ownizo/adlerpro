@@ -660,7 +660,10 @@ export const deletePolicy = createServerFn({ method: 'POST' })
 
 export const fetchSocialPosts = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
-  .handler(async () => db.getSocialPosts())
+  .handler(async () => {
+    const posts = await db.getSocialPosts()
+    return posts ?? []
+  })
 
 export const adminCreateSocialPost = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
@@ -707,6 +710,63 @@ export const adminDeleteSocialPost = createServerFn({ method: 'POST' })
     await db.deleteSocialPost(data.id)
     return { success: true }
   })
+
+// ── SVG carousel helpers (must be defined before adminGenerateSocialContent) ──
+
+function wrapText(text: string, maxChars: number): string[] {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let current = ''
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length > maxChars) {
+      if (current) lines.push(current.trim())
+      current = word
+    } else {
+      current = (current + ' ' + word).trim()
+    }
+  }
+  if (current) lines.push(current.trim())
+  return lines
+}
+
+function escSvg(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
+function buildCarouselSlide(topic: string, text: string, slideNumber: number, totalSlides: number): string {
+  const H = 1080
+  const gold = '#C9A84C'
+  const white = '#FFFFFF'
+  const navy1 = '#0A1628'
+  const navy2 = '#1B2B4B'
+  const gradId = `g${slideNumber}`
+
+  const rawLines = wrapText(text.replace(/\n/g, ' '), 28)
+  const bodyTextLines = rawLines.slice(0, 6)
+  const lineHeight = 56
+  const totalTextH = bodyTextLines.length * lineHeight
+  const startY = (H - totalTextH) / 2 + 20
+
+  const bodyTextSvg = bodyTextLines.map((line, i) =>
+    `<text x="540" y="${startY + i * lineHeight}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="42" font-weight="bold" fill="${white}" opacity="0.95">${escSvg(line)}</text>`
+  ).join('\n  ')
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
+  <defs>
+    <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="${navy1}"/>
+      <stop offset="100%" stop-color="${navy2}"/>
+    </linearGradient>
+  </defs>
+  <rect width="1080" height="1080" fill="url(#${gradId})"/>
+  <text x="540" y="80" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="32" letter-spacing="6" fill="${gold}" font-weight="normal">ADLER &amp; ROCHEFORT</text>
+  <line x1="440" y1="110" x2="640" y2="110" stroke="${gold}" stroke-width="1.5" opacity="0.8"/>
+  ${bodyTextSvg}
+  <line x1="340" y1="960" x2="740" y2="960" stroke="${gold}" stroke-width="1" opacity="0.5"/>
+  <text x="540" y="1000" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="24" fill="${gold}" opacity="0.7">adlerrochefort.com</text>
+  <text x="1040" y="1060" text-anchor="end" font-family="Georgia, 'Times New Roman', serif" font-size="20" fill="${white}" opacity="0.4">${slideNumber}/${totalSlides}</text>
+</svg>`
+}
 
 export const adminGenerateSocialContent = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
@@ -788,63 +848,3 @@ Responde APENAS com um JSON válido neste formato exato (sem markdown, sem texto
     return { ...parsed, carouselSlides }
   })
 
-function wrapText(text: string, maxChars: number): string[] {
-  const words = text.split(' ')
-  const lines: string[] = []
-  let current = ''
-  for (const word of words) {
-    if ((current + ' ' + word).trim().length > maxChars) {
-      if (current) lines.push(current.trim())
-      current = word
-    } else {
-      current = (current + ' ' + word).trim()
-    }
-  }
-  if (current) lines.push(current.trim())
-  return lines
-}
-
-function buildCarouselSlide(topic: string, text: string, slideNumber: number, totalSlides: number): string {
-  const W = 1080
-  const H = 1080
-  const gold = '#C9A84C'
-  const white = '#FFFFFF'
-  const navy1 = '#0A1628'
-  const navy2 = '#1B2B4B'
-  const gradId = `g${slideNumber}`
-
-  // Wrap body text at ~28 chars per line, max 6 lines
-  const rawLines = wrapText(text.replace(/\n/g, ' '), 28)
-  const bodyTextLines = rawLines.slice(0, 6)
-  const lineHeight = 56
-  const totalTextH = bodyTextLines.length * lineHeight
-  const startY = (H - totalTextH) / 2 + 20
-
-  const bodyTextSvg = bodyTextLines.map((line, i) =>
-    `<text x="540" y="${startY + i * lineHeight}" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="42" font-weight="bold" fill="${white}" opacity="0.95">${escSvg(line)}</text>`
-  ).join('\n  ')
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
-  <defs>
-    <linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${navy1}"/>
-      <stop offset="100%" stop-color="${navy2}"/>
-    </linearGradient>
-  </defs>
-  <rect width="1080" height="1080" fill="url(#${gradId})"/>
-  <!-- Header -->
-  <text x="540" y="80" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="32" letter-spacing="6" fill="${gold}" font-weight="normal">ADLER &amp; ROCHEFORT</text>
-  <line x1="440" y1="110" x2="640" y2="110" stroke="${gold}" stroke-width="1.5" opacity="0.8"/>
-  <!-- Body -->
-  ${bodyTextSvg}
-  <!-- Footer -->
-  <line x1="340" y1="960" x2="740" y2="960" stroke="${gold}" stroke-width="1" opacity="0.5"/>
-  <text x="540" y="1000" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="24" fill="${gold}" opacity="0.7">adlerrochefort.com</text>
-  <!-- Slide indicator -->
-  <text x="1040" y="1060" text-anchor="end" font-family="Georgia, 'Times New Roman', serif" font-size="20" fill="${white}" opacity="0.4">${slideNumber}/${totalSlides}</text>
-</svg>`
-}
-
-function escSvg(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
-}
