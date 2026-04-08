@@ -392,6 +392,14 @@ export const adminUpdatePolicy = createServerFn({ method: 'POST' })
     return { success: true }
   })
 
+export const adminDeletePolicy = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    await db.deletePolicy(id)
+    return { success: true }
+  })
+
 export const adminAssociateDocument = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { documentId: string; policyId: string }) => d)
