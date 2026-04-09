@@ -1231,7 +1231,7 @@ export const adminCreateCompanyUser = createServerFn({ method: 'POST' })
 
       if (result.created) {
         await db.updateCompanyUser(id, {
-          identityStatus: 'active',
+          identityStatus: 'confirmed',
           updatedAt: new Date().toISOString(),
         })
       } else if (result.reason === 'already_exists') {
