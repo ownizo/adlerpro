@@ -184,7 +184,25 @@ export const fetchPolicies = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
-    return db.getPolicies(scope.companyId ?? undefined)
+    const companyPolicies = scope.companyId
+      ? await db.getPolicies(scope.companyId)
+      : scope.isAdmin
+        ? await db.getPolicies()
+        : []
+    const viewerEmail = scope.user.email?.trim().toLowerCase()
+    if (!viewerEmail) return companyPolicies
+
+    const companyUser = await db.getCompanyUserByEmail(viewerEmail)
+    if (!companyUser) return companyPolicies
+
+    const sharedRelations = await db.getPolicyUsersByUser(companyUser.id)
+    if (!sharedRelations.length) return companyPolicies
+
+    const sharedPolicies = await db.getPoliciesByIds(sharedRelations.map((item) => item.policyId))
+    const deduped = new Map<string, (typeof companyPolicies)[number]>()
+    for (const policy of companyPolicies) deduped.set(policy.id, policy)
+    for (const policy of sharedPolicies) deduped.set(policy.id, policy)
+    return Array.from(deduped.values())
   })
 
 export const fetchPolicy = createServerFn({ method: 'GET' })
@@ -194,8 +212,15 @@ export const fetchPolicy = createServerFn({ method: 'GET' })
     const scope = await getViewerScope()
     const policy = await db.getPolicy(id)
     if (!policy) return undefined
-    if (scope.companyId && policy.companyId !== scope.companyId) return undefined
-    return policy
+    if (scope.isAdmin) return policy
+    if (scope.companyId && policy.companyId === scope.companyId) return policy
+
+    const viewerEmail = scope.user.email?.trim().toLowerCase()
+    const companyUser = viewerEmail ? await db.getCompanyUserByEmail(viewerEmail) : undefined
+    if (!companyUser) return undefined
+    const sharedRelations = await db.getPolicyUsersByUser(companyUser.id)
+    if (sharedRelations.some((item) => item.policyId === id)) return policy
+    return undefined
   })
 
 export const fetchClaims = createServerFn({ method: 'GET' })
@@ -347,12 +372,13 @@ export const fetchApiConnections = createServerFn({ method: 'GET' })
 export const fetchAdminAll = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
-    const [companies, companyUsers, userEvents, apiConnections, policies, claims, documents, individualClients] = await Promise.all([
+    const [companies, companyUsers, userEvents, apiConnections, policies, policyUsers, claims, documents, individualClients] = await Promise.all([
       db.getCompanies(),
       db.getCompanyUsers(),
       db.getUserMetricEvents(),
       db.getApiConnections(),
       db.getPolicies(),
+      db.getPolicyUsers(),
       db.getClaims(),
       db.getDocuments(),
       db.getIndividualClients(),
@@ -385,6 +411,7 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       userEvents,
       apiConnections,
       policies,
+      policyUsers,
       claims,
       documents,
       individualClients: filteredIndividualClients,
@@ -1095,6 +1122,33 @@ export const adminUpdatePolicy = createServerFn({ method: 'POST' })
     return { success: true }
   })
 
+export const adminDeletePolicy = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data }) => {
+    const policy = await db.getPolicy(data.id)
+    if (!policy) throw new Error('Apólice não encontrada')
+
+    await db.deletePolicyRelations(data.id)
+    await db.deletePolicy(data.id)
+    return { success: true }
+  })
+
+export const adminSetPolicyUsers = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { policyId: string; userIds: string[] }) => d)
+  .handler(async ({ data }) => {
+    const policy = await db.getPolicy(data.policyId)
+    if (!policy) throw new Error('Apólice não encontrada')
+
+    const companyUsers = await db.getCompanyUsers(policy.companyId)
+    const validUserIds = new Set(companyUsers.map((item) => item.id))
+    const sanitizedUserIds = data.userIds.filter((userId) => validUserIds.has(userId))
+
+    await db.setPolicyUsers(data.policyId, sanitizedUserIds)
+    return { success: true, assigned: sanitizedUserIds.length }
+  })
+
 export const adminAssociateDocument = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { documentId: string; policyId: string }) => d)
@@ -1475,6 +1529,20 @@ export const deletePolicy = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((id: string) => id)
   .handler(async ({ data: id }) => {
+    const scope = await getViewerScope()
+    const policy = await db.getPolicy(id)
+    if (!policy) throw new Error('Apólice não encontrada')
+
+    const viewerEmail = scope.user.email?.trim().toLowerCase()
+    const companyUser = viewerEmail ? await db.getCompanyUserByEmail(viewerEmail) : undefined
+    const sharedRelations = companyUser ? await db.getPolicyUsersByUser(companyUser.id) : []
+    const isSharedWithViewer = sharedRelations.some((item) => item.policyId === id)
+    const allowedByCompany = !!scope.companyId && policy.companyId === scope.companyId
+    if (!allowedByCompany && !isSharedWithViewer && !scope.isAdmin) {
+      throw new Error('Sem permissões para eliminar esta apólice')
+    }
+
+    await db.deletePolicyRelations(id)
     await db.deletePolicy(id)
     return { success: true }
   })

@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 import type {
   Company,
   CompanyUser,
+  PolicyUser,
   Policy,
   Claim,
   Document,
@@ -108,7 +109,10 @@ export async function deleteCompany(id: string): Promise<void> {
 
 export async function deleteCompanyRelations(companyId: string): Promise<void> {
   const sb = getSupabaseAdmin()
-  await Promise.all([
+  const { data: companyPolicyRows } = await sb.from('policies').select('id').eq('company_id', companyId)
+  const companyPolicyIds = ((companyPolicyRows as Array<{ id: string }> | null) ?? []).map((row) => row.id).filter(Boolean)
+
+  const tasks = [
     sb.from('policies').delete().eq('company_id', companyId),
     sb.from('claims').delete().eq('company_id', companyId),
     sb.from('documents').delete().eq('company_id', companyId),
@@ -116,7 +120,13 @@ export async function deleteCompanyRelations(companyId: string): Promise<void> {
     sb.from('risk_reports').delete().eq('company_id', companyId),
     sb.from('company_users').delete().eq('company_id', companyId),
     sb.from('user_metric_events').delete().eq('company_id', companyId),
-  ])
+  ]
+
+  if (companyPolicyIds.length > 0) {
+    tasks.push(sb.from('policy_users').delete().in('policy_id', companyPolicyIds as any))
+  }
+
+  await Promise.all(tasks)
 }
 
 // ============================================================
@@ -160,6 +170,39 @@ export async function deleteCompanyUser(id: string): Promise<void> {
   if (error) console.error('deleteCompanyUser error:', error)
 }
 
+export async function getPolicyUsers(policyId?: string): Promise<PolicyUser[]> {
+  const sb = getSupabaseAdmin()
+  let query = sb.from('policy_users').select('*')
+  if (policyId) query = query.eq('policy_id', policyId)
+  const { data, error } = await query
+  if (error) { console.error('getPolicyUsers error:', error); return [] }
+  return rowsToCamel<PolicyUser>(data ?? [])
+}
+
+export async function getPolicyUsersByUser(userId: string): Promise<PolicyUser[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('policy_users').select('*').eq('user_id', userId)
+  if (error) { console.error('getPolicyUsersByUser error:', error); return [] }
+  return rowsToCamel<PolicyUser>(data ?? [])
+}
+
+export async function setPolicyUsers(policyId: string, userIds: string[]): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)))
+  const { error: deleteError } = await sb.from('policy_users').delete().eq('policy_id', policyId)
+  if (deleteError) {
+    console.error('setPolicyUsers delete existing error:', deleteError)
+    return
+  }
+  if (uniqueUserIds.length === 0) return
+  const rows = uniqueUserIds.map((userId) => ({
+    policy_id: policyId,
+    user_id: userId,
+  }))
+  const { error: insertError } = await sb.from('policy_users').insert(rows as any)
+  if (insertError) console.error('setPolicyUsers insert error:', insertError)
+}
+
 // ============================================================
 // Policies
 // ============================================================
@@ -179,6 +222,15 @@ export async function getPolicy(id: string): Promise<Policy | undefined> {
   return objectToCamel(data) as Policy
 }
 
+export async function getPoliciesByIds(ids: string[]): Promise<Policy[]> {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)))
+  if (uniqueIds.length === 0) return []
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('policies').select('*').in('id', uniqueIds)
+  if (error) { console.error('getPoliciesByIds error:', error); return [] }
+  return rowsToCamel<Policy>(data ?? [])
+}
+
 export async function createPolicy(policy: Policy): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('policies').insert(objectToSnake(policy as unknown as Record<string, unknown>))
@@ -195,6 +247,24 @@ export async function deletePolicy(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('policies').delete().eq('id', id)
   if (error) console.error('deletePolicy error:', error)
+}
+
+export async function deletePolicyRelations(id: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const tasks = [
+    sb.from('policy_users').delete().eq('policy_id', id),
+    sb.from('documents').update({ policy_id: null } as any).eq('policy_id', id),
+    sb.from('claims').delete().eq('policy_id', id),
+    sb.from('renewal_alerts_state').delete().eq('policy_id', id),
+    sb.from('renewal_alerts_history').delete().eq('policy_id', id),
+  ]
+
+  const results = await Promise.all(tasks)
+  for (const result of results) {
+    if (result?.error) {
+      console.error('deletePolicyRelations partial failure:', result.error)
+    }
+  }
 }
 
 // ============================================================

@@ -18,10 +18,17 @@ export interface CompanyUser {
   email: string
   role: 'owner' | 'manager' | 'employee'
   accessPassword: string
-  identityStatus?: 'pending_confirmation' | 'confirmed' | 'already_registered' | 'not_found'
+  identityStatus?: 'pending_confirmation' | 'confirmed' | 'already_registered' | 'not_found' | 'active' | 'inactive'
   invitationSentAt?: string
   lastLoginAt?: string
   createdAt: string
+  updatedAt?: string
+}
+
+export interface PolicyUser {
+  policyId: string
+  userId: string
+  createdAt?: string
   updatedAt?: string
 }
 
@@ -143,6 +150,7 @@ export interface ClaimStep {
 export interface Document {
   id: string
   companyId: string
+  individualClientId?: string
   name: string
   category: DocumentCategory
   size: number
