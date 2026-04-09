@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
-import { fetchPolicies, createPolicy, updatePolicy, deletePolicy } from '@/lib/server-fns'
+import { fetchPolicies, createPolicy } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Policy } from '@/lib/types'
 import { POLICY_TYPE_LABELS } from '@/lib/types'
@@ -77,134 +77,6 @@ function StatusBadge({ status }: { status: string }) {
   return <span style={{ display: 'inline-block', fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 600, padding: '0.15rem 0.5rem', borderRadius: '20px', background: s.bg, color: s.color }}>{statusLabel(status, t)}</span>
 }
 
-function DetailItem({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.62rem', color: '#aaaaaa', margin: 0, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{label}</p>
-      <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', fontWeight: 600, color: '#333333', margin: 0 }}>{value}</p>
-    </div>
-  )
-}
-
-function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, formatDate, t }: {
-  policy: Policy
-  onClose: () => void
-  onEdit: (p: Policy) => void
-  onDelete: (id: string) => void
-  formatCurrency: (v: number) => string
-  formatDate: (s: string) => string
-  t: (k: string, opts?: any) => string
-}) {
-  const c = POLICY_TYPE_COLORS[policy.type] || POLICY_TYPE_COLORS.other
-  const icon = POLICY_TYPE_ICONS[policy.type] || '📋'
-  const days = daysUntil(policy.endDate)
-
-  return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-      onClick={onClose}
-    >
-      <div
-        style={{ background: '#ffffff', borderRadius: '4px', width: '100%', maxWidth: '640px', maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header colorido */}
-        <div style={{ background: c.bg, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: `1px solid ${c.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '1.75rem' }}>{icon}</span>
-            <div>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: c.text, margin: 0 }}>{POLICY_TYPE_LABELS[policy.type] || policy.type}</p>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 400, fontSize: '0.82rem', color: c.text, opacity: 0.8, margin: 0 }}>{policy.insurer}</p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <StatusBadge status={policy.status} />
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888888', fontSize: '1.4rem', lineHeight: 1, padding: '0.1rem 0.25rem' }}>×</button>
-          </div>
-        </div>
-
-        <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto' }}>
-          {/* Campos principais */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
-            <DetailItem label={t('policies.policyNumber')} value={policy.policyNumber || '—'} />
-            <DetailItem label={t('policies.annualPremium')} value={formatCurrency(policy.annualPremium)} />
-            <DetailItem label={t('policies.insuredValue')} value={policy.insuredValue > 0 ? formatCurrency(policy.insuredValue) : '—'} />
-            <DetailItem label={t('policies.deductible')} value={policy.deductible ? formatCurrency(policy.deductible) : '—'} />
-            <DetailItem label={t('policies.startDate')} value={formatDate(policy.startDate)} />
-            <DetailItem label={t('policies.endDate')} value={
-              days >= 0 && days <= 90
-                ? `${formatDate(policy.endDate)} (${days}d)`
-                : formatDate(policy.endDate)
-            } />
-          </div>
-
-          {policy.description && (
-            <div style={{ marginBottom: '1.25rem', padding: '0.75rem', background: '#f9f9f9', borderRadius: '4px', border: '1px solid #eeeeee' }}>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#666666', margin: 0 }}>{policy.description}</p>
-            </div>
-          )}
-
-          {/* Coberturas completas */}
-          {policy.coverages && policy.coverages.length > 0 && (
-            <div style={{ marginBottom: '1.25rem' }}>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: '0 0 0.5rem' }}>
-                {t('policies.coverages')} ({policy.coverages.length})
-              </p>
-              <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyle: 'none' }}>
-                {policy.coverages.map((cov: string, i: number) => (
-                  <li key={i} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#333333', marginBottom: '0.4rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
-                    <span style={{ color: '#22C55E', flexShrink: 0, marginTop: '0.1rem' }}>✓</span>
-                    {cov}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Exclusões completas */}
-          {policy.exclusions && policy.exclusions.length > 0 && (
-            <div style={{ marginBottom: '1.25rem' }}>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#991B1B', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: '0 0 0.5rem' }}>
-                {t('policies.exclusions')} ({policy.exclusions.length})
-              </p>
-              <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyle: 'none' }}>
-                {policy.exclusions.map((exc: string, i: number) => (
-                  <li key={i} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#555555', marginBottom: '0.4rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
-                    <span style={{ color: '#EF4444', flexShrink: 0, marginTop: '0.1rem' }}>✕</span>
-                    {exc}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {/* Acções */}
-        <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #eeeeee', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' as const }}>
-          {policy.documentKey && (
-            <a
-              href={`/api/download-document?key=${encodeURIComponent(policy.documentKey)}`}
-              target="_blank" rel="noreferrer"
-              style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: '4px', textDecoration: 'none' }}
-            >
-              {t('policies.viewDocument')}
-            </a>
-          )}
-          <button onClick={() => { onClose(); onEdit(policy) }} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#ffffff', color: '#333333', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>
-            {t('policies.edit')}
-          </button>
-          <button onClick={() => onDelete(policy.id)} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#FFF1F2', color: '#9F1239', border: '1px solid #FECDD3', borderRadius: '4px', cursor: 'pointer' }}>
-            {t('policies.delete')}
-          </button>
-          <button onClick={onClose} style={{ marginLeft: 'auto', fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>
-            {t('policies.close')}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function PoliciesPage() {
   const { t } = useTranslation()
   const [policies, setPolicies] = useState<Policy[]>([])
@@ -212,10 +84,7 @@ function PoliciesPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards')
-  const [selected, setSelected] = useState<Policy | null>(null)
-  const [detailPolicy, setDetailPolicy] = useState<Policy | null>(null)
   const [showForm, setShowForm] = useState(false)
-  const [editMode, setEditMode] = useState(false)
   const [formData, setFormData] = useState<any>({})
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -223,11 +92,6 @@ function PoliciesPage() {
 
   const load = () => { setLoading(true); fetchPolicies().then((p) => { setPolicies(p); setLoading(false) }) }
   useEffect(() => { load() }, [])
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setDetailPolicy(null) }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
 
   const filtered = policies.filter((p) =>
     (typeFilter === 'all' || p.type === typeFilter) && (statusFilter === 'all' || p.status === statusFilter)
@@ -266,21 +130,10 @@ function PoliciesPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true)
     try {
-      if (editMode && selected) await updatePolicy({ data: { id: selected.id, updates: formData } })
-      else await createPolicy({ data: { ...formData, companyId: 'comp_001' } })
-      setShowForm(false); setEditMode(false); setSelected(null); load()
+      await createPolicy({ data: { ...formData, companyId: 'comp_001' } })
+      setShowForm(false); setFormData({}); load()
     } catch { alert(t('policies.errors.saveFailed')); setLoading(false) }
   }
-
-  const handleDelete = async (id: string) => {
-    if (!confirm(t('policies.deleteConfirm'))) return
-    setLoading(true)
-    setDetailPolicy(null)
-    try { await deletePolicy({ data: id }); setSelected(null); load() }
-    catch { alert(t('policies.errors.deleteFailed')); setLoading(false) }
-  }
-
-  const openEdit = (p: Policy) => { setFormData(p); setEditMode(true); setShowForm(true); setSelected(p) }
 
   const selectStyle: React.CSSProperties = { fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', padding: '0.45rem 0.75rem', border: '1px solid #dddddd', borderRadius: '4px', background: '#ffffff', color: '#333333' }
 
@@ -300,7 +153,7 @@ function PoliciesPage() {
                 : <>{t('policies.extractViaAI')}</>}
               <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleUpload} style={{ display: 'none' }} disabled={uploading} />
             </label>
-            <button onClick={() => { setFormData({}); setEditMode(false); setShowForm(true) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.addManual')}</button>
+            <button onClick={() => { setFormData({}); setShowForm(true) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.addManual')}</button>
           </div>
         </div>
 
@@ -351,7 +204,7 @@ function PoliciesPage() {
               const icon = POLICY_TYPE_ICONS[policy.type] || '📋'
               const days = daysUntil(policy.endDate)
               return (
-                <div key={policy.id} onClick={() => setDetailPolicy(policy)} style={{ background: '#ffffff', border: `1px solid ${days >= 0 && days <= 30 ? '#FECDD3' : '#eeeeee'}`, borderRadius: '4px', overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
+                <a key={policy.id} href={`/policies/${policy.id}`} style={{ background: '#ffffff', border: `1px solid ${days >= 0 && days <= 30 ? '#FECDD3' : '#eeeeee'}`, borderRadius: '4px', overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow 0.15s', textDecoration: 'none', display: 'block' }}
                   onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)')}
                   onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
                 >
@@ -388,7 +241,7 @@ function PoliciesPage() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </a>
               )
             })}
           </div>
@@ -400,7 +253,7 @@ function PoliciesPage() {
               const days = daysUntil(policy.endDate)
               return (
                 <div key={policy.id} style={{ borderBottom: idx < filtered.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
-                  <div onClick={() => setDetailPolicy(policy)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.85rem 1.25rem', cursor: 'pointer' }}
+                  <a href={`/policies/${policy.id}`} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.85rem 1.25rem', cursor: 'pointer', textDecoration: 'none' }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = '#fafafa')}
                     onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                   >
@@ -414,7 +267,7 @@ function PoliciesPage() {
                       <StatusBadge status={policy.status} />
                     </div>
                     {days >= 0 && days <= 90 && <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: days <= 30 ? '#dc2626' : '#C8961A', background: days <= 30 ? '#FEE2E2' : '#FFFBEB', padding: '0.15rem 0.5rem', borderRadius: '20px', flexShrink: 0 }}>{days}d</span>}
-                  </div>
+                  </a>
                 </div>
               )
             })}
@@ -422,26 +275,13 @@ function PoliciesPage() {
         )}
       </div>
 
-      {/* Modal Detalhe */}
-      {detailPolicy && (
-        <PolicyDetailModal
-          policy={detailPolicy}
-          onClose={() => setDetailPolicy(null)}
-          onEdit={openEdit}
-          onDelete={handleDelete}
-          formatCurrency={formatCurrency}
-          formatDate={formatDate}
-          t={t}
-        />
-      )}
-
-      {/* Modal Add/Edit */}
+      {/* Modal Add */}
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#ffffff', borderRadius: '4px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #eeeeee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#111111', margin: 0 }}>{editMode ? t('policies.editPolicy') : t('policies.newPolicy')}</h2>
-              <button onClick={() => { setShowForm(false); setEditMode(false); setFormData({}) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888888', fontSize: '1.25rem', lineHeight: 1 }}>×</button>
+              <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#111111', margin: 0 }}>{t('policies.newPolicy')}</h2>
+              <button onClick={() => { setShowForm(false); setFormData({}) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888888', fontSize: '1.25rem', lineHeight: 1 }}>×</button>
             </div>
             {formData.description?.includes('extraída') && (
               <div style={{ margin: '1rem 1.5rem 0', padding: '0.75rem 1rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '4px' }}>
@@ -468,8 +308,8 @@ function PoliciesPage() {
                 <FormField label={t('policies.description')}><input type="text" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} style={inputStyle} /></FormField>
               </div>
               <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
-                <button type="button" onClick={() => { setShowForm(false); setEditMode(false); setFormData({}) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.cancel')}</button>
-                <button type="submit" style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{editMode ? t('policies.saveChanges') : t('policies.createPolicy')}</button>
+                <button type="button" onClick={() => { setShowForm(false); setFormData({}) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.cancel')}</button>
+                <button type="submit" style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.createPolicy')}</button>
               </div>
             </form>
           </div>
