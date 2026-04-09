@@ -435,6 +435,11 @@ function isPolicyActiveInMonth(policy: { startDate: string; endDate: string; sta
   return policyStart <= monthEnd && policyEnd >= monthStart
 }
 
+function toDeltaPct(current: number, previous: number | null): number | null {
+  if (previous === null || previous === 0) return null
+  return ((current - previous) / previous) * 100
+}
+
 export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { year?: number; month?: number; companyId?: string; insurer?: string }) => d)
@@ -458,18 +463,30 @@ export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
     }
 
     const monthFormatter = new Intl.DateTimeFormat('pt-PT', { month: 'short' })
-    const timeline = Array.from({ length: 12 }, (_, index) => {
+    const buildTimelineSkeleton = (year: number) => Array.from({ length: 12 }, (_, index) => {
       const month = index + 1
-      const date = new Date(Date.UTC(selectedYear, index, 1))
+      const date = new Date(Date.UTC(year, index, 1))
       return {
         month,
-        monthKey: `${selectedYear}-${String(month).padStart(2, '0')}`,
+        monthKey: `${year}-${String(month).padStart(2, '0')}`,
         label: monthFormatter.format(date).replace('.', ''),
         premiumsCents: 0,
         commissionsCents: 0,
+        policies: [] as Array<{
+          policyId: string
+          policyNumber: string
+          insurer: string
+          companyId?: string
+          type: string
+          paymentFrequency: string
+          startDate: string
+          endDate: string
+          status: string
+          premiumCents: number
+          commissionCents: number
+        }>,
       }
     })
-    const timelineByKey = new Map(timeline.map((point) => [point.monthKey, point]))
 
     const filteredPolicies = policies.filter((policy) => {
       if (selectedCompanyId && policy.companyId !== selectedCompanyId) return false
@@ -477,32 +494,59 @@ export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
       return true
     })
 
-    for (const policy of filteredPolicies) {
-      const start = parseDateToUtc(policy.startDate)
-      if (!start) continue
+    const distributeToTimeline = (
+      timeline: ReturnType<typeof buildTimelineSkeleton>,
+      targetYear: number
+    ) => {
+      const timelineByKey = new Map(timeline.map((point) => [point.monthKey, point]))
+      for (const policy of filteredPolicies) {
+        const start = parseDateToUtc(policy.startDate)
+        if (!start) continue
 
-      const premiumCents = Math.round((policy.annualPremium || 0) * 100)
-      const commissionSource =
-        typeof policy.commissionValue === 'number' && Number.isFinite(policy.commissionValue)
-          ? policy.commissionValue
-          : typeof policy.commissionPercentage === 'number' && Number.isFinite(policy.commissionPercentage)
-            ? ((policy.annualPremium || 0) * policy.commissionPercentage) / 100
-            : 0
-      const commissionCents = Math.round(commissionSource * 100)
-      const frequency = normalizePaymentFrequency(policy.paymentFrequency)
-      const { periods, stepMonths } = getDistributionRule(frequency)
-      const premiumSlices = splitCents(premiumCents, periods)
-      const commissionSlices = splitCents(commissionCents, periods)
+        const premiumCents = Math.round((policy.annualPremium || 0) * 100)
+        const commissionSource =
+          typeof policy.commissionValue === 'number' && Number.isFinite(policy.commissionValue)
+            ? policy.commissionValue
+            : typeof policy.commissionPercentage === 'number' && Number.isFinite(policy.commissionPercentage)
+              ? ((policy.annualPremium || 0) * policy.commissionPercentage) / 100
+              : 0
+        const commissionCents = Math.round(commissionSource * 100)
+        const frequency = normalizePaymentFrequency(policy.paymentFrequency)
+        const { periods, stepMonths } = getDistributionRule(frequency)
+        const premiumSlices = splitCents(premiumCents, periods)
+        const commissionSlices = splitCents(commissionCents, periods)
 
-      for (let periodIndex = 0; periodIndex < periods; periodIndex += 1) {
-        const periodDate = addMonthsUtc(start, periodIndex * stepMonths)
-        const key = monthKeyFromDate(periodDate)
-        const point = timelineByKey.get(key)
-        if (!point) continue
-        point.premiumsCents += premiumSlices[periodIndex] ?? 0
-        point.commissionsCents += commissionSlices[periodIndex] ?? 0
+        for (let periodIndex = 0; periodIndex < periods; periodIndex += 1) {
+          const periodDate = addMonthsUtc(start, periodIndex * stepMonths)
+          if (periodDate.getUTCFullYear() !== targetYear) continue
+          const key = monthKeyFromDate(periodDate)
+          const point = timelineByKey.get(key)
+          if (!point) continue
+          const premiumSlice = premiumSlices[periodIndex] ?? 0
+          const commissionSlice = commissionSlices[periodIndex] ?? 0
+          point.premiumsCents += premiumSlice
+          point.commissionsCents += commissionSlice
+          point.policies.push({
+            policyId: policy.id,
+            policyNumber: policy.policyNumber,
+            insurer: policy.insurer,
+            companyId: policy.companyId || undefined,
+            type: policy.type,
+            paymentFrequency: policy.paymentFrequency ?? 'annual',
+            startDate: policy.startDate,
+            endDate: policy.endDate,
+            status: policy.status,
+            premiumCents: premiumSlice,
+            commissionCents: commissionSlice,
+          })
+        }
       }
     }
+
+    const timeline = buildTimelineSkeleton(selectedYear)
+    distributeToTimeline(timeline, selectedYear)
+    const previousYearTimeline = buildTimelineSkeleton(selectedYear - 1)
+    distributeToTimeline(previousYearTimeline, selectedYear - 1)
 
     const referenceMonth = selectedMonth
       ?? (selectedYear < now.getUTCFullYear() ? 12 : selectedYear > now.getUTCFullYear() ? 1 : now.getUTCMonth() + 1)
@@ -528,12 +572,113 @@ export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
             .filter((point) => point.month >= projectionStartMonth)
             .reduce((sum, point) => sum + point.commissionsCents, 0)
 
+    const previousMonthYear = selectedMonth && selectedMonth === 1 ? selectedYear - 1 : selectedYear
+    const previousMonthTimeline = previousMonthYear === selectedYear
+      ? timeline
+      : previousYearTimeline
+    const previousMonthIndex = selectedMonth
+      ? (selectedMonth === 1 ? 11 : selectedMonth - 2)
+      : Math.max(referenceMonth - 2, -1)
+    const previousMonthPoint = previousMonthIndex >= 0 ? previousMonthTimeline[previousMonthIndex] : null
+
+    const previousYearReferencePoint = selectedMonth
+      ? previousYearTimeline[selectedMonth - 1] ?? null
+      : null
+
+    const previousYearTotalPremiumsCents = previousYearTimeline.reduce((sum, point) => sum + point.premiumsCents, 0)
+    const previousYearTotalCommissionsCents = previousYearTimeline.reduce((sum, point) => sum + point.commissionsCents, 0)
+    const previousYearProjectedCommissionsCents =
+      projectionStartMonth > 12
+        ? 0
+        : previousYearTimeline
+            .filter((point) => point.month >= projectionStartMonth)
+            .reduce((sum, point) => sum + point.commissionsCents, 0)
+
+    const previousMonthActivePolicies = previousMonthPoint
+      ? filteredPolicies.filter((policy) =>
+          isPolicyActiveInMonth(policy, previousMonthYear, previousMonthPoint.month)
+        ).length
+      : null
+    const previousYearActivePolicies = selectedMonth
+      ? filteredPolicies.filter((policy) =>
+          isPolicyActiveInMonth(policy, selectedYear - 1, selectedMonth)
+        ).length
+      : filteredPolicies.filter((policy) =>
+          isPolicyActiveInMonth(policy, selectedYear - 1, referenceMonth)
+        ).length
+
+    const currentPremiumBase = totalPremiumsCents / 100
+    const currentCommissionBase = totalCommissionsCents / 100
+    const currentProjectedBase = projectedCommissionsCents / 100
+    const currentActiveBase = activePolicies
+    const previousMonthPremiumBase = previousMonthPoint
+      ? previousMonthPoint.premiumsCents / 100
+      : null
+    const previousMonthCommissionBase = previousMonthPoint
+      ? previousMonthPoint.commissionsCents / 100
+      : null
+    const previousMonthProjectedBase = previousMonthPoint
+      ? previousMonthPoint.commissionsCents / 100
+      : null
+    const previousYearPremiumBase = selectedMonth
+      ? (previousYearReferencePoint ? previousYearReferencePoint.premiumsCents / 100 : null)
+      : previousYearTotalPremiumsCents / 100
+    const previousYearCommissionBase = selectedMonth
+      ? (previousYearReferencePoint ? previousYearReferencePoint.commissionsCents / 100 : null)
+      : previousYearTotalCommissionsCents / 100
+    const previousYearProjectedBase = selectedMonth
+      ? (previousYearReferencePoint ? previousYearReferencePoint.commissionsCents / 100 : null)
+      : previousYearProjectedCommissionsCents / 100
+    const currentMonthInSelectedYear = selectedYear === now.getUTCFullYear() ? now.getUTCMonth() + 1 : null
+
+    const projectionHighlights = timeline
+      .filter((point) => point.month >= projectionStartMonth && point.commissionsCents > 0)
+      .sort((a, b) => b.commissionsCents - a.commissionsCents)
+      .slice(0, 3)
+      .map((point) => ({
+        month: point.month,
+        monthKey: point.monthKey,
+        label: point.label,
+        premiums: point.premiumsCents / 100,
+        commissions: point.commissionsCents / 100,
+      }))
+
     return {
       summary: {
-        totalPremiums: totalPremiumsCents / 100,
-        totalCommissions: totalCommissionsCents / 100,
-        projectedCommissions: projectedCommissionsCents / 100,
-        activePolicies,
+        totalPremiums: currentPremiumBase,
+        totalCommissions: currentCommissionBase,
+        projectedCommissions: currentProjectedBase,
+        activePolicies: currentActiveBase,
+        comparisons: {
+          totalPremiums: {
+            current: currentPremiumBase,
+            previousMonth: previousMonthPremiumBase,
+            previousYear: previousYearPremiumBase,
+            momDeltaPct: toDeltaPct(currentPremiumBase, previousMonthPremiumBase),
+            yoyDeltaPct: toDeltaPct(currentPremiumBase, previousYearPremiumBase),
+          },
+          totalCommissions: {
+            current: currentCommissionBase,
+            previousMonth: previousMonthCommissionBase,
+            previousYear: previousYearCommissionBase,
+            momDeltaPct: toDeltaPct(currentCommissionBase, previousMonthCommissionBase),
+            yoyDeltaPct: toDeltaPct(currentCommissionBase, previousYearCommissionBase),
+          },
+          projectedCommissions: {
+            current: currentProjectedBase,
+            previousMonth: previousMonthProjectedBase,
+            previousYear: previousYearProjectedBase,
+            momDeltaPct: toDeltaPct(currentProjectedBase, previousMonthProjectedBase),
+            yoyDeltaPct: toDeltaPct(currentProjectedBase, previousYearProjectedBase),
+          },
+          activePolicies: {
+            current: currentActiveBase,
+            previousMonth: previousMonthActivePolicies,
+            previousYear: previousYearActivePolicies,
+            momDeltaPct: toDeltaPct(currentActiveBase, previousMonthActivePolicies),
+            yoyDeltaPct: toDeltaPct(currentActiveBase, previousYearActivePolicies),
+          },
+        },
       },
       timeline: timeline.map((point) => ({
         month: point.month,
@@ -541,7 +686,48 @@ export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
         label: point.label,
         premiums: point.premiumsCents / 100,
         commissions: point.commissionsCents / 100,
+        isHistorical:
+          selectedYear < now.getUTCFullYear()
+            ? true
+            : selectedYear > now.getUTCFullYear()
+              ? false
+              : point.month <= (currentMonthInSelectedYear ?? 0),
+        isProjected:
+          selectedYear > now.getUTCFullYear()
+            ? true
+            : selectedYear < now.getUTCFullYear()
+              ? false
+              : point.month > (currentMonthInSelectedYear ?? 12),
       })),
+      monthlyDetails: timeline.map((point) => ({
+        month: point.month,
+        monthKey: point.monthKey,
+        label: point.label,
+        premiums: point.premiumsCents / 100,
+        commissions: point.commissionsCents / 100,
+        policiesCount: point.policies.length,
+        policies: point.policies
+          .slice()
+          .sort((a, b) => b.commissionCents - a.commissionCents)
+          .map((item) => ({
+            policyId: item.policyId,
+            policyNumber: item.policyNumber,
+            insurer: item.insurer,
+            companyId: item.companyId,
+            type: item.type,
+            paymentFrequency: item.paymentFrequency,
+            startDate: item.startDate,
+            endDate: item.endDate,
+            status: item.status,
+            premium: item.premiumCents / 100,
+            commission: item.commissionCents / 100,
+          })),
+      })),
+      projectionHighlights,
+      context: {
+        selectedViewMonth: referenceMonth,
+        currentMonthInSelectedYear,
+      },
       availableFilters: {
         years: Array.from(yearSet).sort((a, b) => b - a),
         insurers: Array.from(insurerSet).sort((a, b) => a.localeCompare(b)),

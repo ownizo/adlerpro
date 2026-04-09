@@ -914,6 +914,8 @@ function AdminDashboardTab({
   const [selectedMonth, setSelectedMonth] = useState<string>('')
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
   const [selectedInsurer, setSelectedInsurer] = useState<string>('')
+  const [timelineMode, setTimelineMode] = useState<'historical' | 'projection'>('historical')
+  const [drillDownMonth, setDrillDownMonth] = useState<number | null>(null)
   const [financialData, setFinancialData] = useState<AdminFinancialDashboardData | null>(null)
   const [financialLoading, setFinancialLoading] = useState(false)
 
@@ -947,6 +949,10 @@ function AdminDashboardTab({
     }
   }, [selectedYear, selectedMonth, selectedCompanyId, selectedInsurer])
 
+  useEffect(() => {
+    setDrillDownMonth(selectedMonth ? Number(selectedMonth) : null)
+  }, [selectedMonth])
+
   const monthSelectOptions = [
     { value: '', label: 'Ano completo' },
     { value: '1', label: 'Janeiro' },
@@ -962,6 +968,14 @@ function AdminDashboardTab({
     { value: '11', label: 'Novembro' },
     { value: '12', label: 'Dezembro' },
   ]
+
+  const visibleTimeline = financialData
+    ? financialData.timeline.filter((point) =>
+        timelineMode === 'historical' ? point.isHistorical : point.isProjected
+      )
+    : []
+  const drillMonthValue = drillDownMonth ?? (selectedMonth ? Number(selectedMonth) : null)
+  const selectedMonthDetails = financialData?.monthlyDetails.find((monthItem) => monthItem.month === drillMonthValue)
 
   return (
     <div>
@@ -1026,30 +1040,148 @@ function AdminDashboardTab({
           label="Prémios Totais"
           value={financialLoading || !financialData ? '...' : formatCurrency(financialData.summary.totalPremiums)}
           help={selectedMonth ? 'Valor do mês selecionado' : 'Soma anual distribuída por fracionamento'}
+          momDeltaPct={financialData?.summary.comparisons.totalPremiums.momDeltaPct ?? null}
+          yoyDeltaPct={financialData?.summary.comparisons.totalPremiums.yoyDeltaPct ?? null}
         />
         <MetricCard
           label="Comissões Totais"
           value={financialLoading || !financialData ? '...' : formatCurrency(financialData.summary.totalCommissions)}
           help={selectedMonth ? 'Comissão distribuída no mês' : 'Comissões distribuídas no ano'}
+          momDeltaPct={financialData?.summary.comparisons.totalCommissions.momDeltaPct ?? null}
+          yoyDeltaPct={financialData?.summary.comparisons.totalCommissions.yoyDeltaPct ?? null}
         />
         <MetricCard
           label="Comissões Previstas"
           value={financialLoading || !financialData ? '...' : formatCurrency(financialData.summary.projectedCommissions)}
           help="Cashflow futuro com base no fracionamento"
+          momDeltaPct={financialData?.summary.comparisons.projectedCommissions.momDeltaPct ?? null}
+          yoyDeltaPct={financialData?.summary.comparisons.projectedCommissions.yoyDeltaPct ?? null}
         />
         <MetricCard
           label="Apólices Ativas"
           value={financialLoading || !financialData ? '...' : financialData.summary.activePolicies}
           help="Ativas no período de referência"
+          momDeltaPct={financialData?.summary.comparisons.activePolicies.momDeltaPct ?? null}
+          yoyDeltaPct={financialData?.summary.comparisons.activePolicies.yoyDeltaPct ?? null}
         />
       </div>
 
       <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
-        <h3 className="text-sm font-semibold text-navy-700 mb-3">Prémios vs Comissões (linha temporal mensal)</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h3 className="text-sm font-semibold text-navy-700">Prémios vs Comissões (linha temporal mensal)</h3>
+          <div className="inline-flex rounded border border-navy-200 overflow-hidden text-xs">
+            <button
+              type="button"
+              onClick={() => setTimelineMode('historical')}
+              className={`px-3 py-1.5 ${timelineMode === 'historical' ? 'bg-navy-700 text-white' : 'bg-white text-navy-600 hover:bg-navy-50'}`}
+            >
+              Histórico
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimelineMode('projection')}
+              className={`px-3 py-1.5 border-l border-navy-200 ${timelineMode === 'projection' ? 'bg-gold-400 text-navy-700 font-semibold' : 'bg-white text-navy-600 hover:bg-navy-50'}`}
+            >
+              Projeção
+            </button>
+          </div>
+        </div>
         {financialData ? (
-          <FinancialTimelineChart timeline={financialData.timeline} />
+          visibleTimeline.length > 0 ? (
+            <FinancialTimelineChart
+              timeline={visibleTimeline}
+              onSelectMonth={(month) => setDrillDownMonth(month)}
+              selectedMonth={drillMonthValue}
+            />
+          ) : (
+            <p className="text-sm text-navy-400">
+              {timelineMode === 'historical'
+                ? 'Sem histórico para o período selecionado.'
+                : 'Sem projeção futura para o período selecionado.'}
+            </p>
+          )
         ) : (
           <p className="text-sm text-navy-400">{financialLoading ? 'A calcular cashflow...' : 'Sem dados financeiros para os filtros selecionados.'}</p>
+        )}
+      </div>
+
+      <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
+        <h3 className="text-sm font-semibold text-navy-700 mb-3">Meses com Maior Receita Prevista</h3>
+        {financialData?.projectionHighlights.length ? (
+          <div className="grid sm:grid-cols-3 gap-3">
+            {financialData.projectionHighlights.map((monthItem, index) => (
+              <button
+                type="button"
+                key={monthItem.monthKey}
+                onClick={() => setDrillDownMonth(monthItem.month)}
+                className="text-left bg-amber-50 border border-amber-200 rounded px-3 py-2 hover:bg-amber-100 transition-colors"
+              >
+                <p className="text-xs text-amber-700 uppercase tracking-wide">Top {index + 1}</p>
+                <p className="text-sm font-semibold text-navy-700 mt-1">{monthItem.label} {selectedYear}</p>
+                <p className="text-xs text-navy-600 mt-1">Comissões: {formatCurrency(monthItem.commissions)}</p>
+                <p className="text-xs text-navy-500">Prémios: {formatCurrency(monthItem.premiums)}</p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-navy-400">Não existem meses futuros com receita prevista para os filtros aplicados.</p>
+        )}
+      </div>
+
+      <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h3 className="text-sm font-semibold text-navy-700">Drill-down por Mês (Apólices)</h3>
+          <select
+            value={drillMonthValue ?? ''}
+            onChange={(e) => setDrillDownMonth(e.target.value ? Number(e.target.value) : null)}
+            className="px-3 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-gold-400"
+          >
+            <option value="">Selecionar mês</option>
+            {monthSelectOptions.filter((item) => item.value).map((item) => (
+              <option key={`drill_${item.value}`} value={item.value}>{item.label}</option>
+            ))}
+          </select>
+        </div>
+        {!selectedMonthDetails ? (
+          <p className="text-sm text-navy-400">Selecione um mês para ver o detalhe de apólices distribuídas.</p>
+        ) : selectedMonthDetails.policies.length === 0 ? (
+          <p className="text-sm text-navy-400">Sem apólices com movimento financeiro em {selectedMonthDetails.label}.</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="bg-navy-50 border border-navy-100 rounded px-3 py-2 text-xs text-navy-600">
+              <p><strong>{selectedMonthDetails.label} {selectedYear}</strong> · {selectedMonthDetails.policiesCount} apólices</p>
+              <p>Prémios distribuídos: {formatCurrency(selectedMonthDetails.premiums)} · Comissões distribuídas: {formatCurrency(selectedMonthDetails.commissions)}</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px]">
+                <thead>
+                  <tr className="bg-navy-50 border-b border-navy-200">
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Apólice</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Seguradora</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Cliente</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Fracionamento</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Prémio</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Comissão</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-navy-100">
+                  {selectedMonthDetails.policies.map((policyItem) => (
+                    <tr key={`${selectedMonthDetails.monthKey}_${policyItem.policyId}`}>
+                      <td className="px-3 py-2 text-xs text-navy-700">
+                        <p className="font-semibold">{policyItem.policyNumber}</p>
+                        <p className="text-navy-500">{POLICY_TYPE_LABELS[policyItem.type as keyof typeof POLICY_TYPE_LABELS] ?? policyItem.type}</p>
+                      </td>
+                      <td className="px-3 py-2 text-xs text-navy-600">{policyItem.insurer}</td>
+                      <td className="px-3 py-2 text-xs text-navy-600">{companies.find((company) => company.id === policyItem.companyId)?.name ?? '—'}</td>
+                      <td className="px-3 py-2 text-xs text-navy-600">{policyItem.paymentFrequency || 'anual'}</td>
+                      <td className="px-3 py-2 text-xs text-navy-600">{formatCurrency(policyItem.premium)}</td>
+                      <td className="px-3 py-2 text-xs font-semibold text-navy-700">{formatCurrency(policyItem.commission)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
       </div>
 
@@ -1085,17 +1217,57 @@ function AdminDashboardTab({
   )
 }
 
-function MetricCard({ label, value, help }: { label: string; value: number | string; help: string }) {
+function formatPct(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return 'n/d'
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${value.toFixed(1)}%`
+}
+
+function deltaChipClass(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return 'bg-gray-100 text-gray-500 border border-gray-200'
+  if (value >= 0) return 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+  return 'bg-rose-50 text-rose-700 border border-rose-200'
+}
+
+function MetricCard({
+  label,
+  value,
+  help,
+  momDeltaPct,
+  yoyDeltaPct,
+}: {
+  label: string
+  value: number | string
+  help: string
+  momDeltaPct: number | null
+  yoyDeltaPct: number | null
+}) {
   return (
     <div className="bg-white rounded-[4px] border border-navy-200 p-5">
       <p className="text-xs uppercase tracking-wide text-navy-500">{label}</p>
       <p className="text-3xl font-bold text-navy-700 mt-2">{value}</p>
       <p className="text-xs text-navy-500 mt-2">{help}</p>
+      <div className="flex flex-wrap gap-2 mt-3">
+        <span className={`inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold ${deltaChipClass(momDeltaPct)}`}>
+          MoM: {formatPct(momDeltaPct)}
+        </span>
+        <span className={`inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold ${deltaChipClass(yoyDeltaPct)}`}>
+          YoY: {formatPct(yoyDeltaPct)}
+        </span>
+      </div>
     </div>
   )
 }
 
-function FinancialTimelineChart({ timeline }: { timeline: AdminFinancialDashboardData['timeline'] }) {
+function FinancialTimelineChart({
+  timeline,
+  onSelectMonth,
+  selectedMonth,
+}: {
+  timeline: AdminFinancialDashboardData['timeline']
+  onSelectMonth: (month: number) => void
+  selectedMonth: number | null
+}) {
   if (timeline.length === 0) {
     return <p className="text-sm text-navy-400">Sem movimentos financeiros para o período selecionado.</p>
   }
@@ -1148,9 +1320,21 @@ function FinancialTimelineChart({ timeline }: { timeline: AdminFinancialDashboar
           <polyline fill="none" stroke="#0B1E3A" strokeWidth="3" points={premiumPath} />
           <polyline fill="none" stroke="#C8961A" strokeWidth="3" points={commissionPath} />
           {timeline.map((point, index) => (
-            <g key={point.monthKey}>
-              <circle cx={x(index)} cy={y(point.premiums)} r="3.5" fill="#0B1E3A" />
-              <circle cx={x(index)} cy={y(point.commissions)} r="3.5" fill="#C8961A" />
+            <g
+              key={point.monthKey}
+              className="cursor-pointer"
+              onClick={() => onSelectMonth(point.month)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onSelectMonth(point.month)
+                }
+              }}
+            >
+              <circle cx={x(index)} cy={y(point.premiums)} r={selectedMonth === point.month ? '5' : '3.5'} fill="#0B1E3A" />
+              <circle cx={x(index)} cy={y(point.commissions)} r={selectedMonth === point.month ? '5' : '3.5'} fill="#C8961A" />
               <text x={x(index)} y={height - 10} textAnchor="middle" fontSize="10" fill="#6B7280">
                 {point.label}
               </text>
@@ -1160,11 +1344,16 @@ function FinancialTimelineChart({ timeline }: { timeline: AdminFinancialDashboar
       </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mt-3">
         {timeline.map((point) => (
-          <div key={`${point.monthKey}_kpi`} className="bg-navy-50 rounded px-3 py-2 text-xs text-navy-600">
+          <button
+            type="button"
+            key={`${point.monthKey}_kpi`}
+            onClick={() => onSelectMonth(point.month)}
+            className={`text-left rounded px-3 py-2 text-xs border ${selectedMonth === point.month ? 'bg-amber-50 border-amber-200' : 'bg-navy-50 border-transparent'} text-navy-600`}
+          >
             <p className="font-semibold text-navy-700">{point.label}</p>
             <p>Prémios: {formatCurrency(point.premiums)}</p>
             <p>Comissões: {formatCurrency(point.commissions)}</p>
-          </div>
+          </button>
         ))}
       </div>
     </div>

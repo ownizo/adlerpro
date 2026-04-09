@@ -199,6 +199,40 @@ export interface AdminFinancialTimelinePoint {
   label: string
   premiums: number
   commissions: number
+  isHistorical: boolean
+  isProjected: boolean
+}
+
+export interface AdminFinancialKpiComparison {
+  current: number
+  previousMonth: number | null
+  previousYear: number | null
+  momDeltaPct: number | null
+  yoyDeltaPct: number | null
+}
+
+export interface AdminFinancialMonthlyPolicyItem {
+  policyId: string
+  policyNumber: string
+  insurer: string
+  companyId?: string
+  type: string
+  paymentFrequency: string
+  startDate: string
+  endDate: string
+  status: string
+  premium: number
+  commission: number
+}
+
+export interface AdminFinancialMonthDetail {
+  month: number
+  monthKey: string
+  label: string
+  premiums: number
+  commissions: number
+  policiesCount: number
+  policies: AdminFinancialMonthlyPolicyItem[]
 }
 
 export interface AdminFinancialDashboardData {
@@ -207,8 +241,26 @@ export interface AdminFinancialDashboardData {
     totalCommissions: number
     projectedCommissions: number
     activePolicies: number
+    comparisons: {
+      totalPremiums: AdminFinancialKpiComparison
+      totalCommissions: AdminFinancialKpiComparison
+      projectedCommissions: AdminFinancialKpiComparison
+      activePolicies: AdminFinancialKpiComparison
+    }
   }
   timeline: AdminFinancialTimelinePoint[]
+  monthlyDetails: AdminFinancialMonthDetail[]
+  projectionHighlights: Array<{
+    month: number
+    monthKey: string
+    label: string
+    premiums: number
+    commissions: number
+  }>
+  context: {
+    selectedViewMonth: number
+    currentMonthInSelectedYear: number | null
+  }
   availableFilters: {
     years: number[]
     insurers: string[]
