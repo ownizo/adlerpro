@@ -181,9 +181,9 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
 
         {/* Acções */}
         <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #eeeeee', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' as const }}>
-          {(policy.storagePath || policy.documentKey) && (
+          {policy.storagePath && (
             <a
-              href={`/api/download-document?key=${encodeURIComponent(policy.storagePath ?? policy.documentKey ?? '')}`}
+              href={`/api/download-document?key=${encodeURIComponent(policy.storagePath)}`}
               target="_blank" rel="noreferrer"
               style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: '4px', textDecoration: 'none' }}
             >

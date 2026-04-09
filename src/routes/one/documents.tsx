@@ -18,8 +18,7 @@ interface Document {
   category: string
   size: number
   uploaded_at: string
-  storage_path?: string
-  blob_key?: string
+  storagePath?: string
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -90,7 +89,10 @@ function OneDocuments() {
           .eq('individual_client_id', clientId)
           .order('uploaded_at', { ascending: false })
         if (dErr) throw dErr
-        setDocuments(data ?? [])
+        setDocuments((data ?? []).map((doc: any) => ({
+          ...doc,
+          storagePath: doc.storage_path,
+        })))
       }
     } catch (e: any) {
       setError('Erro ao carregar documentos.')

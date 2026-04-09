@@ -1795,7 +1795,7 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
                           <span>📄</span>
                           <span className="font-medium">{d.name}</span>
                           <span className="text-navy-400">· {d.category}</span>
-                          <PolicyDocumentButtons storagePath={d.storagePath ?? d.blobKey ?? ''} name={d.name} />
+                          <PolicyDocumentButtons storagePath={d.storagePath ?? ''} name={d.name} />
                         </li>
                       ))}
                     </ul>
