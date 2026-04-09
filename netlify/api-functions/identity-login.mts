@@ -1,5 +1,14 @@
 import type { Handler, HandlerEvent } from '@netlify/functions'
-import { getStore } from '@netlify/blobs'
+import { createClient } from '@supabase/supabase-js'
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || ''
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+
+function getSupabaseAdmin() {
+  return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
 
 const handler: Handler = async (event: HandlerEvent) => {
   const payload = JSON.parse(event.body || '{}')
@@ -9,23 +18,28 @@ const handler: Handler = async (event: HandlerEvent) => {
   let companyMetadata: { company_id?: string; company_user_id?: string; company_role?: string } = {}
   let mergedRoles = previousRoles
   if (email) {
-    const store = getStore({ name: 'portal-data', consistency: 'strong' })
-    const users = (await store.get('company-users', { type: 'json' })) as any[] || []
-    const userIndex = users.findIndex((user) => user.email?.toLowerCase() === email)
+    const supabase = getSupabaseAdmin()
+    const { data: userRow } = await supabase
+      .from('company_users')
+      .select('id, company_id, role')
+      .ilike('email', email)
+      .maybeSingle()
 
-    if (userIndex >= 0) {
+    if (userRow) {
       const now = new Date().toISOString()
-      users[userIndex] = {
-        ...users[userIndex],
-        lastLoginAt: now,
-        identityStatus: 'confirmed',
-        updatedAt: now,
-      }
-      await store.setJSON('company-users', users)
+      await supabase
+        .from('company_users')
+        .update({
+          last_login_at: now,
+          identity_status: 'confirmed',
+          updated_at: now,
+        })
+        .eq('id', userRow.id)
+
       companyMetadata = {
-        company_id: users[userIndex].companyId,
-        company_user_id: users[userIndex].id,
-        company_role: users[userIndex].role ?? 'employee',
+        company_id: userRow.company_id,
+        company_user_id: userRow.id,
+        company_role: userRow.role ?? 'employee',
       }
 
       const roleSet = new Set([
@@ -36,16 +50,14 @@ const handler: Handler = async (event: HandlerEvent) => {
       ])
       mergedRoles = Array.from(roleSet)
 
-      const events = (await store.get('user-metric-events', { type: 'json' })) as any[] || []
-      events.push({
+      await supabase.from('user_metric_events').insert({
         id: `evt_${Date.now()}_${Math.random().toString(16).slice(2, 7)}`,
-        companyId: users[userIndex].companyId,
-        userId: users[userIndex].id,
+        company_id: userRow.company_id,
+        user_id: userRow.id,
         timestamp: now,
         type: 'login',
         description: 'Início de sessão no painel de cliente',
       })
-      await store.setJSON('user-metric-events', events)
     }
   }
 

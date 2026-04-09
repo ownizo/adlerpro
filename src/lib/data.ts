@@ -422,15 +422,3 @@ export async function deleteSocialPost(id: string): Promise<void> {
   const { error } = await sb.from('social_posts').delete().eq('id', id)
   if (error) console.error('deleteSocialPost error:', error)
 }
-
-// ============================================================
-// File storage (mantido para compatibilidade — usa Netlify Blobs apenas para ficheiros)
-// ============================================================
-export function fileStore() {
-  try {
-    const { getStore } = require('@netlify/blobs')
-    return getStore('portal-files')
-  } catch {
-    return null
-  }
-}

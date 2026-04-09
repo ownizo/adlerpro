@@ -1,19 +1,27 @@
 import type { Handler, HandlerEvent } from '@netlify/functions'
-import { getStore } from '@netlify/blobs'
+import { createClient } from '@supabase/supabase-js'
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || ''
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+
+function getSupabaseAdmin() {
+  return createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  })
+}
 
 const handler: Handler = async (event: HandlerEvent) => {
   const user = JSON.parse(event.body || '{}')
   const email = String(user.email || '').toLowerCase()
 
   const isAdmin = email.endsWith('@adlerrochefort.com')
-  const store = getStore({ name: 'portal-data', consistency: 'strong' })
-  const companyUsers = (await store.get('company-users', { type: 'json' })) as Array<{
-    id: string
-    email: string
-    companyId: string
-    role?: string
-  }> | null
-  const companyUser = companyUsers?.find((item) => item.email.toLowerCase() === email)
+  const supabase = getSupabaseAdmin()
+  const { data: companyUser } = await supabase
+    .from('company_users')
+    .select('id, email, company_id, role')
+    .ilike('email', email)
+    .maybeSingle()
+
   const companyRole = companyUser?.role ?? 'employee'
 
   return {
@@ -25,7 +33,7 @@ const handler: Handler = async (event: HandlerEvent) => {
       user_metadata: {
         ...user?.user_metadata,
         signed_up_at: new Date().toISOString(),
-        company_id: companyUser?.companyId,
+        company_id: companyUser?.company_id,
         company_user_id: companyUser?.id,
         company_role: companyRole,
       },
