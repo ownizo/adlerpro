@@ -470,7 +470,7 @@ export const adminCreateCompanyUser = createServerFn({ method: 'POST' })
 
       if (result.created) {
         await db.updateCompanyUser(id, {
-          identityStatus: 'active',
+          identityStatus: 'confirmed',
           updatedAt: new Date().toISOString(),
         })
       } else if (result.reason === 'already_exists') {
@@ -504,9 +504,9 @@ export const adminUpdateCompanyUser = createServerFn({ method: 'POST' })
       const current = users.find((user) => user.id === data.id)
       if (!current?.email) throw new Error('Utilizador não encontrado para atualizar password no Identity.')
       await updateIdentityUserPasswordByEmail(current.email, data.updates.accessPassword)
-      // Garantir que o identity_status fica como active após reset de password
+      // Garantir que o identity_status fica como confirmed após reset de password
       if (!data.updates.identityStatus) {
-        data.updates.identityStatus = 'active'
+        data.updates.identityStatus = 'confirmed'
       }
     }
 
