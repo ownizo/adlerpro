@@ -90,8 +90,8 @@ function DashboardPage() {
         icon: '⏰',
         title: t('dashboard.nextActionRenewal_title', { type: POLICY_TYPE_LABELS[p.type] || p.type }),
         description: t('dashboard.nextActionRenewal_desc', { number: p.policyNumber, insurer: p.insurer, days, plural: days !== 1 ? 's' : '' }),
-        link: '/quotes-comparison',
-        linkLabel: t('dashboard.compareQuotes'),
+        link: `/policies/${p.id}`,
+        linkLabel: 'Ver detalhe da apólice',
         color: days <= 30 ? '#FFF1F2' : '#FFFBEB',
         borderColor: days <= 30 ? '#FECDD3' : '#FDE68A',
       }
@@ -187,20 +187,37 @@ function DashboardPage() {
                   {nextAction.description}
                 </p>
               </div>
-              <Link
-                to={nextAction.link as any}
-                style={{
-                  fontFamily: "'Montserrat', sans-serif",
-                  fontWeight: 600,
-                  fontSize: '0.78rem',
-                  color: '#111111',
-                  textDecoration: 'none',
-                  whiteSpace: 'nowrap',
-                  flexShrink: 0,
-                }}
-              >
-                {nextAction.linkLabel}
-              </Link>
+              {nextAction.link.startsWith('/policies/') ? (
+                <a
+                  href={nextAction.link}
+                  style={{
+                    fontFamily: "'Montserrat', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '0.78rem',
+                    color: '#111111',
+                    textDecoration: 'none',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  {nextAction.linkLabel}
+                </a>
+              ) : (
+                <Link
+                  to={nextAction.link as any}
+                  style={{
+                    fontFamily: "'Montserrat', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '0.78rem',
+                    color: '#111111',
+                    textDecoration: 'none',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                  }}
+                >
+                  {nextAction.linkLabel}
+                </Link>
+              )}
             </div>
 
             <div className="grid lg:grid-cols-3 gap-6">
@@ -224,7 +241,8 @@ function DashboardPage() {
                         const colors = POLICY_TYPE_COLORS[policy.type] || POLICY_TYPE_COLORS.other
                         const urgency = days <= 14 ? '#EF4444' : days <= 30 ? '#F59E0B' : '#C8961A'
                         return (
-                          <div
+                          <a
+                            href={`/policies/${policy.id}`}
                             key={policy.id}
                             style={{
                               display: 'flex',
@@ -232,6 +250,7 @@ function DashboardPage() {
                               gap: '0.75rem',
                               padding: '0.75rem 1.25rem',
                               borderBottom: '1px solid #f5f5f5',
+                              textDecoration: 'none',
                             }}
                           >
                             <div
@@ -259,7 +278,7 @@ function DashboardPage() {
                                 {formatDate(policy.endDate)}
                               </p>
                             </div>
-                          </div>
+                          </a>
                         )
                       })}
                     </div>
@@ -326,9 +345,9 @@ function DashboardPage() {
                     policies.slice(0, 5).map((policy) => {
                       const colors = POLICY_TYPE_COLORS[policy.type] || POLICY_TYPE_COLORS.other
                       return (
-                        <Link
+                        <a
                           key={policy.id}
-                          to="/policies"
+                          href={`/policies/${policy.id}`}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -366,7 +385,7 @@ function DashboardPage() {
                             </p>
                             <StatusBadge status={policy.status} />
                           </div>
-                        </Link>
+                        </a>
                       )
                     })
                   )}

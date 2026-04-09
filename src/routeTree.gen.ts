@@ -25,6 +25,7 @@ import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OneIndexRouteImport } from './routes/one/index'
+import { Route as PoliciesPolicyIdRouteImport } from './routes/policies.$policyId'
 import { Route as OneProfileRouteImport } from './routes/one/profile'
 import { Route as OnePoliciesRouteImport } from './routes/one/policies'
 import { Route as OneLoginRouteImport } from './routes/one/login'
@@ -112,6 +113,11 @@ const OneIndexRoute = OneIndexRouteImport.update({
   path: '/one/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PoliciesPolicyIdRoute = PoliciesPolicyIdRouteImport.update({
+  id: '/$policyId',
+  path: '/$policyId',
+  getParentRoute: () => PoliciesRoute,
+} as any)
 const OneProfileRoute = OneProfileRouteImport.update({
   id: '/one/profile',
   path: '/one/profile',
@@ -153,7 +159,7 @@ export interface FileRoutesByFullPath {
   '/license-plates': typeof LicensePlatesRoute
   '/login': typeof LoginRoute
   '/partner-risk': typeof PartnerRiskRoute
-  '/policies': typeof PoliciesRoute
+  '/policies': typeof PoliciesRouteWithChildren
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
@@ -165,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/one/login': typeof OneLoginRoute
   '/one/policies': typeof OnePoliciesRoute
   '/one/profile': typeof OneProfileRoute
+  '/policies/$policyId': typeof PoliciesPolicyIdRoute
   '/one/': typeof OneIndexRoute
 }
 export interface FileRoutesByTo {
@@ -177,7 +184,7 @@ export interface FileRoutesByTo {
   '/license-plates': typeof LicensePlatesRoute
   '/login': typeof LoginRoute
   '/partner-risk': typeof PartnerRiskRoute
-  '/policies': typeof PoliciesRoute
+  '/policies': typeof PoliciesRouteWithChildren
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
@@ -189,6 +196,7 @@ export interface FileRoutesByTo {
   '/one/login': typeof OneLoginRoute
   '/one/policies': typeof OnePoliciesRoute
   '/one/profile': typeof OneProfileRoute
+  '/policies/$policyId': typeof PoliciesPolicyIdRoute
   '/one': typeof OneIndexRoute
 }
 export interface FileRoutesById {
@@ -202,7 +210,7 @@ export interface FileRoutesById {
   '/license-plates': typeof LicensePlatesRoute
   '/login': typeof LoginRoute
   '/partner-risk': typeof PartnerRiskRoute
-  '/policies': typeof PoliciesRoute
+  '/policies': typeof PoliciesRouteWithChildren
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
@@ -214,6 +222,7 @@ export interface FileRoutesById {
   '/one/login': typeof OneLoginRoute
   '/one/policies': typeof OnePoliciesRoute
   '/one/profile': typeof OneProfileRoute
+  '/policies/$policyId': typeof PoliciesPolicyIdRoute
   '/one/': typeof OneIndexRoute
 }
 export interface FileRouteTypes {
@@ -240,6 +249,7 @@ export interface FileRouteTypes {
     | '/one/login'
     | '/one/policies'
     | '/one/profile'
+    | '/policies/$policyId'
     | '/one/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -264,6 +274,7 @@ export interface FileRouteTypes {
     | '/one/login'
     | '/one/policies'
     | '/one/profile'
+    | '/policies/$policyId'
     | '/one'
   id:
     | '__root__'
@@ -288,6 +299,7 @@ export interface FileRouteTypes {
     | '/one/login'
     | '/one/policies'
     | '/one/profile'
+    | '/policies/$policyId'
     | '/one/'
   fileRoutesById: FileRoutesById
 }
@@ -301,7 +313,7 @@ export interface RootRouteChildren {
   LicensePlatesRoute: typeof LicensePlatesRoute
   LoginRoute: typeof LoginRoute
   PartnerRiskRoute: typeof PartnerRiskRoute
-  PoliciesRoute: typeof PoliciesRoute
+  PoliciesRoute: typeof PoliciesRouteWithChildren
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   ProfileRoute: typeof ProfileRoute
   QuotesComparisonRoute: typeof QuotesComparisonRoute
@@ -430,6 +442,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OneIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/policies/$policyId': {
+      id: '/policies/$policyId'
+      path: '/$policyId'
+      fullPath: '/policies/$policyId'
+      preLoaderRoute: typeof PoliciesPolicyIdRouteImport
+      parentRoute: typeof PoliciesRoute
+    }
     '/one/profile': {
       id: '/one/profile'
       path: '/one/profile'
@@ -475,6 +494,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface PoliciesRouteChildren {
+  PoliciesPolicyIdRoute: typeof PoliciesPolicyIdRoute
+}
+
+const PoliciesRouteChildren: PoliciesRouteChildren = {
+  PoliciesPolicyIdRoute: PoliciesPolicyIdRoute,
+}
+
+const PoliciesRouteWithChildren = PoliciesRoute._addFileChildren(
+  PoliciesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -485,7 +516,7 @@ const rootRouteChildren: RootRouteChildren = {
   LicensePlatesRoute: LicensePlatesRoute,
   LoginRoute: LoginRoute,
   PartnerRiskRoute: PartnerRiskRoute,
-  PoliciesRoute: PoliciesRoute,
+  PoliciesRoute: PoliciesRouteWithChildren,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
   ProfileRoute: ProfileRoute,
   QuotesComparisonRoute: QuotesComparisonRoute,
