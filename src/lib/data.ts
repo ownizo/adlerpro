@@ -3,7 +3,6 @@
  * Substitui o Netlify Blobs por Supabase PostgreSQL.
  * Converte automaticamente entre camelCase (TypeScript) e snake_case (Supabase).
  */
-import { createClient } from '@supabase/supabase-js'
 import type {
   Company,
   CompanyUser,
@@ -17,27 +16,16 @@ import type {
   IndividualClient,
   SocialPost,
 } from './types'
+import { supabaseAdmin } from './supabase-admin'
 
 // ============================================================
 // Cliente Supabase (server-side — usa service_role key)
-// Singleton: criado uma vez e reutilizado em todas as chamadas
+// Reutiliza o cliente admin partilhado
 // ============================================================
-let _sbAdmin: ReturnType<typeof createClient> | null = null
+type JsonObject = Record<string, unknown>
 
 function getSupabaseAdmin() {
-  if (_sbAdmin) return _sbAdmin
-  const url =
-    (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) ||
-    process.env['VITE_SUPABASE_URL'] ||
-    ''
-  const key =
-    process.env['SUPABASE_SERVICE_ROLE_KEY'] ||
-    (typeof import.meta !== 'undefined' && import.meta.env?.SUPABASE_SERVICE_ROLE_KEY) ||
-    ''
-  _sbAdmin = createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
-  return _sbAdmin
+  return supabaseAdmin
 }
 
 // ============================================================
@@ -51,24 +39,32 @@ function toCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
 }
 
-function objectToSnake(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
+function objectToSnake(obj: JsonObject): JsonObject {
+  const result: JsonObject = {}
   for (const [k, v] of Object.entries(obj)) {
     result[toSnake(k)] = v
   }
   return result
 }
 
-function objectToCamel(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
+function objectToCamel(obj: JsonObject): JsonObject {
+  const result: JsonObject = {}
   for (const [k, v] of Object.entries(obj)) {
     result[toCamel(k)] = v
   }
   return result
 }
 
-function rowsToCamel<T>(rows: Record<string, unknown>[]): T[] {
-  return rows.map((r) => objectToCamel(r) as T)
+function toDbPayload(value: unknown): JsonObject {
+  return objectToSnake(value as JsonObject)
+}
+
+function rowToCamel<T>(row: unknown): T {
+  return objectToCamel(row as JsonObject) as unknown as T
+}
+
+function rowsToCamel<T>(rows: unknown[]): T[] {
+  return rows.map((row) => rowToCamel<T>(row))
 }
 
 // ============================================================
@@ -84,19 +80,19 @@ export async function getCompanies(): Promise<Company[]> {
 export async function getCompany(id: string): Promise<Company | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('companies').select('*').eq('id', id).single()
-  if (error) return undefined
-  return objectToCamel(data) as Company
+  if (error || !data) return undefined
+  return rowToCamel<Company>(data)
 }
 
 export async function createCompany(company: Company): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('companies').insert(objectToSnake(company as unknown as Record<string, unknown>))
+  const { error } = await sb.from('companies').insert(toDbPayload(company))
   if (error) console.error('createCompany error:', error)
 }
 
 export async function updateCompany(id: string, updates: Partial<Company>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('companies').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('companies').update(toDbPayload(updates)).eq('id', id)
   if (error) console.error('updateCompany error:', error)
 }
 
@@ -138,19 +134,19 @@ export async function getCompanyUserByEmail(email: string): Promise<CompanyUser 
     .select('*')
     .ilike('email', email)
     .single()
-  if (error) return undefined
-  return objectToCamel(data) as CompanyUser
+  if (error || !data) return undefined
+  return rowToCamel<CompanyUser>(data)
 }
 
 export async function createCompanyUser(user: CompanyUser): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('company_users').insert(objectToSnake(user as unknown as Record<string, unknown>))
+  const { error } = await sb.from('company_users').insert(toDbPayload(user))
   if (error) console.error('createCompanyUser error:', error)
 }
 
 export async function updateCompanyUser(id: string, updates: Partial<CompanyUser>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('company_users').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('company_users').update(toDbPayload(updates)).eq('id', id)
   if (error) console.error('updateCompanyUser error:', error)
 }
 
@@ -175,19 +171,19 @@ export async function getPolicies(companyId?: string): Promise<Policy[]> {
 export async function getPolicy(id: string): Promise<Policy | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('policies').select('*').eq('id', id).single()
-  if (error) return undefined
-  return objectToCamel(data) as Policy
+  if (error || !data) return undefined
+  return rowToCamel<Policy>(data)
 }
 
 export async function createPolicy(policy: Policy): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('policies').insert(objectToSnake(policy as unknown as Record<string, unknown>))
+  const { error } = await sb.from('policies').insert(toDbPayload(policy))
   if (error) console.error('createPolicy error:', error)
 }
 
 export async function updatePolicy(id: string, updates: Partial<Policy>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('policies').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('policies').update(toDbPayload(updates)).eq('id', id)
   if (error) console.error('updatePolicy error:', error)
 }
 
@@ -212,19 +208,19 @@ export async function getClaims(companyId?: string): Promise<Claim[]> {
 export async function getClaim(id: string): Promise<Claim | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('claims').select('*').eq('id', id).single()
-  if (error) return undefined
-  return objectToCamel(data) as Claim
+  if (error || !data) return undefined
+  return rowToCamel<Claim>(data)
 }
 
 export async function createClaim(claim: Claim): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('claims').insert(objectToSnake(claim as unknown as Record<string, unknown>))
+  const { error } = await sb.from('claims').insert(toDbPayload(claim))
   if (error) console.error('createClaim error:', error)
 }
 
 export async function updateClaim(id: string, updates: Partial<Claim>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('claims').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('claims').update(toDbPayload(updates)).eq('id', id)
   if (error) console.error('updateClaim error:', error)
 }
 
@@ -242,13 +238,13 @@ export async function getDocuments(companyId?: string): Promise<Document[]> {
 
 export async function createDocument(doc: Document): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('documents').insert(objectToSnake(doc as unknown as Record<string, unknown>))
+  const { error } = await sb.from('documents').insert(toDbPayload(doc))
   if (error) console.error('createDocument error:', error)
 }
 
 export async function updateDocument(id: string, updates: Partial<Document>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('documents').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('documents').update(toDbPayload(updates)).eq('id', id)
   if (error) console.error('updateDocument error:', error)
 }
 
@@ -302,7 +298,7 @@ export async function getRiskReports(companyId?: string): Promise<RiskReport[]> 
 
 export async function createRiskReport(report: RiskReport): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('risk_reports').insert(objectToSnake(report as unknown as Record<string, unknown>))
+  const { error } = await sb.from('risk_reports').insert(toDbPayload(report))
   if (error) console.error('createRiskReport error:', error)
 }
 
@@ -318,7 +314,7 @@ export async function getApiConnections(): Promise<ApiConnection[]> {
 
 export async function updateApiConnection(id: string, updates: Partial<ApiConnection>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('api_connections').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('api_connections').update(toDbPayload(updates)).eq('id', id)
   if (error) console.error('updateApiConnection error:', error)
 }
 
@@ -336,7 +332,7 @@ export async function getUserMetricEvents(companyId?: string): Promise<UserMetri
 
 export async function createUserMetricEvent(event: UserMetricEvent): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('user_metric_events').insert(objectToSnake(event as unknown as Record<string, unknown>))
+  const { error } = await sb.from('user_metric_events').insert(toDbPayload(event))
   if (error) console.error('createUserMetricEvent error:', error)
 }
 
@@ -354,18 +350,20 @@ export async function createIndividualClient(client: Omit<IndividualClient, 'id'
   const sb = getSupabaseAdmin()
   const { data, error } = await sb
     .from('individual_clients')
-    .insert(objectToSnake(client as unknown as Record<string, unknown>))
+    .insert(toDbPayload(client))
     .select('id')
     .single()
   if (error) throw error
-  return { id: data.id }
+  const idValue = data && typeof data === 'object' && 'id' in data ? (data as { id?: unknown }).id : undefined
+  if (typeof idValue !== 'string') throw new Error('Invalid individual_clients insert response')
+  return { id: idValue }
 }
 
 export async function updateIndividualClient(id: string, updates: Partial<IndividualClient>): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb
     .from('individual_clients')
-    .update(objectToSnake(updates as Record<string, unknown>))
+    .update(toDbPayload(updates))
     .eq('id', id)
   if (error) console.error('updateIndividualClient error:', error)
 }
@@ -388,13 +386,13 @@ export async function getSocialPosts(): Promise<SocialPost[]> {
 
 export async function createSocialPost(post: SocialPost): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('social_posts').insert(objectToSnake(post as unknown as Record<string, unknown>))
+  const { error } = await sb.from('social_posts').insert(toDbPayload(post))
   if (error) console.error('createSocialPost error:', error)
 }
 
 export async function updateSocialPost(id: string, updates: Partial<SocialPost>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('social_posts').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('social_posts').update(toDbPayload(updates)).eq('id', id)
   if (error) console.error('updateSocialPost error:', error)
 }
 
