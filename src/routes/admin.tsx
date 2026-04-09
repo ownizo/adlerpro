@@ -26,6 +26,7 @@ import {
   adminUpdateSocialPost,
   adminDeleteSocialPost,
   adminGenerateSocialContent,
+  fetchAdminFinancialDashboard,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type {
@@ -38,6 +39,7 @@ import type {
   ApiConnection,
   IndividualClient,
   SocialPost,
+  AdminFinancialDashboardData,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef } from 'react'
@@ -908,15 +910,147 @@ function AdminDashboardTab({
   const openClaims = claims.filter((c) => c.status !== 'paid' && c.status !== 'denied')
   const connectedApis = apiConnections.filter((a) => a.status === 'connected').length
   const scheduledPosts = socialPosts.filter((p) => p.status === 'scheduled').length
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getUTCFullYear())
+  const [selectedMonth, setSelectedMonth] = useState<string>('')
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
+  const [selectedInsurer, setSelectedInsurer] = useState<string>('')
+  const [financialData, setFinancialData] = useState<AdminFinancialDashboardData | null>(null)
+  const [financialLoading, setFinancialLoading] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    setFinancialLoading(true)
+    fetchAdminFinancialDashboard({
+      data: {
+        year: selectedYear,
+        month: selectedMonth ? Number(selectedMonth) : undefined,
+        companyId: selectedCompanyId || undefined,
+        insurer: selectedInsurer || undefined,
+      },
+    })
+      .then((result) => {
+        if (!active) return
+        setFinancialData(result)
+      })
+      .catch((error) => {
+        console.error('[AdminDashboardTab] fetchAdminFinancialDashboard error:', error)
+        if (!active) return
+        setFinancialData(null)
+      })
+      .finally(() => {
+        if (!active) return
+        setFinancialLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [selectedYear, selectedMonth, selectedCompanyId, selectedInsurer])
+
+  const monthSelectOptions = [
+    { value: '', label: 'Ano completo' },
+    { value: '1', label: 'Janeiro' },
+    { value: '2', label: 'Fevereiro' },
+    { value: '3', label: 'Março' },
+    { value: '4', label: 'Abril' },
+    { value: '5', label: 'Maio' },
+    { value: '6', label: 'Junho' },
+    { value: '7', label: 'Julho' },
+    { value: '8', label: 'Agosto' },
+    { value: '9', label: 'Setembro' },
+    { value: '10', label: 'Outubro' },
+    { value: '11', label: 'Novembro' },
+    { value: '12', label: 'Dezembro' },
+  ]
 
   return (
     <div>
       <h2 className="text-lg font-semibold text-navy-700 mb-4">Dashboard Administração</h2>
+      <div className="bg-white rounded-[4px] border border-navy-200 p-4 mb-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <label className="text-sm text-navy-600">
+            <span className="block text-xs uppercase tracking-wide text-navy-500 mb-1">Ano</span>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+            >
+              {(financialData?.availableFilters.years ?? [selectedYear]).map((year) => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-navy-600">
+            <span className="block text-xs uppercase tracking-wide text-navy-500 mb-1">Mês</span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+            >
+              {monthSelectOptions.map((monthOption) => (
+                <option key={monthOption.value || 'all'} value={monthOption.value}>{monthOption.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-navy-600">
+            <span className="block text-xs uppercase tracking-wide text-navy-500 mb-1">Empresa</span>
+            <select
+              value={selectedCompanyId}
+              onChange={(e) => setSelectedCompanyId(e.target.value)}
+              className="w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+            >
+              <option value="">Todas</option>
+              {companies.map((company) => (
+                <option key={company.id} value={company.id}>{company.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="text-sm text-navy-600">
+            <span className="block text-xs uppercase tracking-wide text-navy-500 mb-1">Seguradora</span>
+            <select
+              value={selectedInsurer}
+              onChange={(e) => setSelectedInsurer(e.target.value)}
+              className="w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+            >
+              <option value="">Todas</option>
+              {(financialData?.availableFilters.insurers ?? []).map((insurer) => (
+                <option key={insurer} value={insurer}>{insurer}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
+
       <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <MetricCard label="Empresas" value={companies.length} help={`${companyUsers.length} utilizadores`} />
-        <MetricCard label="Clientes Individuais" value={individualClients.length} help={`${policies.length} apólices totais`} />
-        <MetricCard label="Sinistros Abertos" value={openClaims.length} help={`${claims.length} sinistros totais`} />
-        <MetricCard label="Ligações API Ativas" value={connectedApis} help={`${apiConnections.length} integrações mapeadas`} />
+        <MetricCard
+          label="Prémios Totais"
+          value={financialLoading || !financialData ? '...' : formatCurrency(financialData.summary.totalPremiums)}
+          help={selectedMonth ? 'Valor do mês selecionado' : 'Soma anual distribuída por fracionamento'}
+        />
+        <MetricCard
+          label="Comissões Totais"
+          value={financialLoading || !financialData ? '...' : formatCurrency(financialData.summary.totalCommissions)}
+          help={selectedMonth ? 'Comissão distribuída no mês' : 'Comissões distribuídas no ano'}
+        />
+        <MetricCard
+          label="Comissões Previstas"
+          value={financialLoading || !financialData ? '...' : formatCurrency(financialData.summary.projectedCommissions)}
+          help="Cashflow futuro com base no fracionamento"
+        />
+        <MetricCard
+          label="Apólices Ativas"
+          value={financialLoading || !financialData ? '...' : financialData.summary.activePolicies}
+          help="Ativas no período de referência"
+        />
+      </div>
+
+      <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
+        <h3 className="text-sm font-semibold text-navy-700 mb-3">Prémios vs Comissões (linha temporal mensal)</h3>
+        {financialData ? (
+          <FinancialTimelineChart timeline={financialData.timeline} />
+        ) : (
+          <p className="text-sm text-navy-400">{financialLoading ? 'A calcular cashflow...' : 'Sem dados financeiros para os filtros selecionados.'}</p>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
@@ -935,6 +1069,12 @@ function AdminDashboardTab({
         <div className="bg-white rounded-[4px] border border-navy-200 p-5">
           <h3 className="text-sm font-semibold text-navy-700 mb-3">Resumo Operacional</h3>
           <div className="space-y-2 text-sm text-navy-600">
+            <p>Empresas registadas: <strong>{companies.length}</strong></p>
+            <p>Utilizadores empresariais: <strong>{companyUsers.length}</strong></p>
+            <p>Clientes individuais: <strong>{individualClients.length}</strong></p>
+            <p>Apólices totais: <strong>{policies.length}</strong></p>
+            <p>Sinistros em aberto: <strong>{openClaims.length}</strong></p>
+            <p>Ligações API ativas: <strong>{connectedApis}</strong> / {apiConnections.length}</p>
             <p>Documentos registados: <strong>{documents.length}</strong></p>
             <p>Posts sociais agendados: <strong>{scheduledPosts}</strong></p>
             <p>Posts sociais totais: <strong>{socialPosts.length}</strong></p>
@@ -945,12 +1085,88 @@ function AdminDashboardTab({
   )
 }
 
-function MetricCard({ label, value, help }: { label: string; value: number; help: string }) {
+function MetricCard({ label, value, help }: { label: string; value: number | string; help: string }) {
   return (
     <div className="bg-white rounded-[4px] border border-navy-200 p-5">
       <p className="text-xs uppercase tracking-wide text-navy-500">{label}</p>
       <p className="text-3xl font-bold text-navy-700 mt-2">{value}</p>
       <p className="text-xs text-navy-500 mt-2">{help}</p>
+    </div>
+  )
+}
+
+function FinancialTimelineChart({ timeline }: { timeline: AdminFinancialDashboardData['timeline'] }) {
+  if (timeline.length === 0) {
+    return <p className="text-sm text-navy-400">Sem movimentos financeiros para o período selecionado.</p>
+  }
+
+  const width = 960
+  const height = 280
+  const paddingLeft = 48
+  const paddingTop = 16
+  const paddingRight = 16
+  const paddingBottom = 34
+  const plotWidth = width - paddingLeft - paddingRight
+  const plotHeight = height - paddingTop - paddingBottom
+  const maxValue = Math.max(
+    1,
+    ...timeline.map((point) => point.premiums),
+    ...timeline.map((point) => point.commissions),
+  )
+
+  const x = (index: number) => (
+    paddingLeft + (index * plotWidth) / Math.max(timeline.length - 1, 1)
+  )
+  const y = (value: number) => (
+    paddingTop + plotHeight - (value / maxValue) * plotHeight
+  )
+  const premiumPath = timeline.map((point, index) => `${x(index)},${y(point.premiums)}`).join(' ')
+  const commissionPath = timeline.map((point, index) => `${x(index)},${y(point.commissions)}`).join(' ')
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-5 text-xs text-navy-500 mb-3">
+        <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-navy-700 inline-block" /> Prémios</span>
+        <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-gold-400 inline-block" /> Comissões</span>
+      </div>
+      <div className="overflow-x-auto">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[760px]" role="img" aria-label="Gráfico mensal de prémios e comissões">
+          {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+            const yPos = paddingTop + plotHeight * fraction
+            return (
+              <line
+                key={`grid-${fraction}`}
+                x1={paddingLeft}
+                y1={yPos}
+                x2={width - paddingRight}
+                y2={yPos}
+                stroke="#E5E7EB"
+                strokeWidth="1"
+              />
+            )
+          })}
+          <polyline fill="none" stroke="#0B1E3A" strokeWidth="3" points={premiumPath} />
+          <polyline fill="none" stroke="#C8961A" strokeWidth="3" points={commissionPath} />
+          {timeline.map((point, index) => (
+            <g key={point.monthKey}>
+              <circle cx={x(index)} cy={y(point.premiums)} r="3.5" fill="#0B1E3A" />
+              <circle cx={x(index)} cy={y(point.commissions)} r="3.5" fill="#C8961A" />
+              <text x={x(index)} y={height - 10} textAnchor="middle" fontSize="10" fill="#6B7280">
+                {point.label}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 mt-3">
+        {timeline.map((point) => (
+          <div key={`${point.monthKey}_kpi`} className="bg-navy-50 rounded px-3 py-2 text-xs text-navy-600">
+            <p className="font-semibold text-navy-700">{point.label}</p>
+            <p>Prémios: {formatCurrency(point.premiums)}</p>
+            <p>Comissões: {formatCurrency(point.commissions)}</p>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
@@ -1275,6 +1491,7 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
   const [clientType, setClientType] = useState<'company' | 'individual'>('company')
   const [form, setForm] = useState({
     companyId: '', individualClientId: '', type: '', insurer: '', policyNumber: '', description: '', startDate: '', endDate: '', annualPremium: '', insuredValue: '',
+    paymentFrequency: 'anual', commissionPercentage: '', commissionValue: '',
   })
   const [submitting, setSubmitting] = useState(false)
 
@@ -1289,6 +1506,9 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
       individualClientId: clientType === 'individual' ? form.individualClientId : undefined,
       annualPremium: Number(form.annualPremium),
       insuredValue: Number(form.insuredValue),
+      paymentFrequency: form.paymentFrequency || undefined,
+      commissionPercentage: form.commissionPercentage ? Number(form.commissionPercentage) : undefined,
+      commissionValue: form.commissionValue ? Number(form.commissionValue) : undefined,
     })
     setSubmitting(false)
   }
@@ -1346,6 +1566,21 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
         <FormField label="Data Fim" value={form.endDate} onChange={(v) => update('endDate', v)} type="date" required />
         <FormField label="Prémio Anual (EUR)" value={form.annualPremium} onChange={(v) => update('annualPremium', v)} type="number" required />
         <FormField label="Capital Segurado (EUR)" value={form.insuredValue} onChange={(v) => update('insuredValue', v)} type="number" required />
+        <div>
+          <label className="block text-sm font-medium text-navy-600 mb-1">Fracionamento</label>
+          <select
+            value={form.paymentFrequency}
+            onChange={(e) => update('paymentFrequency', e.target.value)}
+            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+          >
+            <option value="mensal">Mensal</option>
+            <option value="trimestral">Trimestral</option>
+            <option value="semestral">Semestral</option>
+            <option value="anual">Anual</option>
+          </select>
+        </div>
+        <FormField label="Comissão (%)" value={form.commissionPercentage} onChange={(v) => update('commissionPercentage', v)} type="number" />
+        <FormField label="Comissão (€)" value={form.commissionValue} onChange={(v) => update('commissionValue', v)} type="number" />
         <div className="sm:col-span-2">
           <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 text-sm">
             {submitting ? 'A criar...' : 'Criar Apólice'}

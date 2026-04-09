@@ -186,6 +186,41 @@ export interface DashboardStats {
   openClaims: number
 }
 
+export interface AdminFinancialFilters {
+  year: number
+  month?: number
+  companyId?: string
+  insurer?: string
+}
+
+export interface AdminFinancialTimelinePoint {
+  month: number
+  monthKey: string
+  label: string
+  premiums: number
+  commissions: number
+}
+
+export interface AdminFinancialDashboardData {
+  summary: {
+    totalPremiums: number
+    totalCommissions: number
+    projectedCommissions: number
+    activePolicies: number
+  }
+  timeline: AdminFinancialTimelinePoint[]
+  availableFilters: {
+    years: number[]
+    insurers: string[]
+  }
+  appliedFilters: {
+    year: number
+    month?: number
+    companyId?: string
+    insurer?: string
+  }
+}
+
 export interface RiskReport {
   id: string
   companyId: string

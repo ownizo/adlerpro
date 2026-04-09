@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
-import type { DashboardStats } from './types'
+import type { DashboardStats, AdminFinancialDashboardData } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
 
@@ -384,6 +384,177 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
     }
   })
 
+function normalizePaymentFrequency(value?: string): 'monthly' | 'quarterly' | 'semiannual' | 'annual' {
+  const normalized = (value ?? '').trim().toLowerCase()
+  if (!normalized) return 'annual'
+  if (normalized.includes('mens')) return 'monthly'
+  if (normalized.includes('trim')) return 'quarterly'
+  if (normalized.includes('semes')) return 'semiannual'
+  if (normalized.includes('quarter')) return 'quarterly'
+  if (normalized.includes('semi')) return 'semiannual'
+  if (normalized.includes('month')) return 'monthly'
+  return 'annual'
+}
+
+function getDistributionRule(frequency: 'monthly' | 'quarterly' | 'semiannual' | 'annual') {
+  if (frequency === 'monthly') return { periods: 12, stepMonths: 1 }
+  if (frequency === 'quarterly') return { periods: 4, stepMonths: 3 }
+  if (frequency === 'semiannual') return { periods: 2, stepMonths: 6 }
+  return { periods: 1, stepMonths: 12 }
+}
+
+function splitCents(totalCents: number, parts: number): number[] {
+  const safeParts = Math.max(parts, 1)
+  const base = Math.floor(totalCents / safeParts)
+  const remainder = totalCents % safeParts
+  return Array.from({ length: safeParts }, (_, index) => base + (index < remainder ? 1 : 0))
+}
+
+function parseDateToUtc(dateStr?: string): Date | null {
+  if (!dateStr) return null
+  const [year, month, day] = dateStr.split('-').map((part) => Number(part))
+  if (!year || !month || !day) return null
+  return new Date(Date.UTC(year, month - 1, day))
+}
+
+function addMonthsUtc(baseDate: Date, months: number): Date {
+  return new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth() + months, 1))
+}
+
+function monthKeyFromDate(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+function isPolicyActiveInMonth(policy: { startDate: string; endDate: string; status: string }, year: number, month: number): boolean {
+  if (!['active', 'expiring'].includes(policy.status)) return false
+  const policyStart = parseDateToUtc(policy.startDate)
+  const policyEnd = parseDateToUtc(policy.endDate)
+  if (!policyStart || !policyEnd) return true
+  const monthStart = new Date(Date.UTC(year, month - 1, 1))
+  const monthEnd = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999))
+  return policyStart <= monthEnd && policyEnd >= monthStart
+}
+
+export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { year?: number; month?: number; companyId?: string; insurer?: string }) => d)
+  .handler(async ({ data }): Promise<AdminFinancialDashboardData> => {
+    const policies = await db.getPolicies()
+    const now = new Date()
+    const selectedYear = data.year && Number.isFinite(data.year) ? data.year : now.getUTCFullYear()
+    const selectedMonth = data.month && data.month >= 1 && data.month <= 12 ? data.month : undefined
+    const selectedCompanyId = data.companyId?.trim() || undefined
+    const selectedInsurer = data.insurer?.trim().toLowerCase() || undefined
+
+    const yearSet = new Set<number>([now.getUTCFullYear()])
+    const insurerSet = new Set<string>()
+
+    for (const policy of policies) {
+      const start = parseDateToUtc(policy.startDate)
+      const end = parseDateToUtc(policy.endDate)
+      if (start) yearSet.add(start.getUTCFullYear())
+      if (end) yearSet.add(end.getUTCFullYear())
+      if (policy.insurer?.trim()) insurerSet.add(policy.insurer.trim())
+    }
+
+    const monthFormatter = new Intl.DateTimeFormat('pt-PT', { month: 'short' })
+    const timeline = Array.from({ length: 12 }, (_, index) => {
+      const month = index + 1
+      const date = new Date(Date.UTC(selectedYear, index, 1))
+      return {
+        month,
+        monthKey: `${selectedYear}-${String(month).padStart(2, '0')}`,
+        label: monthFormatter.format(date).replace('.', ''),
+        premiumsCents: 0,
+        commissionsCents: 0,
+      }
+    })
+    const timelineByKey = new Map(timeline.map((point) => [point.monthKey, point]))
+
+    const filteredPolicies = policies.filter((policy) => {
+      if (selectedCompanyId && policy.companyId !== selectedCompanyId) return false
+      if (selectedInsurer && policy.insurer.trim().toLowerCase() !== selectedInsurer) return false
+      return true
+    })
+
+    for (const policy of filteredPolicies) {
+      const start = parseDateToUtc(policy.startDate)
+      if (!start) continue
+
+      const premiumCents = Math.round((policy.annualPremium || 0) * 100)
+      const commissionSource =
+        typeof policy.commissionValue === 'number' && Number.isFinite(policy.commissionValue)
+          ? policy.commissionValue
+          : typeof policy.commissionPercentage === 'number' && Number.isFinite(policy.commissionPercentage)
+            ? ((policy.annualPremium || 0) * policy.commissionPercentage) / 100
+            : 0
+      const commissionCents = Math.round(commissionSource * 100)
+      const frequency = normalizePaymentFrequency(policy.paymentFrequency)
+      const { periods, stepMonths } = getDistributionRule(frequency)
+      const premiumSlices = splitCents(premiumCents, periods)
+      const commissionSlices = splitCents(commissionCents, periods)
+
+      for (let periodIndex = 0; periodIndex < periods; periodIndex += 1) {
+        const periodDate = addMonthsUtc(start, periodIndex * stepMonths)
+        const key = monthKeyFromDate(periodDate)
+        const point = timelineByKey.get(key)
+        if (!point) continue
+        point.premiumsCents += premiumSlices[periodIndex] ?? 0
+        point.commissionsCents += commissionSlices[periodIndex] ?? 0
+      }
+    }
+
+    const referenceMonth = selectedMonth
+      ?? (selectedYear < now.getUTCFullYear() ? 12 : selectedYear > now.getUTCFullYear() ? 1 : now.getUTCMonth() + 1)
+
+    const activePolicies = filteredPolicies.filter((policy) =>
+      isPolicyActiveInMonth(policy, selectedYear, referenceMonth)
+    ).length
+
+    const totalPremiumsCents = selectedMonth
+      ? timeline[selectedMonth - 1]?.premiumsCents ?? 0
+      : timeline.reduce((sum, point) => sum + point.premiumsCents, 0)
+    const totalCommissionsCents = selectedMonth
+      ? timeline[selectedMonth - 1]?.commissionsCents ?? 0
+      : timeline.reduce((sum, point) => sum + point.commissionsCents, 0)
+
+    const projectionStartMonth =
+      selectedMonth
+      ?? (selectedYear > now.getUTCFullYear() ? 1 : selectedYear < now.getUTCFullYear() ? 13 : now.getUTCMonth() + 1)
+    const projectedCommissionsCents =
+      projectionStartMonth > 12
+        ? 0
+        : timeline
+            .filter((point) => point.month >= projectionStartMonth)
+            .reduce((sum, point) => sum + point.commissionsCents, 0)
+
+    return {
+      summary: {
+        totalPremiums: totalPremiumsCents / 100,
+        totalCommissions: totalCommissionsCents / 100,
+        projectedCommissions: projectedCommissionsCents / 100,
+        activePolicies,
+      },
+      timeline: timeline.map((point) => ({
+        month: point.month,
+        monthKey: point.monthKey,
+        label: point.label,
+        premiums: point.premiumsCents / 100,
+        commissions: point.commissionsCents / 100,
+      })),
+      availableFilters: {
+        years: Array.from(yearSet).sort((a, b) => b - a),
+        insurers: Array.from(insurerSet).sort((a, b) => a.localeCompare(b)),
+      },
+      appliedFilters: {
+        year: selectedYear,
+        month: selectedMonth,
+        companyId: selectedCompanyId,
+        insurer: selectedInsurer,
+      },
+    }
+  })
+
 // Admin functions
 export const adminCreatePolicy = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
@@ -399,6 +570,9 @@ export const adminCreatePolicy = createServerFn({ method: 'POST' })
       endDate: string
       annualPremium: number
       insuredValue: number
+      paymentFrequency?: string
+      commissionPercentage?: number
+      commissionValue?: number
     }) => d
   )
   .handler(async ({ data }) => {
@@ -406,7 +580,7 @@ export const adminCreatePolicy = createServerFn({ method: 'POST' })
     await db.createPolicy({
       id,
       ...data,
-      companyId: data.companyId || undefined,
+      companyId: data.companyId || '',
       individualClientId: data.individualClientId || undefined,
       type: data.type as any,
       status: 'active',
