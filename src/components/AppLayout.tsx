@@ -54,7 +54,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [adminSectionOpen, setAdminSectionOpen] = useState(true)
   const [lang, setLangState] = useState<LangCode>((i18n.language as LangCode) ?? 'pt')
   const isAdmin = user?.roles?.includes('admin')
-  const isAdminRoute = location.pathname === '/admin'
+  const isAdminRoute = location.pathname.startsWith('/admin')
 
   const primaryItems = isAdmin
     ? NAV_ITEMS.filter((item) => item.to === '/dashboard' || item.to === '/profile')
@@ -163,6 +163,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       {t(item.key)}
                     </Link>
                   ))}
+                  <Link
+                    to="/admin-claims"
+                    className={cn('flex items-center px-3 py-2 text-sm font-medium transition-colors', '[&.active]:text-primary [&.active]:bg-[#f8f8f8]')}
+                    style={{ fontFamily: font, color: '#666666', borderRadius: '2px' }}
+                    activeProps={{ className: 'active' }}
+                    onClick={() => setSidebarOpen(false)}
+                  >
+                    Sinistros Operacional
+                  </Link>
                 </div>
               )}
             </>

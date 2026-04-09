@@ -104,6 +104,7 @@ export interface Claim {
   status: ClaimStatus
   steps: ClaimStep[]
   createdAt: string
+  assignedTo?: string
 }
 
 export type ClaimStatus =
@@ -140,6 +141,39 @@ export interface ClaimStep {
   notes?: string
 }
 
+export interface ClaimInternalNote {
+  id: string
+  claimId: string
+  body: string
+  createdBy: string
+  createdAt: string
+  updatedAt?: string
+}
+
+export type ClaimTimelineEventType =
+  | 'status_change'
+  | 'upload'
+  | 'assignment'
+  | 'note_created'
+  | 'note_updated'
+  | 'team_action'
+
+export interface ClaimTimelineEvent {
+  id: string
+  claimId: string
+  type: ClaimTimelineEventType
+  title: string
+  details?: string
+  createdBy: string
+  createdAt: string
+  meta?: Record<string, string | number | boolean | null>
+}
+
+export interface ClaimAssigneeOption {
+  id: string
+  label: string
+}
+
 export interface Document {
   id: string
   companyId: string
@@ -150,6 +184,27 @@ export interface Document {
   uploadedAt: string
   blobKey: string
   policyId?: string
+  claimId?: string
+}
+
+export interface AdminClaimListItem {
+  claim: Claim
+  clientName: string
+  companyName: string
+  policy?: Policy
+  assigneeLabel?: string
+}
+
+export interface AdminClaimDetail {
+  claim: Claim
+  clientName: string
+  companyName: string
+  policy?: Policy
+  documents: Document[]
+  internalNotes: ClaimInternalNote[]
+  timeline: ClaimTimelineEvent[]
+  assigneeOptions: ClaimAssigneeOption[]
+  assigneeLabel?: string
 }
 
 export type DocumentCategory =
