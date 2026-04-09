@@ -77,11 +77,11 @@ function isMissingColumnError(error: unknown, column: string): boolean {
 }
 
 function normalizePolicyStorage<T extends Partial<Policy>>(policy: T): T {
-  const storagePath = policy.storagePath ?? policy.documentKey
+  const storagePath = policy.storagePath
+  const { documentKey: _legacyDocumentKey, ...policyWithoutLegacyKey } = policy
   return {
-    ...policy,
+    ...policyWithoutLegacyKey,
     ...(storagePath ? { storagePath } : {}),
-    ...(policy.documentKey || storagePath ? { documentKey: policy.documentKey ?? storagePath } : {}),
   } as T
 }
 
@@ -232,13 +232,6 @@ export async function updatePolicy(id: string, updates: Partial<Policy>, company
   if (error && isMissingColumnError(error, 'storage_path')) {
     const { storage_path: _ignored, ...legacyPayload } = payload
     let fallbackQuery = sb.from('policies').update(legacyPayload).eq('id', id)
-    if (companyId) fallbackQuery = fallbackQuery.eq('company_id', companyId)
-    const fallbackResult = await fallbackQuery.select('id')
-    data = fallbackResult.data
-    error = fallbackResult.error
-  } else if (error && isMissingColumnError(error, 'document_key')) {
-    const { document_key: _ignored, ...modernPayload } = payload
-    let fallbackQuery = sb.from('policies').update(modernPayload).eq('id', id)
     if (companyId) fallbackQuery = fallbackQuery.eq('company_id', companyId)
     const fallbackResult = await fallbackQuery.select('id')
     data = fallbackResult.data
