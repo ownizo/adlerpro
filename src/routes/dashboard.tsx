@@ -1,13 +1,14 @@
-import { createFileRoute, Navigate, Link } from '@tanstack/react-router'
+import { createFileRoute, Navigate, Link, useNavigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { OnboardingBanner } from '@/components/OnboardingBanner'
-import { fetchDashboardAll } from '@/lib/server-fns'
+import { fetchDashboardAll, markAlertAsRead } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { DashboardStats, Alert, Policy } from '@/lib/types'
 import { POLICY_TYPE_LABELS } from '@/lib/types'
 import { useState, useEffect, useMemo } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { useTranslation } from 'react-i18next'
+import { getAlertDestination } from '@/lib/alert-routing'
 
 export const Route = createFileRoute('/dashboard')({
   component: DashboardPage,
@@ -38,6 +39,7 @@ function daysUntil(dateStr: string): number {
 function DashboardPage() {
   const { user, ready } = useIdentity()
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
@@ -117,6 +119,56 @@ function DashboardPage() {
       borderColor: '#BBF7D0',
     }
   }, [renewalAlerts, policies])
+
+  const tasks = useMemo(() => {
+    const policiesWithoutDocument = policies.filter((policy) => !policy.documentKey)
+    const openClaims = stats?.openClaims ?? 0
+
+    return [
+      {
+        key: 'renewals',
+        label: t('dashboard.taskRenewals'),
+        value: renewalAlerts.length,
+        description: renewalAlerts.length > 0
+          ? t('dashboard.taskRenewalsDescPending', { count: renewalAlerts.length })
+          : t('dashboard.taskRenewalsDescEmpty'),
+        to: '/policies',
+        tone: renewalAlerts.length > 0 ? '#F59E0B' : '#16A34A',
+      },
+      {
+        key: 'documents',
+        label: t('dashboard.taskDocuments'),
+        value: policiesWithoutDocument.length,
+        description: policiesWithoutDocument.length > 0
+          ? t('dashboard.taskDocumentsDescPending', { count: policiesWithoutDocument.length })
+          : t('dashboard.taskDocumentsDescEmpty'),
+        to: '/policies',
+        tone: policiesWithoutDocument.length > 0 ? '#3B82F6' : '#16A34A',
+      },
+      {
+        key: 'claims',
+        label: t('dashboard.taskClaims'),
+        value: openClaims,
+        description: openClaims > 0
+          ? t('dashboard.taskClaimsDescPending', { count: openClaims })
+          : t('dashboard.taskClaimsDescEmpty'),
+        to: '/claims',
+        tone: openClaims > 0 ? '#EF4444' : '#16A34A',
+      },
+    ]
+  }, [policies, renewalAlerts.length, stats?.openClaims, t])
+
+  const handleAlertClick = async (alert: Alert) => {
+    if (!alert.read) {
+      try {
+        await markAlertAsRead({ data: alert.id })
+        setAlerts((current) => current.map((item) => (item.id === alert.id ? { ...item, read: true } : item)))
+      } catch {
+        // navigation should continue even if read status update fails
+      }
+    }
+    navigate({ to: getAlertDestination(alert.type) as any })
+  }
 
   if (!ready) {
     return (
@@ -201,6 +253,43 @@ function DashboardPage() {
               >
                 {nextAction.linkLabel}
               </Link>
+            </div>
+
+            <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', padding: '1rem 1.25rem', marginBottom: '1.5rem' }}>
+              <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.88rem', color: '#111111', margin: '0 0 0.8rem' }}>
+                {t('dashboard.attentionTitle')}
+              </h2>
+              <div style={{ display: 'grid', gap: '0.6rem' }}>
+                {tasks.map((task) => (
+                  <Link
+                    key={task.key}
+                    to={task.to as any}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '1rem',
+                      padding: '0.7rem 0.8rem',
+                      textDecoration: 'none',
+                      border: '1px solid #f3f3f3',
+                      borderRadius: '4px',
+                      background: '#fcfcfc',
+                    }}
+                  >
+                    <div style={{ minWidth: 0 }}>
+                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.78rem', color: '#111111', margin: 0 }}>
+                        {task.label}
+                      </p>
+                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 400, fontSize: '0.72rem', color: '#777777', margin: '0.18rem 0 0' }}>
+                        {task.description}
+                      </p>
+                    </div>
+                    <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.8rem', color: task.tone, flexShrink: 0 }}>
+                      {task.value}
+                    </span>
+                  </Link>
+                ))}
+              </div>
             </div>
 
             <div className="grid lg:grid-cols-3 gap-6">
@@ -403,12 +492,20 @@ function DashboardPage() {
                     </div>
                   ) : (
                     alerts.map((alert) => (
-                      <div
+                      <button
                         key={alert.id}
+                        type="button"
+                        onClick={() => handleAlertClick(alert)}
                         style={{
+                          width: '100%',
+                          textAlign: 'left',
                           padding: '0.75rem 1.25rem',
                           borderBottom: '1px solid #f5f5f5',
                           background: !alert.read ? '#fffdf5' : 'transparent',
+                          borderTop: 'none',
+                          borderLeft: 'none',
+                          borderRight: 'none',
+                          cursor: 'pointer',
                         }}
                       >
                         <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
@@ -428,7 +525,7 @@ function DashboardPage() {
                             <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#C8961A', flexShrink: 0, marginTop: '4px' }} />
                           )}
                         </div>
-                      </div>
+                      </button>
                     ))
                   )}
                 </div>

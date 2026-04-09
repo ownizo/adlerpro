@@ -120,7 +120,17 @@
     "compareQuotes": "Compare quotes →",
     "analyzeQuotes": "Analyse quotes →",
     "addPolicyLink": "Add policy →",
-    "perYear": "/year"
+    "perYear": "/year",
+    "attentionTitle": "What needs your attention",
+    "taskRenewals": "Renewals",
+    "taskRenewalsDescPending": "{{count}} policy(ies) renewing within 90 days.",
+    "taskRenewalsDescEmpty": "No pending renewals.",
+    "taskDocuments": "Documents",
+    "taskDocumentsDescPending": "{{count}} policy(ies) without an attached document.",
+    "taskDocumentsDescEmpty": "Core documentation is up to date.",
+    "taskClaims": "Claims",
+    "taskClaimsDescPending": "{{count}} open claim(s).",
+    "taskClaimsDescEmpty": "No open claims."
   },
   "policies": {
     "title": "Policy Portfolio",
