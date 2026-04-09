@@ -58,8 +58,6 @@ export interface Policy {
   status: 'active' | 'expiring' | 'expired' | 'cancelled'
   createdAt: string
   storagePath?: string
-  // Compatibilidade com dados legados durante migração
-  documentKey?: string
   deductible?: number
   coverages?: string[]
   exclusions?: string[]
@@ -151,8 +149,6 @@ export interface Document {
   uploadedBy: string
   uploadedAt: string
   storagePath: string
-  // Compatibilidade com dados legados durante migração
-  blobKey?: string
   policyId?: string
 }
 

@@ -72,19 +72,11 @@ function rowsToCamel<T>(rows: Record<string, unknown>[]): T[] {
 }
 
 function normalizePolicyStorage<T extends Partial<Policy>>(policy: T): T {
-  const { documentKey: _legacyDocumentKey, ...normalizedPolicy } = policy as Partial<Policy>
-  return {
-    ...normalizedPolicy,
-    ...(normalizedPolicy.storagePath ? { storagePath: normalizedPolicy.storagePath } : {}),
-  } as T
+  return policy
 }
 
 function normalizeDocumentStorage<T extends Partial<Document>>(doc: T): T {
-  const { blobKey: _legacyBlobKey, ...normalizedDocument } = doc as Partial<Document>
-  return {
-    ...normalizedDocument,
-    ...(normalizedDocument.storagePath ? { storagePath: normalizedDocument.storagePath } : {}),
-  } as T
+  return doc
 }
 
 // ============================================================

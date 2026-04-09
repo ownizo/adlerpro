@@ -18,7 +18,7 @@ interface Document {
   category: string
   size: number
   uploaded_at: string
-  storagePath?: string
+  storagePath: string
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -85,14 +85,11 @@ function OneDocuments() {
       if (clientId) {
         const { data, error: dErr } = await supabase
           .from('documents')
-          .select('*')
+          .select('id,name,category,size,uploaded_at,storagePath:storage_path')
           .eq('individual_client_id', clientId)
           .order('uploaded_at', { ascending: false })
         if (dErr) throw dErr
-        setDocuments((data ?? []).map((doc: any) => ({
-          ...doc,
-          storagePath: doc.storage_path,
-        })))
+        setDocuments(data ?? [])
       }
     } catch (e: any) {
       setError('Erro ao carregar documentos.')
