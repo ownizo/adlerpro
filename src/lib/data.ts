@@ -22,7 +22,7 @@ import type {
 // Cliente Supabase (server-side — usa service_role key)
 // Singleton: criado uma vez e reutilizado em todas as chamadas
 // ============================================================
-let _sbAdmin: ReturnType<typeof createClient> | null = null
+let _sbAdmin: ReturnType<typeof createClient<any, any, any>> | null = null
 
 function getSupabaseAdmin() {
   if (_sbAdmin) return _sbAdmin
@@ -96,7 +96,7 @@ export async function getCompany(id: string): Promise<Company | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('companies').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as Company
+  return objectToCamel(data) as unknown as Company
 }
 
 export async function createCompany(company: Company): Promise<void> {
@@ -107,7 +107,7 @@ export async function createCompany(company: Company): Promise<void> {
 
 export async function updateCompany(id: string, updates: Partial<Company>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('companies').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('companies').update(objectToSnake(updates as unknown as Record<string, unknown>)).eq('id', id)
   if (error) console.error('updateCompany error:', error)
 }
 
@@ -150,7 +150,7 @@ export async function getCompanyUserByEmail(email: string): Promise<CompanyUser 
     .ilike('email', email)
     .single()
   if (error) return undefined
-  return objectToCamel(data) as CompanyUser
+  return objectToCamel(data) as unknown as CompanyUser
 }
 
 export async function createCompanyUser(user: CompanyUser): Promise<void> {
@@ -161,7 +161,7 @@ export async function createCompanyUser(user: CompanyUser): Promise<void> {
 
 export async function updateCompanyUser(id: string, updates: Partial<CompanyUser>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('company_users').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('company_users').update(objectToSnake(updates as unknown as Record<string, unknown>)).eq('id', id)
   if (error) console.error('updateCompanyUser error:', error)
 }
 
@@ -187,7 +187,7 @@ export async function getPolicy(id: string): Promise<Policy | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('policies').select('*').eq('id', id).single()
   if (error) return undefined
-  return normalizePolicyStorage(objectToCamel(data) as Policy)
+  return normalizePolicyStorage(objectToCamel(data) as unknown as Policy)
 }
 
 export async function createPolicy(policy: Policy): Promise<void> {
@@ -242,7 +242,7 @@ export async function getClaim(id: string): Promise<Claim | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('claims').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as Claim
+  return objectToCamel(data) as unknown as Claim
 }
 
 export async function createClaim(claim: Claim): Promise<void> {
@@ -253,7 +253,7 @@ export async function createClaim(claim: Claim): Promise<void> {
 
 export async function updateClaim(id: string, updates: Partial<Claim>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('claims').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('claims').update(objectToSnake(updates as unknown as Record<string, unknown>)).eq('id', id)
   if (error) console.error('updateClaim error:', error)
 }
 
@@ -310,7 +310,7 @@ export async function getAlert(id: string): Promise<Alert | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('alerts').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as Alert
+  return objectToCamel(data) as unknown as Alert
 }
 
 export async function markAlertRead(id: string): Promise<void> {
@@ -361,7 +361,7 @@ export async function getApiConnections(): Promise<ApiConnection[]> {
 
 export async function updateApiConnection(id: string, updates: Partial<ApiConnection>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('api_connections').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('api_connections').update(objectToSnake(updates as unknown as Record<string, unknown>)).eq('id', id)
   if (error) console.error('updateApiConnection error:', error)
 }
 
@@ -408,7 +408,7 @@ export async function updateIndividualClient(id: string, updates: Partial<Indivi
   const sb = getSupabaseAdmin()
   const { error } = await sb
     .from('individual_clients')
-    .update(objectToSnake(updates as Record<string, unknown>))
+    .update(objectToSnake(updates as unknown as Record<string, unknown>))
     .eq('id', id)
   if (error) console.error('updateIndividualClient error:', error)
 }
@@ -437,7 +437,7 @@ export async function createSocialPost(post: SocialPost): Promise<void> {
 
 export async function updateSocialPost(id: string, updates: Partial<SocialPost>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('social_posts').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('social_posts').update(objectToSnake(updates as unknown as Record<string, unknown>)).eq('id', id)
   if (error) console.error('updateSocialPost error:', error)
 }
 
