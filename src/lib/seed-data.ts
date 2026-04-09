@@ -168,6 +168,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 750000,
       status: 'active',
       createdAt: '2024-01-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_002',
@@ -182,6 +183,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 500000,
       status: 'active',
       createdAt: '2024-03-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_003',
@@ -196,6 +198,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 2000000,
       status: 'active',
       createdAt: '2024-06-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_004',
@@ -210,6 +213,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 1000000,
       status: 'expiring',
       createdAt: '2024-02-15T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_005',
@@ -224,6 +228,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 320000,
       status: 'active',
       createdAt: '2024-04-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_006',
@@ -238,6 +243,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 0,
       status: 'expired',
       createdAt: '2024-01-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_007',
@@ -252,6 +258,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 5000000,
       status: 'active',
       createdAt: '2024-05-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_008',
@@ -266,6 +273,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 8000000,
       status: 'active',
       createdAt: '2024-03-15T00:00:00Z',
+      storagePath: '',
     },
   ]
 }

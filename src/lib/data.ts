@@ -72,7 +72,10 @@ function rowsToCamel<T>(rows: Record<string, unknown>[]): T[] {
 }
 
 function normalizePolicyStorage<T extends Partial<Policy>>(policy: T): T {
-  return policy
+  return {
+    ...policy,
+    storagePath: policy.storagePath ?? '',
+  }
 }
 
 function normalizeDocumentStorage<T extends Partial<Document>>(doc: T): T {
@@ -190,10 +193,8 @@ export async function getPolicy(id: string): Promise<Policy | undefined> {
 export async function createPolicy(policy: Policy): Promise<void> {
   const sb = getSupabaseAdmin()
   const normalized = normalizePolicyStorage(policy)
-  const resolvedStoragePath = normalized.storagePath ?? ''
   const payload = objectToSnake({
     ...normalized,
-    storagePath: resolvedStoragePath,
   } as unknown as Record<string, unknown>)
   const { error } = await sb.from('policies').insert(payload)
   if (error) console.error('createPolicy error:', error)

@@ -57,7 +57,7 @@ export interface Policy {
   insuredValue: number
   status: 'active' | 'expiring' | 'expired' | 'cancelled'
   createdAt: string
-  storagePath?: string
+  storagePath: string
   deductible?: number
   coverages?: string[]
   exclusions?: string[]

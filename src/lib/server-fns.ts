@@ -316,7 +316,7 @@ export const adminCreatePolicy = createServerFn({ method: 'POST' })
     await db.createPolicy({
       id,
       ...policyData,
-      companyId: data.companyId || undefined,
+      companyId: data.companyId ?? '',
       individualClientId: data.individualClientId || undefined,
       storagePath: resolvedStoragePath,
       type: data.type as any,
