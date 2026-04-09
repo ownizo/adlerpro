@@ -71,26 +71,19 @@ function rowsToCamel<T>(rows: Record<string, unknown>[]): T[] {
   return rows.map((r) => objectToCamel(r) as T)
 }
 
-function isMissingColumnError(error: unknown, column: string): boolean {
-  const message = String((error as { message?: string } | null)?.message ?? '').toLowerCase()
-  return message.includes('column') && message.includes(column.toLowerCase()) && message.includes('does not exist')
-}
-
 function normalizePolicyStorage<T extends Partial<Policy>>(policy: T): T {
-  const storagePath = policy.storagePath
-  const { documentKey: _legacyDocumentKey, ...policyWithoutLegacyKey } = policy
+  const { documentKey: _legacyDocumentKey, ...normalizedPolicy } = policy as Partial<Policy>
   return {
-    ...policyWithoutLegacyKey,
-    ...(storagePath ? { storagePath } : {}),
+    ...normalizedPolicy,
+    ...(normalizedPolicy.storagePath ? { storagePath: normalizedPolicy.storagePath } : {}),
   } as T
 }
 
 function normalizeDocumentStorage<T extends Partial<Document>>(doc: T): T {
-  const storagePath = doc.storagePath ?? doc.blobKey
+  const { blobKey: _legacyBlobKey, ...normalizedDocument } = doc as Partial<Document>
   return {
-    ...doc,
-    ...(storagePath ? { storagePath } : {}),
-    ...(doc.blobKey || storagePath ? { blobKey: doc.blobKey ?? storagePath } : {}),
+    ...normalizedDocument,
+    ...(normalizedDocument.storagePath ? { storagePath: normalizedDocument.storagePath } : {}),
   } as T
 }
 
@@ -204,22 +197,14 @@ export async function getPolicy(id: string): Promise<Policy | undefined> {
 
 export async function createPolicy(policy: Policy): Promise<void> {
   const sb = getSupabaseAdmin()
-  const resolvedStoragePath = policy.storagePath ?? ''
-  const { documentKey: _legacyDocumentKey, ...policyWithoutLegacyKey } = policy
+  const normalized = normalizePolicyStorage(policy)
+  const resolvedStoragePath = normalized.storagePath ?? ''
   const payload = objectToSnake({
-    ...policyWithoutLegacyKey,
+    ...normalized,
     storagePath: resolvedStoragePath,
   } as unknown as Record<string, unknown>)
   const { error } = await sb.from('policies').insert(payload)
-  if (error) {
-    if (isMissingColumnError(error, 'storage_path')) {
-      const { storage_path: _ignored, ...legacyPayload } = payload
-      const { error: legacyError } = await sb.from('policies').insert(legacyPayload)
-      if (legacyError) console.error('createPolicy error:', legacyError)
-      return
-    }
-    console.error('createPolicy error:', error)
-  }
+  if (error) console.error('createPolicy error:', error)
 }
 
 export async function updatePolicy(id: string, updates: Partial<Policy>, companyId?: string): Promise<boolean> {
@@ -228,15 +213,7 @@ export async function updatePolicy(id: string, updates: Partial<Policy>, company
   const payload = objectToSnake(normalized as unknown as Record<string, unknown>)
   let query = sb.from('policies').update(payload).eq('id', id)
   if (companyId) query = query.eq('company_id', companyId)
-  let { data, error } = await query.select('id')
-  if (error && isMissingColumnError(error, 'storage_path')) {
-    const { storage_path: _ignored, ...legacyPayload } = payload
-    let fallbackQuery = sb.from('policies').update(legacyPayload).eq('id', id)
-    if (companyId) fallbackQuery = fallbackQuery.eq('company_id', companyId)
-    const fallbackResult = await fallbackQuery.select('id')
-    data = fallbackResult.data
-    error = fallbackResult.error
-  }
+  const { data, error } = await query.select('id')
   if (error) {
     console.error('updatePolicy error:', error)
     return false
@@ -296,14 +273,10 @@ export async function getDocuments(companyId?: string): Promise<Document[]> {
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
   if (error) { console.error('getDocuments error:', error); return [] }
-  return rowsToCamel<Document>(data ?? []).map((row) => {
-    const normalized = normalizeDocumentStorage(row)
-    return {
-      ...normalized,
-      storagePath: normalized.storagePath ?? normalized.blobKey ?? '',
-      blobKey: normalized.blobKey ?? normalized.storagePath ?? '',
-    }
-  })
+  return rowsToCamel<Document>(data ?? []).map((row) => normalizeDocumentStorage({
+    ...row,
+    storagePath: row.storagePath ?? '',
+  }))
 }
 
 export async function createDocument(doc: Document): Promise<void> {
@@ -311,35 +284,14 @@ export async function createDocument(doc: Document): Promise<void> {
   const normalized = normalizeDocumentStorage(doc)
   const payload = objectToSnake(normalized as unknown as Record<string, unknown>)
   const { error } = await sb.from('documents').insert(payload)
-  if (error) {
-    if (isMissingColumnError(error, 'storage_path')) {
-      const { storage_path: _ignored, ...legacyPayload } = payload
-      const { error: legacyError } = await sb.from('documents').insert(legacyPayload)
-      if (legacyError) console.error('createDocument error:', legacyError)
-      return
-    }
-    if (isMissingColumnError(error, 'blob_key')) {
-      const { blob_key: _ignored, ...modernPayload } = payload
-      const { error: modernError } = await sb.from('documents').insert(modernPayload)
-      if (modernError) console.error('createDocument error:', modernError)
-      return
-    }
-    console.error('createDocument error:', error)
-  }
+  if (error) console.error('createDocument error:', error)
 }
 
 export async function updateDocument(id: string, updates: Partial<Document>): Promise<void> {
   const sb = getSupabaseAdmin()
   const normalized = normalizeDocumentStorage(updates)
   const payload = objectToSnake(normalized as unknown as Record<string, unknown>)
-  let { error } = await sb.from('documents').update(payload).eq('id', id)
-  if (error && isMissingColumnError(error, 'storage_path')) {
-    const { storage_path: _ignored, ...legacyPayload } = payload
-    error = (await sb.from('documents').update(legacyPayload).eq('id', id)).error
-  } else if (error && isMissingColumnError(error, 'blob_key')) {
-    const { blob_key: _ignored, ...modernPayload } = payload
-    error = (await sb.from('documents').update(modernPayload).eq('id', id)).error
-  }
+  const { error } = await sb.from('documents').update(payload).eq('id', id)
   if (error) console.error('updateDocument error:', error)
 }
 
