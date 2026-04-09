@@ -306,15 +306,20 @@ export const adminCreatePolicy = createServerFn({ method: 'POST' })
       endDate: string
       annualPremium: number
       insuredValue: number
+      storagePath?: string
+      blobKey?: string
     }) => d
   )
   .handler(async ({ data }) => {
     const id = `pol_${Date.now()}`
+    const { blobKey: legacyBlobKey, storagePath, ...policyData } = data
+    const resolvedStoragePath = storagePath ?? legacyBlobKey ?? ''
     await db.createPolicy({
       id,
-      ...data,
+      ...policyData,
       companyId: data.companyId || undefined,
       individualClientId: data.individualClientId || undefined,
+      storagePath: resolvedStoragePath,
       type: data.type as any,
       status: 'active',
       createdAt: new Date().toISOString(),
@@ -681,7 +686,7 @@ export const createPolicy = createServerFn({ method: 'POST' })
     const scope = await getViewerScope(context?.user)
     const companyId = resolveScopedCompanyId(scope, data.companyId)
     const { blobKey: legacyBlobKey, storagePath, companyId: _companyId, ...policyData } = data
-    const resolvedStoragePath = storagePath ?? legacyBlobKey
+    const resolvedStoragePath = storagePath ?? legacyBlobKey ?? ''
 
     const id = `pol_${Date.now()}`
     await db.createPolicy({
@@ -689,7 +694,6 @@ export const createPolicy = createServerFn({ method: 'POST' })
       ...policyData,
       companyId,
       storagePath: resolvedStoragePath,
-      documentKey: resolvedStoragePath,
       type: data.type as any,
       status: 'active',
       createdAt: new Date().toISOString(),

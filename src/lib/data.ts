@@ -204,20 +204,18 @@ export async function getPolicy(id: string): Promise<Policy | undefined> {
 
 export async function createPolicy(policy: Policy): Promise<void> {
   const sb = getSupabaseAdmin()
-  const normalized = normalizePolicyStorage(policy)
-  const payload = objectToSnake(normalized as unknown as Record<string, unknown>)
+  const resolvedStoragePath = policy.storagePath ?? ''
+  const { documentKey: _legacyDocumentKey, ...policyWithoutLegacyKey } = policy
+  const payload = objectToSnake({
+    ...policyWithoutLegacyKey,
+    storagePath: resolvedStoragePath,
+  } as unknown as Record<string, unknown>)
   const { error } = await sb.from('policies').insert(payload)
   if (error) {
     if (isMissingColumnError(error, 'storage_path')) {
       const { storage_path: _ignored, ...legacyPayload } = payload
       const { error: legacyError } = await sb.from('policies').insert(legacyPayload)
       if (legacyError) console.error('createPolicy error:', legacyError)
-      return
-    }
-    if (isMissingColumnError(error, 'document_key')) {
-      const { document_key: _ignored, ...modernPayload } = payload
-      const { error: modernError } = await sb.from('policies').insert(modernPayload)
-      if (modernError) console.error('createPolicy error:', modernError)
       return
     }
     console.error('createPolicy error:', error)
