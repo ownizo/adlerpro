@@ -51,7 +51,8 @@ export const Route = createFileRoute('/admin')({
 
 function AdminPage() {
   const { user, ready } = useIdentity()
-  const [tab, setTab] = useState<'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts' | 'individual_clients' | 'social'>('companies')
+  const [tab, setTab] = useState<'dashboard' | 'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts' | 'individual_clients' | 'social'>('dashboard')
+  const [adminNavExpanded, setAdminNavExpanded] = useState(true)
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
   const [userEvents, setUserEvents] = useState<UserMetricEvent[]>([])
@@ -113,14 +114,15 @@ function AdminPage() {
   if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
   const tabs = [
-    { key: 'companies' as const, label: 'Empresas' },
-    { key: 'individual_clients' as const, label: 'Clientes Individuais' },
-    { key: 'policies' as const, label: 'Apólices e Docs' },
-    { key: 'claims' as const, label: 'Sinistros' },
-    { key: 'social' as const, label: '✦ Social Hub' },
-    { key: 'api' as const, label: 'API & Ligações' },
-    { key: 'profiles' as const, label: 'Perfis e Métricas' },
-    { key: 'alerts' as const, label: 'Alertas (60 dias)' },
+    { key: 'dashboard' as const, label: 'Dashboard', icon: '◫' },
+    { key: 'companies' as const, label: 'Empresas', icon: '🏢' },
+    { key: 'individual_clients' as const, label: 'Clientes Individuais', icon: '👤' },
+    { key: 'policies' as const, label: 'Apólices e Docs', icon: '📄' },
+    { key: 'claims' as const, label: 'Sinistros', icon: '⚠' },
+    { key: 'social' as const, label: '✦ Social Hub', icon: '✦' },
+    { key: 'api' as const, label: 'API & Ligações', icon: '🔌' },
+    { key: 'profiles' as const, label: 'Perfis e Métricas', icon: '📊' },
+    { key: 'alerts' as const, label: 'Alertas (60 dias)', icon: '⏰' },
   ]
 
   const expiringPolicies = policies.filter((p) => {
@@ -156,26 +158,72 @@ function AdminPage() {
           <p className="text-navy-500 mt-1">Gestão de empresas, acessos, apólices, sinistros e integrações</p>
         </div>
 
-        <div className="flex flex-wrap gap-1 bg-navy-100 p-1 rounded-[2px] mb-8 w-fit">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-                tab === t.key ? 'bg-white text-navy-700 shadow-sm' : 'text-navy-500 hover:text-navy-700'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="lg:hidden mb-5">
+          <label htmlFor="admin-tab" className="block text-xs font-semibold uppercase text-navy-500 mb-2">Secção do Admin</label>
+          <select
+            id="admin-tab"
+            value={tab}
+            onChange={(e) => setTab(e.target.value as typeof tab)}
+            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 bg-white"
+          >
+            {tabs.map((t) => (
+              <option key={t.key} value={t.key}>{t.label}</option>
+            ))}
+          </select>
         </div>
 
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <>
+        <div className="flex gap-6">
+          <aside
+            className={`hidden lg:flex flex-col border border-navy-200 bg-white rounded-[4px] p-2 h-fit sticky top-24 transition-all duration-200 ${
+              adminNavExpanded ? 'w-72' : 'w-20'
+            }`}
+          >
+            <button
+              onClick={() => setAdminNavExpanded((prev) => !prev)}
+              className="mb-2 px-3 py-2 text-xs font-semibold text-navy-500 border border-navy-200 rounded hover:bg-navy-50 transition-colors text-left"
+            >
+              {adminNavExpanded ? 'Recolher menu' : 'Expandir'}
+            </button>
+            <nav className="space-y-1">
+              {tabs.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-[2px] transition-colors ${
+                    tab === t.key
+                      ? 'bg-navy-700 text-white'
+                      : 'text-navy-600 hover:text-navy-700 hover:bg-navy-50'
+                  }`}
+                  title={t.label}
+                >
+                  <span className="w-4 text-center">{t.icon}</span>
+                  {adminNavExpanded ? <span>{t.label}</span> : null}
+                </button>
+              ))}
+            </nav>
+          </aside>
+
+          <div className="flex-1 min-w-0">
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <>
+            {tab === 'dashboard' && (
+              <AdminDashboardTab
+                companies={companies}
+                companyUsers={companyUsers}
+                policies={policies}
+                claims={claims}
+                documents={documents}
+                individualClients={individualClients}
+                socialPosts={socialPosts}
+                apiConnections={apiConnections}
+                expiringPolicies={expiringPolicies}
+              />
+            )}
+
             {tab === 'companies' && (
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -636,7 +684,55 @@ function AdminPage() {
               <div>
                 <h2 className="text-lg font-semibold text-navy-700 mb-2">API & Ligações</h2>
                 <p className="text-sm text-navy-500 mb-6">Serviços externos integrados na plataforma Adler Pro. Todas as chaves são configuradas como variáveis de ambiente no Netlify.</p>
-                <div className="grid gap-4">
+                <div className="grid gap-4 mb-6">
+                  {apiConnections.map((api) => (
+                    <div key={api.id} className="bg-white rounded-[4px] border border-navy-200 p-5">
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                          <h3 className="font-bold text-navy-700">{api.service}</h3>
+                          <p className="text-xs text-navy-500">Endpoint: {api.endpoint}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={api.status}
+                            onChange={async (e) => {
+                              await adminUpdateApiConnection({ data: { id: api.id, updates: { status: e.target.value } } })
+                              await reload()
+                            }}
+                            className="px-2 py-1 text-xs border border-navy-200 rounded"
+                          >
+                            <option value="connected">Ligado</option>
+                            <option value="degraded">Degradado</option>
+                            <option value="error">Erro</option>
+                          </select>
+                          <button
+                            onClick={async () => {
+                              await adminRefreshApiConnection({ data: { id: api.id } })
+                              await reload()
+                            }}
+                            className="px-3 py-1.5 text-xs bg-gold-400 text-navy-700 rounded hover:bg-gold-300"
+                          >
+                            Atualizar Dados
+                          </button>
+                        </div>
+                      </div>
+                      <div className="mt-3 text-sm text-navy-600 grid sm:grid-cols-3 gap-2">
+                        <p><strong>Estado:</strong> {api.status}</p>
+                        <p><strong>Latência:</strong> {api.latency}</p>
+                        <p><strong>Última Sincronização:</strong> {formatDate(api.lastSync)}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {apiConnections.length === 0 && (
+                    <div className="bg-white rounded-[4px] border border-navy-200 p-5 text-sm text-navy-500">
+                      Nenhuma ligação dinâmica encontrada em `api_connections`.
+                    </div>
+                  )}
+                </div>
+
+                <InvoiceExpressStatus apiConnections={apiConnections} />
+
+                <div className="grid gap-4 mt-6">
 
                   {/* Anthropic Claude */}
                   <div className="bg-white rounded-[4px] border border-navy-200 p-5">
@@ -829,10 +925,116 @@ function AdminPage() {
                 )}
               </div>
             )}
-          </>
-        )}
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </AppLayout>
+  )
+}
+
+function AdminDashboardTab({
+  companies,
+  companyUsers,
+  policies,
+  claims,
+  documents,
+  individualClients,
+  socialPosts,
+  apiConnections,
+  expiringPolicies,
+}: {
+  companies: Company[]
+  companyUsers: CompanyUser[]
+  policies: Policy[]
+  claims: Claim[]
+  documents: DocType[]
+  individualClients: IndividualClient[]
+  socialPosts: SocialPost[]
+  apiConnections: ApiConnection[]
+  expiringPolicies: Policy[]
+}) {
+  const openClaims = claims.filter((c) => c.status !== 'paid' && c.status !== 'denied')
+  const connectedApis = apiConnections.filter((a) => a.status === 'connected').length
+  const scheduledPosts = socialPosts.filter((p) => p.status === 'scheduled').length
+
+  return (
+    <div>
+      <h2 className="text-lg font-semibold text-navy-700 mb-4">Dashboard Administração</h2>
+      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+        <MetricCard label="Empresas" value={companies.length} help={`${companyUsers.length} utilizadores`} />
+        <MetricCard label="Clientes Individuais" value={individualClients.length} help={`${policies.length} apólices totais`} />
+        <MetricCard label="Sinistros Abertos" value={openClaims.length} help={`${claims.length} sinistros totais`} />
+        <MetricCard label="Ligações API Ativas" value={connectedApis} help={`${apiConnections.length} integrações mapeadas`} />
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+          <h3 className="text-sm font-semibold text-navy-700 mb-3">Renovações Próximas (60 dias)</h3>
+          <div className="space-y-2 text-sm">
+            {expiringPolicies.slice(0, 5).map((p) => (
+              <p key={p.id} className="text-navy-600">
+                {POLICY_TYPE_LABELS[p.type]} · <strong>{p.policyNumber}</strong> · {formatDate(p.endDate)}
+              </p>
+            ))}
+            {expiringPolicies.length === 0 && <p className="text-navy-400">Sem renovações iminentes.</p>}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+          <h3 className="text-sm font-semibold text-navy-700 mb-3">Resumo Operacional</h3>
+          <div className="space-y-2 text-sm text-navy-600">
+            <p>Documentos registados: <strong>{documents.length}</strong></p>
+            <p>Posts sociais agendados: <strong>{scheduledPosts}</strong></p>
+            <p>Posts sociais totais: <strong>{socialPosts.length}</strong></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MetricCard({ label, value, help }: { label: string; value: number; help: string }) {
+  return (
+    <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+      <p className="text-xs uppercase tracking-wide text-navy-500">{label}</p>
+      <p className="text-3xl font-bold text-navy-700 mt-2">{value}</p>
+      <p className="text-xs text-navy-500 mt-2">{help}</p>
+    </div>
+  )
+}
+
+function InvoiceExpressStatus({ apiConnections }: { apiConnections: ApiConnection[] }) {
+  const invoiceExpressConnections = apiConnections.filter((api) => {
+    const value = `${api.service} ${api.endpoint}`.toLowerCase()
+    return value.includes('invoice express') || value.includes('invoiceexpress') || value.includes('fatur')
+  })
+
+  if (invoiceExpressConnections.length > 0) {
+    return (
+      <div className="bg-white rounded-[4px] border border-emerald-200 p-5">
+        <h3 className="text-sm font-semibold text-emerald-700 mb-2">Invoice Express</h3>
+        <p className="text-sm text-navy-600 mb-3">Foram encontradas ligações de faturação no estado dinâmico de `api_connections`.</p>
+        <div className="space-y-2 text-sm">
+          {invoiceExpressConnections.map((api) => (
+            <p key={api.id} className="text-navy-600">
+              <strong>{api.service}</strong> · {api.status} · {api.endpoint}
+            </p>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white rounded-[4px] border border-amber-200 p-5">
+      <h3 className="text-sm font-semibold text-amber-700 mb-2">Invoice Express</h3>
+      <p className="text-sm text-navy-600">
+        Não foi encontrado código de integração Invoice Express neste repositório nem entradas dedicadas em `api_connections`.
+        O módulo foi deixado em modo stub para reintegração futura sem simular integrações inexistentes.
+      </p>
+    </div>
   )
 }
 
