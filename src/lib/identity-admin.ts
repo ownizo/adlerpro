@@ -14,6 +14,16 @@ interface IdentitySignupResult {
   reason?: string
 }
 
+interface IdentityUserSummary {
+  id: string
+  email?: string | null
+}
+
+function findIdentityUserByEmail(users: IdentityUserSummary[], email: string): IdentityUserSummary | undefined {
+  const normalizedEmail = email.toLowerCase()
+  return users.find((user) => user.email?.toLowerCase() === normalizedEmail)
+}
+
 export async function createIdentityUserWithConfirmation(
   payload: IdentitySignupPayload
 ): Promise<IdentitySignupResult> {
@@ -48,16 +58,15 @@ export async function createIdentityUserWithConfirmation(
 }
 
 export async function updateIdentityUserPasswordByEmail(email: string, password: string): Promise<void> {
-  const normalizedEmail = email.toLowerCase()
-
   const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers()
   if (listError) throw new Error('Falha ao listar utilizadores.')
 
-  const user = data.users.find((u) => u.email?.toLowerCase() === normalizedEmail)
+  const users: IdentityUserSummary[] = (data?.users ?? []) as IdentityUserSummary[]
+  const user = findIdentityUserByEmail(users, email)
   if (!user) {
     // Se o utilizador não existe no Auth, criar com a nova password
     const { error: createError } = await supabaseAdmin.auth.admin.createUser({
-      email: normalizedEmail,
+      email: email.toLowerCase(),
       password,
       email_confirm: true,
     })
@@ -70,12 +79,11 @@ export async function updateIdentityUserPasswordByEmail(email: string, password:
 }
 
 export async function deleteIdentityUserByEmail(email: string): Promise<void> {
-  const normalizedEmail = email.toLowerCase()
-
   const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers()
   if (listError) throw new Error('Falha ao listar utilizadores.')
 
-  const user = data.users.find((u) => u.email?.toLowerCase() === normalizedEmail)
+  const users: IdentityUserSummary[] = (data?.users ?? []) as IdentityUserSummary[]
+  const user = findIdentityUserByEmail(users, email)
   if (!user) return // Utilizador não existe no Auth, nada a fazer
 
   const { error } = await supabaseAdmin.auth.admin.deleteUser(user.id)
