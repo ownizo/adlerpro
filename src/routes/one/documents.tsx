@@ -18,6 +18,7 @@ interface Document {
   category: string
   size: number
   uploaded_at: string
+  storage_path?: string
   blob_key?: string
 }
 
@@ -85,7 +86,7 @@ function OneDocuments() {
       if (clientId) {
         const { data, error: dErr } = await supabase
           .from('documents')
-          .select('id, name, category, size, uploaded_at, blob_key')
+          .select('*')
           .eq('individual_client_id', clientId)
           .order('uploaded_at', { ascending: false })
         if (dErr) throw dErr

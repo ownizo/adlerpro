@@ -350,7 +350,7 @@ export const adminUploadPolicyDocument = createServerFn({ method: 'POST' })
       size: data.size,
       uploadedBy: 'admin',
       uploadedAt: new Date().toISOString(),
-      blobKey: data.storagePath,
+      storagePath: data.storagePath,
       policyId: data.policyId,
     })
     return { success: true }
@@ -673,18 +673,23 @@ export const createPolicy = createServerFn({ method: 'POST' })
       deductible?: number
       coverages?: string[]
       exclusions?: string[]
+      storagePath?: string
       blobKey?: string
     }) => d
   )
   .handler(async ({ data, context }) => {
     const scope = await getViewerScope(context?.user)
     const companyId = resolveScopedCompanyId(scope, data.companyId)
+    const { blobKey: legacyBlobKey, storagePath, companyId: _companyId, ...policyData } = data
+    const resolvedStoragePath = storagePath ?? legacyBlobKey
 
     const id = `pol_${Date.now()}`
     await db.createPolicy({
       id,
-      ...data,
+      ...policyData,
       companyId,
+      storagePath: resolvedStoragePath,
+      documentKey: resolvedStoragePath,
       type: data.type as any,
       status: 'active',
       createdAt: new Date().toISOString(),

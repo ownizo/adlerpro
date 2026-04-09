@@ -1795,7 +1795,7 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
                           <span>📄</span>
                           <span className="font-medium">{d.name}</span>
                           <span className="text-navy-400">· {d.category}</span>
-                          <PolicyDocumentButtons storagePath={d.blobKey} name={d.name} />
+                          <PolicyDocumentButtons storagePath={d.storagePath ?? d.blobKey ?? ''} name={d.name} />
                         </li>
                       ))}
                     </ul>
@@ -1855,6 +1855,7 @@ function AssociateDocumentDropdown({ policyId, availableDocs, onAssociated }: {
 
 function PolicyDocumentButtons({ storagePath, name }: { storagePath: string; name: string }) {
   const [loading, setLoading] = useState(false)
+  const disabled = loading || !storagePath
 
   const getUrl = async () => {
     setLoading(true)
@@ -1869,7 +1870,7 @@ function PolicyDocumentButtons({ storagePath, name }: { storagePath: string; nam
   return (
     <span className="flex gap-1">
       <button
-        disabled={loading}
+        disabled={disabled}
         onClick={async () => { const url = await getUrl(); window.open(url, '_blank') }}
         className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
         title="Preview"
@@ -1877,7 +1878,7 @@ function PolicyDocumentButtons({ storagePath, name }: { storagePath: string; nam
         👁
       </button>
       <button
-        disabled={loading}
+        disabled={disabled}
         onClick={async () => {
           const url = await getUrl()
           const a = document.createElement('a')
