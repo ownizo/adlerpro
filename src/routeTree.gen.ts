@@ -18,6 +18,7 @@ import { Route as PoliciesRouteImport } from './routes/policies'
 import { Route as PartnerRiskRouteImport } from './routes/partner-risk'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LicensePlatesRouteImport } from './routes/license-plates'
+import { Route as DocumentsRouteImport } from './routes/documents'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ClaimsRouteImport } from './routes/claims'
@@ -75,6 +76,11 @@ const LoginRoute = LoginRouteImport.update({
 const LicensePlatesRoute = LicensePlatesRouteImport.update({
   id: '/license-plates',
   path: '/license-plates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocumentsRoute = DocumentsRouteImport.update({
+  id: '/documents',
+  path: '/documents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -150,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/documents': typeof DocumentsRoute
   '/license-plates': typeof LicensePlatesRoute
   '/login': typeof LoginRoute
   '/partner-risk': typeof PartnerRiskRoute
@@ -174,6 +181,7 @@ export interface FileRoutesByTo {
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/documents': typeof DocumentsRoute
   '/license-plates': typeof LicensePlatesRoute
   '/login': typeof LoginRoute
   '/partner-risk': typeof PartnerRiskRoute
@@ -199,6 +207,7 @@ export interface FileRoutesById {
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
+  '/documents': typeof DocumentsRoute
   '/license-plates': typeof LicensePlatesRoute
   '/login': typeof LoginRoute
   '/partner-risk': typeof PartnerRiskRoute
@@ -225,6 +234,7 @@ export interface FileRouteTypes {
     | '/claims'
     | '/contact'
     | '/dashboard'
+    | '/documents'
     | '/license-plates'
     | '/login'
     | '/partner-risk'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/claims'
     | '/contact'
     | '/dashboard'
+    | '/documents'
     | '/license-plates'
     | '/login'
     | '/partner-risk'
@@ -273,6 +284,7 @@ export interface FileRouteTypes {
     | '/claims'
     | '/contact'
     | '/dashboard'
+    | '/documents'
     | '/license-plates'
     | '/login'
     | '/partner-risk'
@@ -298,6 +310,7 @@ export interface RootRouteChildren {
   ClaimsRoute: typeof ClaimsRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
+  DocumentsRoute: typeof DocumentsRoute
   LicensePlatesRoute: typeof LicensePlatesRoute
   LoginRoute: typeof LoginRoute
   PartnerRiskRoute: typeof PartnerRiskRoute
@@ -379,6 +392,13 @@ declare module '@tanstack/react-router' {
       path: '/license-plates'
       fullPath: '/license-plates'
       preLoaderRoute: typeof LicensePlatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/documents': {
+      id: '/documents'
+      path: '/documents'
+      fullPath: '/documents'
+      preLoaderRoute: typeof DocumentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -482,6 +502,7 @@ const rootRouteChildren: RootRouteChildren = {
   ClaimsRoute: ClaimsRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
+  DocumentsRoute: DocumentsRoute,
   LicensePlatesRoute: LicensePlatesRoute,
   LoginRoute: LoginRoute,
   PartnerRiskRoute: PartnerRiskRoute,
@@ -502,12 +523,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

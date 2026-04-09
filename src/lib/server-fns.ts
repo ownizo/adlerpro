@@ -123,10 +123,12 @@ export const fetchDashboardAll = createServerFn({ method: 'GET' })
     const scope = await getViewerScope()
     const companyId = scope.companyId ?? undefined
 
-    const [policies, claims, alerts] = await Promise.all([
+    const [policies, claims, alerts, documents, riskReports] = await Promise.all([
       db.getPolicies(companyId),
       db.getClaims(companyId),
       db.getAlerts(companyId),
+      db.getDocuments(companyId),
+      db.getRiskReports(companyId),
     ])
 
     const activePolicies = policies.filter((p) => p.status === 'active' || p.status === 'expiring').length
@@ -146,7 +148,7 @@ export const fetchDashboardAll = createServerFn({ method: 'GET' })
     ).length
 
     const stats: DashboardStats = { activePolicies, annualPremiums, renewalsIn90Days, openClaims }
-    return { stats, alerts, policies }
+    return { stats, alerts, policies, claims, documents, riskReports }
   })
 
 // Manter para compatibilidade
