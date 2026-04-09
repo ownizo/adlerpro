@@ -360,10 +360,6 @@ Respond with this exact JSON (no markdown, no extra text):
       const now = new Date()
       const dateStr = now.toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })
 
-      const DARK = '#111111'
-      const GOLD = '#C8961A'
-      const GREEN = '#166534'
-      const LIGHT = '#888888'
       const FOOTER_COLOR: [number, number, number] = [136, 136, 136]
 
       const addFooter = (pageNum: number, totalPages: number) => {

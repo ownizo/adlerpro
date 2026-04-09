@@ -1556,7 +1556,7 @@ function escSvg(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function buildCarouselSlide(topic: string, text: string, slideNumber: number, totalSlides: number): string {
+function buildCarouselSlide(text: string, slideNumber: number, totalSlides: number): string {
   const H = 1080
   const gold = '#C9A84C'
   const white = '#FFFFFF'
@@ -1663,9 +1663,9 @@ Responde APENAS com um JSON válido neste formato exato (sem markdown, sem texto
     const bodyB = splitAt > 0 ? body.slice(splitAt).trim() : ''
 
     const carouselSlides = [
-      buildCarouselSlide(topic, topic, 1, 3),
-      buildCarouselSlide(topic, bodyA || body, 2, 3),
-      buildCarouselSlide(topic, (bodyB || body) + (hashtagLine ? '\n' + hashtagLine : ''), 3, 3),
+      buildCarouselSlide(topic, 1, 3),
+      buildCarouselSlide(bodyA || body, 2, 3),
+      buildCarouselSlide((bodyB || body) + (hashtagLine ? '\n' + hashtagLine : ''), 3, 3),
     ]
 
     return { ...parsed, carouselSlides }
