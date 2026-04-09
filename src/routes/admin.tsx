@@ -46,7 +46,7 @@ import type {
   RenewalAlertStatus,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
 
@@ -57,6 +57,30 @@ const RENEWAL_ALERT_STATUS_LABELS: Record<RenewalAlertStatus, string> = {
   tratado: 'Tratado',
   em_negociacao: 'Em negociação',
   renovado: 'Renovado',
+}
+
+type RenewalKanbanColumnId = 'pending' | 'negotiating' | 'renewed'
+type RenewalKanbanColumn = {
+  id: RenewalKanbanColumnId
+  title: string
+}
+
+const RENEWAL_KANBAN_COLUMNS: RenewalKanbanColumn[] = [
+  { id: 'pending', title: 'Pending' },
+  { id: 'negotiating', title: 'Negotiating' },
+  { id: 'renewed', title: 'Renewed' },
+]
+
+const RENEWAL_KANBAN_TARGET_STATUS: Record<RenewalKanbanColumnId, RenewalAlertStatus> = {
+  pending: 'pendente',
+  negotiating: 'em_negociacao',
+  renewed: 'renovado',
+}
+
+function renewalColumnByStatus(status: RenewalAlertStatus): RenewalKanbanColumnId {
+  if (status === 'em_negociacao') return 'negotiating'
+  if (status === 'renovado') return 'renewed'
+  return 'pending'
 }
 
 function isAdminTab(value: unknown): value is AdminTab {
@@ -928,6 +952,8 @@ function AdminDashboardTab({
   const [renewalAlerts, setRenewalAlerts] = useState<RenewalAlertsResponse | null>(null)
   const [renewalAlertsLoading, setRenewalAlertsLoading] = useState(false)
   const [updatingRenewalAlertKey, setUpdatingRenewalAlertKey] = useState<string | null>(null)
+  const [draggingAlertKey, setDraggingAlertKey] = useState<string | null>(null)
+  const [activeDropColumn, setActiveDropColumn] = useState<RenewalKanbanColumnId | null>(null)
 
   useEffect(() => {
     let active = true
@@ -1003,14 +1029,61 @@ function AdminDashboardTab({
     setUpdatingRenewalAlertKey(key)
     try {
       await adminUpdateRenewalAlertStatus({ data: { key, status } })
-      await reloadRenewalAlerts()
+      setRenewalAlerts((current) => {
+        if (!current) return current
+
+        const nextAlerts = current.alerts.map((alert) =>
+          alert.key === key ? { ...alert, status } : alert
+        )
+
+        const nextByUrgency: RenewalAlertsResponse['byUrgency'] = { 30: [], 60: [], 90: [] }
+        const nextCounts: RenewalAlertsResponse['summary']['countsByStatus'] = {
+          pendente: 0,
+          tratado: 0,
+          em_negociacao: 0,
+          renovado: 0,
+        }
+        let totalValueAtRisk = 0
+
+        for (const alert of nextAlerts) {
+          nextByUrgency[alert.urgency].push(alert)
+          nextCounts[alert.status] += 1
+          if (alert.status !== 'renovado') totalValueAtRisk += alert.value
+        }
+
+        return {
+          ...current,
+          alerts: nextAlerts,
+          byUrgency: nextByUrgency,
+          summary: {
+            ...current.summary,
+            countsByStatus: nextCounts,
+            totalValueAtRisk,
+          },
+        }
+      })
     } catch (error) {
       console.error('[AdminDashboardTab] adminUpdateRenewalAlertStatus error:', error)
       alert('Não foi possível atualizar o estado do alerta.')
+      await reloadRenewalAlerts()
     } finally {
       setUpdatingRenewalAlertKey(null)
     }
   }
+
+  const renewalAlertsByColumn = useMemo(() => {
+    const grouped: Record<RenewalKanbanColumnId, RenewalAlertsResponse['alerts']> = {
+      pending: [],
+      negotiating: [],
+      renewed: [],
+    }
+
+    for (const alert of renewalAlerts?.alerts ?? []) {
+      grouped[renewalColumnByStatus(alert.status)].push(alert)
+    }
+
+    return grouped
+  }, [renewalAlerts])
 
   const monthSelectOptions = [
     { value: '', label: 'Ano completo' },
@@ -1246,10 +1319,12 @@ function AdminDashboardTab({
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-[4px] border border-navy-200 p-5">
-          <h3 className="text-sm font-semibold text-navy-700 mb-3">Renovações próximas</h3>
-          {renewalAlerts && (
-            <div className="mb-4 space-y-2">
-              <div className="grid grid-cols-2 gap-2">
+          <h3 className="text-sm font-semibold text-navy-700 mb-3">Pipeline de Renovações</h3>
+          {renewalAlertsLoading ? (
+            <p className="text-sm text-navy-400">A carregar alertas de renovação...</p>
+          ) : renewalAlerts && renewalAlerts.total > 0 ? (
+            <div className="space-y-4">
+              <div className="grid sm:grid-cols-2 gap-2">
                 <div className="rounded border border-navy-200 bg-navy-50 px-3 py-2">
                   <p className="text-[11px] uppercase tracking-wide text-navy-500">Número de renovações</p>
                   <p className="text-base font-semibold text-navy-700">{renewalAlerts.summary.totalRenewals}</p>
@@ -1259,123 +1334,176 @@ function AdminDashboardTab({
                   <p className="text-base font-semibold text-red-700">{formatCurrency(renewalAlerts.summary.totalValueAtRisk)}</p>
                 </div>
               </div>
-              <div className="rounded border border-navy-100 bg-white px-3 py-2">
-                <p className="text-[11px] uppercase tracking-wide text-navy-500 mb-1">Estados</p>
-                <p className="text-xs text-navy-600">
-                  Pendente: <strong>{renewalAlerts.summary.countsByStatus.pendente}</strong> · Tratado: <strong>{renewalAlerts.summary.countsByStatus.tratado}</strong> · Em negociação: <strong>{renewalAlerts.summary.countsByStatus.em_negociacao}</strong> · Renovado: <strong>{renewalAlerts.summary.countsByStatus.renovado}</strong>
-                </p>
-              </div>
-            </div>
-          )}
-          {renewalAlertsLoading ? (
-            <p className="text-sm text-navy-400">A carregar alertas de renovação...</p>
-          ) : renewalAlerts && renewalAlerts.total > 0 ? (
-            <div className="space-y-3">
-              {[30, 60, 90].map((urgency) => {
-                const items = renewalAlerts.byUrgency[urgency as 30 | 60 | 90]
-                if (!items.length) return null
+              <div className="grid xl:grid-cols-3 gap-3">
+                {RENEWAL_KANBAN_COLUMNS.map((column) => {
+                  const items = renewalAlertsByColumn[column.id]
+                  const columnValue = items.reduce((sum, alert) => sum + alert.value, 0)
 
-                const palette =
-                  urgency === 30
-                    ? {
-                        box: 'bg-red-50 border-red-200',
-                        badge: 'bg-red-100 text-red-700',
-                      }
-                    : urgency === 60
-                      ? {
-                          box: 'bg-amber-50 border-amber-200',
-                          badge: 'bg-amber-100 text-amber-700',
-                        }
-                      : {
-                          box: 'bg-blue-50 border-blue-200',
-                          badge: 'bg-blue-100 text-blue-700',
-                        }
-
-                return (
-                  <div key={`renewal_${urgency}`} className={`rounded-[4px] border p-3 ${palette.box}`}>
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-navy-700">D-{urgency}</p>
-                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${palette.badge}`}>
-                        {items.length} alerta{items.length > 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    <div className="space-y-2">
-                      {items.map((alert) => (
-                        <div key={alert.key} className="text-xs text-navy-700 rounded border border-navy-200 bg-white p-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-semibold">
-                              {alert.client} · {POLICY_TYPE_LABELS[alert.policyType]}
-                            </p>
-                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-semibold">
-                              {RENEWAL_ALERT_STATUS_LABELS[alert.status]}
-                            </span>
-                          </div>
-                          <p className="text-navy-600 mt-0.5">
-                            {alert.company} · {alert.insurer} · {formatCurrency(alert.value)}
-                          </p>
-                          <p className="text-navy-500 mt-0.5">
-                            Apólice {alert.policyNumber} · Renovação em {formatDate(alert.renewalDate)}
-                          </p>
-                          <div className="flex flex-wrap gap-1.5 mt-2">
-                            <button
-                              type="button"
-                              className="px-2 py-1 text-[11px] rounded border border-navy-200 text-navy-700 bg-white hover:bg-navy-50 disabled:opacity-50"
-                              disabled={updatingRenewalAlertKey === alert.key}
-                              onClick={() => handleRenewalAlertStatusUpdate(alert.key, 'tratado')}
-                            >
-                              Marcar tratado
-                            </button>
-                            <button
-                              type="button"
-                              className="px-2 py-1 text-[11px] rounded border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
-                              disabled={updatingRenewalAlertKey === alert.key}
-                              onClick={() => handleRenewalAlertStatusUpdate(alert.key, 'em_negociacao')}
-                            >
-                              Em negociação
-                            </button>
-                            <button
-                              type="button"
-                              className="px-2 py-1 text-[11px] rounded border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50"
-                              disabled={updatingRenewalAlertKey === alert.key}
-                              onClick={() => handleRenewalAlertStatusUpdate(alert.key, 'renovado')}
-                            >
-                              Marcar renovado
-                            </button>
-                          </div>
-                          <div className="flex flex-wrap gap-1.5 mt-2">
-                            <Link
-                              to="/admin"
-                              search={{ tab: 'policies' }}
-                              className="px-2 py-1 text-[11px] rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
-                            >
-                              Ver apólice
-                            </Link>
-                            {alert.contactEmail ? (
-                              <a
-                                href={`mailto:${alert.contactEmail}`}
-                                className="px-2 py-1 text-[11px] rounded border border-gold-300 text-navy-700 bg-gold-100 hover:bg-gold-200"
-                              >
-                                Contactar cliente
-                              </a>
-                            ) : alert.contactPhone ? (
-                              <a
-                                href={`tel:${alert.contactPhone}`}
-                                className="px-2 py-1 text-[11px] rounded border border-gold-300 text-navy-700 bg-gold-100 hover:bg-gold-200"
-                              >
-                                Contactar cliente
-                              </a>
-                            ) : (
-                              <span className="px-2 py-1 text-[11px] rounded border border-gray-200 text-gray-400 bg-gray-50">
-                                Sem contacto
-                              </span>
-                            )}
-                          </div>
+                  return (
+                    <section
+                      key={column.id}
+                      className={`rounded-[4px] border p-3 bg-navy-50/60 transition-colors ${
+                        activeDropColumn === column.id ? 'border-gold-400 bg-gold-50/60' : 'border-navy-200'
+                      }`}
+                      onDragOver={(event) => {
+                        if (!draggingAlertKey) return
+                        event.preventDefault()
+                        setActiveDropColumn(column.id)
+                      }}
+                      onDragLeave={() => {
+                        if (!draggingAlertKey) return
+                        setActiveDropColumn((current) => (current === column.id ? null : current))
+                      }}
+                      onDrop={async (event) => {
+                        event.preventDefault()
+                        const droppedKey = event.dataTransfer.getData('text/plain')
+                        setActiveDropColumn(null)
+                        setDraggingAlertKey(null)
+                        if (!droppedKey) return
+                        await handleRenewalAlertStatusUpdate(droppedKey, RENEWAL_KANBAN_TARGET_STATUS[column.id])
+                      }}
+                    >
+                      <div className="mb-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-xs font-semibold uppercase tracking-wide text-navy-700">{column.title}</h4>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-navy-200 text-navy-700 font-semibold">
+                            {items.length}
+                          </span>
                         </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
+                        <p className="text-[11px] text-navy-500 mt-1">Total: {formatCurrency(columnValue)}</p>
+                      </div>
+
+                      {items.length === 0 ? (
+                        <p className="text-[11px] text-navy-400 rounded border border-dashed border-navy-200 bg-white px-2 py-2">
+                          Sem apólices nesta coluna.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {items.map((alert) => {
+                            const urgencyPalette =
+                              alert.urgency === 30
+                                ? {
+                                    border: 'border-red-300',
+                                    badge: 'bg-red-100 text-red-700',
+                                  }
+                                : alert.urgency === 60
+                                  ? {
+                                      border: 'border-amber-300',
+                                      badge: 'bg-amber-100 text-amber-700',
+                                    }
+                                  : {
+                                      border: 'border-blue-300',
+                                      badge: 'bg-blue-100 text-blue-700',
+                                    }
+
+                            const nextStatusActions: Array<{ label: string; status: RenewalAlertStatus; className: string }> = []
+                            if (renewalColumnByStatus(alert.status) !== 'pending') {
+                              nextStatusActions.push({
+                                label: 'Mover para pending',
+                                status: 'pendente',
+                                className: 'border-navy-200 text-navy-700 bg-white hover:bg-navy-50',
+                              })
+                            }
+                            if (renewalColumnByStatus(alert.status) !== 'negotiating') {
+                              nextStatusActions.push({
+                                label: 'Mover para negotiating',
+                                status: 'em_negociacao',
+                                className: 'border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100',
+                              })
+                            }
+                            if (renewalColumnByStatus(alert.status) !== 'renewed') {
+                              nextStatusActions.push({
+                                label: 'Mover para renewed',
+                                status: 'renovado',
+                                className: 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100',
+                              })
+                            }
+
+                            return (
+                              <article
+                                key={alert.key}
+                                draggable={updatingRenewalAlertKey !== alert.key}
+                                onDragStart={(event) => {
+                                  event.dataTransfer.setData('text/plain', alert.key)
+                                  event.dataTransfer.effectAllowed = 'move'
+                                  setDraggingAlertKey(alert.key)
+                                }}
+                                onDragEnd={() => {
+                                  setDraggingAlertKey(null)
+                                  setActiveDropColumn(null)
+                                }}
+                                className={`text-xs text-navy-700 rounded border bg-white p-2 ${urgencyPalette.border} ${
+                                  updatingRenewalAlertKey === alert.key ? 'opacity-70' : ''
+                                }`}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="font-semibold">{alert.client}</p>
+                                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${urgencyPalette.badge}`}>
+                                    D-{alert.urgency}
+                                  </span>
+                                </div>
+                                <p className="text-navy-600 mt-0.5">
+                                  {alert.company} · {POLICY_TYPE_LABELS[alert.policyType]}
+                                </p>
+                                <p className="text-navy-600 mt-0.5">
+                                  {alert.insurer} · {formatCurrency(alert.value)}
+                                </p>
+                                <p className="text-navy-500 mt-0.5">
+                                  Apólice {alert.policyNumber} · Renovação em {alert.daysUntilRenewal} dias ({formatDate(alert.renewalDate)})
+                                </p>
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  {nextStatusActions.map((action) => (
+                                    <button
+                                      key={action.status}
+                                      type="button"
+                                      className={`px-2 py-1 text-[11px] rounded border disabled:opacity-50 ${action.className}`}
+                                      disabled={updatingRenewalAlertKey === alert.key}
+                                      onClick={() => handleRenewalAlertStatusUpdate(alert.key, action.status)}
+                                    >
+                                      {action.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                  <Link
+                                    to="/admin"
+                                    search={{ tab: 'policies' }}
+                                    className="px-2 py-1 text-[11px] rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
+                                  >
+                                    Ver apólice
+                                  </Link>
+                                  {alert.contactEmail ? (
+                                    <a
+                                      href={`mailto:${alert.contactEmail}`}
+                                      className="px-2 py-1 text-[11px] rounded border border-gold-300 text-navy-700 bg-gold-100 hover:bg-gold-200"
+                                    >
+                                      Contactar cliente
+                                    </a>
+                                  ) : alert.contactPhone ? (
+                                    <a
+                                      href={`tel:${alert.contactPhone}`}
+                                      className="px-2 py-1 text-[11px] rounded border border-gold-300 text-navy-700 bg-gold-100 hover:bg-gold-200"
+                                    >
+                                      Contactar cliente
+                                    </a>
+                                  ) : (
+                                    <span className="px-2 py-1 text-[11px] rounded border border-gray-200 text-gray-400 bg-gray-50">
+                                      Sem contacto
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-navy-500 mt-2">
+                                  Estado atual: <strong>{RENEWAL_ALERT_STATUS_LABELS[alert.status]}</strong>
+                                </p>
+                              </article>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </section>
+                  )
+                })}
+              </div>
             </div>
           ) : (
             <p className="text-sm text-navy-400">Sem alertas ativos para D-90, D-60 ou D-30.</p>
