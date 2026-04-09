@@ -19,10 +19,14 @@ import {
   adminPromoteToCompany,
   adminUpdatePolicy,
   adminDeletePolicy,
+  adminRestorePolicy,
+  adminBulkPolicyAction,
   adminSetPolicyUsers,
   adminAssociateDocument,
   adminUploadPolicyDocument,
   adminGetDocumentUrl,
+  fetchPolicyAuditTrail,
+  adminGlobalSearch,
   fetchSocialPosts,
   adminCreateSocialPost,
   adminUpdateSocialPost,
@@ -40,6 +44,7 @@ import type {
   Document as DocType,
   CompanyUser,
   PolicyUser,
+  PolicyAuditTrailEntry,
   UserMetricEvent,
   ApiConnection,
   IndividualClient,
@@ -292,6 +297,10 @@ function AdminPage() {
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null)
   const [showUserFormForCompanyId, setShowUserFormForCompanyId] = useState<string | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
+  const [showDeletedPolicies, setShowDeletedPolicies] = useState(false)
+  const [globalQuery, setGlobalQuery] = useState('')
+  const [globalResults, setGlobalResults] = useState<Array<{ id: string; type: string; title: string; subtitle: string }>>([])
+  const [globalSearching, setGlobalSearching] = useState(false)
 
   const reload = async () => {
     const {
@@ -345,11 +354,12 @@ function AdminPage() {
   if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
   const expiringPolicies = policies.filter((p) => {
+    if (p.deletedAt) return false
     const endDate = new Date(p.endDate)
     const now = new Date()
     const diffTime = Math.abs(endDate.getTime() - now.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays <= 60 && (p.status === 'active' || p.status === 'expiring')
+    return diffDays <= 60 && ['active', 'expiring', 'ativa', 'renovacao', 'renovação'].includes(p.status)
   })
 
   const metricsByUser = companyUsers.map((user) => {
@@ -369,12 +379,61 @@ function AdminPage() {
     }
   })
 
+  useEffect(() => {
+    const query = globalQuery.trim()
+    if (query.length < 2) {
+      setGlobalResults([])
+      return
+    }
+
+    const timeout = setTimeout(async () => {
+      setGlobalSearching(true)
+      try {
+        const response = await adminGlobalSearch({ data: { query, limit: 25 } })
+        setGlobalResults(response.results ?? [])
+      } catch (error) {
+        console.error('[adminGlobalSearch] error:', error)
+        setGlobalResults([])
+      } finally {
+        setGlobalSearching(false)
+      }
+    }, 250)
+
+    return () => clearTimeout(timeout)
+  }, [globalQuery])
+
   return (
     <AppLayout>
       <div className="w-full">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-navy-700">Painel de Administração</h1>
           <p className="text-navy-500 mt-1">Gestão de empresas, acessos, apólices, sinistros e integrações</p>
+        </div>
+
+        <div className="mb-6 bg-white border border-navy-200 rounded-[4px] p-4">
+          <label className="block text-xs font-semibold text-navy-500 uppercase tracking-wide mb-2">Pesquisa Global</label>
+          <input
+            value={globalQuery}
+            onChange={(e) => setGlobalQuery(e.target.value)}
+            placeholder="Pesquisar apólices, empresas, utilizadores, sinistros e clientes..."
+            className="w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+          />
+          {globalQuery.trim().length >= 2 && (
+            <div className="mt-3 border border-navy-100 rounded-[2px] max-h-56 overflow-auto">
+              {globalSearching ? (
+                <p className="px-3 py-2 text-xs text-navy-500">A pesquisar...</p>
+              ) : globalResults.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-navy-500">Sem resultados.</p>
+              ) : (
+                globalResults.map((result) => (
+                  <div key={`${result.type}:${result.id}`} className="px-3 py-2 border-b border-navy-100 last:border-b-0">
+                    <p className="text-sm font-semibold text-navy-700">{result.title}</p>
+                    <p className="text-xs text-navy-500">{result.type} · {result.subtitle}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -809,11 +868,9 @@ function AdminPage() {
                                           </div>
                                           <div className="text-right">
                                             <p className="text-sm font-semibold text-navy-700">{formatCurrency(p.annualPremium)}/ano</p>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                              p.status === 'active' ? 'bg-green-100 text-green-700' :
-                                              p.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
-                                              'bg-red-100 text-red-700'
-                                            }`}>{p.status}</span>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full ${POLICY_STATUS_CLASS[p.status] ?? 'bg-red-100 text-red-700'}`}>
+                                              {POLICY_STATUS_LABEL[p.status] ?? p.status}
+                                            </span>
                                           </div>
                                         </div>
                                       ))}
@@ -860,6 +917,15 @@ function AdminPage() {
                         </optgroup>
                       )}
                     </select>
+                    <label className="flex items-center gap-2 text-sm text-navy-600">
+                      <input
+                        type="checkbox"
+                        checked={showDeletedPolicies}
+                        onChange={(e) => setShowDeletedPolicies(e.target.checked)}
+                        className="accent-gold-400"
+                      />
+                      Mostrar eliminadas
+                    </label>
                   </div>
                   <button
                     onClick={() => setShowNewPolicy(!showNewPolicy)}
@@ -883,6 +949,7 @@ function AdminPage() {
 
                 <AdminPolicyList
                   policies={policies.filter((p) => {
+                    if (!showDeletedPolicies && p.deletedAt) return false
                     if (!selectedCompanyId) return true
                     if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
                     return p.companyId === selectedCompanyId
@@ -893,6 +960,7 @@ function AdminPage() {
                   companies={companies}
                   individualClients={individualClients}
                   onReload={reload}
+                  showDeletedPolicies={showDeletedPolicies}
                 />
               </div>
             )}
@@ -3019,16 +3087,26 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const POLICY_STATUS_LABEL: Record<string, string> = {
-  active: 'Ativa', ativa: 'Ativa',
-  expiring: 'A Renovar',
-  expired: 'Expirada', expirada: 'Expirada',
-  cancelled: 'Cancelada', cancelada: 'Cancelada',
+  active: 'Ativa',
+  ativa: 'Ativa',
+  expiring: 'Renovação',
+  renovacao: 'Renovação',
+  'renovação': 'Renovação',
+  expired: 'Expirada',
+  expirada: 'Expirada',
+  cancelled: 'Cancelada',
+  cancelada: 'Cancelada',
 }
 const POLICY_STATUS_CLASS: Record<string, string> = {
-  active: 'bg-green-100 text-green-700', ativa: 'bg-green-100 text-green-700',
+  active: 'bg-green-100 text-green-700',
+  ativa: 'bg-green-100 text-green-700',
   expiring: 'bg-yellow-100 text-yellow-700',
-  expired: 'bg-red-100 text-red-700', expirada: 'bg-red-100 text-red-700',
-  cancelled: 'bg-gray-100 text-gray-600', cancelada: 'bg-gray-100 text-gray-600',
+  renovacao: 'bg-yellow-100 text-yellow-700',
+  'renovação': 'bg-yellow-100 text-yellow-700',
+  expired: 'bg-red-100 text-red-700',
+  expirada: 'bg-red-100 text-red-700',
+  cancelled: 'bg-gray-100 text-gray-600',
+  cancelada: 'bg-gray-100 text-gray-600',
 }
 
 // ─── Admin Policy List ────────────────────────────────────────────────────────
@@ -3041,11 +3119,16 @@ function AdminPolicyList({ policies, documents, companyUsers, policyUsers, compa
   companies: Company[]
   individualClients: IndividualClient[]
   onReload: () => Promise<void>
+  showDeletedPolicies: boolean
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkStatus, setBulkStatus] = useState<'ativa' | 'renovacao' | 'expirada' | 'cancelada'>('renovacao')
 
   if (policies.length === 0) return <p className="text-navy-500 text-sm">Sem apólices para o filtro selecionado.</p>
+
+  const allSelected = selectedIds.length > 0 && selectedIds.length === policies.length
 
   const docsByPolicyId = useMemo(() => {
     const map = new Map<string, DocType[]>()
@@ -3060,22 +3143,87 @@ function AdminPolicyList({ policies, documents, companyUsers, policyUsers, compa
 
   const usersByPolicyId = useMemo(() => {
     const usersById = new Map(companyUsers.map((user) => [user.id, user]))
-    const map = new Map<string, CompanyUser[]>()
+    const map = new Map<string, Array<{ user: CompanyUser; role: PolicyUser['role'] }>>()
     for (const relation of policyUsers) {
       const user = usersById.get(relation.userId)
       if (!user) continue
       const list = map.get(relation.policyId) ?? []
-      list.push(user)
+      list.push({ user, role: relation.role ?? 'viewer' })
       map.set(relation.policyId, list)
     }
     return map
   }, [policyUsers, companyUsers])
 
+  const toggleSelect = (policyId: string) => {
+    setSelectedIds((current) => (
+      current.includes(policyId)
+        ? current.filter((id) => id !== policyId)
+        : [...current, policyId]
+    ))
+  }
+
+  const runBulkAction = async (action: 'status' | 'delete' | 'restore') => {
+    if (selectedIds.length === 0) return
+    await adminBulkPolicyAction({
+      data: {
+        policyIds: selectedIds,
+        action,
+        status: action === 'status' ? bulkStatus : undefined,
+      },
+    })
+    setSelectedIds([])
+    await onReload()
+  }
+
   return (
-    <div className="bg-white rounded-[4px] border border-navy-200 overflow-x-auto">
+    <div className="space-y-3">
+      <div className="bg-white border border-navy-200 rounded-[4px] p-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-navy-500">Selecionadas: {selectedIds.length}</span>
+        <select
+          value={bulkStatus}
+          onChange={(e) => setBulkStatus(e.target.value as any)}
+          className="text-xs border border-navy-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gold-400"
+        >
+          <option value="ativa">Ativa</option>
+          <option value="renovacao">Renovação</option>
+          <option value="expirada">Expirada</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
+        <button
+          onClick={() => runBulkAction('status')}
+          disabled={selectedIds.length === 0}
+          className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 disabled:opacity-50"
+        >
+          Atualizar Estado
+        </button>
+        <button
+          onClick={() => runBulkAction('delete')}
+          disabled={selectedIds.length === 0}
+          className="px-2.5 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
+        >
+          Eliminar em Lote
+        </button>
+        <button
+          onClick={() => runBulkAction('restore')}
+          disabled={selectedIds.length === 0}
+          className="px-2.5 py-1 text-xs border border-green-300 text-green-700 rounded hover:bg-green-50 disabled:opacity-50"
+        >
+          Recuperar em Lote
+        </button>
+      </div>
+
+      <div className="bg-white rounded-[4px] border border-navy-200 overflow-x-auto">
       <table className="w-full min-w-[1200px]">
         <thead>
           <tr className="bg-navy-50 border-b border-navy-200">
+            <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => setSelectedIds(allSelected ? [] : policies.map((policy) => policy.id))}
+                className="accent-gold-400"
+              />
+            </th>
             <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Apólice</th>
             <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Cliente</th>
             <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Seguradora</th>
@@ -3107,10 +3255,19 @@ function AdminPolicyList({ policies, documents, companyUsers, policyUsers, compa
               }))
             const isEditing = editingId === policy.id
             const isExpanded = expandedId === policy.id
+            const isDeleted = Boolean(policy.deletedAt)
 
             return (
               <Fragment key={policy.id}>
-                <tr className="hover:bg-navy-50/50">
+                <tr className={`hover:bg-navy-50/50 ${isDeleted ? 'opacity-60' : ''}`}>
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(policy.id)}
+                      onChange={() => toggleSelect(policy.id)}
+                      className="accent-gold-400"
+                    />
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <button
@@ -3138,35 +3295,48 @@ function AdminPolicyList({ policies, documents, companyUsers, policyUsers, compa
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1.5">
                       <button
+                        disabled={isDeleted}
                         onClick={() => setEditingId(isEditing ? null : policy.id)}
-                        className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                        className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 disabled:opacity-50"
                       >
                         {isEditing ? 'Cancelar' : 'Editar'}
                       </button>
-                      <button
-                        onClick={async () => {
-                          if (!confirm(`Eliminar a apólice ${policy.policyNumber}? Esta ação remove partilhas e relações associadas.`)) return
-                          await adminDeletePolicy({ data: { id: policy.id } })
-                          if (expandedId === policy.id) setExpandedId(null)
-                          if (editingId === policy.id) setEditingId(null)
-                          await onReload()
-                        }}
-                        className="px-2.5 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
-                      >
-                        Eliminar
-                      </button>
+                      {isDeleted ? (
+                        <button
+                          onClick={async () => {
+                            await adminRestorePolicy({ data: { id: policy.id } })
+                            await onReload()
+                          }}
+                          className="px-2.5 py-1 text-xs border border-green-300 text-green-700 rounded hover:bg-green-50"
+                        >
+                          Recuperar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Eliminar a apólice ${policy.policyNumber}? A apólice poderá ser recuperada posteriormente.`)) return
+                            await adminDeletePolicy({ data: { id: policy.id } })
+                            if (expandedId === policy.id) setExpandedId(null)
+                            if (editingId === policy.id) setEditingId(null)
+                            await onReload()
+                          }}
+                          className="px-2.5 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                        >
+                          Eliminar
+                        </button>
+                      )}
                       <button
                         onClick={() => setExpandedId(isExpanded ? null : policy.id)}
                         className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
                       >
-                        {isExpanded ? 'Fechar' : 'Documentos'}
+                        {isExpanded ? 'Fechar' : 'Detalhes'}
                       </button>
                     </div>
                   </td>
                 </tr>
                 {isEditing && (
                   <tr>
-                    <td colSpan={8} className="border-t border-navy-100 bg-navy-50/30 p-4">
+                    <td colSpan={9} className="border-t border-navy-100 bg-navy-50/30 p-4">
                       <PolicyEditForm
                         policy={policy}
                         onSave={async (updates) => {
@@ -3180,8 +3350,8 @@ function AdminPolicyList({ policies, documents, companyUsers, policyUsers, compa
                 )}
                 {isExpanded && !isEditing && (
                   <tr>
-                    <td colSpan={8} className="border-t border-navy-100 bg-navy-50/30 p-4">
-                      <div className="grid lg:grid-cols-2 gap-4">
+                    <td colSpan={9} className="border-t border-navy-100 bg-navy-50/30 p-4">
+                      <div className="grid lg:grid-cols-3 gap-4">
                         <div className="bg-white border border-navy-200 rounded-[4px] p-4">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide">Documentos da apólice</p>
@@ -3215,9 +3385,14 @@ function AdminPolicyList({ policies, documents, companyUsers, policyUsers, compa
                           <PolicyShareManager
                             policyId={policy.id}
                             users={companyScopedUsers}
-                            selectedUserIds={sharedUsers.map((user) => user.id)}
+                            selectedAssignments={sharedUsers.map((item) => ({ userId: item.user.id, role: item.role }))}
                             onSaved={onReload}
+                            disabled={isDeleted}
                           />
+                        </div>
+                        <div className="bg-white border border-navy-200 rounded-[4px] p-4">
+                          <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide mb-2">Histórico</p>
+                          <PolicyAuditTrail policyId={policy.id} />
                         </div>
                       </div>
                     </td>
@@ -3228,6 +3403,7 @@ function AdminPolicyList({ policies, documents, companyUsers, policyUsers, compa
           })}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }
@@ -3235,26 +3411,34 @@ function AdminPolicyList({ policies, documents, companyUsers, policyUsers, compa
 function PolicyShareManager({
   policyId,
   users,
-  selectedUserIds,
+  selectedAssignments,
   onSaved,
+  disabled,
 }: {
   policyId: string
   users: CompanyUser[]
-  selectedUserIds: string[]
+  selectedAssignments: Array<{ userId: string; role: PolicyUser['role'] }>
   onSaved: () => Promise<void>
+  disabled?: boolean
 }) {
-  const [selected, setSelected] = useState<string[]>(selectedUserIds)
+  const [selected, setSelected] = useState<Array<{ userId: string; role: PolicyUser['role'] }>>(selectedAssignments)
   const [open, setOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    setSelected(selectedUserIds)
-  }, [selectedUserIds])
+    setSelected(selectedAssignments)
+  }, [selectedAssignments])
 
   const toggleUser = (userId: string) => {
-    setSelected((current) => current.includes(userId)
-      ? current.filter((id) => id !== userId)
-      : [...current, userId])
+    setSelected((current) => {
+      const exists = current.some((entry) => entry.userId === userId)
+      if (exists) return current.filter((entry) => entry.userId !== userId)
+      return [...current, { userId, role: 'viewer' }]
+    })
+  }
+
+  const updateRole = (userId: string, role: PolicyUser['role']) => {
+    setSelected((current) => current.map((entry) => entry.userId === userId ? { ...entry, role } : entry))
   }
 
   if (users.length === 0) {
@@ -3266,32 +3450,47 @@ function PolicyShareManager({
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="px-3 py-1.5 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300"
+        disabled={disabled}
+        className="px-3 py-1.5 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50"
       >
         {open ? 'Fechar Partilha' : 'Partilhar apólice'}
       </button>
       {open && (
         <>
       <div className="mt-3 max-h-40 overflow-y-auto border border-navy-200 rounded-[2px] p-2 space-y-1.5">
-        {users.map((user) => (
-          <label key={user.id} className="flex items-center gap-2 text-xs text-navy-600">
-            <input
-              type="checkbox"
-              checked={selected.includes(user.id)}
-              onChange={() => toggleUser(user.id)}
-              className="accent-gold-400"
-            />
-            <span>{user.name}</span>
-            <span className="text-navy-400">({user.email})</span>
-          </label>
-        ))}
+        {users.map((user) => {
+          const assignment = selected.find((entry) => entry.userId === user.id)
+          return (
+            <div key={user.id} className="flex items-center gap-2 text-xs text-navy-600">
+              <input
+                type="checkbox"
+                checked={Boolean(assignment)}
+                onChange={() => toggleUser(user.id)}
+                className="accent-gold-400"
+              />
+              <span>{user.name}</span>
+              <span className="text-navy-400">({user.email})</span>
+              {assignment && (
+                <select
+                  value={assignment.role}
+                  onChange={(e) => updateRole(user.id, e.target.value as PolicyUser['role'])}
+                  className="ml-auto border border-navy-200 rounded px-1 py-0.5 text-xs"
+                >
+                  <option value="owner">owner</option>
+                  <option value="editor">editor</option>
+                  <option value="viewer">viewer</option>
+                </select>
+              )}
+            </div>
+          )
+        })}
       </div>
       <div className="mt-3 flex items-center gap-2">
         <button
-          disabled={saving}
+          disabled={saving || disabled}
           onClick={async () => {
             setSaving(true)
-            await adminSetPolicyUsers({ data: { policyId, userIds: selected } })
+            await adminSetPolicyUsers({ data: { policyId, assignments: selected } })
             setSaving(false)
             await onSaved()
           }}
@@ -3304,6 +3503,42 @@ function PolicyShareManager({
       </>
       )}
     </div>
+  )
+}
+
+function PolicyAuditTrail({ policyId }: { policyId: string }) {
+  const [items, setItems] = useState<PolicyAuditTrailEntry[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    fetchPolicyAuditTrail({ data: { policyId, limit: 30 } })
+      .then((data) => {
+        if (active) setItems(data ?? [])
+      })
+      .catch((error) => {
+        console.error('[fetchPolicyAuditTrail] error:', error)
+        if (active) setItems([])
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [policyId])
+
+  if (loading) return <p className="text-xs text-navy-400">A carregar histórico...</p>
+  if (items.length === 0) return <p className="text-xs text-navy-400">Sem histórico.</p>
+
+  return (
+    <ul className="space-y-2 max-h-64 overflow-auto">
+      {items.map((item) => (
+        <li key={item.id} className="text-xs text-navy-600 border border-navy-100 rounded p-2">
+          <p className="font-semibold">{item.action} · {item.entity}</p>
+          <p className="text-navy-400">{formatDate(item.timestamp)} · user: {item.userId}</p>
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -3507,7 +3742,7 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
           <label className={lbl}>Estado</label>
           <select value={form.status} onChange={e => u('status', e.target.value)} className={inp}>
             {Object.entries(POLICY_STATUS_LABEL)
-              .filter(([k]) => ['active','expiring','expired','cancelled'].includes(k))
+              .filter(([k]) => ['ativa', 'renovacao', 'expirada', 'cancelada'].includes(k))
               .map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </div>

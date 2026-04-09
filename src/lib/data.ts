@@ -8,6 +8,7 @@ import type {
   Company,
   CompanyUser,
   PolicyUser,
+  PolicyAuditTrailEntry,
   Policy,
   Claim,
   Document,
@@ -176,28 +177,62 @@ export async function getPolicyUsers(policyId?: string): Promise<PolicyUser[]> {
   if (policyId) query = query.eq('policy_id', policyId)
   const { data, error } = await query
   if (error) { console.error('getPolicyUsers error:', error); return [] }
-  return rowsToCamel<PolicyUser>(data ?? [])
+  return rowsToCamel<PolicyUser>(data ?? []).map((item) => ({
+    ...item,
+    role: item.role ?? 'viewer',
+  }))
 }
 
 export async function getPolicyUsersByUser(userId: string): Promise<PolicyUser[]> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('policy_users').select('*').eq('user_id', userId)
   if (error) { console.error('getPolicyUsersByUser error:', error); return [] }
-  return rowsToCamel<PolicyUser>(data ?? [])
+  return rowsToCamel<PolicyUser>(data ?? []).map((item) => ({
+    ...item,
+    role: item.role ?? 'viewer',
+  }))
 }
 
-export async function setPolicyUsers(policyId: string, userIds: string[]): Promise<void> {
+export async function getPolicyUser(policyId: string, userId: string): Promise<PolicyUser | undefined> {
   const sb = getSupabaseAdmin()
-  const uniqueUserIds = Array.from(new Set(userIds.filter(Boolean)))
+  const { data, error } = await sb
+    .from('policy_users')
+    .select('*')
+    .eq('policy_id', policyId)
+    .eq('user_id', userId)
+    .maybeSingle()
+  if (error || !data) return undefined
+  const mapped = objectToCamel(data) as PolicyUser
+  return {
+    ...mapped,
+    role: mapped.role ?? 'viewer',
+  }
+}
+
+export async function setPolicyUsers(
+  policyId: string,
+  assignments: Array<string | { userId: string; role: PolicyUser['role'] }>
+): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const normalizedEntries = assignments
+    .map((entry) => {
+      if (typeof entry === 'string') return { userId: entry, role: 'viewer' as const }
+      return { userId: entry.userId, role: entry.role }
+    })
+    .filter((entry) => entry.userId)
+  const byUserId = new Map<string, { userId: string; role: PolicyUser['role'] }>()
+  for (const entry of normalizedEntries) byUserId.set(entry.userId, entry)
+  const uniqueEntries = Array.from(byUserId.values())
   const { error: deleteError } = await sb.from('policy_users').delete().eq('policy_id', policyId)
   if (deleteError) {
     console.error('setPolicyUsers delete existing error:', deleteError)
     return
   }
-  if (uniqueUserIds.length === 0) return
-  const rows = uniqueUserIds.map((userId) => ({
+  if (uniqueEntries.length === 0) return
+  const rows = uniqueEntries.map((entry) => ({
     policy_id: policyId,
-    user_id: userId,
+    user_id: entry.userId,
+    role: entry.role,
   }))
   const { error: insertError } = await sb.from('policy_users').insert(rows as any)
   if (insertError) console.error('setPolicyUsers insert error:', insertError)
@@ -206,27 +241,32 @@ export async function setPolicyUsers(policyId: string, userIds: string[]): Promi
 // ============================================================
 // Policies
 // ============================================================
-export async function getPolicies(companyId?: string): Promise<Policy[]> {
+export async function getPolicies(companyId?: string, options?: { includeDeleted?: boolean }): Promise<Policy[]> {
   const sb = getSupabaseAdmin()
   let query = sb.from('policies').select('*').order('created_at', { ascending: true })
   if (companyId) query = query.eq('company_id', companyId)
+  if (!options?.includeDeleted) query = query.is('deleted_at', null)
   const { data, error } = await query
   if (error) { console.error('getPolicies error:', error); return [] }
   return rowsToCamel<Policy>(data ?? [])
 }
 
-export async function getPolicy(id: string): Promise<Policy | undefined> {
+export async function getPolicy(id: string, options?: { includeDeleted?: boolean }): Promise<Policy | undefined> {
   const sb = getSupabaseAdmin()
-  const { data, error } = await sb.from('policies').select('*').eq('id', id).single()
+  let query = sb.from('policies').select('*').eq('id', id)
+  if (!options?.includeDeleted) query = query.is('deleted_at', null)
+  const { data, error } = await query.single()
   if (error) return undefined
   return objectToCamel(data) as Policy
 }
 
-export async function getPoliciesByIds(ids: string[]): Promise<Policy[]> {
+export async function getPoliciesByIds(ids: string[], options?: { includeDeleted?: boolean }): Promise<Policy[]> {
   const uniqueIds = Array.from(new Set(ids.filter(Boolean)))
   if (uniqueIds.length === 0) return []
   const sb = getSupabaseAdmin()
-  const { data, error } = await sb.from('policies').select('*').in('id', uniqueIds)
+  let query = sb.from('policies').select('*').in('id', uniqueIds)
+  if (!options?.includeDeleted) query = query.is('deleted_at', null)
+  const { data, error } = await query
   if (error) { console.error('getPoliciesByIds error:', error); return [] }
   return rowsToCamel<Policy>(data ?? [])
 }
@@ -245,8 +285,14 @@ export async function updatePolicy(id: string, updates: Partial<Policy>): Promis
 
 export async function deletePolicy(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('policies').delete().eq('id', id)
+  const { error } = await sb.from('policies').update({ deleted_at: new Date().toISOString() }).eq('id', id)
   if (error) console.error('deletePolicy error:', error)
+}
+
+export async function restorePolicy(id: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('policies').update({ deleted_at: null }).eq('id', id)
+  if (error) console.error('restorePolicy error:', error)
 }
 
 export async function deletePolicyRelations(id: string): Promise<void> {
@@ -460,6 +506,38 @@ export async function createSocialPost(post: SocialPost): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('social_posts').insert(objectToSnake(post as unknown as Record<string, unknown>))
   if (error) console.error('createSocialPost error:', error)
+}
+
+// ============================================================
+// Policy Audit Trail
+// ============================================================
+export async function createPolicyAuditTrailEntry(entry: Omit<PolicyAuditTrailEntry, 'id'>): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const payload = {
+    policy_id: entry.policyId,
+    user_id: entry.userId,
+    action: entry.action,
+    entity: entry.entity,
+    timestamp: entry.timestamp,
+    changes: entry.changes,
+  }
+  const { error } = await sb.from('policy_audit_trail').insert(payload as any)
+  if (error) console.error('createPolicyAuditTrailEntry error:', error)
+}
+
+export async function getPolicyAuditTrail(policyId: string, limit = 50): Promise<PolicyAuditTrailEntry[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('policy_audit_trail')
+    .select('*')
+    .eq('policy_id', policyId)
+    .order('timestamp', { ascending: false })
+    .limit(limit)
+  if (error) {
+    console.error('getPolicyAuditTrail error:', error)
+    return []
+  }
+  return rowsToCamel<PolicyAuditTrailEntry>(data ?? [])
 }
 
 export async function updateSocialPost(id: string, updates: Partial<SocialPost>): Promise<void> {

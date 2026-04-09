@@ -9,6 +9,8 @@ import type {
   RenewalAlertItem,
   RenewalAlertHistoryItem,
   RenewalAlertStatus,
+  PolicyUser,
+  PolicyAuditTrailEntry,
 } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
@@ -116,6 +118,60 @@ async function getViewerScope() {
   return scope
 }
 
+type CanonicalPolicyStatus = 'ativa' | 'renovacao' | 'expirada' | 'cancelada'
+
+function toCanonicalPolicyStatus(status?: string | null): CanonicalPolicyStatus {
+  const normalized = (status ?? '').trim().toLowerCase()
+  if (normalized === 'active' || normalized === 'ativa') return 'ativa'
+  if (normalized === 'expiring' || normalized === 'renovacao' || normalized === 'renovação') return 'renovacao'
+  if (normalized === 'expired' || normalized === 'expirada') return 'expirada'
+  return 'cancelada'
+}
+
+function isPolicyOperational(status?: string | null): boolean {
+  const canonical = toCanonicalPolicyStatus(status)
+  return canonical === 'ativa' || canonical === 'renovacao'
+}
+
+async function getPolicyRoleForViewer(
+  policyId: string,
+  scope: Awaited<ReturnType<typeof getViewerScope>>
+): Promise<PolicyUser['role'] | null> {
+  if (scope.isAdmin) return 'owner'
+  const viewerEmail = scope.user.email?.trim().toLowerCase()
+  if (!viewerEmail) return null
+  const companyUser = await db.getCompanyUserByEmail(viewerEmail)
+  if (!companyUser) return null
+  const relation = await db.getPolicyUser(policyId, companyUser.id)
+  if (!relation) return null
+  return relation.role ?? 'viewer'
+}
+
+function canManagePolicyByRole(role: PolicyUser['role'] | null): boolean {
+  return role === 'owner' || role === 'editor'
+}
+
+function canDeletePolicyByRole(role: PolicyUser['role'] | null): boolean {
+  return role === 'owner'
+}
+
+async function appendPolicyAuditTrail(input: {
+  policyId: string
+  userId: string
+  action: PolicyAuditTrailEntry['action']
+  entity: string
+  changes: Record<string, unknown>
+}) {
+  await db.createPolicyAuditTrailEntry({
+    policyId: input.policyId,
+    userId: input.userId,
+    action: input.action,
+    entity: input.entity,
+    timestamp: new Date().toISOString(),
+    changes: input.changes,
+  })
+}
+
 // Dashboard — endpoint unificado: retorna stats + alertas + apólices numa só chamada
 export const fetchDashboardAll = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
@@ -129,16 +185,16 @@ export const fetchDashboardAll = createServerFn({ method: 'GET' })
       db.getAlerts(companyId),
     ])
 
-    const activePolicies = policies.filter((p) => p.status === 'active' || p.status === 'expiring').length
+    const activePolicies = policies.filter((p) => isPolicyOperational(p.status)).length
     const annualPremiums = policies
-      .filter((p) => p.status === 'active' || p.status === 'expiring')
+      .filter((p) => isPolicyOperational(p.status))
       .reduce((sum, p) => sum + p.annualPremium, 0)
 
     const now = new Date()
     const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
     const renewalsIn90Days = policies.filter((p) => {
       const endDate = new Date(p.endDate)
-      return endDate >= now && endDate <= in90Days && (p.status === 'active' || p.status === 'expiring')
+      return endDate >= now && endDate <= in90Days && isPolicyOperational(p.status)
     }).length
 
     const openClaims = claims.filter(
@@ -160,16 +216,16 @@ export const fetchDashboardStats = createServerFn({ method: 'GET' })
       db.getClaims(scope.companyId ?? undefined),
     ])
 
-    const activePolicies = policies.filter((p) => p.status === 'active' || p.status === 'expiring').length
+    const activePolicies = policies.filter((p) => isPolicyOperational(p.status)).length
     const annualPremiums = policies
-      .filter((p) => p.status === 'active' || p.status === 'expiring')
+      .filter((p) => isPolicyOperational(p.status))
       .reduce((sum, p) => sum + p.annualPremium, 0)
 
     const now = new Date()
     const in90Days = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
     const renewalsIn90Days = policies.filter((p) => {
       const endDate = new Date(p.endDate)
-      return endDate >= now && endDate <= in90Days && (p.status === 'active' || p.status === 'expiring')
+      return endDate >= now && endDate <= in90Days && isPolicyOperational(p.status)
     }).length
 
     const openClaims = claims.filter(
@@ -377,7 +433,7 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       db.getCompanyUsers(),
       db.getUserMetricEvents(),
       db.getApiConnections(),
-      db.getPolicies(),
+      db.getPolicies(undefined, { includeDeleted: true }),
       db.getPolicyUsers(),
       db.getClaims(),
       db.getDocuments(),
@@ -416,6 +472,16 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       documents,
       individualClients: filteredIndividualClients,
     }
+  })
+
+export const fetchPolicyAuditTrail = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { policyId: string; limit?: number }) => d)
+  .handler(async ({ data }) => {
+    const policyId = data.policyId?.trim()
+    if (!policyId) throw new Error('Apólice inválida')
+    const limit = data.limit && data.limit > 0 ? Math.min(data.limit, 200) : 50
+    return db.getPolicyAuditTrail(policyId, limit)
   })
 
 function normalizePaymentFrequency(value?: string): 'monthly' | 'quarterly' | 'semiannual' | 'annual' {
@@ -460,7 +526,7 @@ function monthKeyFromDate(date: Date): string {
 }
 
 function isPolicyActiveInMonth(policy: { startDate: string; endDate: string; status: string }, year: number, month: number): boolean {
-  if (!['active', 'expiring'].includes(policy.status)) return false
+  if (!isPolicyOperational(policy.status)) return false
   const policyStart = parseDateToUtc(policy.startDate)
   const policyEnd = parseDateToUtc(policy.endDate)
   if (!policyStart || !policyEnd) return true
@@ -616,7 +682,7 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
     const alerts: RenewalAlertItem[] = []
 
     for (const policy of policies) {
-      if (!['active', 'expiring'].includes(policy.status)) continue
+      if (!isPolicyOperational(policy.status)) continue
       const startDate = parseDateToUtc(policy.startDate)
       if (!startDate) continue
 
@@ -1101,6 +1167,8 @@ export const adminCreatePolicy = createServerFn({ method: 'POST' })
     }) => d
   )
   .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const now = new Date().toISOString()
     const id = `pol_${Date.now()}`
     await db.createPolicy({
       id,
@@ -1108,8 +1176,27 @@ export const adminCreatePolicy = createServerFn({ method: 'POST' })
       companyId: data.companyId || '',
       individualClientId: data.individualClientId || undefined,
       type: data.type as any,
-      status: 'active',
-      createdAt: new Date().toISOString(),
+      status: 'ativa',
+      createdAt: now,
+    })
+    if (data.companyId) {
+      const companyUsers = await db.getCompanyUsers(data.companyId)
+      const owner = companyUsers.find((user) => user.role === 'owner') ?? companyUsers[0]
+      if (owner) {
+        await db.setPolicyUsers(id, [{ userId: owner.id, role: 'owner' }])
+      }
+    }
+    await appendPolicyAuditTrail({
+      policyId: id,
+      userId: scope.user.id,
+      action: 'create',
+      entity: 'policy',
+      changes: {
+        policyNumber: data.policyNumber,
+        status: 'ativa',
+        companyId: data.companyId ?? null,
+        individualClientId: data.individualClientId ?? null,
+      },
     })
     return { id }
   })
@@ -1118,7 +1205,21 @@ export const adminUpdatePolicy = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: string; updates: any }) => d)
   .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const previous = await db.getPolicy(data.id, { includeDeleted: true })
+    if (!previous) throw new Error('Apólice não encontrada')
+
     await db.updatePolicy(data.id, data.updates)
+    await appendPolicyAuditTrail({
+      policyId: data.id,
+      userId: scope.user.id,
+      action: 'update',
+      entity: 'policy',
+      changes: {
+        before: previous,
+        after: data.updates,
+      },
+    })
     return { success: true }
   })
 
@@ -1126,34 +1227,226 @@ export const adminDeletePolicy = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data }) => {
-    const policy = await db.getPolicy(data.id)
+    const scope = await getViewerScope()
+    const policy = await db.getPolicy(data.id, { includeDeleted: true })
     if (!policy) throw new Error('Apólice não encontrada')
+    if (policy.deletedAt) return { success: true, alreadyDeleted: true }
 
-    await db.deletePolicyRelations(data.id)
     await db.deletePolicy(data.id)
+    await appendPolicyAuditTrail({
+      policyId: data.id,
+      userId: scope.user.id,
+      action: 'delete',
+      entity: 'policy',
+      changes: {
+        deletedAt: new Date().toISOString(),
+      },
+    })
     return { success: true }
+  })
+
+export const adminRestorePolicy = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { id: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const policy = await db.getPolicy(data.id, { includeDeleted: true })
+    if (!policy) throw new Error('Apólice não encontrada')
+    if (!policy.deletedAt) return { success: true, alreadyActive: true }
+
+    await db.restorePolicy(data.id)
+    await appendPolicyAuditTrail({
+      policyId: data.id,
+      userId: scope.user.id,
+      action: 'update',
+      entity: 'policy',
+      changes: {
+        restoredFromDeletedAt: policy.deletedAt,
+      },
+    })
+    return { success: true }
+  })
+
+export const adminBulkPolicyAction = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { policyIds: string[]; action: 'status' | 'delete' | 'restore'; status?: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const uniquePolicyIds = Array.from(new Set((data.policyIds ?? []).map((id) => id?.trim()).filter(Boolean)))
+    if (!uniquePolicyIds.length) return { success: true, affected: 0 }
+
+    const policies = await db.getPoliciesByIds(uniquePolicyIds, { includeDeleted: true })
+    const policyById = new Map(policies.map((policy) => [policy.id, policy]))
+    const validStatuses = new Set(['ativa', 'renovacao', 'expirada', 'cancelada', 'active', 'expiring', 'expired', 'cancelled'])
+    let affected = 0
+
+    for (const policyId of uniquePolicyIds) {
+      const policy = policyById.get(policyId)
+      if (!policy) continue
+
+      if (data.action === 'delete') {
+        if (policy.deletedAt) continue
+        await db.deletePolicy(policyId)
+        await appendPolicyAuditTrail({
+          policyId,
+          userId: scope.user.id,
+          action: 'delete',
+          entity: 'policy',
+          changes: { bulk: true, deletedAt: new Date().toISOString() },
+        })
+        affected += 1
+        continue
+      }
+
+      if (data.action === 'restore') {
+        if (!policy.deletedAt) continue
+        await db.restorePolicy(policyId)
+        await appendPolicyAuditTrail({
+          policyId,
+          userId: scope.user.id,
+          action: 'update',
+          entity: 'policy',
+          changes: { bulk: true, restoredFromDeletedAt: policy.deletedAt },
+        })
+        affected += 1
+        continue
+      }
+
+      if (data.action === 'status') {
+        if (!data.status || !validStatuses.has(data.status)) continue
+        await db.updatePolicy(policyId, { status: data.status as any })
+        await appendPolicyAuditTrail({
+          policyId,
+          userId: scope.user.id,
+          action: 'update',
+          entity: 'policy',
+          changes: { bulk: true, status: data.status },
+        })
+        affected += 1
+      }
+    }
+
+    return { success: true, affected }
+  })
+
+export const adminGlobalSearch = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { query: string; limit?: number }) => d)
+  .handler(async ({ data }) => {
+    const query = data.query?.trim().toLowerCase()
+    if (!query || query.length < 2) return { query: '', results: [] as Array<{ id: string; type: string; title: string; subtitle: string }> }
+
+    const limit = data.limit && data.limit > 0 ? Math.min(data.limit, 100) : 30
+    const [companies, companyUsers, policies, claims, individualClients] = await Promise.all([
+      db.getCompanies(),
+      db.getCompanyUsers(),
+      db.getPolicies(undefined, { includeDeleted: true }),
+      db.getClaims(),
+      db.getIndividualClients(),
+    ])
+
+    const contains = (...values: Array<string | undefined>) => values.some((value) => value?.toLowerCase().includes(query))
+    const companyById = new Map(companies.map((company) => [company.id, company]))
+    const policyResults = policies
+      .filter((policy) => contains(policy.policyNumber, policy.insurer, policy.description))
+      .map((policy) => ({
+        id: policy.id,
+        type: 'policy',
+        title: policy.policyNumber,
+        subtitle: `${policy.insurer} · ${companyById.get(policy.companyId)?.name ?? 'Cliente individual'}`,
+      }))
+    const companyResults = companies
+      .filter((company) => contains(company.name, company.nif, company.contactEmail))
+      .map((company) => ({
+        id: company.id,
+        type: 'company',
+        title: company.name,
+        subtitle: `${company.nif} · ${company.contactEmail}`,
+      }))
+    const userResults = companyUsers
+      .filter((user) => contains(user.name, user.email))
+      .map((user) => ({
+        id: user.id,
+        type: 'user',
+        title: user.name,
+        subtitle: `${user.email} · ${user.role}`,
+      }))
+    const claimResults = claims
+      .filter((claim) => contains(claim.title, claim.description, claim.id))
+      .map((claim) => ({
+        id: claim.id,
+        type: 'claim',
+        title: claim.title,
+        subtitle: `Sinistro ${claim.id} · ${claim.status}`,
+      }))
+    const clientResults = individualClients
+      .filter((client) => contains(client.fullName, client.email, client.nif))
+      .map((client) => ({
+        id: client.id,
+        type: 'individual_client',
+        title: client.fullName,
+        subtitle: `${client.email ?? 'sem email'} · ${client.nif ?? 'sem NIF'}`,
+      }))
+
+    return {
+      query: data.query,
+      results: [...policyResults, ...companyResults, ...userResults, ...claimResults, ...clientResults].slice(0, limit),
+    }
   })
 
 export const adminSetPolicyUsers = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
-  .inputValidator((d: { policyId: string; userIds: string[] }) => d)
+  .inputValidator((d: { policyId: string; userIds?: string[]; assignments?: Array<{ userId: string; role: PolicyUser['role'] }> }) => d)
   .handler(async ({ data }) => {
-    const policy = await db.getPolicy(data.policyId)
+    const scope = await getViewerScope()
+    const policy = await db.getPolicy(data.policyId, { includeDeleted: true })
     if (!policy) throw new Error('Apólice não encontrada')
+
+    const rawAssignments = data.assignments
+      ?? (data.userIds ?? []).map((userId) => ({ userId, role: 'viewer' as const }))
+    const validRoles: PolicyUser['role'][] = ['owner', 'editor', 'viewer']
 
     const companyUsers = await db.getCompanyUsers(policy.companyId)
     const validUserIds = new Set(companyUsers.map((item) => item.id))
-    const sanitizedUserIds = data.userIds.filter((userId) => validUserIds.has(userId))
+    const sanitizedAssignments = rawAssignments
+      .filter((entry) => validUserIds.has(entry.userId))
+      .map((entry) => ({
+        userId: entry.userId,
+        role: validRoles.includes(entry.role) ? entry.role : 'viewer',
+      }))
 
-    await db.setPolicyUsers(data.policyId, sanitizedUserIds)
-    return { success: true, assigned: sanitizedUserIds.length }
+    if (sanitizedAssignments.length > 0 && !sanitizedAssignments.some((entry) => entry.role === 'owner')) {
+      sanitizedAssignments[0] = { ...sanitizedAssignments[0], role: 'owner' }
+    }
+
+    await db.setPolicyUsers(data.policyId, sanitizedAssignments)
+    await appendPolicyAuditTrail({
+      policyId: data.policyId,
+      userId: scope.user.id,
+      action: 'share',
+      entity: 'policy_users',
+      changes: {
+        assignments: sanitizedAssignments,
+      },
+    })
+    return { success: true, assigned: sanitizedAssignments.length }
   })
 
 export const adminAssociateDocument = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { documentId: string; policyId: string }) => d)
   .handler(async ({ data }) => {
+    const scope = await getViewerScope()
     await db.updateDocument(data.documentId, { policyId: data.policyId })
+    await appendPolicyAuditTrail({
+      policyId: data.policyId,
+      userId: scope.user.id,
+      action: 'upload',
+      entity: 'document_association',
+      changes: {
+        documentId: data.documentId,
+      },
+    })
     return { success: true }
   })
 
@@ -1161,6 +1454,7 @@ export const adminUploadPolicyDocument = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { policyId: string; companyId?: string; individualClientId?: string; name: string; storagePath: string; size: number; category: string }) => d)
   .handler(async ({ data }) => {
+    const scope = await getViewerScope()
     await db.createDocument({
       id: crypto.randomUUID(),
       companyId: data.companyId ?? '',
@@ -1171,6 +1465,17 @@ export const adminUploadPolicyDocument = createServerFn({ method: 'POST' })
       uploadedAt: new Date().toISOString(),
       blobKey: data.storagePath,
       policyId: data.policyId,
+    })
+    await appendPolicyAuditTrail({
+      policyId: data.policyId,
+      userId: scope.user.id,
+      action: 'upload',
+      entity: 'document',
+      changes: {
+        name: data.name,
+        category: data.category,
+        size: data.size,
+      },
     })
     return { success: true }
   })
@@ -1500,14 +1805,35 @@ export const createPolicy = createServerFn({ method: 'POST' })
     const companyId = scope.companyId ?? data.companyId
     if (!companyId) throw new Error('Empresa não associada ao utilizador')
 
+    if (!scope.isAdmin && scope.companyId && scope.companyId !== companyId) {
+      throw new Error('Sem permissões para criar apólices nesta empresa')
+    }
+
     const id = `pol_${Date.now()}`
+    const now = new Date().toISOString()
     await db.createPolicy({
       id,
       ...data,
       companyId,
       type: data.type as any,
-      status: 'active',
-      createdAt: new Date().toISOString(),
+      status: 'ativa',
+      createdAt: now,
+    })
+
+    const viewerEmail = scope.user.email?.trim().toLowerCase()
+    const companyUser = viewerEmail ? await db.getCompanyUserByEmail(viewerEmail) : undefined
+    if (companyUser) {
+      await db.setPolicyUsers(id, [{ userId: companyUser.id, role: 'owner' }])
+    }
+    await appendPolicyAuditTrail({
+      policyId: id,
+      userId: scope.user.id,
+      action: 'create',
+      entity: 'policy',
+      changes: {
+        policyNumber: data.policyNumber,
+        companyId,
+      },
     })
     return { id }
   })
@@ -1521,7 +1847,27 @@ export const updatePolicy = createServerFn({ method: 'POST' })
     }) => d
   )
   .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const policy = await db.getPolicy(data.id)
+    if (!policy) throw new Error('Apólice não encontrada')
+
+    const role = await getPolicyRoleForViewer(data.id, scope)
+    const shares = await db.getPolicyUsers(data.id)
+    const allowedByCompanyFallback = shares.length === 0 && !!scope.companyId && policy.companyId === scope.companyId
+    if (!scope.isAdmin && !allowedByCompanyFallback && !canManagePolicyByRole(role)) {
+      throw new Error('Sem permissões para atualizar esta apólice')
+    }
+
     await db.updatePolicy(data.id, data.updates)
+    await appendPolicyAuditTrail({
+      policyId: data.id,
+      userId: scope.user.id,
+      action: 'update',
+      entity: 'policy',
+      changes: {
+        updates: data.updates,
+      },
+    })
     return { success: true }
   })
 
@@ -1533,17 +1879,23 @@ export const deletePolicy = createServerFn({ method: 'POST' })
     const policy = await db.getPolicy(id)
     if (!policy) throw new Error('Apólice não encontrada')
 
-    const viewerEmail = scope.user.email?.trim().toLowerCase()
-    const companyUser = viewerEmail ? await db.getCompanyUserByEmail(viewerEmail) : undefined
-    const sharedRelations = companyUser ? await db.getPolicyUsersByUser(companyUser.id) : []
-    const isSharedWithViewer = sharedRelations.some((item) => item.policyId === id)
-    const allowedByCompany = !!scope.companyId && policy.companyId === scope.companyId
-    if (!allowedByCompany && !isSharedWithViewer && !scope.isAdmin) {
+    const role = await getPolicyRoleForViewer(id, scope)
+    const shares = await db.getPolicyUsers(id)
+    const allowedByCompanyFallback = shares.length === 0 && !!scope.companyId && policy.companyId === scope.companyId
+    if (!scope.isAdmin && !allowedByCompanyFallback && !canDeletePolicyByRole(role)) {
       throw new Error('Sem permissões para eliminar esta apólice')
     }
 
-    await db.deletePolicyRelations(id)
     await db.deletePolicy(id)
+    await appendPolicyAuditTrail({
+      policyId: id,
+      userId: scope.user.id,
+      action: 'delete',
+      entity: 'policy',
+      changes: {
+        deletedAt: new Date().toISOString(),
+      },
+    })
     return { success: true }
   })
 
