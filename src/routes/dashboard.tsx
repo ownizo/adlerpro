@@ -1,10 +1,10 @@
 import { createFileRoute, Navigate, Link } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { OnboardingBanner } from '@/components/OnboardingBanner'
-import { fetchDashboardAll } from '@/lib/server-fns'
+import { fetchDashboardAll, fetchClaims } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import type { DashboardStats, Alert, Policy } from '@/lib/types'
-import { POLICY_TYPE_LABELS } from '@/lib/types'
+import type { DashboardStats, Alert, Policy, Claim } from '@/lib/types'
+import { CLAIM_STATUS_LABELS, POLICY_TYPE_LABELS } from '@/lib/types'
 import { useState, useEffect, useMemo } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { useTranslation } from 'react-i18next'
@@ -27,6 +27,19 @@ const POLICY_TYPE_COLORS: Record<string, { bg: string; text: string; dot: string
   other:                { bg: '#F8F8F8', text: '#444444', dot: '#999999' },
 }
 
+const REFRESH_INTERVAL_MS = 30_000
+const CLOSED_CLAIM_STATUSES = ['approved', 'denied', 'paid']
+type TaskUrgency = 'critical' | 'upcoming' | 'remaining'
+
+type AttentionTask = {
+  id: string
+  title: string
+  subtitle: string
+  to: '/policies' | '/claims'
+  date: string
+  urgency: TaskUrgency
+}
+
 function daysUntil(dateStr: string): number {
   const now = new Date()
   now.setHours(0, 0, 0, 0)
@@ -41,22 +54,43 @@ function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
+  const [claims, setClaims] = useState<Claim[]>([])
   const [loading, setLoading] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(true)
 
   useEffect(() => {
     if (!ready || !user) return
-    fetchDashboardAll()
-      .then(({ stats: s, alerts: a, policies: p }) => {
+
+    let cancelled = false
+
+    const loadDashboard = async (initialLoad = false) => {
+      if (initialLoad) setLoading(true)
+      try {
+        const [{ stats: s, alerts: a, policies: p }, claimsData] = await Promise.all([
+          fetchDashboardAll(),
+          fetchClaims(),
+        ])
+        if (cancelled) return
         setStats(s)
         setAlerts(a)
         setPolicies(p)
-        setLoading(false)
-      })
-      .catch((err) => {
-        console.error('Erro ao carregar dashboard:', err)
-        setLoading(false)
-      })
+        setClaims(claimsData)
+      } catch (err) {
+        if (!cancelled) console.error('Erro ao carregar dashboard:', err)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadDashboard(true)
+    const interval = window.setInterval(() => {
+      loadDashboard(false)
+    }, REFRESH_INTERVAL_MS)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [ready, user])
 
   // Apólices a renovar nos próximos 90 dias, ordenadas por urgência
@@ -117,6 +151,79 @@ function DashboardPage() {
       borderColor: '#BBF7D0',
     }
   }, [renewalAlerts, policies])
+
+  const attentionGroups = useMemo(() => {
+    const urgencyRank: Record<TaskUrgency, number> = {
+      critical: 0,
+      upcoming: 1,
+      remaining: 2,
+    }
+
+    const sortedByUrgency = (items: AttentionTask[]) =>
+      [...items].sort((a, b) => {
+        const urgencyDiff = urgencyRank[a.urgency] - urgencyRank[b.urgency]
+        if (urgencyDiff !== 0) return urgencyDiff
+        return new Date(a.date).getTime() - new Date(b.date).getTime()
+      })
+
+    const renewals: AttentionTask[] = policies
+      .filter((policy) => {
+        const days = daysUntil(policy.endDate)
+        return days >= 0 && days <= 90 && (policy.status === 'active' || policy.status === 'expiring')
+      })
+      .map((policy) => {
+        const days = daysUntil(policy.endDate)
+        const urgency: TaskUrgency = days <= 14 ? 'critical' : days <= 30 ? 'upcoming' : 'remaining'
+        return {
+          id: `renewal_${policy.id}`,
+          title: `${POLICY_TYPE_LABELS[policy.type] || policy.type} · ${policy.policyNumber}`,
+          subtitle: `Renovação em ${days} dias · ${policy.insurer}`,
+          to: '/policies',
+          date: policy.endDate,
+          urgency,
+        }
+      })
+
+    const missingDocuments: AttentionTask[] = alerts
+      .filter((alert) => alert.type === 'document')
+      .map((alert) => {
+        const ageInDays = Math.max(0, daysUntil(alert.createdAt) * -1)
+        const urgency: TaskUrgency = !alert.read ? 'critical' : ageInDays <= 7 ? 'upcoming' : 'remaining'
+        return {
+          id: `document_${alert.id}`,
+          title: alert.title,
+          subtitle: alert.message,
+          to: '/policies',
+          date: alert.createdAt,
+          urgency,
+        }
+      })
+
+    const claimsInProgress: AttentionTask[] = claims
+      .filter((claim) => !CLOSED_CLAIM_STATUSES.includes(claim.status))
+      .map((claim) => {
+        const urgency: TaskUrgency =
+          claim.status === 'documentation' || claim.status === 'assessment'
+            ? 'critical'
+            : claim.status === 'under_review'
+              ? 'upcoming'
+              : 'remaining'
+        return {
+          id: `claim_${claim.id}`,
+          title: claim.title,
+          subtitle: `${CLAIM_STATUS_LABELS[claim.status]} · ${formatDate(claim.incidentDate)}`,
+          to: '/claims',
+          date: claim.incidentDate,
+          urgency,
+        }
+      })
+
+    return {
+      renewals: sortedByUrgency(renewals),
+      documents: sortedByUrgency(missingDocuments),
+      claims: sortedByUrgency(claimsInProgress),
+    }
+  }, [policies, alerts, claims])
 
   if (!ready) {
     return (
@@ -373,64 +480,29 @@ function DashboardPage() {
                 </div>
               </div>
 
-              {/* Right column: Alertas */}
+              {/* Right column: Centro de tarefas */}
               <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', overflow: 'hidden', alignSelf: 'start' }}>
-                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eeeeee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eeeeee' }}>
                   <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#111111', margin: 0 }}>
-                    {t('dashboard.alerts')}
+                    {t('dashboard.attentionCenterTitle')}
                   </h2>
-                  {alerts.length > 0 && (
-                    <button
-                      onClick={async () => {
-                        if (confirm(t('dashboard.clearAlertsConfirm'))) {
-                          const { clearAlerts } = await import('@/lib/server-fns')
-                          await clearAlerts()
-                          setAlerts([])
-                        }
-                      }}
-                      style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#EF4444', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}
-                    >
-                      {t('dashboard.clearAlerts')}
-                    </button>
-                  )}
                 </div>
-                <div style={{ maxHeight: '420px', overflowY: 'auto' }}>
-                  {alerts.length === 0 ? (
-                    <div style={{ padding: '2rem', textAlign: 'center' }}>
-                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', color: '#aaaaaa', margin: 0 }}>
-                        {t('dashboard.noAlerts')}
-                      </p>
-                    </div>
-                  ) : (
-                    alerts.map((alert) => (
-                      <div
-                        key={alert.id}
-                        style={{
-                          padding: '0.75rem 1.25rem',
-                          borderBottom: '1px solid #f5f5f5',
-                          background: !alert.read ? '#fffdf5' : 'transparent',
-                        }}
-                      >
-                        <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
-                          <AlertIcon type={alert.type} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.8rem', color: '#111111', margin: 0 }}>
-                              {alert.title}
-                            </p>
-                            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.72rem', color: '#888888', margin: '0.2rem 0 0', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                              {alert.message}
-                            </p>
-                            <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', color: '#cccccc', margin: '0.2rem 0 0' }}>
-                              {formatDate(alert.createdAt)}
-                            </p>
-                          </div>
-                          {!alert.read && (
-                            <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#C8961A', flexShrink: 0, marginTop: '4px' }} />
-                          )}
-                        </div>
-                      </div>
-                    ))
-                  )}
+                <div style={{ padding: '0.8rem 1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  <TaskGroup
+                    title={t('dashboard.attentionRenewals')}
+                    items={attentionGroups.renewals}
+                    emptyLabel={t('dashboard.attentionNoRenewals')}
+                  />
+                  <TaskGroup
+                    title={t('dashboard.attentionDocuments')}
+                    items={attentionGroups.documents}
+                    emptyLabel={t('dashboard.attentionNoDocuments')}
+                  />
+                  <TaskGroup
+                    title={t('dashboard.attentionClaims')}
+                    items={attentionGroups.claims}
+                    emptyLabel={t('dashboard.attentionNoClaims')}
+                  />
                 </div>
               </div>
             </div>
@@ -513,18 +585,107 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function AlertIcon({ type }: { type: string }) {
-  const icons: Record<string, { color: string; path: string }> = {
-    renewal:      { color: '#F59E0B', path: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
-    claim_update: { color: '#3B82F6', path: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-    payment:      { color: '#22C55E', path: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
-    document:     { color: '#6B7280', path: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-    general:      { color: '#9CA3AF', path: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' },
-  }
-  const { color, path } = icons[type] || icons.general
+function taskUrgencyLabel(urgency: TaskUrgency, t: (key: string) => string): string {
+  if (urgency === 'critical') return t('dashboard.attentionCritical')
+  if (urgency === 'upcoming') return t('dashboard.attentionUpcoming')
+  return t('dashboard.attentionRemaining')
+}
+
+function taskUrgencyStyle(urgency: TaskUrgency) {
+  if (urgency === 'critical') return { bg: '#FFF1F2', color: '#BE123C' }
+  if (urgency === 'upcoming') return { bg: '#FFFBEB', color: '#92400E' }
+  return { bg: '#F5F5F5', color: '#666666' }
+}
+
+function TaskGroup({ title, items, emptyLabel }: { title: string; items: AttentionTask[]; emptyLabel: string }) {
+  const { t } = useTranslation()
+
   return (
-    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke={color} strokeWidth={1.5} style={{ flexShrink: 0, marginTop: '2px' }}>
-      <path strokeLinecap="round" strokeLinejoin="round" d={path} />
-    </svg>
+    <div>
+      <p
+        style={{
+          margin: '0 0 0.5rem',
+          fontFamily: "'Montserrat', sans-serif",
+          fontWeight: 700,
+          fontSize: '0.72rem',
+          color: '#666666',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+        }}
+      >
+        {title}
+      </p>
+      {items.length === 0 ? (
+        <p style={{ margin: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#b5b5b5' }}>
+          {emptyLabel}
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+          {items.slice(0, 4).map((item) => {
+            const urgency = taskUrgencyStyle(item.urgency)
+            return (
+              <Link
+                key={item.id}
+                to={item.to}
+                style={{
+                  textDecoration: 'none',
+                  border: '1px solid #f0f0f0',
+                  borderRadius: '4px',
+                  padding: '0.55rem 0.6rem',
+                  background: '#ffffff',
+                  display: 'block',
+                }}
+              >
+                <p
+                  style={{
+                    margin: 0,
+                    fontFamily: "'Montserrat', sans-serif",
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                    color: '#1f2937',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {item.title}
+                </p>
+                <p
+                  style={{
+                    margin: '0.12rem 0 0',
+                    fontFamily: "'Montserrat', sans-serif",
+                    fontWeight: 300,
+                    fontSize: '0.7rem',
+                    color: '#7a7a7a',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {item.subtitle}
+                </p>
+                <span
+                  style={{
+                    display: 'inline-block',
+                    marginTop: '0.35rem',
+                    fontFamily: "'Montserrat', sans-serif",
+                    fontWeight: 700,
+                    fontSize: '0.6rem',
+                    padding: '0.12rem 0.38rem',
+                    borderRadius: '999px',
+                    background: urgency.bg,
+                    color: urgency.color,
+                    letterSpacing: '0.04em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {taskUrgencyLabel(item.urgency, t)}
+                </span>
+              </Link>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }

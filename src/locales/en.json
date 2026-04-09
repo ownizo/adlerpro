@@ -120,7 +120,28 @@
     "compareQuotes": "Compare quotes →",
     "analyzeQuotes": "Analyse quotes →",
     "addPolicyLink": "Add policy →",
-    "perYear": "/year"
+    "perYear": "/year",
+    "attentionCenterTitle": "What needs your attention",
+    "attentionRenewals": "Upcoming renewals",
+    "attentionDocuments": "Missing documents",
+    "attentionClaims": "Claims in progress",
+    "attentionNoRenewals": "No pending renewals.",
+    "attentionNoDocuments": "No pending documents.",
+    "attentionNoClaims": "No active claims.",
+    "attentionCritical": "Critical",
+    "attentionUpcoming": "Upcoming",
+    "attentionRemaining": "Remaining"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications at the moment.",
+    "types": {
+      "renewal": "Renewal",
+      "claim": "Claim",
+      "payment": "Payment",
+      "document": "Document",
+      "general": "General"
+    }
   },
   "policies": {
     "title": "Policy Portfolio",

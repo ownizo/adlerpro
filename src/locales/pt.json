@@ -120,7 +120,28 @@
     "compareQuotes": "Comparar cotações →",
     "analyzeQuotes": "Analisar cotações →",
     "addPolicyLink": "Adicionar apólice →",
-    "perYear": "/ano"
+    "perYear": "/ano",
+    "attentionCenterTitle": "O que precisa da tua atenção",
+    "attentionRenewals": "Renovações próximas",
+    "attentionDocuments": "Documentos em falta",
+    "attentionClaims": "Sinistros em curso",
+    "attentionNoRenewals": "Sem renovações pendentes.",
+    "attentionNoDocuments": "Sem documentos pendentes.",
+    "attentionNoClaims": "Sem sinistros em curso.",
+    "attentionCritical": "Crítica",
+    "attentionUpcoming": "Próxima",
+    "attentionRemaining": "Restante"
+  },
+  "notifications": {
+    "title": "Notificações",
+    "empty": "Sem notificações no momento.",
+    "types": {
+      "renewal": "Renovação",
+      "claim": "Sinistro",
+      "payment": "Pagamento",
+      "document": "Documento",
+      "general": "Geral"
+    }
   },
   "policies": {
     "title": "Portfólio de Apólices",
