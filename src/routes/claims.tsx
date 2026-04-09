@@ -1,128 +1,134 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
 import { AppLayout } from '@/components/AppLayout'
-import { useState, useEffect, useMemo } from 'react'
-import { fetchClaims, fetchPolicies, submitClaim } from '@/lib/server-fns'
+import { fetchClaims, fetchPolicies } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import type { Claim, Policy } from '@/lib/types'
-import { CLAIM_STATUS_LABELS, POLICY_TYPE_LABELS } from '@/lib/types'
-import { useTranslation } from 'react-i18next'
+import type { Claim, ClaimStatus, Policy } from '@/lib/types'
 
 export const Route = createFileRoute('/claims')({
   component: ClaimsPage,
 })
 
-const CLAIM_TYPES = [
-  { value: 'Acidente de Trabalho', label: 'Acidente de Trabalho' },
-  { value: 'Sinistro Patrimonial', label: 'Sinistro Patrimonial' },
-  { value: 'Sinistro de Frota', label: 'Sinistro de Frota' },
-  { value: 'Responsabilidade Civil', label: 'Responsabilidade Civil' },
-  { value: 'Incêndio / Explosão', label: 'Incêndio / Explosão' },
-  { value: 'Inundação / Tempestade', label: 'Inundação / Tempestade' },
-  { value: 'Furto / Roubo', label: 'Furto / Roubo' },
-  { value: 'Danos a Terceiros', label: 'Danos a Terceiros' },
-  { value: 'Saúde / Doença', label: 'Saúde / Doença' },
-  { value: 'Ciber-Risco', label: 'Ciber-Risco' },
-  { value: 'Outro', label: 'Outro' },
-]
+type StateFilter = 'all' | 'open' | 'analysis' | 'resolved'
+type UrgencyLevel = 'high' | 'medium' | 'low'
 
-const STATUS_COLORS: Record<string, string> = {
-  submitted: 'bg-blue-50 text-blue-700 border-blue-200',
-  under_review: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  documentation: 'bg-orange-50 text-orange-700 border-orange-200',
-  assessment: 'bg-purple-50 text-purple-700 border-purple-200',
-  approved: 'bg-green-50 text-green-700 border-green-200',
-  denied: 'bg-red-50 text-red-700 border-red-200',
-  paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+const OPEN_STATUSES: ClaimStatus[] = ['submitted']
+const ANALYSIS_STATUSES: ClaimStatus[] = ['under_review', 'documentation', 'assessment']
+const RESOLVED_STATUSES: ClaimStatus[] = ['approved', 'denied', 'paid']
+
+const STATUS_GROUP_LABELS: Record<StateFilter, string> = {
+  all: 'Todos',
+  open: 'Abertos',
+  analysis: 'Em análise',
+  resolved: 'Resolvidos',
 }
 
-const STATUS_STEPS = ['submitted', 'under_review', 'documentation', 'assessment', 'approved', 'paid']
+const STATE_LABELS: Record<ClaimStatus, string> = {
+  submitted: 'A aguardar resposta',
+  under_review: 'Em análise',
+  documentation: 'A aguardar documentos',
+  assessment: 'Em avaliação',
+  approved: 'Resolvido com aprovação',
+  denied: 'Encerrado sem aprovação',
+  paid: 'Resolvido e pago',
+}
+
+const ROW_STATUS_LABELS: Record<StateFilter, string> = {
+  all: 'Todos',
+  open: 'Aberto',
+  analysis: 'Em análise',
+  resolved: 'Resolvido',
+}
+
+const STATE_BADGE_CLASS: Record<StateFilter, string> = {
+  all: 'bg-slate-100 text-slate-700 border-slate-200',
+  open: 'bg-amber-50 text-amber-700 border-amber-200',
+  analysis: 'bg-blue-50 text-blue-700 border-blue-200',
+  resolved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+}
+
+const URGENCY_LABELS: Record<UrgencyLevel, string> = {
+  high: 'Alta',
+  medium: 'Média',
+  low: 'Baixa',
+}
+
+const URGENCY_CLASS: Record<UrgencyLevel, string> = {
+  high: 'bg-red-50 text-red-700 border-red-200',
+  medium: 'bg-amber-50 text-amber-700 border-amber-200',
+  low: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+}
 
 function ClaimsPage() {
-  const { t } = useTranslation()
   const [claims, setClaims] = useState<Claim[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading, setLoading] = useState(true)
-  const [showForm, setShowForm] = useState(false)
-  const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null)
-
-  // Filtros
-  const [filterStatus, setFilterStatus] = useState<string>('all')
-  const [filterType, setFilterType] = useState<string>('all')
-  const [filterYear, setFilterYear] = useState<string>('all')
-  const [filterMonth, setFilterMonth] = useState<string>('all')
-  const [searchText, setSearchText] = useState('')
-
-  const reload = async () => {
-    const [c, p] = await Promise.all([fetchClaims(), fetchPolicies()])
-    setClaims(c)
-    setPolicies(p)
-  }
+  const [stateFilter, setStateFilter] = useState<StateFilter>('all')
 
   useEffect(() => {
-    reload().then(() => setLoading(false)).catch(() => setLoading(false))
+    async function load() {
+      try {
+        const [claimsData, policiesData] = await Promise.all([fetchClaims(), fetchPolicies()])
+        setClaims(claimsData)
+        setPolicies(policiesData)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    load().catch(() => setLoading(false))
   }, [])
 
-  // Derivar anos disponíveis
-  const availableYears = useMemo(() => {
-    const years = [...new Set(claims.map(c => new Date(c.incidentDate).getFullYear()))]
-    return years.sort((a, b) => b - a)
-  }, [claims])
+  const claimsWithMeta = useMemo(() => {
+    return claims
+      .map((claim) => {
+        const policy = policies.find((item) => item.id === claim.policyId)
+        const state = getClaimState(claim.status)
+        const lastUpdated = getLastUpdated(claim)
+        const urgency = getUrgency(claim, lastUpdated, state)
 
-  // Filtrar sinistros
-  const filteredClaims = useMemo(() => {
-    return claims.filter(c => {
-      const date = new Date(c.incidentDate)
-      const year = date.getFullYear().toString()
-      const month = (date.getMonth() + 1).toString()
-      const matchStatus = filterStatus === 'all' || c.status === filterStatus
-      const matchType = filterType === 'all' || c.title.includes(filterType)
-      const matchYear = filterYear === 'all' || year === filterYear
-      const matchMonth = filterMonth === 'all' || month === filterMonth
-      const matchSearch = !searchText || c.title.toLowerCase().includes(searchText.toLowerCase()) || c.description.toLowerCase().includes(searchText.toLowerCase())
-      return matchStatus && matchType && matchYear && matchMonth && matchSearch
-    })
-  }, [claims, filterStatus, filterType, filterYear, filterMonth, searchText])
+        return {
+          claim,
+          policy,
+          state,
+          lastUpdated,
+          urgency,
+        }
+      })
+      .sort((a, b) => {
+        const stateDiff = stateSortPriority(a.state) - stateSortPriority(b.state)
+        if (stateDiff !== 0) return stateDiff
 
-  // Estatísticas
-  const stats = useMemo(() => {
-    const total = filteredClaims.length
-    const totalValue = filteredClaims.reduce((s, c) => s + (c.estimatedValue || 0), 0)
-    const open = filteredClaims.filter(c => !['approved', 'denied', 'paid'].includes(c.status)).length
-    const approved = filteredClaims.filter(c => c.status === 'approved' || c.status === 'paid').length
-    const denied = filteredClaims.filter(c => c.status === 'denied').length
-    return { total, totalValue, open, approved, denied }
-  }, [filteredClaims])
+        const urgencyDiff = urgencySortPriority(a.urgency) - urgencySortPriority(b.urgency)
+        if (urgencyDiff !== 0) return urgencyDiff
 
-  // Exportar CSV
-  const exportCSV = () => {
-    const headers = [t('claims.refLabel').replace(':', ''), t('claims.claimType').replace(' *', ''), t('claims.incidentDateLabel').replace(' *', ''), t('claims.claimDate').replace(':', ''), `${t('claims.estimatedValue')}`, t('claims.allStatuses').replace('All ', '').replace('Todos os ', ''), 'Apólice']
-    const rows = filteredClaims.map(c => {
-      const policy = policies.find(p => p.id === c.policyId)
-      return [
-        c.id,
-        c.title,
-        c.incidentDate,
-        c.claimDate,
-        c.estimatedValue?.toString() || '0',
-        CLAIM_STATUS_LABELS[c.status] || c.status,
-        policy ? `${policy.policyNumber} — ${POLICY_TYPE_LABELS[policy.type] || policy.type}` : c.policyId,
-      ]
-    })
-    const csv = [headers, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `sinistros_${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+        return b.lastUpdated.getTime() - a.lastUpdated.getTime()
+      })
+  }, [claims, policies])
+
+  const totals = useMemo(() => {
+    const open = claimsWithMeta.filter((item) => item.state === 'open').length
+    const analysis = claimsWithMeta.filter((item) => item.state === 'analysis').length
+    const resolved = claimsWithMeta.filter((item) => item.state === 'resolved').length
+
+    return {
+      total: claimsWithMeta.length,
+      open,
+      analysis,
+      resolved,
+    }
+  }, [claimsWithMeta])
+
+  const filtered = useMemo(() => {
+    if (stateFilter === 'all') return claimsWithMeta
+    return claimsWithMeta.filter((item) => item.state === stateFilter)
+  }, [claimsWithMeta, stateFilter])
 
   if (loading) {
     return (
       <AppLayout>
         <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gold-400 border-t-transparent" />
         </div>
       </AppLayout>
     )
@@ -130,393 +136,194 @@ function ClaimsPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-7xl mx-auto">
-        {/* Cabeçalho */}
-        <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-navy-700">{t('claims.title')}</h1>
-            <p className="text-navy-500 mt-1">{t('claims.subtitle')}</p>
+            <h1 className="text-3xl font-bold text-navy-700">Sinistros</h1>
+            <p className="mt-1 text-sm text-navy-500">Acompanhe o estado de cada sinistro e veja os próximos passos com clareza.</p>
           </div>
-          <div className="flex gap-2">
-            <button
-              onClick={exportCSV}
-              className="px-4 py-2 border border-navy-200 text-navy-600 text-sm font-medium rounded-[2px] hover:bg-navy-50 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              {t('claims.exportCSV')}
-            </button>
-            <button
-              onClick={() => { setShowForm(true); setSelectedClaim(null) }}
-              className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold text-sm rounded-[2px] hover:bg-gold-300 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              {t('claims.newClaim')}
-            </button>
+          <Link
+            to="/policies"
+            className="rounded-[2px] border border-navy-200 px-4 py-2 text-sm font-medium text-navy-600 transition-colors hover:bg-navy-50"
+          >
+            Ver apólices relacionadas
+          </Link>
+        </header>
+
+        <section className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <StatCard label="Total" value={totals.total} tone="text-navy-700" />
+          <StatCard label="Abertos" value={totals.open} tone="text-amber-700" />
+          <StatCard label="Em análise" value={totals.analysis} tone="text-blue-700" />
+          <StatCard label="Resolvidos" value={totals.resolved} tone="text-emerald-700" />
+        </section>
+
+        <section className="rounded-[4px] border border-navy-200 bg-white p-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-navy-500">Estado</p>
+          <div className="flex flex-wrap gap-2">
+            {(['open', 'analysis', 'resolved'] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setStateFilter((current) => (current === key ? 'all' : key))}
+                className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                  stateFilter === key
+                    ? 'border-navy-700 bg-navy-700 text-white'
+                    : 'border-navy-200 bg-white text-navy-600 hover:border-navy-300 hover:bg-navy-50'
+                }`}
+              >
+                {STATUS_GROUP_LABELS[key]}
+              </button>
+            ))}
+            {stateFilter !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setStateFilter('all')}
+                className="rounded-full border border-navy-200 px-4 py-2 text-sm text-navy-500 hover:bg-navy-50"
+              >
+                Limpar filtro
+              </button>
+            )}
           </div>
-        </div>
+        </section>
 
-        {/* KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: t('claims.total'), value: stats.total, color: 'text-navy-700' },
-            { label: t('claims.open'), value: stats.open, color: 'text-orange-600' },
-            { label: t('claims.approved'), value: stats.approved, color: 'text-green-600' },
-            { label: t('claims.totalValue'), value: formatCurrency(stats.totalValue), color: 'text-navy-700' },
-          ].map(kpi => (
-            <div key={kpi.label} className="bg-white rounded-[4px] border border-navy-200 p-4">
-              <p className="text-xs text-navy-500 mb-1">{kpi.label}</p>
-              <p className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Filtros */}
-        <div className="bg-white rounded-[4px] border border-navy-200 p-4 mb-6">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <input
-              type="text"
-              placeholder={t('claims.searchPlaceholder')}
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              className="col-span-2 sm:col-span-1 px-3 py-2 text-sm border border-navy-200 rounded focus:outline-none focus:ring-1 focus:ring-gold-400"
-            />
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-2 text-sm border border-navy-200 rounded focus:outline-none focus:ring-1 focus:ring-gold-400">
-              <option value="all">{t('claims.allStatuses')}</option>
-              {Object.entries(CLAIM_STATUS_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-            <select value={filterType} onChange={e => setFilterType(e.target.value)} className="px-3 py-2 text-sm border border-navy-200 rounded focus:outline-none focus:ring-1 focus:ring-gold-400">
-              <option value="all">{t('claims.allTypes')}</option>
-              {CLAIM_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
-            <select value={filterYear} onChange={e => setFilterYear(e.target.value)} className="px-3 py-2 text-sm border border-navy-200 rounded focus:outline-none focus:ring-1 focus:ring-gold-400">
-              <option value="all">{t('claims.allYears')}</option>
-              {availableYears.map(y => <option key={y} value={y.toString()}>{y}</option>)}
-            </select>
-            <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)} className="px-3 py-2 text-sm border border-navy-200 rounded focus:outline-none focus:ring-1 focus:ring-gold-400">
-              <option value="all">{t('claims.allMonths')}</option>
-              {[1,2,3,4,5,6,7,8,9,10,11,12].map((m) => (
-                <option key={m} value={m.toString()}>{t(`claims.months.${m}`)}</option>
-              ))}
-            </select>
-            <button onClick={() => { setFilterStatus('all'); setFilterType('all'); setFilterYear('all'); setFilterMonth('all'); setSearchText('') }} className="px-3 py-2 text-sm text-navy-500 border border-navy-200 rounded hover:bg-navy-50">
-              {t('claims.clear')}
-            </button>
-          </div>
-        </div>
-
-        {/* Formulário de novo sinistro */}
-        {showForm && (
-          <NewClaimForm
-            policies={policies}
-            onClose={() => setShowForm(false)}
-            onSubmit={async (data) => {
-              await submitClaim({ data })
-              await reload()
-              setShowForm(false)
-            }}
-          />
-        )}
-
-        {/* Lista de sinistros */}
-        {filteredClaims.length === 0 ? (
-          <div className="bg-white rounded-[4px] border border-navy-200 p-12 text-center">
-            <svg className="w-12 h-12 text-navy-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            <p className="text-navy-500 font-medium">{t('claims.noResults')}</p>
-            <p className="text-navy-400 text-sm mt-1">{t('claims.noResultsHint')}</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filteredClaims.map(claim => {
-              const policy = policies.find(p => p.id === claim.policyId)
-              const isSelected = selectedClaim?.id === claim.id
-              return (
-                <div key={claim.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-                  <button
-                    onClick={() => setSelectedClaim(isSelected ? null : claim)}
-                    className="w-full p-5 text-left hover:bg-navy-50/50 transition-colors"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-semibold text-navy-700">{claim.title}</h3>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_COLORS[claim.status] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
-                            {CLAIM_STATUS_LABELS[claim.status] || claim.status}
-                          </span>
-                        </div>
-                        <p className="text-sm text-navy-500 mt-1 truncate">{claim.description}</p>
-                        <div className="flex flex-wrap gap-3 mt-2 text-xs text-navy-400">
-                          <span>{t('claims.incidentDate')} {formatDate(claim.incidentDate)}</span>
-                          <span>{t('claims.claimDate')} {formatDate(claim.claimDate)}</span>
-                          {policy && <span>{t('claims.policyLabel')} {policy.policyNumber} ({POLICY_TYPE_LABELS[policy.type] || policy.type})</span>}
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="font-bold text-navy-700">{formatCurrency(claim.estimatedValue)}</p>
-                        <p className="text-xs text-navy-400 mt-1">{t('claims.refLabel')} {claim.id.slice(-8).toUpperCase()}</p>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Detalhe expandido */}
-                  {isSelected && (
-                    <div className="border-t border-navy-100 bg-navy-50/30 p-5">
-                      {/* Timeline de estados */}
-                      <h4 className="text-xs font-semibold text-navy-500 uppercase tracking-wide mb-3">{t('claims.progress')}</h4>
-                      <div className="flex items-center gap-0 mb-6 overflow-x-auto pb-2">
-                        {STATUS_STEPS.map((step, idx) => {
-                          const stepOrder = STATUS_STEPS.indexOf(claim.status)
-                          const isActive = idx <= stepOrder && claim.status !== 'denied'
-                          const isCurrent = step === claim.status
-                          const isDenied = claim.status === 'denied'
-                          return (
-                            <div key={step} className="flex items-center flex-shrink-0">
-                              <div className={`flex flex-col items-center`}>
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-colors ${
-                                  isDenied && isCurrent ? 'bg-red-500 border-red-500 text-white' :
-                                  isCurrent ? 'bg-gold-400 border-gold-400 text-navy-700' :
-                                  isActive ? 'bg-navy-700 border-navy-700 text-white' :
-                                  'bg-white border-navy-200 text-navy-300'
-                                }`}>
-                                  {isActive && !isCurrent ? '✓' : idx + 1}
-                                </div>
-                                <span className={`text-xs mt-1 whitespace-nowrap ${isCurrent ? 'text-navy-700 font-semibold' : 'text-navy-400'}`}>
-                                  {CLAIM_STATUS_LABELS[step as keyof typeof CLAIM_STATUS_LABELS]}
-                                </span>
-                              </div>
-                              {idx < STATUS_STEPS.length - 1 && (
-                                <div className={`h-0.5 w-8 mx-1 flex-shrink-0 ${idx < STATUS_STEPS.indexOf(claim.status) && claim.status !== 'denied' ? 'bg-navy-700' : 'bg-navy-200'}`} />
-                              )}
-                            </div>
-                          )
-                        })}
-                        {claim.status === 'denied' && (
-                          <div className="ml-4 flex-shrink-0">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                              {t('claims.denied')}
-                            </span>
-                          </div>
+        <section className="overflow-hidden rounded-[4px] border border-navy-200 bg-white">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-navy-100">
+              <thead className="bg-navy-50/60">
+                <tr className="text-left text-xs uppercase tracking-wide text-navy-500">
+                  <th className="px-4 py-3 font-semibold">Tipo</th>
+                  <th className="px-4 py-3 font-semibold">Apólice</th>
+                  <th className="px-4 py-3 font-semibold">Data</th>
+                  <th className="px-4 py-3 font-semibold">Estado</th>
+                  <th className="px-4 py-3 font-semibold">Estado atual</th>
+                  <th className="px-4 py-3 font-semibold">Valor estimado</th>
+                  <th className="px-4 py-3 font-semibold">Última atualização</th>
+                  <th className="px-4 py-3 font-semibold">Urgência</th>
+                  <th className="px-4 py-3 font-semibold text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-navy-100">
+                {filtered.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="px-4 py-10 text-center text-sm text-navy-500">
+                      Sem sinistros para o filtro selecionado.
+                    </td>
+                  </tr>
+                ) : (
+                  filtered.map(({ claim, policy, state, urgency, lastUpdated }) => (
+                    <tr key={claim.id} className="align-top text-sm text-navy-600">
+                      <td className="px-4 py-4">
+                        <p className="font-semibold text-navy-700">{claim.title}</p>
+                        <p className="mt-1 text-xs text-navy-400">Ref. {claim.id.slice(-8).toUpperCase()}</p>
+                      </td>
+                      <td className="px-4 py-4">
+                        {policy ? (
+                          <>
+                            <p className="font-medium text-navy-700">{policy.policyNumber}</p>
+                            <p className="text-xs text-navy-400">{policy.insurer}</p>
+                          </>
+                        ) : (
+                          <span className="text-xs text-navy-400">Sem apólice associada</span>
                         )}
-                      </div>
-
-                      {/* Histórico de passos */}
-                      {claim.steps && claim.steps.length > 0 && (
-                        <div>
-                          <h4 className="text-xs font-semibold text-navy-500 uppercase tracking-wide mb-3">{t('claims.history')}</h4>
-                          <div className="space-y-2">
-                            {[...claim.steps].reverse().map((step, idx) => (
-                              <div key={idx} className="flex items-start gap-3 text-sm">
-                                <div className="w-2 h-2 rounded-full bg-gold-400 mt-1.5 flex-shrink-0" />
-                                <div>
-                                  <span className="font-medium text-navy-700">{CLAIM_STATUS_LABELS[step.status] || step.status}</span>
-                                  <span className="text-navy-400 ml-2">{formatDate(step.date)}</span>
-                                  {step.notes && <p className="text-navy-500 mt-0.5">{step.notes}</p>}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                      </td>
+                      <td className="px-4 py-4">{formatDate(claim.incidentDate)}</td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${STATE_BADGE_CLASS[state]}`}>
+                          {ROW_STATUS_LABELS[state]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-navy-700">{STATE_LABELS[claim.status]}</td>
+                      <td className="px-4 py-4 font-semibold text-navy-700">{formatCurrency(claim.estimatedValue || 0)}</td>
+                      <td className="px-4 py-4">{formatDate(lastUpdated.toISOString())}</td>
+                      <td className="px-4 py-4">
+                        <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${URGENCY_CLASS[urgency]}`}>
+                          {URGENCY_LABELS[urgency]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex flex-col items-end gap-1 text-xs font-medium">
+                          <a href={`/claims/${claim.id}`} className="text-navy-700 hover:text-navy-500">
+                            Ver detalhe
+                          </a>
+                          <a href={`/claims/${claim.id}#documentos`} className="text-navy-700 hover:text-navy-500">
+                            Adicionar documento
+                          </a>
+                          <a href="/contact" className="text-navy-700 hover:text-navy-500">
+                            Contactar apoio
+                          </a>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        )}
+        </section>
       </div>
     </AppLayout>
   )
 }
 
-function NewClaimForm({
-  policies,
-  onClose,
-  onSubmit,
-}: {
-  policies: Policy[]
-  onClose: () => void
-  onSubmit: (data: { policyId: string; companyId: string; title: string; description: string; incidentDate: string; estimatedValue: number }) => Promise<void>
-}) {
-  const { t } = useTranslation()
-  const [form, setForm] = useState({
-    claimType: '',
-    customTitle: '',
-    policyId: '',
-    description: '',
-    incidentDate: new Date().toISOString().split('T')[0],
-    estimatedValue: '',
-  })
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState('')
-
-  const selectedPolicy = policies.find(p => p.id === form.policyId)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    if (!form.policyId) { setError(t('claims.errors.noPolicy')); return }
-    if (!form.claimType) { setError(t('claims.errors.noType')); return }
-    if (!form.description.trim()) { setError(t('claims.errors.noDescription')); return }
-    const title = form.claimType === 'Outro' ? (form.customTitle || 'Outro Sinistro') : form.claimType
-    setSubmitting(true)
-    try {
-      await onSubmit({
-        policyId: form.policyId,
-        companyId: selectedPolicy?.companyId || '',
-        title,
-        description: form.description,
-        incidentDate: form.incidentDate,
-        estimatedValue: parseFloat(form.estimatedValue) || 0,
-      })
-    } catch (err) {
-      setError(t('claims.errors.submitFailed'))
-      setSubmitting(false)
-    }
-  }
-
+function StatCard({ label, value, tone }: { label: string; value: number; tone: string }) {
   return (
-    <div className="bg-white rounded-[4px] border border-gold-400 shadow-lg p-6 mb-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-lg font-bold text-navy-700">{t('claims.registerTitle')}</h2>
-          <p className="text-sm text-navy-500 mt-0.5">{t('claims.registerSubtitle')}</p>
-        </div>
-        <button onClick={onClose} className="text-navy-400 hover:text-navy-600">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div className="grid sm:grid-cols-2 gap-5">
-          {/* Tipo de sinistro */}
-          <div>
-            <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.claimType')}</label>
-            <select
-              value={form.claimType}
-              onChange={e => setForm(f => ({ ...f, claimType: e.target.value }))}
-              className="w-full px-3 py-2 border border-navy-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gold-400"
-              required
-            >
-              <option value="">{t('claims.selectType')}</option>
-              {CLAIM_TYPES.map(ct => <option key={ct.value} value={ct.value}>{ct.label}</option>)}
-            </select>
-          </div>
-
-          {/* Título personalizado se "Outro" */}
-          {form.claimType === 'Outro' && (
-            <div>
-              <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.customTitle')}</label>
-              <input
-                type="text"
-                value={form.customTitle}
-                onChange={e => setForm(f => ({ ...f, customTitle: e.target.value }))}
-                placeholder={t('claims.customTitlePlaceholder')}
-                className="w-full px-3 py-2 border border-navy-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gold-400"
-              />
-            </div>
-          )}
-
-          {/* Apólice */}
-          <div>
-            <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.associatedPolicy')}</label>
-            <select
-              value={form.policyId}
-              onChange={e => setForm(f => ({ ...f, policyId: e.target.value }))}
-              className="w-full px-3 py-2 border border-navy-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gold-400"
-              required
-            >
-              <option value="">{t('claims.selectPolicy')}</option>
-              {policies.filter(p => p.status === 'active' || p.status === 'expiring').map(p => (
-                <option key={p.id} value={p.id}>
-                  {p.policyNumber} — {POLICY_TYPE_LABELS[p.type] || p.type} ({p.insurer})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Data do incidente */}
-          <div>
-            <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.incidentDateLabel')}</label>
-            <input
-              type="date"
-              value={form.incidentDate}
-              onChange={e => setForm(f => ({ ...f, incidentDate: e.target.value }))}
-              max={new Date().toISOString().split('T')[0]}
-              className="w-full px-3 py-2 border border-navy-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gold-400"
-              required
-            />
-          </div>
-
-          {/* Valor estimado */}
-          <div>
-            <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.estimatedValue')}</label>
-            <input
-              type="number"
-              value={form.estimatedValue}
-              onChange={e => setForm(f => ({ ...f, estimatedValue: e.target.value }))}
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-              className="w-full px-3 py-2 border border-navy-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gold-400"
-            />
-          </div>
-        </div>
-
-        {/* Descrição */}
-        <div>
-          <label className="block text-sm font-medium text-navy-700 mb-1">{t('claims.descriptionLabel')}</label>
-          <textarea
-            value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-            placeholder={t('claims.descriptionPlaceholder')}
-            rows={4}
-            className="w-full px-3 py-2 border border-navy-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-gold-400 resize-none"
-            required
-          />
-        </div>
-
-        {/* Informação sobre próximos passos */}
-        <div className="bg-navy-50 rounded p-4 text-sm text-navy-600">
-          <p className="font-medium mb-1">{t('claims.afterSubmitTitle')}</p>
-          <ol className="list-decimal list-inside space-y-1 text-navy-500">
-            <li dangerouslySetInnerHTML={{ __html: t('claims.afterSubmit1') }} />
-            <li>{t('claims.afterSubmit2')}</li>
-            <li>{t('claims.afterSubmit3')}</li>
-          </ol>
-        </div>
-
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        <div className="flex gap-3 justify-end">
-          <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-navy-200 text-navy-600 rounded hover:bg-navy-50">
-            {t('claims.cancel')}
-          </button>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-6 py-2 bg-gold-400 text-navy-700 font-semibold text-sm rounded-[2px] hover:bg-gold-300 disabled:opacity-50 flex items-center gap-2"
-          >
-            {submitting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-navy-700 border-t-transparent rounded-full animate-spin" />
-                {t('claims.registering')}
-              </>
-            ) : t('claims.register')}
-          </button>
-        </div>
-      </form>
+    <div className="rounded-[4px] border border-navy-200 bg-white p-4">
+      <p className="text-xs text-navy-500">{label}</p>
+      <p className={`mt-1 text-2xl font-bold ${tone}`}>{value}</p>
     </div>
   )
+}
+
+function getClaimState(status: ClaimStatus): StateFilter {
+  if (OPEN_STATUSES.includes(status)) return 'open'
+  if (ANALYSIS_STATUSES.includes(status)) return 'analysis'
+  if (RESOLVED_STATUSES.includes(status)) return 'resolved'
+  return 'open'
+}
+
+function getLastUpdated(claim: Claim): Date {
+  const latestStep = claim.steps
+    ?.map((step) => Date.parse(step.date))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => b - a)[0]
+
+  if (typeof latestStep === 'number') return new Date(latestStep)
+
+  const claimDate = Date.parse(claim.claimDate)
+  if (Number.isFinite(claimDate)) return new Date(claimDate)
+
+  const createdAt = Date.parse(claim.createdAt)
+  if (Number.isFinite(createdAt)) return new Date(createdAt)
+
+  return new Date(0)
+}
+
+function getUrgency(claim: Claim, lastUpdated: Date, state: StateFilter): UrgencyLevel {
+  if (state === 'resolved') return 'low'
+
+  const now = Date.now()
+  const daysWithoutUpdate = Math.floor((now - lastUpdated.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (daysWithoutUpdate >= 7 || claim.estimatedValue >= 20000 || claim.status === 'documentation') {
+    return 'high'
+  }
+
+  if (daysWithoutUpdate >= 3 || claim.estimatedValue >= 5000) {
+    return 'medium'
+  }
+
+  return 'low'
+}
+
+function stateSortPriority(state: StateFilter): number {
+  if (state === 'open') return 0
+  if (state === 'analysis') return 1
+  if (state === 'resolved') return 2
+  return 3
+}
+
+function urgencySortPriority(level: UrgencyLevel): number {
+  if (level === 'high') return 0
+  if (level === 'medium') return 1
+  return 2
 }

@@ -20,6 +20,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as LicensePlatesRouteImport } from './routes/license-plates'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as ClaimsClaimIdRouteImport } from './routes/claims.$claimId'
 import { Route as ClaimsRouteImport } from './routes/claims'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -87,6 +88,11 @@ const ContactRoute = ContactRouteImport.update({
   path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClaimsClaimIdRoute = ClaimsClaimIdRouteImport.update({
+  id: '/claims/$claimId',
+  path: '/claims/$claimId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ClaimsRoute = ClaimsRouteImport.update({
   id: '/claims',
   path: '/claims',
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
   '/claims': typeof ClaimsRoute
+  '/claims/$claimId': typeof ClaimsClaimIdRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/license-plates': typeof LicensePlatesRoute
@@ -172,6 +179,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
   '/claims': typeof ClaimsRoute
+  '/claims/$claimId': typeof ClaimsClaimIdRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/license-plates': typeof LicensePlatesRoute
@@ -197,6 +205,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
   '/claims': typeof ClaimsRoute
+  '/claims/$claimId': typeof ClaimsClaimIdRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
   '/license-plates': typeof LicensePlatesRoute
@@ -223,6 +232,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/claims'
+    | '/claims/$claimId'
     | '/contact'
     | '/dashboard'
     | '/license-plates'
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/claims'
+    | '/claims/$claimId'
     | '/contact'
     | '/dashboard'
     | '/license-plates'
@@ -271,6 +282,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/alerts'
     | '/claims'
+    | '/claims/$claimId'
     | '/contact'
     | '/dashboard'
     | '/license-plates'
@@ -296,6 +308,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AlertsRoute: typeof AlertsRoute
   ClaimsRoute: typeof ClaimsRoute
+  ClaimsClaimIdRoute: typeof ClaimsClaimIdRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
   LicensePlatesRoute: typeof LicensePlatesRoute
@@ -402,6 +415,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClaimsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/claims/$claimId': {
+      id: '/claims/$claimId'
+      path: '/claims/$claimId'
+      fullPath: '/claims/$claimId'
+      preLoaderRoute: typeof ClaimsClaimIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/alerts': {
       id: '/alerts'
       path: '/alerts'
@@ -480,6 +500,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AlertsRoute: AlertsRoute,
   ClaimsRoute: ClaimsRoute,
+  ClaimsClaimIdRoute: ClaimsClaimIdRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
   LicensePlatesRoute: LicensePlatesRoute,
