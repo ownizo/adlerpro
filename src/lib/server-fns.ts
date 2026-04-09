@@ -13,6 +13,39 @@ import type {
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
 
+type PolicyListPreferencesPayload = {
+  typeFilter: string
+  statusFilter: string
+  insurerFilter: string
+  searchTerm: string
+  portfolioFilter: 'all' | 'active' | 'renewal' | 'critical'
+}
+
+const DEFAULT_POLICY_LIST_PREFERENCES: PolicyListPreferencesPayload = {
+  typeFilter: 'all',
+  statusFilter: 'all',
+  insurerFilter: 'all',
+  searchTerm: '',
+  portfolioFilter: 'all',
+}
+
+function normalizePolicyListPreferences(raw: unknown): PolicyListPreferencesPayload {
+  const value = (raw && typeof raw === 'object') ? raw as Record<string, unknown> : {}
+  const portfolioFilter = value.portfolioFilter
+  return {
+    typeFilter: typeof value.typeFilter === 'string' && value.typeFilter.trim() ? value.typeFilter : 'all',
+    statusFilter: typeof value.statusFilter === 'string' && value.statusFilter.trim() ? value.statusFilter : 'all',
+    insurerFilter: typeof value.insurerFilter === 'string' && value.insurerFilter.trim() ? value.insurerFilter : 'all',
+    searchTerm: typeof value.searchTerm === 'string' ? value.searchTerm.slice(0, 100) : '',
+    portfolioFilter:
+      portfolioFilter === 'active' ||
+      portfolioFilter === 'renewal' ||
+      portfolioFilter === 'critical'
+        ? portfolioFilter
+        : 'all',
+  }
+}
+
 function extractAccessToken(): string | null {
   try {
     const authHeader = getRequestHeader('authorization')
@@ -185,6 +218,35 @@ export const fetchPolicies = createServerFn({ method: 'GET' })
   .handler(async () => {
     const scope = await getViewerScope()
     return db.getPolicies(scope.companyId ?? undefined)
+  })
+
+export const fetchPolicyListPreferences = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    const scope = await getViewerScope()
+    const userId = scope.user?.id
+    if (!userId) return DEFAULT_POLICY_LIST_PREFERENCES
+
+    const { getStore } = await import('@netlify/blobs')
+    const store = getStore({ name: 'policy-list-preferences', consistency: 'strong' })
+    const key = `user:${userId}:policies`
+    const saved = await store.get(key, { type: 'json' })
+    return saved ? normalizePolicyListPreferences(saved) : DEFAULT_POLICY_LIST_PREFERENCES
+  })
+
+export const savePolicyListPreferences = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: PolicyListPreferencesPayload) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const userId = scope.user?.id
+    if (!userId) return { success: false }
+
+    const { getStore } = await import('@netlify/blobs')
+    const store = getStore({ name: 'policy-list-preferences', consistency: 'strong' })
+    const key = `user:${userId}:policies`
+    await store.setJSON(key, normalizePolicyListPreferences(data))
+    return { success: true }
   })
 
 export const fetchPolicy = createServerFn({ method: 'GET' })
