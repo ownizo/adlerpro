@@ -42,71 +42,6 @@ function parseStorageKey(input: string): { bucket: string; path: string }[] {
   return candidates
 }
 
-function isMissingColumnError(error: unknown, column: string): boolean {
-  const message = String((error as { message?: string } | null)?.message ?? '').toLowerCase()
-  return message.includes('column') && message.includes(column.toLowerCase()) && message.includes('does not exist')
-}
-
-async function getDocumentStorageReferences(
-  supabase: ReturnType<typeof getSupabaseAdmin>,
-  key: string
-): Promise<string[]> {
-  const references = new Set<string>()
-
-  const tryAdd = (value?: string | null) => {
-    if (typeof value === 'string' && value.trim().length > 0) references.add(value.trim())
-  }
-
-  const modernByStorage = await supabase
-    .from('documents')
-    .select('storage_path, blob_key')
-    .eq('storage_path', key)
-    .maybeSingle()
-
-  if (!modernByStorage.error && modernByStorage.data) {
-    tryAdd(modernByStorage.data.storage_path)
-    tryAdd(modernByStorage.data.blob_key)
-    return Array.from(references)
-  }
-
-  if (modernByStorage.error && isMissingColumnError(modernByStorage.error, 'storage_path')) {
-    const legacyByBlob = await supabase
-      .from('documents')
-      .select('blob_key')
-      .eq('blob_key', key)
-      .maybeSingle()
-    if (!legacyByBlob.error && legacyByBlob.data?.blob_key) {
-      tryAdd(legacyByBlob.data.blob_key)
-    }
-    return Array.from(references)
-  }
-
-  if (modernByStorage.error && isMissingColumnError(modernByStorage.error, 'blob_key')) {
-    const modernOnly = await supabase
-      .from('documents')
-      .select('storage_path')
-      .eq('storage_path', key)
-      .maybeSingle()
-    if (!modernOnly.error && modernOnly.data?.storage_path) {
-      tryAdd(modernOnly.data.storage_path)
-    }
-    return Array.from(references)
-  }
-
-  const modernByBlob = await supabase
-    .from('documents')
-    .select('storage_path, blob_key')
-    .eq('blob_key', key)
-    .maybeSingle()
-
-  if (!modernByBlob.error && modernByBlob.data) {
-    tryAdd(modernByBlob.data.storage_path)
-    tryAdd(modernByBlob.data.blob_key)
-  }
-
-  return Array.from(references)
-}
-
 export default async (req: Request) => {
   const url = new URL(req.url)
   const rawKey = url.searchParams.get('key')
@@ -123,14 +58,6 @@ export default async (req: Request) => {
 
   const supabase = getSupabaseAdmin()
   const candidates = parseStorageKey(key)
-  const references = await getDocumentStorageReferences(supabase, key)
-  for (const reference of references) {
-    for (const parsed of parseStorageKey(reference)) {
-      if (!candidates.some((candidate) => candidate.bucket === parsed.bucket && candidate.path === parsed.path)) {
-        candidates.push(parsed)
-      }
-    }
-  }
 
   for (const candidate of candidates) {
     const { data, error } = await supabase.storage.from(candidate.bucket).createSignedUrl(candidate.path, 300)
