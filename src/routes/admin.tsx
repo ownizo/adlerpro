@@ -111,6 +111,148 @@ function buildRenewalAlertsView(alerts: RenewalAlertItem[]) {
   }
 }
 
+type RenewalRiskByPeriod = {
+  urgency: 30 | 60 | 90
+  alertsCount: number
+  valueAtRisk: number
+}
+
+type RenewalTopRiskClient = {
+  client: string
+  company: string
+  policiesCount: number
+  valueAtRisk: number
+}
+
+type RenewalPipelineIntelligence = {
+  totalAlerts: number
+  renewedCount: number
+  pendingOrNegotiatingCount: number
+  renewalRatePct: number
+  avgDaysPendingToRenewed: number | null
+  avgDaysSampleSize: number
+  valueAtRiskByPeriod: RenewalRiskByPeriod[]
+  topRiskClients: RenewalTopRiskClient[]
+  insights: string[]
+}
+
+function formatPctValue(value: number): string {
+  return `${value.toFixed(1)}%`
+}
+
+function calculatePendingToRenewedDurationDays(alert: RenewalAlertItem): number | null {
+  if (!alert.history.length) return null
+
+  const sortedHistory = [...alert.history].sort((a, b) => {
+    const ta = new Date(a.changedAt).getTime()
+    const tb = new Date(b.changedAt).getTime()
+    return ta - tb
+  })
+
+  let pendingAt: number | null = null
+  for (const entry of sortedHistory) {
+    const changedAt = new Date(entry.changedAt).getTime()
+    if (!Number.isFinite(changedAt)) continue
+    if (entry.newStatus === 'pendente' && pendingAt === null) pendingAt = changedAt
+    if (entry.previousStatus === 'pendente' && pendingAt === null) pendingAt = changedAt
+  }
+
+  if (pendingAt === null) return null
+
+  for (const entry of sortedHistory) {
+    if (entry.newStatus !== 'renovado') continue
+    const renewedAt = new Date(entry.changedAt).getTime()
+    if (!Number.isFinite(renewedAt) || renewedAt < pendingAt) continue
+    return (renewedAt - pendingAt) / (1000 * 60 * 60 * 24)
+  }
+
+  return null
+}
+
+function buildRenewalPipelineIntelligence(alerts: RenewalAlertItem[]): RenewalPipelineIntelligence {
+  const totalAlerts = alerts.length
+  const renewedCount = alerts.filter((alert) => alert.status === 'renovado').length
+  const pendingOrNegotiatingCount = alerts.filter((alert) => alert.status !== 'renovado').length
+  const renewalRatePct = totalAlerts > 0 ? (renewedCount / totalAlerts) * 100 : 0
+
+  const durations = alerts
+    .map(calculatePendingToRenewedDurationDays)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value >= 0)
+  const avgDaysPendingToRenewed = durations.length
+    ? durations.reduce((sum, value) => sum + value, 0) / durations.length
+    : null
+
+  const valueAtRiskByPeriod: RenewalRiskByPeriod[] = ([30, 60, 90] as const).map((urgency) => {
+    const periodAlerts = alerts.filter((alert) => alert.urgency === urgency && alert.status !== 'renovado')
+    return {
+      urgency,
+      alertsCount: periodAlerts.length,
+      valueAtRisk: periodAlerts.reduce((sum, alert) => sum + alert.value, 0),
+    }
+  })
+
+  const riskByClient = new Map<string, RenewalTopRiskClient>()
+  for (const alert of alerts) {
+    if (alert.status === 'renovado') continue
+    const key = `${alert.client}::${alert.company}`
+    const current = riskByClient.get(key)
+    if (current) {
+      current.valueAtRisk += alert.value
+      current.policiesCount += 1
+    } else {
+      riskByClient.set(key, {
+        client: alert.client,
+        company: alert.company,
+        policiesCount: 1,
+        valueAtRisk: alert.value,
+      })
+    }
+  }
+
+  const topRiskClients = Array.from(riskByClient.values())
+    .sort((a, b) => b.valueAtRisk - a.valueAtRisk)
+    .slice(0, 3)
+
+  const highestRiskPeriod = [...valueAtRiskByPeriod].sort((a, b) => b.valueAtRisk - a.valueAtRisk)[0]
+  const overduePending = alerts.filter((alert) => alert.status !== 'renovado' && alert.daysUntilRenewal <= 30)
+  const unassignedCount = alerts.filter((alert) => alert.status !== 'renovado' && !alert.assignedTo?.trim()).length
+
+  const insights: string[] = []
+  if (totalAlerts === 0) {
+    insights.push('Sem alertas ativos no período atual para gerar insights.')
+  } else {
+    insights.push(`Taxa de renovação atual em ${formatPctValue(renewalRatePct)} (${renewedCount}/${totalAlerts}).`)
+    if (highestRiskPeriod && highestRiskPeriod.valueAtRisk > 0) {
+      insights.push(`Maior concentração de risco no D-${highestRiskPeriod.urgency}: ${formatCurrency(highestRiskPeriod.valueAtRisk)}.`)
+    }
+    if (topRiskClients[0]) {
+      const topClient = topRiskClients[0]
+      insights.push(`Maior risco financeiro concentrado em ${topClient.client} (${formatCurrency(topClient.valueAtRisk)}).`)
+    }
+    if (avgDaysPendingToRenewed !== null) {
+      insights.push(`Tempo médio de transição pending → renewed em ${avgDaysPendingToRenewed.toFixed(1)} dias (${durations.length} casos).`)
+    }
+    if (overduePending.length > 0) {
+      insights.push(`${overduePending.length} apólices com renovação em até 30 dias ainda sem estado renovado.`)
+    }
+    if (unassignedCount > 0) {
+      insights.push(`${unassignedCount} apólices em risco ainda sem responsável definido.`)
+    }
+  }
+
+  return {
+    totalAlerts,
+    renewedCount,
+    pendingOrNegotiatingCount,
+    renewalRatePct,
+    avgDaysPendingToRenewed,
+    avgDaysSampleSize: durations.length,
+    valueAtRiskByPeriod,
+    topRiskClients,
+    insights,
+  }
+}
+
 function isAdminTab(value: unknown): value is AdminTab {
   return typeof value === 'string' && ADMIN_TABS.includes(value as AdminTab)
 }
@@ -1110,6 +1252,11 @@ function AdminDashboardTab({
     return grouped
   }, [renewalAlertsView])
 
+  const renewalIntelligence = useMemo(
+    () => buildRenewalPipelineIntelligence(renewalAlertsView?.alerts ?? []),
+    [renewalAlertsView]
+  )
+
   const responsibleOptions = useMemo(() => {
     const unique = new Map<string, string>()
     for (const user of companyUsers) {
@@ -1388,6 +1535,73 @@ function AdminDashboardTab({
                 <div className="rounded border border-red-200 bg-red-50 px-3 py-2">
                   <p className="text-[11px] uppercase tracking-wide text-red-500">Valor total em risco</p>
                   <p className="text-base font-semibold text-red-700">{formatCurrency(renewalAlertsView.summary.totalValueAtRisk)}</p>
+                </div>
+              </div>
+              <div className="grid xl:grid-cols-3 gap-2">
+                <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-emerald-600">Taxa de renovação</p>
+                  <p className="text-base font-semibold text-emerald-700">{formatPctValue(renewalIntelligence.renewalRatePct)}</p>
+                  <p className="text-[11px] text-emerald-700/80">
+                    {renewalIntelligence.renewedCount} renovadas de {renewalIntelligence.totalAlerts}
+                  </p>
+                </div>
+                <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-amber-600">Tempo médio pending → renewed</p>
+                  <p className="text-base font-semibold text-amber-700">
+                    {renewalIntelligence.avgDaysPendingToRenewed === null
+                      ? 'n/d'
+                      : `${renewalIntelligence.avgDaysPendingToRenewed.toFixed(1)} dias`}
+                  </p>
+                  <p className="text-[11px] text-amber-700/80">
+                    Base: {renewalIntelligence.avgDaysSampleSize} transições completas
+                  </p>
+                </div>
+                <div className="rounded border border-navy-200 bg-navy-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-navy-500">Casos em risco</p>
+                  <p className="text-base font-semibold text-navy-700">{renewalIntelligence.pendingOrNegotiatingCount}</p>
+                  <p className="text-[11px] text-navy-600">Ainda não renovadas</p>
+                </div>
+              </div>
+              <div className="grid xl:grid-cols-3 gap-2">
+                {renewalIntelligence.valueAtRiskByPeriod.map((period) => (
+                  <div key={period.urgency} className="rounded border border-red-200 bg-red-50 px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-wide text-red-500">Risco D-{period.urgency}</p>
+                    <p className="text-base font-semibold text-red-700">{formatCurrency(period.valueAtRisk)}</p>
+                    <p className="text-[11px] text-red-600/90">{period.alertsCount} apólices em risco</p>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded border border-navy-200 bg-white px-3 py-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-navy-700 mb-2">
+                  Clientes com maior risco financeiro
+                </h4>
+                {renewalIntelligence.topRiskClients.length === 0 ? (
+                  <p className="text-[11px] text-navy-500">Sem clientes em risco no período atual.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {renewalIntelligence.topRiskClients.map((client, index) => (
+                      <div key={`${client.client}_${client.company}`} className="flex items-center justify-between gap-2 text-[11px] text-navy-600">
+                        <p>
+                          <strong className="text-navy-700">#{index + 1}</strong> {client.client} <span className="text-navy-400">({client.company})</span>
+                        </p>
+                        <p className="font-semibold text-red-700">
+                          {formatCurrency(client.valueAtRisk)} · {client.policiesCount} apólices
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="rounded border border-gold-200 bg-gold-50 px-3 py-3">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-navy-700 mb-2">
+                  Insights automáticos
+                </h4>
+                <div className="space-y-1.5">
+                  {renewalIntelligence.insights.map((insight, index) => (
+                    <p key={`insight_${index}`} className="text-[11px] text-navy-700">
+                      {insight}
+                    </p>
+                  ))}
                 </div>
               </div>
               <div className="grid xl:grid-cols-3 gap-3">
