@@ -273,6 +273,30 @@ export interface AdminFinancialDashboardData {
   }
 }
 
+export type RenewalAlertUrgency = 30 | 60 | 90
+
+export interface RenewalAlertItem {
+  key: string
+  policyId: string
+  policyNumber: string
+  client: string
+  company: string
+  policyType: PolicyType
+  insurer: string
+  value: number
+  startDate: string
+  renewalDate: string
+  daysUntilRenewal: number
+  urgency: RenewalAlertUrgency
+}
+
+export interface RenewalAlertsResponse {
+  generatedAt: string
+  total: number
+  alerts: RenewalAlertItem[]
+  byUrgency: Record<RenewalAlertUrgency, RenewalAlertItem[]>
+}
+
 export interface RiskReport {
   id: string
   companyId: string

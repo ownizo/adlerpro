@@ -27,6 +27,7 @@ import {
   adminDeleteSocialPost,
   adminGenerateSocialContent,
   fetchAdminFinancialDashboard,
+  getRenewalAlerts,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type {
@@ -40,6 +41,7 @@ import type {
   IndividualClient,
   SocialPost,
   AdminFinancialDashboardData,
+  RenewalAlertsResponse,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef } from 'react'
@@ -174,7 +176,6 @@ function AdminPage() {
                 individualClients={individualClients}
                 socialPosts={socialPosts}
                 apiConnections={apiConnections}
-                expiringPolicies={expiringPolicies}
               />
             )}
 
@@ -895,7 +896,6 @@ function AdminDashboardTab({
   individualClients,
   socialPosts,
   apiConnections,
-  expiringPolicies,
 }: {
   companies: Company[]
   companyUsers: CompanyUser[]
@@ -905,7 +905,6 @@ function AdminDashboardTab({
   individualClients: IndividualClient[]
   socialPosts: SocialPost[]
   apiConnections: ApiConnection[]
-  expiringPolicies: Policy[]
 }) {
   const openClaims = claims.filter((c) => c.status !== 'paid' && c.status !== 'denied')
   const connectedApis = apiConnections.filter((a) => a.status === 'connected').length
@@ -918,6 +917,8 @@ function AdminDashboardTab({
   const [drillDownMonth, setDrillDownMonth] = useState<number | null>(null)
   const [financialData, setFinancialData] = useState<AdminFinancialDashboardData | null>(null)
   const [financialLoading, setFinancialLoading] = useState(false)
+  const [renewalAlerts, setRenewalAlerts] = useState<RenewalAlertsResponse | null>(null)
+  const [renewalAlertsLoading, setRenewalAlertsLoading] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -952,6 +953,29 @@ function AdminDashboardTab({
   useEffect(() => {
     setDrillDownMonth(selectedMonth ? Number(selectedMonth) : null)
   }, [selectedMonth])
+
+  useEffect(() => {
+    let active = true
+    setRenewalAlertsLoading(true)
+    getRenewalAlerts()
+      .then((result) => {
+        if (!active) return
+        setRenewalAlerts(result)
+      })
+      .catch((error) => {
+        console.error('[AdminDashboardTab] getRenewalAlerts error:', error)
+        if (!active) return
+        setRenewalAlerts(null)
+      })
+      .finally(() => {
+        if (!active) return
+        setRenewalAlertsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [policies])
 
   const monthSelectOptions = [
     { value: '', label: 'Ano completo' },
@@ -1187,15 +1211,61 @@ function AdminDashboardTab({
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-[4px] border border-navy-200 p-5">
-          <h3 className="text-sm font-semibold text-navy-700 mb-3">Renovações Próximas (60 dias)</h3>
-          <div className="space-y-2 text-sm">
-            {expiringPolicies.slice(0, 5).map((p) => (
-              <p key={p.id} className="text-navy-600">
-                {POLICY_TYPE_LABELS[p.type]} · <strong>{p.policyNumber}</strong> · {formatDate(p.endDate)}
-              </p>
-            ))}
-            {expiringPolicies.length === 0 && <p className="text-navy-400">Sem renovações iminentes.</p>}
-          </div>
+          <h3 className="text-sm font-semibold text-navy-700 mb-3">Renovações próximas</h3>
+          {renewalAlertsLoading ? (
+            <p className="text-sm text-navy-400">A carregar alertas de renovação...</p>
+          ) : renewalAlerts && renewalAlerts.total > 0 ? (
+            <div className="space-y-3">
+              {[30, 60, 90].map((urgency) => {
+                const items = renewalAlerts.byUrgency[urgency as 30 | 60 | 90]
+                if (!items.length) return null
+
+                const palette =
+                  urgency === 30
+                    ? {
+                        box: 'bg-red-50 border-red-200',
+                        badge: 'bg-red-100 text-red-700',
+                      }
+                    : urgency === 60
+                      ? {
+                          box: 'bg-amber-50 border-amber-200',
+                          badge: 'bg-amber-100 text-amber-700',
+                        }
+                      : {
+                          box: 'bg-blue-50 border-blue-200',
+                          badge: 'bg-blue-100 text-blue-700',
+                        }
+
+                return (
+                  <div key={`renewal_${urgency}`} className={`rounded-[4px] border p-3 ${palette.box}`}>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-navy-700">D-{urgency}</p>
+                      <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${palette.badge}`}>
+                        {items.length} alerta{items.length > 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {items.slice(0, 4).map((alert) => (
+                        <div key={alert.key} className="text-xs text-navy-700">
+                          <p className="font-semibold">
+                            {alert.client} · {POLICY_TYPE_LABELS[alert.policyType]}
+                          </p>
+                          <p className="text-navy-600">
+                            {alert.company} · {alert.insurer} · {formatCurrency(alert.value)}
+                          </p>
+                          <p className="text-navy-500">
+                            Apólice {alert.policyNumber} · Renovação em {formatDate(alert.renewalDate)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-navy-400">Sem alertas ativos para D-90, D-60 ou D-30.</p>
+          )}
         </div>
 
         <div className="bg-white rounded-[4px] border border-navy-200 p-5">

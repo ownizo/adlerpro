@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
-import type { DashboardStats, AdminFinancialDashboardData } from './types'
+import type { DashboardStats, AdminFinancialDashboardData, RenewalAlertsResponse, RenewalAlertItem } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
 
@@ -439,6 +439,102 @@ function toDeltaPct(current: number, previous: number | null): number | null {
   if (previous === null || previous === 0) return null
   return ((current - previous) / previous) * 100
 }
+
+const RENEWAL_ALERT_DAYS = [30, 60, 90] as const
+
+function startOfUtcDay(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+}
+
+function addYearsUtc(baseDate: Date, years: number): Date {
+  return new Date(Date.UTC(baseDate.getUTCFullYear() + years, baseDate.getUTCMonth(), baseDate.getUTCDate()))
+}
+
+function computeUpcomingRenewalDate(startDate: Date, todayUtc: Date): Date {
+  let renewalDate = addYearsUtc(startDate, 1)
+  while (renewalDate < todayUtc) {
+    renewalDate = addYearsUtc(renewalDate, 1)
+  }
+  return renewalDate
+}
+
+function getUtcDayDiff(targetDate: Date, todayUtc: Date): number {
+  const MS_PER_DAY = 24 * 60 * 60 * 1000
+  return Math.round((targetDate.getTime() - todayUtc.getTime()) / MS_PER_DAY)
+}
+
+export const getRenewalAlerts = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async (): Promise<RenewalAlertsResponse> => {
+    const scope = await getViewerScope()
+    const todayUtc = startOfUtcDay(new Date())
+
+    const [policies, companies, individualClients] = await Promise.all([
+      db.getPolicies(scope.companyId ?? undefined),
+      scope.companyId
+        ? db.getCompany(scope.companyId).then((company) => (company ? [company] : []))
+        : db.getCompanies(),
+      db.getIndividualClients(),
+    ])
+
+    const companyById = new Map(companies.map((company) => [company.id, company]))
+    const individualClientById = new Map(individualClients.map((client) => [client.id, client]))
+    const dedupe = new Set<string>()
+    const alerts: RenewalAlertItem[] = []
+
+    for (const policy of policies) {
+      if (!['active', 'expiring'].includes(policy.status)) continue
+      const startDate = parseDateToUtc(policy.startDate)
+      if (!startDate) continue
+
+      const renewalDate = computeUpcomingRenewalDate(startDate, todayUtc)
+      const daysUntilRenewal = getUtcDayDiff(renewalDate, todayUtc)
+      if (!RENEWAL_ALERT_DAYS.includes(daysUntilRenewal as (typeof RENEWAL_ALERT_DAYS)[number])) continue
+
+      const urgency = daysUntilRenewal as 30 | 60 | 90
+      const key = `${policy.id}:${urgency}:${renewalDate.toISOString().slice(0, 10)}`
+      if (dedupe.has(key)) continue
+      dedupe.add(key)
+
+      const company = policy.companyId ? companyById.get(policy.companyId) : undefined
+      const individualClient = policy.individualClientId
+        ? individualClientById.get(policy.individualClientId)
+        : undefined
+
+      alerts.push({
+        key,
+        policyId: policy.id,
+        policyNumber: policy.policyNumber,
+        client: individualClient?.fullName || company?.contactName || company?.name || 'Cliente não identificado',
+        company: company?.name || 'Cliente individual',
+        policyType: policy.type,
+        insurer: policy.insurer,
+        value: policy.annualPremium || 0,
+        startDate: policy.startDate,
+        renewalDate: renewalDate.toISOString().slice(0, 10),
+        daysUntilRenewal,
+        urgency,
+      })
+    }
+
+    alerts.sort((a, b) => {
+      if (a.daysUntilRenewal !== b.daysUntilRenewal) return a.daysUntilRenewal - b.daysUntilRenewal
+      if (a.renewalDate !== b.renewalDate) return a.renewalDate.localeCompare(b.renewalDate)
+      return a.policyNumber.localeCompare(b.policyNumber)
+    })
+
+    const byUrgency: RenewalAlertsResponse['byUrgency'] = { 30: [], 60: [], 90: [] }
+    for (const alert of alerts) {
+      byUrgency[alert.urgency].push(alert)
+    }
+
+    return {
+      generatedAt: new Date().toISOString(),
+      total: alerts.length,
+      alerts,
+      byUrgency,
+    }
+  })
 
 export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
