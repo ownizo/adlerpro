@@ -44,15 +44,25 @@ import { useState, useEffect, useRef } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
 
+const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'social', 'api', 'profiles', 'alerts'] as const
+type AdminTab = (typeof ADMIN_TABS)[number]
+
+function isAdminTab(value: unknown): value is AdminTab {
+  return typeof value === 'string' && ADMIN_TABS.includes(value as AdminTab)
+}
+
 export const Route = createFileRoute('/admin')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: isAdminTab(search.tab) ? search.tab : undefined,
+  }),
   component: AdminPage,
   head: () => ({ meta: [{ title: 'Adler Admin' }] }),
 })
 
 function AdminPage() {
   const { user, ready } = useIdentity()
-  const [tab, setTab] = useState<'dashboard' | 'companies' | 'policies' | 'claims' | 'api' | 'profiles' | 'alerts' | 'individual_clients' | 'social'>('dashboard')
-  const [adminNavExpanded, setAdminNavExpanded] = useState(true)
+  const { tab: searchTab } = Route.useSearch()
+  const tab: AdminTab = searchTab ?? 'dashboard'
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
   const [userEvents, setUserEvents] = useState<UserMetricEvent[]>([])
@@ -113,18 +123,6 @@ function AdminPage() {
   if (!user) return <Navigate to="/login" />
   if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
-  const tabs = [
-    { key: 'dashboard' as const, label: 'Dashboard', icon: '◫' },
-    { key: 'companies' as const, label: 'Empresas', icon: '🏢' },
-    { key: 'individual_clients' as const, label: 'Clientes Individuais', icon: '👤' },
-    { key: 'policies' as const, label: 'Apólices e Docs', icon: '📄' },
-    { key: 'claims' as const, label: 'Sinistros', icon: '⚠' },
-    { key: 'social' as const, label: '✦ Social Hub', icon: '✦' },
-    { key: 'api' as const, label: 'API & Ligações', icon: '🔌' },
-    { key: 'profiles' as const, label: 'Perfis e Métricas', icon: '📊' },
-    { key: 'alerts' as const, label: 'Alertas (60 dias)', icon: '⏰' },
-  ]
-
   const expiringPolicies = policies.filter((p) => {
     const endDate = new Date(p.endDate)
     const now = new Date()
@@ -158,58 +156,12 @@ function AdminPage() {
           <p className="text-navy-500 mt-1">Gestão de empresas, acessos, apólices, sinistros e integrações</p>
         </div>
 
-        <div className="lg:hidden mb-5">
-          <label htmlFor="admin-tab" className="block text-xs font-semibold uppercase text-navy-500 mb-2">Secção do Admin</label>
-          <select
-            id="admin-tab"
-            value={tab}
-            onChange={(e) => setTab(e.target.value as typeof tab)}
-            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 bg-white"
-          >
-            {tabs.map((t) => (
-              <option key={t.key} value={t.key}>{t.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="flex gap-6">
-          <aside
-            className={`hidden lg:flex flex-col border border-navy-200 bg-white rounded-[4px] p-2 h-fit sticky top-24 transition-all duration-200 ${
-              adminNavExpanded ? 'w-72' : 'w-20'
-            }`}
-          >
-            <button
-              onClick={() => setAdminNavExpanded((prev) => !prev)}
-              className="mb-2 px-3 py-2 text-xs font-semibold text-navy-500 border border-navy-200 rounded hover:bg-navy-50 transition-colors text-left"
-            >
-              {adminNavExpanded ? 'Recolher menu' : 'Expandir'}
-            </button>
-            <nav className="space-y-1">
-              {tabs.map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setTab(t.key)}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-[2px] transition-colors ${
-                    tab === t.key
-                      ? 'bg-navy-700 text-white'
-                      : 'text-navy-600 hover:text-navy-700 hover:bg-navy-50'
-                  }`}
-                  title={t.label}
-                >
-                  <span className="w-4 text-center">{t.icon}</span>
-                  {adminNavExpanded ? <span>{t.label}</span> : null}
-                </button>
-              ))}
-            </nav>
-          </aside>
-
-          <div className="flex-1 min-w-0">
-            {loading ? (
-              <div className="flex items-center justify-center py-20">
-                <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : (
-              <>
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
             {tab === 'dashboard' && (
               <AdminDashboardTab
                 companies={companies}
@@ -925,10 +877,8 @@ function AdminPage() {
                 )}
               </div>
             )}
-              </>
-            )}
-          </div>
-        </div>
+          </>
+        )}
       </div>
     </AppLayout>
   )

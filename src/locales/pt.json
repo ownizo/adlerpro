@@ -10,6 +10,15 @@
     "alerts": "Alertas",
     "profile": "Perfil",
     "admin": "Administração",
+    "adminDashboard": "Dashboard",
+    "adminCompanies": "Empresas",
+    "adminIndividualClients": "Clientes Individuais",
+    "adminPoliciesDocs": "Apólices e Docs",
+    "adminClaims": "Sinistros",
+    "adminSocialHub": "✦ Social Hub",
+    "adminApiLinks": "API & Ligações",
+    "adminProfilesMetrics": "Perfis e Métricas",
+    "adminAlerts60d": "Alertas (60 dias)",
     "openMenu": "Abrir menu"
   },
   "common": {

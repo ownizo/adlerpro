@@ -350,7 +350,38 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       db.getDocuments(),
       db.getIndividualClients(),
     ])
-    return { companies, companyUsers, userEvents, apiConnections, policies, claims, documents, individualClients }
+
+    const normalizeNif = (value?: string | null) => (value ?? '').replace(/\D/g, '')
+    const normalizeEmail = (value?: string | null) => (value ?? '').trim().toLowerCase()
+
+    const companyNifs = new Set(companies.map((company) => normalizeNif(company.nif)).filter(Boolean))
+    const companyEmails = new Set(
+      [
+        ...companies.flatMap((company) => [company.contactEmail, company.accessEmail]),
+        ...companyUsers.map((companyUser) => companyUser.email),
+      ]
+        .map((email) => normalizeEmail(email))
+        .filter(Boolean)
+    )
+
+    const filteredIndividualClients = individualClients.filter((client) => {
+      const clientNif = normalizeNif(client.nif)
+      const clientEmail = normalizeEmail(client.email)
+      const matchesCompanyNif = clientNif && companyNifs.has(clientNif)
+      const matchesCompanyEmail = clientEmail && companyEmails.has(clientEmail)
+      return !matchesCompanyNif && !matchesCompanyEmail
+    })
+
+    return {
+      companies,
+      companyUsers,
+      userEvents,
+      apiConnections,
+      policies,
+      claims,
+      documents,
+      individualClients: filteredIndividualClients,
+    }
   })
 
 // Admin functions
@@ -967,4 +998,3 @@ Responde APENAS com um JSON válido neste formato exato (sem markdown, sem texto
 
     return { ...parsed, carouselSlides }
   })
-

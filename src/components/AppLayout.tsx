@@ -1,4 +1,4 @@
-import { Link } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import { useIdentity } from '@/lib/identity-context'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
@@ -17,8 +17,24 @@ const NAV_ITEMS = [
   { to: '/profile' as const, key: 'nav.profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
 ]
 
-const ADMIN_NAV_ITEMS = [
-  { to: '/admin' as const, key: 'nav.admin', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z' },
+type AdminTab = 'dashboard' | 'companies' | 'individual_clients' | 'policies' | 'claims' | 'social' | 'api' | 'profiles' | 'alerts'
+
+const ADMIN_NAV_ROOT = {
+  to: '/admin' as const,
+  key: 'nav.admin',
+  icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
+}
+
+const ADMIN_SUBNAV_ITEMS: Array<{ key: string; tab: AdminTab }> = [
+  { key: 'nav.adminDashboard', tab: 'dashboard' },
+  { key: 'nav.adminCompanies', tab: 'companies' },
+  { key: 'nav.adminIndividualClients', tab: 'individual_clients' },
+  { key: 'nav.adminPoliciesDocs', tab: 'policies' },
+  { key: 'nav.adminClaims', tab: 'claims' },
+  { key: 'nav.adminSocialHub', tab: 'social' },
+  { key: 'nav.adminApiLinks', tab: 'api' },
+  { key: 'nav.adminProfilesMetrics', tab: 'profiles' },
+  { key: 'nav.adminAlerts60d', tab: 'alerts' },
 ]
 
 const BOTTOM_NAV_ITEMS = [
@@ -33,9 +49,12 @@ const font = "'Montserrat', sans-serif"
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, ready, logout } = useIdentity()
   const { t, i18n } = useTranslation()
+  const location = useRouterState({ select: (state) => state.location })
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [adminSectionOpen, setAdminSectionOpen] = useState(true)
   const [lang, setLangState] = useState<LangCode>((i18n.language as LangCode) ?? 'pt')
   const isAdmin = user?.roles?.includes('admin')
+  const isAdminRoute = location.pathname === '/admin'
 
   const primaryItems = isAdmin
     ? NAV_ITEMS.filter((item) => item.to === '/dashboard' || item.to === '/profile')
@@ -102,21 +121,50 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   {t('nav.admin')}
                 </p>
               </div>
-              {ADMIN_NAV_ITEMS.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={cn('flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors', '[&.active]:text-primary [&.active]:bg-[#f8f8f8]')}
-                  style={{ fontFamily: font, color: '#666666', borderRadius: '2px' }}
-                  activeProps={{ className: 'active' }}
-                  onClick={() => setSidebarOpen(false)}
-                >
+              <button
+                type="button"
+                onClick={() => setAdminSectionOpen((prev) => !prev)}
+                className={cn(
+                  'w-full flex items-center justify-between gap-3 px-3 py-2.5 text-sm font-medium transition-colors',
+                  isAdminRoute ? 'bg-[#f8f8f8] text-primary' : 'text-[#666666] hover:bg-[#f8f8f8]'
+                )}
+                style={{ fontFamily: font, borderRadius: '2px' }}
+              >
+                <span className="flex items-center gap-3">
                   <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                    <path strokeLinecap="round" strokeLinejoin="round" d={ADMIN_NAV_ROOT.icon} />
                   </svg>
-                  {t(item.key)}
-                </Link>
-              ))}
+                  {t(ADMIN_NAV_ROOT.key)}
+                </span>
+                <svg
+                  className={cn('w-4 h-4 transition-transform', adminSectionOpen ? 'rotate-180' : 'rotate-0')}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {adminSectionOpen && (
+                <div className="pl-4 mt-1 space-y-1">
+                  {ADMIN_SUBNAV_ITEMS.map((item) => (
+                    <Link
+                      key={item.tab}
+                      to="/admin"
+                      search={{ tab: item.tab }}
+                      className={cn('flex items-center px-3 py-2 text-sm font-medium transition-colors', '[&.active]:text-primary [&.active]:bg-[#f8f8f8]')}
+                      style={{ fontFamily: font, color: '#666666', borderRadius: '2px' }}
+                      activeProps={{ className: 'active' }}
+                      activeOptions={{ includeSearch: true }}
+                      onClick={() => setSidebarOpen(false)}
+                    >
+                      {t(item.key)}
+                    </Link>
+                  ))}
+                </div>
+              )}
             </>
           )}
         </nav>
