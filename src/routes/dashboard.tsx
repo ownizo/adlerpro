@@ -29,9 +29,44 @@ type DashboardPayload = {
 }
 
 type RiskLevel = 'low' | 'medium' | 'high'
+type RiskTrend = 'up' | 'down' | 'stable'
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, value))
+}
+
+function toDate(value?: string): Date | null {
+  if (!value) return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function isWithinRange(date: Date | null, start: Date, end: Date) {
+  return Boolean(date && date >= start && date < end)
+}
+
+function pctDelta(current: number, previous: number): number | null {
+  if (previous <= 0) return current > 0 ? 100 : 0
+  return Math.round(((current - previous) / previous) * 100)
+}
+
+function hasWeatherSignal(text: string): boolean {
+  const normalized = text.toLowerCase()
+  return [
+    'weather',
+    'tempo',
+    'ipma',
+    'storm',
+    'tempest',
+    'chuva',
+    'rain',
+    'wind',
+    'vento',
+    'flood',
+    'inunda',
+    'heat',
+    'calor',
+  ].some((token) => normalized.includes(token))
 }
 
 function DashboardPage() {
@@ -114,32 +149,6 @@ function DashboardPage() {
     [activePolicies],
   )
 
-  const riskScore = useMemo(() => {
-    const totalBase = Math.max(totalInsuredValue, 1)
-    const claimPressure = clamp((openClaimExposure / totalBase) * 100, 0, 100)
-    const urgencyPressure = clamp(
-      renewals30Days.length * 10 + criticalAlerts.length * 9 + pendingDocumentAlerts * 6 + openClaims.length * 5,
-      0,
-      100,
-    )
-    const riskReportPressure = riskReports[0]?.summary ? 12 : 0
-    return clamp(Math.round(claimPressure * 0.5 + urgencyPressure * 0.4 + riskReportPressure), 0, 100)
-  }, [
-    totalInsuredValue,
-    openClaimExposure,
-    renewals30Days.length,
-    criticalAlerts.length,
-    pendingDocumentAlerts,
-    openClaims.length,
-    riskReports,
-  ])
-
-  const riskLevel = useMemo((): RiskLevel => {
-    if (riskScore >= 67) return 'high'
-    if (riskScore >= 34) return 'medium'
-    return 'low'
-  }, [riskScore])
-
   const riskTimeline = useMemo(() => {
     const now = new Date()
     const startMonth = new Date(now.getFullYear(), now.getMonth() - 2, 1)
@@ -206,6 +215,176 @@ function DashboardPage() {
     const projectedClaimExposure = riskTimeline.find((point) => point.isNext30Days)?.claimsExposure ?? 0
     return renewalsExposure + projectedClaimExposure
   }, [renewals30Days, riskTimeline])
+
+  const riskAnalytics = useMemo(() => {
+    const now = new Date()
+    const currentPeriodStart = new Date(now)
+    currentPeriodStart.setDate(currentPeriodStart.getDate() - 30)
+    const previousPeriodStart = new Date(now)
+    previousPeriodStart.setDate(previousPeriodStart.getDate() - 60)
+
+    const previousRenewals = activePolicies.filter((policy) =>
+      isWithinRange(toDate(policy.endDate), currentPeriodStart, now),
+    )
+    const previousRenewalsExposure = previousRenewals.reduce((sum, policy) => sum + (policy.insuredValue || 0), 0)
+
+    const claimsCurrentPeriod = claims.filter((claim) =>
+      isWithinRange(toDate(claim.incidentDate || claim.claimDate || claim.createdAt), currentPeriodStart, now),
+    )
+    const claimsPreviousPeriod = claims.filter((claim) =>
+      isWithinRange(toDate(claim.incidentDate || claim.claimDate || claim.createdAt), previousPeriodStart, currentPeriodStart),
+    )
+    const claimsPreviousExposure = claimsPreviousPeriod.reduce((sum, claim) => sum + (claim.estimatedValue || 0), 0)
+
+    const alertsCurrentPeriod = alerts.filter((alert) =>
+      isWithinRange(toDate(alert.createdAt), currentPeriodStart, now),
+    )
+    const alertsPreviousPeriod = alerts.filter((alert) =>
+      isWithinRange(toDate(alert.createdAt), previousPeriodStart, currentPeriodStart),
+    )
+    const criticalCurrentPeriod = alertsCurrentPeriod.filter((alert) => ['renewal', 'claim_update', 'document', 'general'].includes(alert.type))
+    const criticalPreviousPeriod = alertsPreviousPeriod.filter((alert) => ['renewal', 'claim_update', 'document', 'general'].includes(alert.type))
+    const documentPreviousPeriod = alertsPreviousPeriod.filter((alert) => alert.type === 'document')
+
+    const weatherCurrentPeriod = alertsCurrentPeriod.filter((alert) => hasWeatherSignal(`${alert.title} ${alert.message}`))
+    const weatherPreviousPeriod = alertsPreviousPeriod.filter((alert) => hasWeatherSignal(`${alert.title} ${alert.message}`))
+
+    const reportSeverity = (summary?: string) => {
+      if (!summary) return 0
+      const normalized = summary.toLowerCase()
+      if (['alto', 'high', 'default', 'insolv', 'critical'].some((token) => normalized.includes(token))) return 44
+      if (['médio', 'medio', 'medium', 'attention', 'atencao', 'atención'].some((token) => normalized.includes(token))) return 30
+      return 18
+    }
+
+    const reportRecencyBoost = (generatedAt?: string) => {
+      const d = toDate(generatedAt)
+      if (!d) return 0
+      const days = Math.max(0, Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24)))
+      if (days <= 30) return 20
+      if (days <= 90) return 12
+      return 5
+    }
+
+    const insuredBase = Math.max(totalInsuredValue * 0.65, 1)
+    const financialCurrentRaw = openClaimExposure + next30DaysExposure
+    const financialPreviousRaw = claimsPreviousExposure + previousRenewalsExposure
+    const financial = clamp(Math.round((financialCurrentRaw / insuredBase) * 100))
+    const financialPrev = clamp(Math.round((financialPreviousRaw / insuredBase) * 100))
+
+    const operationalBase = Math.max(activePolicies.length * 2.8, 6)
+    const operationalCurrentLoad = renewals30Days.length * 1.4 + openClaims.length * 1.2 + pendingDocumentAlerts + criticalAlerts.length * 1.1
+    const operationalPreviousLoad = previousRenewals.length * 1.4 + claimsPreviousPeriod.length * 1.2 + documentPreviousPeriod.length + criticalPreviousPeriod.length * 1.1
+    const operational = clamp(Math.round((operationalCurrentLoad / operationalBase) * 100))
+    const operationalPrev = clamp(Math.round((operationalPreviousLoad / operationalBase) * 100))
+
+    const latestReport = riskReports[0]
+    const previousReport = riskReports[1]
+    const partners = clamp(18 + reportSeverity(latestReport?.summary) + reportRecencyBoost(latestReport?.generatedAt))
+    const partnersPrev = previousReport
+      ? clamp(18 + reportSeverity(previousReport.summary) + reportRecencyBoost(previousReport.generatedAt))
+      : clamp(Math.max(partners - 6, 10))
+
+    const climate = clamp(weatherCurrentPeriod.length * 18 + weatherCurrentPeriod.filter((alert) => !alert.read).length * 12)
+    const climatePrev = clamp(weatherPreviousPeriod.length * 18)
+
+    const dimensions = [
+      { key: 'financial', label: t('dashboard.dimensionFinancial'), score: financial, previousScore: financialPrev, weight: 0.38 },
+      { key: 'operational', label: t('dashboard.dimensionOperational'), score: operational, previousScore: operationalPrev, weight: 0.32 },
+      { key: 'partners', label: t('dashboard.dimensionPartners'), score: partners, previousScore: partnersPrev, weight: 0.2 },
+      { key: 'climate', label: t('dashboard.dimensionClimate'), score: climate, previousScore: climatePrev, weight: 0.1 },
+    ]
+
+    const globalScore = clamp(Math.round(dimensions.reduce((sum, item) => sum + item.score * item.weight, 0)))
+    const previousGlobalScore = clamp(Math.round(dimensions.reduce((sum, item) => sum + item.previousScore * item.weight, 0)))
+    const delta = globalScore - previousGlobalScore
+
+    const trend: RiskTrend = delta >= 4 ? 'up' : delta <= -4 ? 'down' : 'stable'
+    const riskLevel: RiskLevel = globalScore >= 67 ? 'high' : globalScore >= 34 ? 'medium' : 'low'
+
+    const factors = dimensions
+      .map((dimension) => ({
+        ...dimension,
+        contribution: Math.round(dimension.score * dimension.weight),
+      }))
+      .sort((a, b) => b.contribution - a.contribution)
+
+    const comparisons = [
+      {
+        label: t('dashboard.comparisonExposure'),
+        current: next30DaysExposure + openClaimExposure,
+        previous: financialPreviousRaw,
+        format: (value: number) => formatCurrency(value),
+      },
+      {
+        label: t('dashboard.comparisonClaims'),
+        current: claimsCurrentPeriod.length,
+        previous: claimsPreviousPeriod.length,
+        format: (value: number) => `${value}`,
+      },
+      {
+        label: t('dashboard.comparisonCriticalAlerts'),
+        current: criticalCurrentPeriod.length,
+        previous: criticalPreviousPeriod.length,
+        format: (value: number) => `${value}`,
+      },
+      {
+        label: t('dashboard.comparisonRenewals'),
+        current: renewals30Days.length,
+        previous: previousRenewals.length,
+        format: (value: number) => `${value}`,
+      },
+    ]
+
+    const recommendations: string[] = []
+    if (financial >= 65) {
+      recommendations.push(t('dashboard.recoFinancial', { value: formatCurrency(next30DaysExposure + openClaimExposure) }))
+    }
+    if (operational >= 60) {
+      const totalItems = renewals30Days.length + openClaims.length + pendingDocumentAlerts + criticalAlerts.length
+      recommendations.push(t('dashboard.recoOperational', { count: totalItems }))
+    }
+    if (partners >= 60) {
+      recommendations.push(t('dashboard.recoPartners'))
+    }
+    if (climate >= 50) {
+      recommendations.push(t('dashboard.recoClimate', { count: weatherCurrentPeriod.length }))
+    }
+    if (recommendations.length === 0) {
+      recommendations.push(t('dashboard.recoStable'))
+    }
+
+    return {
+      globalScore,
+      previousGlobalScore,
+      delta,
+      trend,
+      riskLevel,
+      dimensions,
+      factors,
+      comparisons,
+      recommendations: recommendations.slice(0, 3),
+    }
+  }, [
+    activePolicies,
+    alerts,
+    claims,
+    criticalAlerts.length,
+    next30DaysExposure,
+    openClaimExposure,
+    openClaims.length,
+    pendingDocumentAlerts,
+    renewals30Days.length,
+    riskReports,
+    t,
+    totalInsuredValue,
+  ])
+
+  const riskScore = riskAnalytics.globalScore
+  const previousRiskScore = riskAnalytics.previousGlobalScore
+  const riskDelta = riskAnalytics.delta
+  const riskTrend = riskAnalytics.trend
+  const riskLevel = riskAnalytics.riskLevel
 
   const sectionPriorities = useMemo(() => {
     const sections = [
@@ -300,6 +479,12 @@ function DashboardPage() {
 
     list.push(t('dashboard.smartRiskSummary', { level: t(`dashboard.riskLevel.${riskLevel}`), score: riskScore }))
     list.push(t('dashboard.smartNext30Days', { exposure: formatCurrency(next30DaysExposure) }))
+    list.push(
+      t('dashboard.smartTrendSummary', {
+        trend: t(`dashboard.riskTrend.${riskTrend}`),
+        delta: Math.abs(riskDelta),
+      }),
+    )
 
     if (sectionPriorities.length > 0) {
       list.push(t('dashboard.smartTopPriority', { section: sectionPriorities[0].title, score: sectionPriorities[0].priorityScore }))
@@ -313,8 +498,24 @@ function DashboardPage() {
       list.push(t('dashboard.smartStableContext'))
     }
 
-    return list.slice(0, 4)
-  }, [t, riskLevel, riskScore, next30DaysExposure, sectionPriorities, openClaims.length, openClaimExposure, latestRiskSummary])
+    riskAnalytics.recommendations.forEach((recommendation) => {
+      list.push(t('dashboard.smartRecommendation', { text: recommendation }))
+    })
+
+    return list.slice(0, 6)
+  }, [
+    t,
+    riskLevel,
+    riskScore,
+    next30DaysExposure,
+    riskTrend,
+    riskDelta,
+    sectionPriorities,
+    openClaims.length,
+    openClaimExposure,
+    latestRiskSummary,
+    riskAnalytics.recommendations,
+  ])
 
   const modulesSorted = useMemo(() => {
     const modules = [
@@ -358,18 +559,60 @@ function DashboardPage() {
           </div>
         ) : (
           <>
-            <div className="mb-4" style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.8rem' }}>
-              <div>
-                <p style={{ margin: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.68rem', color: '#777777', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  {t('dashboard.globalRiskTitle')}
-                </p>
-                <p style={{ margin: '0.2rem 0 0', fontFamily: "'Montserrat', sans-serif", fontSize: '0.95rem', color: '#111111', fontWeight: 700 }}>
-                  {t(`dashboard.riskLevel.${riskLevel}`)} · {riskScore}/100
-                </p>
+            <div className="mb-4" style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', padding: '0.85rem 1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.8rem' }}>
+                <div>
+                  <p style={{ margin: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.68rem', color: '#777777', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {t('dashboard.globalRiskTitle')}
+                  </p>
+                  <p style={{ margin: '0.2rem 0 0', fontFamily: "'Montserrat', sans-serif", fontSize: '0.95rem', color: '#111111', fontWeight: 700 }}>
+                    {t(`dashboard.riskLevel.${riskLevel}`)} · {riskScore}/100
+                    <span style={{ marginLeft: '0.45rem', color: riskTrend === 'up' ? '#B91C1C' : riskTrend === 'down' ? '#166534' : '#666666', fontSize: '0.78rem', fontWeight: 600 }}>
+                      {t(`dashboard.riskTrend.${riskTrend}`)} ({riskDelta > 0 ? '+' : ''}{riskDelta})
+                    </span>
+                  </p>
+                  <p style={{ margin: '0.2rem 0 0', fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#666666' }}>
+                    {t('dashboard.periodComparisonSummary', { current: riskScore, previous: previousRiskScore })}
+                  </p>
+                </div>
+                <Link to={(sectionPriorities[0]?.to ?? '/dashboard') as any} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.74rem', color: '#C8961A', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  {t('dashboard.drillDown')}
+                </Link>
               </div>
-              <Link to={(sectionPriorities[0]?.to ?? '/dashboard') as any} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.74rem', color: '#C8961A', fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-                {t('dashboard.drillDown')}
-              </Link>
+              <div className="grid md:grid-cols-4 gap-2" style={{ marginTop: '0.75rem' }}>
+                {riskAnalytics.dimensions.map((dimension) => (
+                  <div key={dimension.key} style={{ border: '1px solid #efefef', borderRadius: '4px', padding: '0.45rem 0.55rem', background: '#fafafa' }}>
+                    <p style={{ margin: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#777777' }}>
+                      {dimension.label}
+                    </p>
+                    <p style={{ margin: '0.12rem 0 0', fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', fontWeight: 700, color: '#111111' }}>
+                      {dimension.score}/100
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="grid md:grid-cols-2 gap-2" style={{ marginTop: '0.7rem' }}>
+                {riskAnalytics.factors.slice(0, 2).map((factor) => (
+                  <p key={factor.key} style={{ margin: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#555555' }}>
+                    {t('dashboard.factorExplainer', { factor: factor.label, contribution: factor.contribution })}
+                  </p>
+                ))}
+              </div>
+              <div className="grid md:grid-cols-4 gap-2" style={{ marginTop: '0.5rem' }}>
+                {riskAnalytics.comparisons.map((comparison) => {
+                  const deltaPct = pctDelta(comparison.current, comparison.previous)
+                  return (
+                    <p key={comparison.label} style={{ margin: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.68rem', color: '#666666', lineHeight: 1.4 }}>
+                      {t('dashboard.metricVsPrevious', {
+                        metric: comparison.label,
+                        current: comparison.format(comparison.current),
+                        previous: comparison.format(comparison.previous),
+                        delta: deltaPct === null ? '0' : `${deltaPct > 0 ? '+' : ''}${deltaPct}`,
+                      })}
+                    </p>
+                  )
+                })}
+              </div>
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
