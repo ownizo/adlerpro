@@ -9,6 +9,8 @@ import type {
   CompanyUser,
   Policy,
   Claim,
+  ClaimInternalNote,
+  ClaimTimelineEvent,
   Document,
   Alert,
   RiskReport,
@@ -228,6 +230,45 @@ export async function updateClaim(id: string, updates: Partial<Claim>): Promise<
   if (error) console.error('updateClaim error:', error)
 }
 
+export async function getClaimInternalNotes(claimId: string): Promise<ClaimInternalNote[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('claim_internal_notes')
+    .select('*')
+    .eq('claim_id', claimId)
+    .order('created_at', { ascending: false })
+  if (error) { console.error('getClaimInternalNotes error:', error); return [] }
+  return rowsToCamel<ClaimInternalNote>(data ?? [])
+}
+
+export async function upsertClaimInternalNote(note: ClaimInternalNote): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const payload = objectToSnake(note as unknown as Record<string, unknown>)
+  const { error } = await sb
+    .from('claim_internal_notes')
+    .upsert(payload, { onConflict: 'id' })
+  if (error) console.error('upsertClaimInternalNote error:', error)
+}
+
+export async function getClaimTimelineEvents(claimId: string): Promise<ClaimTimelineEvent[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('claim_timeline_events')
+    .select('*')
+    .eq('claim_id', claimId)
+    .order('created_at', { ascending: false })
+  if (error) { console.error('getClaimTimelineEvents error:', error); return [] }
+  return rowsToCamel<ClaimTimelineEvent>(data ?? [])
+}
+
+export async function createClaimTimelineEvent(event: ClaimTimelineEvent): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb
+    .from('claim_timeline_events')
+    .insert(objectToSnake(event as unknown as Record<string, unknown>))
+  if (error) console.error('createClaimTimelineEvent error:', error)
+}
+
 // ============================================================
 // Documents
 // ============================================================
@@ -246,6 +287,17 @@ export async function createDocument(doc: Document): Promise<void> {
   if (error) console.error('createDocument error:', error)
 }
 
+export async function getDocument(id: string): Promise<Document | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('documents')
+    .select('*')
+    .eq('id', id)
+    .single()
+  if (error) return undefined
+  return objectToCamel(data) as Document
+}
+
 export async function updateDocument(id: string, updates: Partial<Document>): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('documents').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
@@ -256,6 +308,17 @@ export async function deleteDocument(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('documents').delete().eq('id', id)
   if (error) console.error('deleteDocument error:', error)
+}
+
+export async function getClaimDocuments(claimId: string): Promise<Document[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('documents')
+    .select('*')
+    .eq('claim_id', claimId)
+    .order('uploaded_at', { ascending: false })
+  if (error) { console.error('getClaimDocuments error:', error); return [] }
+  return rowsToCamel<Document>(data ?? [])
 }
 
 // ============================================================

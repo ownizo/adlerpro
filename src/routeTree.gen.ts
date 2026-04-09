@@ -22,6 +22,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ClaimsRouteImport } from './routes/claims'
 import { Route as AlertsRouteImport } from './routes/alerts'
+import { Route as AdminClaimsRouteImport } from './routes/admin-claims'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OneIndexRouteImport } from './routes/one/index'
@@ -31,6 +32,7 @@ import { Route as OneLoginRouteImport } from './routes/one/login'
 import { Route as OneDocumentsRouteImport } from './routes/one/documents'
 import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
 import { Route as OneClaimsRouteImport } from './routes/one/claims'
+import { Route as AdminClaimsClaimIdRouteImport } from './routes/admin-claims.$claimId'
 
 const WeatherAlertsRoute = WeatherAlertsRouteImport.update({
   id: '/weather-alerts',
@@ -97,6 +99,11 @@ const AlertsRoute = AlertsRouteImport.update({
   path: '/alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminClaimsRoute = AdminClaimsRouteImport.update({
+  id: '/admin-claims',
+  path: '/admin-claims',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
@@ -142,10 +149,16 @@ const OneClaimsRoute = OneClaimsRouteImport.update({
   path: '/one/claims',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminClaimsClaimIdRoute = AdminClaimsClaimIdRouteImport.update({
+  id: '/$claimId',
+  path: '/$claimId',
+  getParentRoute: () => AdminClaimsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/admin-claims': typeof AdminClaimsRouteWithChildren
   '/alerts': typeof AlertsRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
@@ -159,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/weather-alerts': typeof WeatherAlertsRoute
+  '/admin-claims/$claimId': typeof AdminClaimsClaimIdRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -170,6 +184,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/admin-claims': typeof AdminClaimsRouteWithChildren
   '/alerts': typeof AlertsRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
@@ -183,6 +198,7 @@ export interface FileRoutesByTo {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/weather-alerts': typeof WeatherAlertsRoute
+  '/admin-claims/$claimId': typeof AdminClaimsClaimIdRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -195,6 +211,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/admin-claims': typeof AdminClaimsRouteWithChildren
   '/alerts': typeof AlertsRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
@@ -208,6 +225,7 @@ export interface FileRoutesById {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/weather-alerts': typeof WeatherAlertsRoute
+  '/admin-claims/$claimId': typeof AdminClaimsClaimIdRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -221,6 +239,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/admin-claims'
     | '/alerts'
     | '/claims'
     | '/contact'
@@ -234,6 +253,7 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/weather-alerts'
+    | '/admin-claims/$claimId'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -245,6 +265,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/admin-claims'
     | '/alerts'
     | '/claims'
     | '/contact'
@@ -258,6 +279,7 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/weather-alerts'
+    | '/admin-claims/$claimId'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -269,6 +291,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/admin-claims'
     | '/alerts'
     | '/claims'
     | '/contact'
@@ -282,6 +305,7 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/weather-alerts'
+    | '/admin-claims/$claimId'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -294,6 +318,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AdminClaimsRoute: typeof AdminClaimsRouteWithChildren
   AlertsRoute: typeof AlertsRoute
   ClaimsRoute: typeof ClaimsRoute
   ContactRoute: typeof ContactRoute
@@ -409,6 +434,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin-claims': {
+      id: '/admin-claims'
+      path: '/admin-claims'
+      fullPath: '/admin-claims'
+      preLoaderRoute: typeof AdminClaimsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin': {
       id: '/admin'
       path: '/admin'
@@ -472,12 +504,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OneClaimsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin-claims/$claimId': {
+      id: '/admin-claims/$claimId'
+      path: '/$claimId'
+      fullPath: '/admin-claims/$claimId'
+      preLoaderRoute: typeof AdminClaimsClaimIdRouteImport
+      parentRoute: typeof AdminClaimsRoute
+    }
   }
 }
+
+interface AdminClaimsRouteChildren {
+  AdminClaimsClaimIdRoute: typeof AdminClaimsClaimIdRoute
+}
+
+const AdminClaimsRouteChildren: AdminClaimsRouteChildren = {
+  AdminClaimsClaimIdRoute: AdminClaimsClaimIdRoute,
+}
+
+const AdminClaimsRouteWithChildren = AdminClaimsRoute._addFileChildren(
+  AdminClaimsRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AdminClaimsRoute: AdminClaimsRouteWithChildren,
   AlertsRoute: AlertsRoute,
   ClaimsRoute: ClaimsRoute,
   ContactRoute: ContactRoute,
@@ -502,12 +554,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-  }
-}

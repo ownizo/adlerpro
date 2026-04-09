@@ -5,6 +5,10 @@ import * as db from './data'
 import type {
   DashboardStats,
   AdminFinancialDashboardData,
+  AdminClaimListItem,
+  AdminClaimDetail,
+  ClaimInternalNote,
+  ClaimTimelineEvent,
   RenewalAlertsResponse,
   RenewalAlertItem,
   RenewalAlertHistoryItem,
@@ -1054,6 +1058,112 @@ export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
   })
 
 // Admin functions
+function actorLabelFromScope(scope: Awaited<ReturnType<typeof getViewerScope>>): string {
+  return scope.user.name || scope.user.email || 'Admin'
+}
+
+function sortClaimTimeline(events: ClaimTimelineEvent[]): ClaimTimelineEvent[] {
+  return [...events].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+}
+
+export const fetchAdminClaimsList = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .handler(async (): Promise<AdminClaimListItem[]> => {
+    const [claims, policies, companies, individualClients, companyUsers] = await Promise.all([
+      db.getClaims(),
+      db.getPolicies(),
+      db.getCompanies(),
+      db.getIndividualClients(),
+      db.getCompanyUsers(),
+    ])
+
+    const policyById = new Map(policies.map((policy) => [policy.id, policy]))
+    const companyById = new Map(companies.map((company) => [company.id, company]))
+    const individualClientById = new Map(individualClients.map((client) => [client.id, client]))
+    const companyUsersById = new Map(companyUsers.map((user) => [user.id, user]))
+
+    return claims
+      .map((claim) => {
+        const policy = policyById.get(claim.policyId)
+        const company = companyById.get(claim.companyId)
+        const individualClient = policy?.individualClientId
+          ? individualClientById.get(policy.individualClientId)
+          : undefined
+        const clientName = individualClient?.fullName || company?.contactName || company?.name || 'Cliente não identificado'
+        const companyName = company?.name || 'Cliente individual'
+        const assigneeLabel = claim.assignedTo
+          ? (companyUsersById.get(claim.assignedTo)?.name ?? claim.assignedTo)
+          : undefined
+
+        return {
+          claim,
+          clientName,
+          companyName,
+          policy,
+          assigneeLabel,
+        }
+      })
+      .sort((a, b) => new Date(b.claim.createdAt).getTime() - new Date(a.claim.createdAt).getTime())
+  })
+
+export const fetchAdminClaimDetail = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((claimId: string) => claimId)
+  .handler(async ({ data: claimId }): Promise<AdminClaimDetail> => {
+    const [claim, policies, companies, individualClients, companyUsers, internalNotes, timelineEvents, documents] = await Promise.all([
+      db.getClaim(claimId),
+      db.getPolicies(),
+      db.getCompanies(),
+      db.getIndividualClients(),
+      db.getCompanyUsers(),
+      db.getClaimInternalNotes(claimId),
+      db.getClaimTimelineEvents(claimId),
+      db.getClaimDocuments(claimId),
+    ])
+
+    if (!claim) throw new Error('Sinistro não encontrado')
+
+    const policy = policies.find((item) => item.id === claim.policyId)
+    const company = companies.find((item) => item.id === claim.companyId)
+    const individualClient = policy?.individualClientId
+      ? individualClients.find((item) => item.id === policy.individualClientId)
+      : undefined
+    const clientName = individualClient?.fullName || company?.contactName || company?.name || 'Cliente não identificado'
+    const companyName = company?.name || 'Cliente individual'
+
+    const assigneeOptions = companyUsers
+      .filter((user) => !company?.id || user.companyId === company.id)
+      .map((user) => ({ id: user.id, label: `${user.name} (${user.email})` }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+
+    const assigneeLabel = claim.assignedTo
+      ? assigneeOptions.find((option) => option.id === claim.assignedTo)?.label
+      : undefined
+
+    const stepEvents: ClaimTimelineEvent[] = (claim.steps ?? []).map((step, index) => ({
+      id: `${claim.id}:step:${index}`,
+      claimId: claim.id,
+      type: 'status_change',
+      title: `Estado alterado para ${step.status}`,
+      details: step.notes,
+      createdBy: 'sistema',
+      createdAt: step.date,
+      meta: { source: 'steps' },
+    }))
+
+    return {
+      claim,
+      clientName,
+      companyName,
+      policy,
+      documents,
+      internalNotes,
+      timeline: sortClaimTimeline([...timelineEvents, ...stepEvents]),
+      assigneeOptions,
+      assigneeLabel,
+    }
+  })
+
 export const adminCreatePolicy = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator(
@@ -1132,10 +1242,65 @@ export const adminGetDocumentUrl = createServerFn({ method: 'POST' })
     return { url: urlData.signedUrl }
   })
 
+export const adminUploadClaimDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { claimId: string; companyId?: string; name: string; storagePath: string; size: number; category: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    await db.createDocument({
+      id: crypto.randomUUID(),
+      companyId: data.companyId ?? '',
+      name: data.name,
+      category: data.category as any,
+      size: data.size,
+      uploadedBy: actorLabelFromScope(scope),
+      uploadedAt: new Date().toISOString(),
+      blobKey: data.storagePath,
+      claimId: data.claimId,
+    })
+    await db.createClaimTimelineEvent({
+      id: crypto.randomUUID(),
+      claimId: data.claimId,
+      type: 'upload',
+      title: 'Documento carregado',
+      details: data.name,
+      createdBy: actorLabelFromScope(scope),
+      createdAt: new Date().toISOString(),
+    })
+    return { success: true }
+  })
+
+export const adminDeleteClaimDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { claimId: string; documentId: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const document = await db.getDocument(data.documentId)
+    if (!document || document.claimId !== data.claimId) throw new Error('Documento não encontrado para este sinistro')
+
+    await db.deleteDocument(document.id)
+    if (document.blobKey) {
+      const { error } = await supabaseAdmin.storage.from('documents').remove([document.blobKey])
+      if (error) console.error('[adminDeleteClaimDocument] storage remove error:', error)
+    }
+
+    await db.createClaimTimelineEvent({
+      id: crypto.randomUUID(),
+      claimId: data.claimId,
+      type: 'team_action',
+      title: 'Documento removido',
+      details: document.name,
+      createdBy: actorLabelFromScope(scope),
+      createdAt: new Date().toISOString(),
+    })
+    return { success: true }
+  })
+
 export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { claimId: string; status: string; notes?: string }) => d)
   .handler(async ({ data }) => {
+    const scope = await getViewerScope()
     const claim = await db.getClaim(data.claimId)
     if (!claim) throw new Error('Sinistro não encontrado')
     const steps = [
@@ -1147,7 +1312,73 @@ export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
       },
     ]
     await db.updateClaim(data.claimId, { status: data.status as any, steps })
+    await db.createClaimTimelineEvent({
+      id: crypto.randomUUID(),
+      claimId: data.claimId,
+      type: 'status_change',
+      title: `Estado alterado para ${data.status}`,
+      details: data.notes,
+      createdBy: actorLabelFromScope(scope),
+      createdAt: new Date().toISOString(),
+    })
     return { success: true }
+  })
+
+export const adminAssignClaimOwner = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { claimId: string; assignedTo?: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+
+    await db.updateClaim(data.claimId, { assignedTo: data.assignedTo || undefined })
+    await db.createClaimTimelineEvent({
+      id: crypto.randomUUID(),
+      claimId: data.claimId,
+      type: 'assignment',
+      title: data.assignedTo ? 'Responsável atribuído' : 'Responsável removido',
+      details: data.assignedTo || 'Sem responsável',
+      createdBy: actorLabelFromScope(scope),
+      createdAt: new Date().toISOString(),
+    })
+    return { success: true }
+  })
+
+export const adminUpsertClaimInternalNote = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { claimId: string; noteId?: string; body: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+
+    const now = new Date().toISOString()
+    const noteId = data.noteId || crypto.randomUUID()
+    const existing = data.noteId
+      ? (await db.getClaimInternalNotes(data.claimId)).find((note) => note.id === data.noteId)
+      : undefined
+
+    const note: ClaimInternalNote = {
+      id: noteId,
+      claimId: data.claimId,
+      body: data.body.trim(),
+      createdBy: existing?.createdBy || actorLabelFromScope(scope),
+      createdAt: existing?.createdAt || now,
+      updatedAt: existing ? now : undefined,
+    }
+
+    await db.upsertClaimInternalNote(note)
+    await db.createClaimTimelineEvent({
+      id: crypto.randomUUID(),
+      claimId: data.claimId,
+      type: existing ? 'note_updated' : 'note_created',
+      title: existing ? 'Nota interna atualizada' : 'Nota interna criada',
+      details: note.body.slice(0, 140),
+      createdBy: actorLabelFromScope(scope),
+      createdAt: now,
+    })
+    return { success: true, noteId }
   })
 
 export const adminCreateCompany = createServerFn({ method: 'POST' })

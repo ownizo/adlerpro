@@ -3,7 +3,6 @@ import { AppLayout } from '@/components/AppLayout'
 import {
   fetchAdminAll,
   adminCreatePolicy,
-  adminUpdateClaimStatus,
   adminCreateCompany,
   adminUpdateCompany,
   adminDeleteCompany,
@@ -815,25 +814,43 @@ function AdminPage() {
 
             {tab === 'claims' && (
               <div>
-                <h2 className="text-lg font-semibold text-navy-700 mb-4">Sinistros ({claims.length})</h2>
-                <div className="grid gap-4">
-                  {claims.map((claim) => {
-                    const policy = policies.find((p) => p.id === claim.policyId)
-                    const company = companies.find((c) => c.id === claim.companyId)
-                    return (
-                      <AdminClaimCard
-                        key={claim.id}
-                        claim={claim}
-                        policy={policy}
-                        company={company}
-                        onStatusUpdate={async (status, notes) => {
-                          await adminUpdateClaimStatus({ data: { claimId: claim.id, status, notes } })
-                          await reload()
-                        }}
-                      />
-                    )
-                  })}
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h2 className="text-lg font-semibold text-navy-700">Sinistros ({claims.length})</h2>
+                  <Link
+                    to="/admin-claims"
+                    className="px-3 py-2 bg-gold-400 text-navy-700 text-sm font-semibold rounded-[2px] hover:bg-gold-300 transition-colors"
+                  >
+                    Abrir módulo operacional
+                  </Link>
                 </div>
+                <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-navy-50 border-b border-navy-200">
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Sinistro</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Empresa</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Estado</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-navy-100">
+                      {claims.slice(0, 8).map((claim) => {
+                        const company = companies.find((c) => c.id === claim.companyId)
+                        return (
+                          <tr key={claim.id}>
+                            <td className="px-4 py-3 text-sm text-navy-700 font-medium">{claim.title}</td>
+                            <td className="px-4 py-3 text-sm text-navy-500">{company?.name || 'Cliente individual'}</td>
+                            <td className="px-4 py-3 text-sm text-navy-500">{CLAIM_STATUS_LABELS[claim.status]}</td>
+                            <td className="px-4 py-3 text-sm text-navy-500">{formatCurrency(claim.estimatedValue || 0)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-navy-400 mt-2">
+                  A gestão completa (estado, responsável, notas internas, timeline e documentos) foi movida para o módulo operacional dedicado.
+                </p>
               </div>
             )}
 
@@ -2266,86 +2283,6 @@ function CompanyUserForm({
       </div>
     </form>
   )
-}
-
-function AdminClaimCard({
-  claim,
-  policy,
-  company,
-  onStatusUpdate,
-}: {
-  claim: Claim
-  policy?: Policy
-  company?: Company
-  onStatusUpdate: (status: string, notes?: string) => Promise<void>
-}) {
-  const [updating, setUpdating] = useState(false)
-  const [newStatus, setNewStatus] = useState('')
-  const [notes, setNotes] = useState('')
-
-  const handleUpdate = async () => {
-    if (!newStatus) return
-    setUpdating(true)
-    await onStatusUpdate(newStatus, notes || undefined)
-    setNewStatus('')
-    setNotes('')
-    setUpdating(false)
-  }
-
-  return (
-    <div className="bg-white rounded-[4px] border border-navy-200 p-6">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="text-lg font-semibold text-navy-700">{claim.title}</h3>
-          <p className="text-sm text-navy-400">
-            {company?.name} | {policy ? `${POLICY_TYPE_LABELS[policy.type]} — ${policy.policyNumber}` : 'N/A'}
-          </p>
-        </div>
-        <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getStatusColor(claim.status)}`}>
-          {CLAIM_STATUS_LABELS[claim.status]}
-        </span>
-      </div>
-      <p className="text-sm text-navy-500 mb-4">{claim.description}</p>
-      <div className="flex flex-wrap items-end gap-3 pt-3 border-t border-navy-100">
-        <select
-          value={newStatus}
-          onChange={(e) => setNewStatus(e.target.value)}
-          className="px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
-        >
-          <option value="">Alterar estado...</option>
-          {Object.entries(CLAIM_STATUS_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
-        <input
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notas (opcional)"
-          className="px-3 py-2 border border-navy-200 rounded-[2px] text-sm flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-gold-400"
-        />
-        <button
-          onClick={handleUpdate}
-          disabled={!newStatus || updating}
-          className="px-4 py-2 bg-navy-700 text-white text-sm font-medium rounded-[2px] hover:bg-navy-600 disabled:opacity-50 transition-colors"
-        >
-          {updating ? 'A atualizar...' : 'Atualizar'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function getStatusColor(status: string): string {
-  const colors: Record<string, string> = {
-    submitted: 'bg-blue-100 text-blue-700',
-    under_review: 'bg-purple-100 text-purple-700',
-    documentation: 'bg-yellow-100 text-yellow-700',
-    assessment: 'bg-orange-100 text-orange-700',
-    approved: 'bg-green-100 text-green-700',
-    denied: 'bg-red-100 text-red-700',
-    paid: 'bg-emerald-100 text-emerald-700',
-  }
-  return colors[status] || 'bg-gray-100 text-gray-600'
 }
 
 function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: Company[]; individualClients: IndividualClient[]; onSubmit: (data: any) => Promise<void> }) {
