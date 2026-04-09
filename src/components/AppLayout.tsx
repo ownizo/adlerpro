@@ -1,9 +1,12 @@
-import { Link, useRouterState } from '@tanstack/react-router'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useIdentity } from '@/lib/identity-context'
-import { cn } from '@/lib/utils'
-import { useState } from 'react'
+import { cn, formatDate } from '@/lib/utils'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { setLang, type LangCode } from '@/lib/i18n'
+import { fetchAlerts, markAlertAsRead } from '@/lib/server-fns'
+import type { Alert } from '@/lib/types'
+import { getAlertDestination } from '@/lib/alert-routing'
 
 const NAV_ITEMS = [
   { to: '/dashboard' as const, key: 'nav.dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -49,10 +52,14 @@ const font = "'Montserrat', sans-serif"
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, ready, logout } = useIdentity()
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const location = useRouterState({ select: (state) => state.location })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [adminSectionOpen, setAdminSectionOpen] = useState(true)
   const [lang, setLangState] = useState<LangCode>((i18n.language as LangCode) ?? 'pt')
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [notifications, setNotifications] = useState<Alert[]>([])
+  const notificationsRef = useRef<HTMLDivElement | null>(null)
   const isAdmin = user?.roles?.includes('admin')
   const isAdminRoute = location.pathname === '/admin'
 
@@ -68,6 +75,45 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const handleLang = (l: LangCode) => {
     setLang(l)
     setLangState(l)
+  }
+
+  const unreadNotifications = useMemo(
+    () => notifications.filter((alert) => !alert.read).length,
+    [notifications],
+  )
+
+  useEffect(() => {
+    if (!ready || !user) {
+      setNotifications([])
+      return
+    }
+    fetchAlerts()
+      .then((items) => setNotifications(items))
+      .catch(() => setNotifications([]))
+  }, [ready, user])
+
+  useEffect(() => {
+    if (!notificationsOpen) return
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [notificationsOpen])
+
+  const handleNotificationClick = async (alert: Alert) => {
+    if (!alert.read) {
+      try {
+        await markAlertAsRead({ data: alert.id })
+        setNotifications((current) => current.map((item) => (item.id === alert.id ? { ...item, read: true } : item)))
+      } catch {
+        // proceed with navigation even if state update fails
+      }
+    }
+    setNotificationsOpen(false)
+    navigate({ to: getAlertDestination(alert.type) as any })
   }
 
   return (
@@ -237,11 +283,102 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <span className="hidden sm:inline text-sm" style={{ color: '#666666', fontFamily: font, fontWeight: 300 }}>
                   {user.name || user.email}
                 </span>
-                <Link to="/alerts" style={{ color: '#666666', display: 'flex', alignItems: 'center' }} title={t('nav.alerts')}>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
-                </Link>
+                <div ref={notificationsRef} style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => setNotificationsOpen((open) => !open)}
+                    style={{ color: '#666666', display: 'flex', alignItems: 'center', position: 'relative', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                    title={t('nav.alerts')}
+                    aria-label={t('nav.alerts')}
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    {unreadNotifications > 0 && (
+                      <span
+                        style={{
+                          position: 'absolute',
+                          top: '-6px',
+                          right: '-8px',
+                          minWidth: '16px',
+                          height: '16px',
+                          borderRadius: '999px',
+                          background: '#C8961A',
+                          color: '#ffffff',
+                          fontSize: '0.62rem',
+                          fontWeight: 700,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          padding: '0 4px',
+                          fontFamily: font,
+                        }}
+                      >
+                        {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                      </span>
+                    )}
+                  </button>
+
+                  {notificationsOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: 'calc(100% + 10px)',
+                        width: '320px',
+                        maxHeight: '360px',
+                        overflowY: 'auto',
+                        background: '#ffffff',
+                        border: '1px solid #eeeeee',
+                        borderRadius: '4px',
+                        boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
+                        zIndex: 60,
+                      }}
+                    >
+                      <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #f3f3f3', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontFamily: font, fontWeight: 700, fontSize: '0.78rem', color: '#111111' }}>
+                          {t('dashboard.alerts')}
+                        </span>
+                        <Link to="/alerts" onClick={() => setNotificationsOpen(false)} style={{ fontFamily: font, fontSize: '0.72rem', color: '#C8961A', textDecoration: 'none', fontWeight: 600 }}>
+                          {t('dashboard.seeAll')}
+                        </Link>
+                      </div>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '1rem', textAlign: 'center', fontFamily: font, fontSize: '0.75rem', color: '#999999' }}>
+                          {t('dashboard.noAlerts')}
+                        </div>
+                      ) : (
+                        notifications.slice(0, 8).map((alert) => (
+                          <button
+                            key={alert.id}
+                            type="button"
+                            onClick={() => handleNotificationClick(alert)}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              border: 'none',
+                              background: alert.read ? '#ffffff' : '#fffdf5',
+                              borderBottom: '1px solid #f7f7f7',
+                              padding: '0.75rem 1rem',
+                              cursor: 'pointer',
+                              fontFamily: font,
+                            }}
+                          >
+                            <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 700, color: '#111111' }}>
+                              {alert.title}
+                            </p>
+                            <p style={{ margin: '0.2rem 0 0', fontSize: '0.7rem', color: '#666666', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {alert.message}
+                            </p>
+                            <p style={{ margin: '0.2rem 0 0', fontSize: '0.63rem', color: '#aaaaaa' }}>
+                              {formatDate(alert.createdAt)}
+                            </p>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>

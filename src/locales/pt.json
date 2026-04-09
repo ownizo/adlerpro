@@ -120,7 +120,17 @@
     "compareQuotes": "Comparar cotações →",
     "analyzeQuotes": "Analisar cotações →",
     "addPolicyLink": "Adicionar apólice →",
-    "perYear": "/ano"
+    "perYear": "/ano",
+    "attentionTitle": "O que precisa da tua atenção",
+    "taskRenewals": "Renovações",
+    "taskRenewalsDescPending": "{{count}} apólice(s) com renovação nos próximos 90 dias.",
+    "taskRenewalsDescEmpty": "Sem renovações pendentes.",
+    "taskDocuments": "Documentos",
+    "taskDocumentsDescPending": "{{count}} apólice(s) sem documento associado.",
+    "taskDocumentsDescEmpty": "Documentação principal em dia.",
+    "taskClaims": "Sinistros",
+    "taskClaimsDescPending": "{{count}} sinistro(s) em aberto.",
+    "taskClaimsDescEmpty": "Sem sinistros em aberto."
   },
   "policies": {
     "title": "Portfólio de Apólices",
