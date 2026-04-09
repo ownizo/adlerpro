@@ -9,7 +9,6 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
     "@google/generative-ai": "^0.24.1",
-    "@netlify/blobs": "^10.7.4",
     "@netlify/functions": "^5.1.5",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",

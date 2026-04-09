@@ -168,6 +168,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 750000,
       status: 'active',
       createdAt: '2024-01-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_002',
@@ -182,6 +183,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 500000,
       status: 'active',
       createdAt: '2024-03-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_003',
@@ -196,6 +198,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 2000000,
       status: 'active',
       createdAt: '2024-06-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_004',
@@ -210,6 +213,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 1000000,
       status: 'expiring',
       createdAt: '2024-02-15T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_005',
@@ -224,6 +228,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 320000,
       status: 'active',
       createdAt: '2024-04-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_006',
@@ -238,6 +243,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 0,
       status: 'expired',
       createdAt: '2024-01-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_007',
@@ -252,6 +258,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 5000000,
       status: 'active',
       createdAt: '2024-05-01T00:00:00Z',
+      storagePath: '',
     },
     {
       id: 'pol_008',
@@ -266,6 +273,7 @@ export function getSeedPolicies(): Policy[] {
       insuredValue: 8000000,
       status: 'active',
       createdAt: '2024-03-15T00:00:00Z',
+      storagePath: '',
     },
   ]
 }
@@ -341,7 +349,7 @@ export function getSeedDocuments(): Document[] {
       size: 245000,
       uploadedBy: 'Sistema',
       uploadedAt: '2024-01-02T10:00:00Z',
-      blobKey: 'documents/comp_001/doc_001.pdf',
+      storagePath: 'documents/comp_001/doc_001.pdf',
     },
     {
       id: 'doc_002',
@@ -351,7 +359,7 @@ export function getSeedDocuments(): Document[] {
       size: 180000,
       uploadedBy: 'Ana Ferreira',
       uploadedAt: '2024-03-05T14:20:00Z',
-      blobKey: 'documents/comp_001/doc_002.pdf',
+      storagePath: 'documents/comp_001/doc_002.pdf',
     },
     {
       id: 'doc_003',
@@ -361,7 +369,7 @@ export function getSeedDocuments(): Document[] {
       size: 520000,
       uploadedBy: 'Sistema',
       uploadedAt: '2024-09-16T09:15:00Z',
-      blobKey: 'documents/comp_001/doc_003.pdf',
+      storagePath: 'documents/comp_001/doc_003.pdf',
     },
     {
       id: 'doc_004',
@@ -371,7 +379,7 @@ export function getSeedDocuments(): Document[] {
       size: 95000,
       uploadedBy: 'Sistema',
       uploadedAt: '2024-10-01T08:00:00Z',
-      blobKey: 'documents/comp_001/doc_004.pdf',
+      storagePath: 'documents/comp_001/doc_004.pdf',
     },
     {
       id: 'doc_005',
@@ -381,7 +389,7 @@ export function getSeedDocuments(): Document[] {
       size: 890000,
       uploadedBy: 'IA Adler & Rochefort',
       uploadedAt: '2024-12-15T11:30:00Z',
-      blobKey: 'documents/comp_001/doc_005.pdf',
+      storagePath: 'documents/comp_001/doc_005.pdf',
     },
   ]
 }

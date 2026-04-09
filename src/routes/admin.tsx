@@ -10,8 +10,6 @@ import {
   adminCreateCompanyUser,
   adminDeleteCompanyUser,
   adminUpdateCompanyUser,
-  adminRefreshApiConnection,
-  adminUpdateApiConnection,
   adminCreateIndividualClient,
   adminUpdateIndividualClient,
   adminDeleteIndividualClient,
@@ -35,7 +33,6 @@ import type {
   Document as DocType,
   CompanyUser,
   UserMetricEvent,
-  ApiConnection,
   IndividualClient,
   SocialPost,
 } from '@/lib/types'
@@ -55,7 +52,6 @@ function AdminPage() {
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
   const [userEvents, setUserEvents] = useState<UserMetricEvent[]>([])
-  const [apiConnections, setApiConnections] = useState<ApiConnection[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
   const [claims, setClaims] = useState<Claim[]>([])
   const [documents, setDocuments] = useState<DocType[]>([])
@@ -73,11 +69,10 @@ function AdminPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
 
   const reload = async () => {
-    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d, individualClients: ic } = await fetchAdminAll()
+    const { companies: c, companyUsers: u, userEvents: e, policies: p, claims: cl, documents: d, individualClients: ic } = await fetchAdminAll()
     setCompanies(c)
     setCompanyUsers(u)
     setUserEvents(e)
-    setApiConnections(a)
     setPolicies(p)
     setClaims(cl)
     setDocuments(d)
@@ -1211,7 +1206,6 @@ function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClien
     if (e.target.value !== 'company') return
     e.target.value = 'individual' // reset immediately
 
-    const hasPolicies = true // we don't have the count here, warn generically
     const authWarning = client.authUserId ? '\n⚠️ Este cliente tem acesso ao Adler One — o acesso será desligado.' : ''
     if (!confirm(`Converter "${client.fullName}" para Empresa?\n\nIsso irá:\n• Criar um registo de Empresa\n• Mover as apólices associadas\n• Apagar o registo de cliente individual${authWarning}`)) return
 
@@ -1795,7 +1789,7 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
                           <span>📄</span>
                           <span className="font-medium">{d.name}</span>
                           <span className="text-navy-400">· {d.category}</span>
-                          <PolicyDocumentButtons storagePath={d.blobKey} name={d.name} />
+                          <PolicyDocumentButtons storagePath={d.storagePath} name={d.name} />
                         </li>
                       ))}
                     </ul>

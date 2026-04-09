@@ -22,7 +22,7 @@ import type {
 // Cliente Supabase (server-side — usa service_role key)
 // Singleton: criado uma vez e reutilizado em todas as chamadas
 // ============================================================
-let _sbAdmin: ReturnType<typeof createClient> | null = null
+let _sbAdmin: ReturnType<typeof createClient<any, any, any>> | null = null
 
 function getSupabaseAdmin() {
   if (_sbAdmin) return _sbAdmin
@@ -71,6 +71,17 @@ function rowsToCamel<T>(rows: Record<string, unknown>[]): T[] {
   return rows.map((r) => objectToCamel(r) as T)
 }
 
+function normalizePolicyStorage<T extends Partial<Policy>>(policy: T): T {
+  return {
+    ...policy,
+    storagePath: policy.storagePath ?? '',
+  }
+}
+
+function normalizeDocumentStorage<T extends Partial<Document>>(doc: T): T {
+  return doc
+}
+
 // ============================================================
 // Companies
 // ============================================================
@@ -85,7 +96,7 @@ export async function getCompany(id: string): Promise<Company | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('companies').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as Company
+  return objectToCamel(data) as unknown as Company
 }
 
 export async function createCompany(company: Company): Promise<void> {
@@ -96,7 +107,7 @@ export async function createCompany(company: Company): Promise<void> {
 
 export async function updateCompany(id: string, updates: Partial<Company>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('companies').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('companies').update(objectToSnake(updates as unknown as Record<string, unknown>)).eq('id', id)
   if (error) console.error('updateCompany error:', error)
 }
 
@@ -139,7 +150,7 @@ export async function getCompanyUserByEmail(email: string): Promise<CompanyUser 
     .ilike('email', email)
     .single()
   if (error) return undefined
-  return objectToCamel(data) as CompanyUser
+  return objectToCamel(data) as unknown as CompanyUser
 }
 
 export async function createCompanyUser(user: CompanyUser): Promise<void> {
@@ -150,7 +161,7 @@ export async function createCompanyUser(user: CompanyUser): Promise<void> {
 
 export async function updateCompanyUser(id: string, updates: Partial<CompanyUser>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('company_users').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('company_users').update(objectToSnake(updates as unknown as Record<string, unknown>)).eq('id', id)
   if (error) console.error('updateCompanyUser error:', error)
 }
 
@@ -169,32 +180,50 @@ export async function getPolicies(companyId?: string): Promise<Policy[]> {
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
   if (error) { console.error('getPolicies error:', error); return [] }
-  return rowsToCamel<Policy>(data ?? [])
+  return rowsToCamel<Policy>(data ?? []).map((row) => normalizePolicyStorage(row))
 }
 
 export async function getPolicy(id: string): Promise<Policy | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('policies').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as Policy
+  return normalizePolicyStorage(objectToCamel(data) as unknown as Policy)
 }
 
 export async function createPolicy(policy: Policy): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('policies').insert(objectToSnake(policy as unknown as Record<string, unknown>))
+  const normalized = normalizePolicyStorage(policy)
+  const payload = objectToSnake({
+    ...normalized,
+  } as unknown as Record<string, unknown>)
+  const { error } = await sb.from('policies').insert(payload)
   if (error) console.error('createPolicy error:', error)
 }
 
-export async function updatePolicy(id: string, updates: Partial<Policy>): Promise<void> {
+export async function updatePolicy(id: string, updates: Partial<Policy>, companyId?: string): Promise<boolean> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('policies').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
-  if (error) console.error('updatePolicy error:', error)
+  const normalized = normalizePolicyStorage(updates)
+  const payload = objectToSnake(normalized as unknown as Record<string, unknown>)
+  let query = sb.from('policies').update(payload).eq('id', id)
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query.select('id')
+  if (error) {
+    console.error('updatePolicy error:', error)
+    return false
+  }
+  return Boolean(data?.length)
 }
 
-export async function deletePolicy(id: string): Promise<void> {
+export async function deletePolicy(id: string, companyId?: string): Promise<boolean> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('policies').delete().eq('id', id)
-  if (error) console.error('deletePolicy error:', error)
+  let query = sb.from('policies').delete().eq('id', id)
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query.select('id')
+  if (error) {
+    console.error('deletePolicy error:', error)
+    return false
+  }
+  return Boolean(data?.length)
 }
 
 // ============================================================
@@ -213,7 +242,7 @@ export async function getClaim(id: string): Promise<Claim | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('claims').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as Claim
+  return objectToCamel(data) as unknown as Claim
 }
 
 export async function createClaim(claim: Claim): Promise<void> {
@@ -224,7 +253,7 @@ export async function createClaim(claim: Claim): Promise<void> {
 
 export async function updateClaim(id: string, updates: Partial<Claim>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('claims').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('claims').update(objectToSnake(updates as unknown as Record<string, unknown>)).eq('id', id)
   if (error) console.error('updateClaim error:', error)
 }
 
@@ -237,18 +266,25 @@ export async function getDocuments(companyId?: string): Promise<Document[]> {
   if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
   if (error) { console.error('getDocuments error:', error); return [] }
-  return rowsToCamel<Document>(data ?? [])
+  return rowsToCamel<Document>(data ?? []).map((row) => normalizeDocumentStorage({
+    ...row,
+    storagePath: row.storagePath ?? '',
+  }))
 }
 
 export async function createDocument(doc: Document): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('documents').insert(objectToSnake(doc as unknown as Record<string, unknown>))
+  const normalized = normalizeDocumentStorage(doc)
+  const payload = objectToSnake(normalized as unknown as Record<string, unknown>)
+  const { error } = await sb.from('documents').insert(payload)
   if (error) console.error('createDocument error:', error)
 }
 
 export async function updateDocument(id: string, updates: Partial<Document>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('documents').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const normalized = normalizeDocumentStorage(updates)
+  const payload = objectToSnake(normalized as unknown as Record<string, unknown>)
+  const { error } = await sb.from('documents').update(payload).eq('id', id)
   if (error) console.error('updateDocument error:', error)
 }
 
@@ -268,6 +304,13 @@ export async function getAlerts(companyId?: string): Promise<Alert[]> {
   const { data, error } = await query
   if (error) { console.error('getAlerts error:', error); return [] }
   return rowsToCamel<Alert>(data ?? [])
+}
+
+export async function getAlert(id: string): Promise<Alert | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('alerts').select('*').eq('id', id).single()
+  if (error) return undefined
+  return objectToCamel(data) as unknown as Alert
 }
 
 export async function markAlertRead(id: string): Promise<void> {
@@ -318,7 +361,7 @@ export async function getApiConnections(): Promise<ApiConnection[]> {
 
 export async function updateApiConnection(id: string, updates: Partial<ApiConnection>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('api_connections').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('api_connections').update(objectToSnake(updates as unknown as Record<string, unknown>)).eq('id', id)
   if (error) console.error('updateApiConnection error:', error)
 }
 
@@ -365,7 +408,7 @@ export async function updateIndividualClient(id: string, updates: Partial<Indivi
   const sb = getSupabaseAdmin()
   const { error } = await sb
     .from('individual_clients')
-    .update(objectToSnake(updates as Record<string, unknown>))
+    .update(objectToSnake(updates as unknown as Record<string, unknown>))
     .eq('id', id)
   if (error) console.error('updateIndividualClient error:', error)
 }
@@ -394,7 +437,7 @@ export async function createSocialPost(post: SocialPost): Promise<void> {
 
 export async function updateSocialPost(id: string, updates: Partial<SocialPost>): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('social_posts').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
+  const { error } = await sb.from('social_posts').update(objectToSnake(updates as unknown as Record<string, unknown>)).eq('id', id)
   if (error) console.error('updateSocialPost error:', error)
 }
 
@@ -402,16 +445,4 @@ export async function deleteSocialPost(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('social_posts').delete().eq('id', id)
   if (error) console.error('deleteSocialPost error:', error)
-}
-
-// ============================================================
-// File storage (mantido para compatibilidade — usa Netlify Blobs apenas para ficheiros)
-// ============================================================
-export function fileStore() {
-  try {
-    const { getStore } = require('@netlify/blobs')
-    return getStore('portal-files')
-  } catch {
-    return null
-  }
 }

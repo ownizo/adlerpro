@@ -57,7 +57,7 @@ export interface Policy {
   insuredValue: number
   status: 'active' | 'expiring' | 'expired' | 'cancelled'
   createdAt: string
-  documentKey?: string
+  storagePath: string
   deductible?: number
   coverages?: string[]
   exclusions?: string[]
@@ -148,7 +148,7 @@ export interface Document {
   size: number
   uploadedBy: string
   uploadedAt: string
-  blobKey: string
+  storagePath: string
   policyId?: string
 }
 
