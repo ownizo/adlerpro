@@ -684,11 +684,24 @@ function AdminPage() {
                                 rows={companyDocs.map((doc) => `${doc.name} · ${doc.category} · ${formatDate(doc.uploadedAt)}`)}
                                 emptyMessage="Sem documentos carregados."
                               />
-                              <SimpleCollection
-                                title="Apólices da Empresa"
-                                rows={companyPolicies.map((policy) => `${POLICY_TYPE_LABELS[policy.type]} · ${policy.policyNumber} · ${policy.insurer}`)}
-                                emptyMessage="Sem apólices associadas."
-                              />
+                              <div className="bg-white rounded-[4px] border border-navy-200 p-4">
+                                <p className="text-sm font-semibold text-navy-700 mb-2">Apólices da Empresa</p>
+                                {companyPolicies.length === 0 ? (
+                                  <p className="text-sm text-navy-400">Sem apólices associadas.</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {companyPolicies.map((policy) => (
+                                      <a
+                                        key={policy.id}
+                                        href={`/admin/policies/${policy.id}`}
+                                        className="block text-xs text-navy-600 hover:text-navy-800 hover:underline"
+                                      >
+                                        {POLICY_TYPE_LABELS[policy.type]} · {policy.policyNumber} · {policy.insurer}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}
@@ -871,6 +884,14 @@ function AdminPage() {
                                             <span className={`text-xs px-2 py-0.5 rounded-full ${POLICY_STATUS_CLASS[p.status] ?? 'bg-red-100 text-red-700'}`}>
                                               {POLICY_STATUS_LABEL[p.status] ?? p.status}
                                             </span>
+                                            <div className="mt-2">
+                                              <a
+                                                href={`/admin/policies/${p.id}`}
+                                                className="text-xs text-navy-600 hover:text-navy-800 hover:underline"
+                                              >
+                                                Abrir detalhe
+                                              </a>
+                                            </div>
                                           </div>
                                         </div>
                                       ))}
@@ -3294,6 +3315,12 @@ function AdminPolicyList({ policies, documents, companyUsers, policyUsers, compa
                   <td className="px-4 py-3 text-sm text-navy-500">{sharedUsers.length}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1.5">
+                      <a
+                        href={`/admin/policies/${policy.id}`}
+                        className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                      >
+                        Abrir
+                      </a>
                       <button
                         disabled={isDeleted}
                         onClick={() => setEditingId(isEditing ? null : policy.id)}

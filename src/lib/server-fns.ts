@@ -484,6 +484,67 @@ export const fetchPolicyAuditTrail = createServerFn({ method: 'GET' })
     return db.getPolicyAuditTrail(policyId, limit)
   })
 
+export const fetchAdminPolicyDetail = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { policyId: string }) => d)
+  .handler(async ({ data }) => {
+    const policyId = data.policyId?.trim()
+    if (!policyId) throw new Error('Apólice inválida')
+
+    const policy = await db.getPolicy(policyId, { includeDeleted: true })
+    if (!policy) throw new Error('Apólice não encontrada')
+
+    const [policyUsers, documents, claims, auditTrail, companyUsers, company, individualClient] = await Promise.all([
+      db.getPolicyUsers(policyId),
+      db.getPolicyDocuments(policyId),
+      db.getClaimsByPolicy(policyId),
+      db.getPolicyAuditTrail(policyId, 100),
+      policy.companyId ? db.getCompanyUsers(policy.companyId) : Promise.resolve([]),
+      policy.companyId ? db.getCompany(policy.companyId) : Promise.resolve(undefined),
+      policy.individualClientId ? db.getIndividualClient(policy.individualClientId) : Promise.resolve(undefined),
+    ])
+
+    const renewalDate = policy.renewalDate || policy.endDate
+    const msPerDay = 24 * 60 * 60 * 1000
+    const now = new Date()
+    const renewalTarget = renewalDate ? new Date(renewalDate) : null
+    const daysUntilRenewal = renewalTarget ? Math.ceil((renewalTarget.getTime() - now.getTime()) / msPerDay) : null
+    const hasUpcomingRenewal = typeof daysUntilRenewal === 'number' && daysUntilRenewal >= 0 && daysUntilRenewal <= 90
+
+    const sharedUsers = policyUsers
+      .map((relation) => {
+        const user = companyUsers.find((item) => item.id === relation.userId)
+        if (!user) return null
+        return {
+          ...user,
+          policyRole: relation.role,
+        }
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item))
+
+    const documentState = documents.length > 0 ? 'completo' : 'incompleto'
+    const openClaimsCount = claims.filter((claim) => !['approved', 'denied', 'paid'].includes(claim.status)).length
+
+    return {
+      policy,
+      company,
+      individualClient,
+      companyUsers,
+      documents,
+      claims,
+      policyUsers,
+      sharedUsers,
+      auditTrail,
+      summary: {
+        documentState,
+        documentsCount: documents.length,
+        openClaimsCount,
+        hasUpcomingRenewal,
+        daysUntilRenewal,
+      },
+    }
+  })
+
 function normalizePaymentFrequency(value?: string): 'monthly' | 'quarterly' | 'semiannual' | 'annual' {
   const normalized = (value ?? '').trim().toLowerCase()
   if (!normalized) return 'annual'
@@ -1475,6 +1536,39 @@ export const adminUploadPolicyDocument = createServerFn({ method: 'POST' })
         name: data.name,
         category: data.category,
         size: data.size,
+      },
+    })
+    return { success: true }
+  })
+
+export const adminDeletePolicyDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { documentId: string; policyId: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const policy = await db.getPolicy(data.policyId, { includeDeleted: true })
+    if (!policy) throw new Error('Apólice não encontrada')
+
+    const document = await db.getDocument(data.documentId)
+    if (!document) throw new Error('Documento não encontrado')
+    if (document.policyId !== data.policyId) throw new Error('Documento não pertence a esta apólice')
+
+    if (document.blobKey) {
+      const { error: removeError } = await supabaseAdmin.storage.from('documents').remove([document.blobKey])
+      if (removeError) {
+        console.error('[adminDeletePolicyDocument] storage remove error:', removeError)
+      }
+    }
+
+    await db.deleteDocument(data.documentId)
+    await appendPolicyAuditTrail({
+      policyId: data.policyId,
+      userId: scope.user.id,
+      action: 'delete',
+      entity: 'document',
+      changes: {
+        documentId: data.documentId,
+        name: document.name,
       },
     })
     return { success: true }

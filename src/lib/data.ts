@@ -325,6 +325,20 @@ export async function getClaims(companyId?: string): Promise<Claim[]> {
   return rowsToCamel<Claim>(data ?? [])
 }
 
+export async function getClaimsByPolicy(policyId: string): Promise<Claim[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('claims')
+    .select('*')
+    .eq('policy_id', policyId)
+    .order('created_at', { ascending: false })
+  if (error) {
+    console.error('getClaimsByPolicy error:', error)
+    return []
+  }
+  return rowsToCamel<Claim>(data ?? [])
+}
+
 export async function getClaim(id: string): Promise<Claim | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('claims').select('*').eq('id', id).single()
@@ -354,6 +368,27 @@ export async function getDocuments(companyId?: string): Promise<Document[]> {
   const { data, error } = await query
   if (error) { console.error('getDocuments error:', error); return [] }
   return rowsToCamel<Document>(data ?? [])
+}
+
+export async function getPolicyDocuments(policyId: string): Promise<Document[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('documents')
+    .select('*')
+    .eq('policy_id', policyId)
+    .order('uploaded_at', { ascending: false })
+  if (error) {
+    console.error('getPolicyDocuments error:', error)
+    return []
+  }
+  return rowsToCamel<Document>(data ?? [])
+}
+
+export async function getDocument(id: string): Promise<Document | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('documents').select('*').eq('id', id).maybeSingle()
+  if (error || !data) return undefined
+  return objectToCamel(data) as Document
 }
 
 export async function createDocument(doc: Document): Promise<void> {
@@ -464,6 +499,13 @@ export async function getIndividualClients(): Promise<IndividualClient[]> {
   const { data, error } = await sb.from('individual_clients').select('*').order('full_name', { ascending: true })
   if (error) { console.error('getIndividualClients error:', error); return [] }
   return rowsToCamel<IndividualClient>(data ?? [])
+}
+
+export async function getIndividualClient(id: string): Promise<IndividualClient | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('individual_clients').select('*').eq('id', id).maybeSingle()
+  if (error || !data) return undefined
+  return objectToCamel(data) as IndividualClient
 }
 
 export async function createIndividualClient(client: Omit<IndividualClient, 'id' | 'createdAt'>): Promise<{ id: string }> {
