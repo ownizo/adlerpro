@@ -42,6 +42,7 @@ import type {
   IndividualClient,
   SocialPost,
   AdminFinancialDashboardData,
+  RenewalAlertItem,
   RenewalAlertsResponse,
   RenewalAlertStatus,
 } from '@/lib/types'
@@ -81,6 +82,33 @@ function renewalColumnByStatus(status: RenewalAlertStatus): RenewalKanbanColumnI
   if (status === 'em_negociacao') return 'negotiating'
   if (status === 'renovado') return 'renewed'
   return 'pending'
+}
+
+function buildRenewalAlertsView(alerts: RenewalAlertItem[]) {
+  const byUrgency: RenewalAlertsResponse['byUrgency'] = { 30: [], 60: [], 90: [] }
+  const countsByStatus: RenewalAlertsResponse['summary']['countsByStatus'] = {
+    pendente: 0,
+    tratado: 0,
+    em_negociacao: 0,
+    renovado: 0,
+  }
+  let totalValueAtRisk = 0
+
+  for (const alert of alerts) {
+    byUrgency[alert.urgency].push(alert)
+    countsByStatus[alert.status] += 1
+    if (alert.status !== 'renovado') totalValueAtRisk += alert.value
+  }
+
+  return {
+    total: alerts.length,
+    byUrgency,
+    summary: {
+      totalRenewals: alerts.length,
+      totalValueAtRisk,
+      countsByStatus,
+    },
+  }
 }
 
 function isAdminTab(value: unknown): value is AdminTab {
@@ -954,6 +982,9 @@ function AdminDashboardTab({
   const [updatingRenewalAlertKey, setUpdatingRenewalAlertKey] = useState<string | null>(null)
   const [draggingAlertKey, setDraggingAlertKey] = useState<string | null>(null)
   const [activeDropColumn, setActiveDropColumn] = useState<RenewalKanbanColumnId | null>(null)
+  const [renewalRiskMinValue, setRenewalRiskMinValue] = useState<string>('')
+  const [assigneeDraftByKey, setAssigneeDraftByKey] = useState<Record<string, string>>({})
+  const [nextActionDraftByKey, setNextActionDraftByKey] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let active = true
@@ -1025,43 +1056,14 @@ function AdminDashboardTab({
     }
   }
 
-  const handleRenewalAlertStatusUpdate = async (key: string, status: RenewalAlertStatus) => {
+  const handleRenewalAlertStatusUpdate = async (
+    key: string,
+    updates: { status?: RenewalAlertStatus; assignedTo?: string | null; nextAction?: string | null }
+  ) => {
     setUpdatingRenewalAlertKey(key)
     try {
-      await adminUpdateRenewalAlertStatus({ data: { key, status } })
-      setRenewalAlerts((current) => {
-        if (!current) return current
-
-        const nextAlerts = current.alerts.map((alert) =>
-          alert.key === key ? { ...alert, status } : alert
-        )
-
-        const nextByUrgency: RenewalAlertsResponse['byUrgency'] = { 30: [], 60: [], 90: [] }
-        const nextCounts: RenewalAlertsResponse['summary']['countsByStatus'] = {
-          pendente: 0,
-          tratado: 0,
-          em_negociacao: 0,
-          renovado: 0,
-        }
-        let totalValueAtRisk = 0
-
-        for (const alert of nextAlerts) {
-          nextByUrgency[alert.urgency].push(alert)
-          nextCounts[alert.status] += 1
-          if (alert.status !== 'renovado') totalValueAtRisk += alert.value
-        }
-
-        return {
-          ...current,
-          alerts: nextAlerts,
-          byUrgency: nextByUrgency,
-          summary: {
-            ...current.summary,
-            countsByStatus: nextCounts,
-            totalValueAtRisk,
-          },
-        }
-      })
+      await adminUpdateRenewalAlertStatus({ data: { key, ...updates } })
+      await reloadRenewalAlerts()
     } catch (error) {
       console.error('[AdminDashboardTab] adminUpdateRenewalAlertStatus error:', error)
       alert('Não foi possível atualizar o estado do alerta.')
@@ -1071,6 +1073,22 @@ function AdminDashboardTab({
     }
   }
 
+  const renewalAlertsView = useMemo(() => {
+    if (!renewalAlerts) return null
+    const minValue = Number(renewalRiskMinValue)
+    if (!Number.isFinite(minValue) || minValue <= 0) return renewalAlerts
+
+    const filteredAlerts = renewalAlerts.alerts.filter((alert) => alert.value >= minValue)
+    const derived = buildRenewalAlertsView(filteredAlerts)
+    return {
+      ...renewalAlerts,
+      alerts: filteredAlerts,
+      byUrgency: derived.byUrgency,
+      total: derived.total,
+      summary: derived.summary,
+    }
+  }, [renewalAlerts, renewalRiskMinValue])
+
   const renewalAlertsByColumn = useMemo(() => {
     const grouped: Record<RenewalKanbanColumnId, RenewalAlertsResponse['alerts']> = {
       pending: [],
@@ -1078,12 +1096,36 @@ function AdminDashboardTab({
       renewed: [],
     }
 
-    for (const alert of renewalAlerts?.alerts ?? []) {
+    for (const alert of renewalAlertsView?.alerts ?? []) {
       grouped[renewalColumnByStatus(alert.status)].push(alert)
     }
 
+    for (const column of Object.keys(grouped) as RenewalKanbanColumnId[]) {
+      grouped[column].sort((a, b) => {
+        if (a.value !== b.value) return b.value - a.value
+        return a.daysUntilRenewal - b.daysUntilRenewal
+      })
+    }
+
     return grouped
-  }, [renewalAlerts])
+  }, [renewalAlertsView])
+
+  const responsibleOptions = useMemo(() => {
+    const unique = new Map<string, string>()
+    for (const user of companyUsers) {
+      const email = user.email?.trim()
+      if (!email) continue
+      if (!unique.has(email)) unique.set(email, user.name?.trim() || email)
+    }
+    return Array.from(unique.entries())
+      .map(([email, name]) => ({ email, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [companyUsers])
+
+  const responsibleLabelMap = useMemo(
+    () => new Map(responsibleOptions.map((item) => [item.email, item.name])),
+    [responsibleOptions]
+  )
 
   const monthSelectOptions = [
     { value: '', label: 'Ano completo' },
@@ -1319,19 +1361,33 @@ function AdminDashboardTab({
 
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-[4px] border border-navy-200 p-5">
-          <h3 className="text-sm font-semibold text-navy-700 mb-3">Pipeline de Renovações</h3>
+          <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
+            <h3 className="text-sm font-semibold text-navy-700">Pipeline de Renovações</h3>
+            <label className="text-xs text-navy-600">
+              <span className="block mb-1">Filtro por valor mínimo (€)</span>
+              <input
+                type="number"
+                min={0}
+                step={100}
+                value={renewalRiskMinValue}
+                onChange={(event) => setRenewalRiskMinValue(event.target.value)}
+                placeholder="Top risco financeiro"
+                className="w-44 px-2 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-gold-400"
+              />
+            </label>
+          </div>
           {renewalAlertsLoading ? (
             <p className="text-sm text-navy-400">A carregar alertas de renovação...</p>
-          ) : renewalAlerts && renewalAlerts.total > 0 ? (
+          ) : renewalAlertsView && renewalAlertsView.total > 0 ? (
             <div className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-2">
                 <div className="rounded border border-navy-200 bg-navy-50 px-3 py-2">
                   <p className="text-[11px] uppercase tracking-wide text-navy-500">Número de renovações</p>
-                  <p className="text-base font-semibold text-navy-700">{renewalAlerts.summary.totalRenewals}</p>
+                  <p className="text-base font-semibold text-navy-700">{renewalAlertsView.summary.totalRenewals}</p>
                 </div>
                 <div className="rounded border border-red-200 bg-red-50 px-3 py-2">
                   <p className="text-[11px] uppercase tracking-wide text-red-500">Valor total em risco</p>
-                  <p className="text-base font-semibold text-red-700">{formatCurrency(renewalAlerts.summary.totalValueAtRisk)}</p>
+                  <p className="text-base font-semibold text-red-700">{formatCurrency(renewalAlertsView.summary.totalValueAtRisk)}</p>
                 </div>
               </div>
               <div className="grid xl:grid-cols-3 gap-3">
@@ -1360,7 +1416,7 @@ function AdminDashboardTab({
                         setActiveDropColumn(null)
                         setDraggingAlertKey(null)
                         if (!droppedKey) return
-                        await handleRenewalAlertStatusUpdate(droppedKey, RENEWAL_KANBAN_TARGET_STATUS[column.id])
+                        await handleRenewalAlertStatusUpdate(droppedKey, { status: RENEWAL_KANBAN_TARGET_STATUS[column.id] })
                       }}
                     >
                       <div className="mb-2">
@@ -1458,11 +1514,72 @@ function AdminDashboardTab({
                                       type="button"
                                       className={`px-2 py-1 text-[11px] rounded border disabled:opacity-50 ${action.className}`}
                                       disabled={updatingRenewalAlertKey === alert.key}
-                                      onClick={() => handleRenewalAlertStatusUpdate(alert.key, action.status)}
+                                      onClick={() => handleRenewalAlertStatusUpdate(alert.key, { status: action.status })}
                                     >
                                       {action.label}
                                     </button>
                                   ))}
+                                </div>
+                                <div className="mt-2 rounded border border-navy-100 bg-navy-50/60 p-2 space-y-2">
+                                  <div>
+                                    <label className="text-[11px] text-navy-600">Responsável</label>
+                                    <div className="flex gap-1.5 mt-1">
+                                      <input
+                                        list={`responsible_${alert.key}`}
+                                        value={assigneeDraftByKey[alert.key] ?? alert.assignedTo ?? ''}
+                                        onChange={(event) => {
+                                          const value = event.target.value
+                                          setAssigneeDraftByKey((current) => ({ ...current, [alert.key]: value }))
+                                        }}
+                                        placeholder="Email do responsável"
+                                        className="flex-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-gold-400"
+                                      />
+                                      <datalist id={`responsible_${alert.key}`}>
+                                        {responsibleOptions.map((option) => (
+                                          <option key={`${alert.key}_${option.email}`} value={option.email}>
+                                            {option.name}
+                                          </option>
+                                        ))}
+                                      </datalist>
+                                      <button
+                                        type="button"
+                                        disabled={updatingRenewalAlertKey === alert.key}
+                                        onClick={() => handleRenewalAlertStatusUpdate(alert.key, { assignedTo: assigneeDraftByKey[alert.key] ?? alert.assignedTo ?? null })}
+                                        className="px-2 py-1 text-[11px] rounded border border-navy-200 bg-white text-navy-700 hover:bg-navy-100 disabled:opacity-50"
+                                      >
+                                        Guardar
+                                      </button>
+                                    </div>
+                                    <p className="text-[11px] text-navy-500 mt-1">
+                                      Atual: <strong>{alert.assignedTo ? (responsibleLabelMap.get(alert.assignedTo) ? `${responsibleLabelMap.get(alert.assignedTo)} (${alert.assignedTo})` : alert.assignedTo) : 'Sem responsável'}</strong>
+                                    </p>
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] text-navy-600">Próxima ação</label>
+                                    <textarea
+                                      value={nextActionDraftByKey[alert.key] ?? alert.nextAction ?? ''}
+                                      onChange={(event) => {
+                                        const value = event.target.value
+                                        setNextActionDraftByKey((current) => ({ ...current, [alert.key]: value }))
+                                      }}
+                                      placeholder="Definir próxima ação para a apólice"
+                                      rows={2}
+                                      className="w-full mt-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-gold-400 resize-y"
+                                    />
+                                    <div className="flex items-center justify-between mt-1">
+                                      <p className="text-[11px] text-navy-500">
+                                        Atual: <strong>{alert.nextAction || 'Sem ação definida'}</strong>
+                                      </p>
+                                      <button
+                                        type="button"
+                                        disabled={updatingRenewalAlertKey === alert.key}
+                                        onClick={() => handleRenewalAlertStatusUpdate(alert.key, { nextAction: nextActionDraftByKey[alert.key] ?? alert.nextAction ?? null })}
+                                        className="px-2 py-1 text-[11px] rounded border border-navy-200 bg-white text-navy-700 hover:bg-navy-100 disabled:opacity-50"
+                                      >
+                                        Guardar ação
+                                      </button>
+                                    </div>
+                                  </div>
                                 </div>
                                 <div className="flex flex-wrap gap-1.5 mt-2">
                                   <Link
@@ -1495,6 +1612,31 @@ function AdminDashboardTab({
                                 <p className="text-[11px] text-navy-500 mt-2">
                                   Estado atual: <strong>{RENEWAL_ALERT_STATUS_LABELS[alert.status]}</strong>
                                 </p>
+                                <details className="mt-2 rounded border border-navy-100 bg-navy-50 px-2 py-1.5">
+                                  <summary className="text-[11px] font-semibold text-navy-700 cursor-pointer">
+                                    Histórico de alterações ({alert.history.length})
+                                  </summary>
+                                  <div className="mt-2 space-y-1.5 max-h-40 overflow-y-auto">
+                                    {alert.history.length === 0 ? (
+                                      <p className="text-[11px] text-navy-500">Sem histórico.</p>
+                                    ) : (
+                                      alert.history.map((entry) => (
+                                        <div key={entry.id} className="text-[11px] text-navy-600 border-l-2 border-navy-200 pl-2 py-0.5">
+                                          <p className="text-navy-700 font-medium">{formatDate(entry.changedAt)}</p>
+                                          <p>
+                                            Estado: <strong>{entry.previousStatus ? RENEWAL_ALERT_STATUS_LABELS[entry.previousStatus] : '—'}</strong> → <strong>{RENEWAL_ALERT_STATUS_LABELS[entry.newStatus]}</strong>
+                                          </p>
+                                          <p>
+                                            Responsável: <strong>{entry.previousAssignedTo || '—'}</strong> → <strong>{entry.newAssignedTo || '—'}</strong>
+                                          </p>
+                                          <p>
+                                            Próxima ação: <strong>{entry.previousNextAction || '—'}</strong> → <strong>{entry.newNextAction || '—'}</strong>
+                                          </p>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </details>
                               </article>
                             )
                           })}
@@ -1506,7 +1648,11 @@ function AdminDashboardTab({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-navy-400">Sem alertas ativos para D-90, D-60 ou D-30.</p>
+            <p className="text-sm text-navy-400">
+              {renewalRiskMinValue
+                ? 'Sem alertas para o filtro de valor aplicado.'
+                : 'Sem alertas ativos para D-90, D-60 ou D-30.'}
+            </p>
           )}
         </div>
 

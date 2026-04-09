@@ -7,6 +7,7 @@ import type {
   AdminFinancialDashboardData,
   RenewalAlertsResponse,
   RenewalAlertItem,
+  RenewalAlertHistoryItem,
   RenewalAlertStatus,
 } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
@@ -453,13 +454,21 @@ interface RenewalAlertStateRecord {
   key: string
   policyId: string | null
   status: RenewalAlertStatus
+  assignedTo: string | null
+  nextAction: string | null
   updatedAt: string
+}
+
+function normalizeOptionalText(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed : null
 }
 
 async function readRenewalAlertStateMap() {
   const { data, error } = await supabaseAdmin
     .from('renewal_alerts_state')
-    .select('alert_key, policy_id, status, updated_at')
+    .select('alert_key, policy_id, status, assigned_to, next_action, updated_at')
 
   if (error) {
     console.error('[readRenewalAlertStateMap] supabase error:', error)
@@ -480,11 +489,62 @@ async function readRenewalAlertStateMap() {
       key: alertKey,
       policyId: typeof row.policy_id === 'string' ? row.policy_id : null,
       status: normalizedStatus,
+      assignedTo: normalizeOptionalText(row.assigned_to),
+      nextAction: normalizeOptionalText(row.next_action),
       updatedAt: typeof row.updated_at === 'string' ? row.updated_at : new Date().toISOString(),
     }
   }
 
   return stateMap
+}
+
+async function readRenewalAlertHistoryMap(alertKeys: string[]) {
+  if (alertKeys.length === 0) return {}
+
+  const { data, error } = await supabaseAdmin
+    .from('renewal_alerts_history')
+    .select('id, alert_key, policy_id, previous_status, new_status, previous_assigned_to, new_assigned_to, previous_next_action, new_next_action, changed_at')
+    .in('alert_key', alertKeys)
+    .order('changed_at', { ascending: false })
+
+  if (error) {
+    console.error('[readRenewalAlertHistoryMap] supabase error:', error)
+    return {}
+  }
+
+  const historyMap: Record<string, RenewalAlertHistoryItem[]> = {}
+  for (const row of data ?? []) {
+    const alertKey = normalizeOptionalText(row.alert_key)
+    if (!alertKey) continue
+
+    const newStatusCandidate = row.new_status as RenewalAlertStatus
+    const newStatus: RenewalAlertStatus =
+      newStatusCandidate === 'pendente' || newStatusCandidate === 'tratado' || newStatusCandidate === 'em_negociacao' || newStatusCandidate === 'renovado'
+        ? newStatusCandidate
+        : DEFAULT_RENEWAL_ALERT_STATUS
+
+    const prevStatusCandidate = row.previous_status as RenewalAlertStatus | null
+    const previousStatus: RenewalAlertStatus | null =
+      prevStatusCandidate === 'pendente' || prevStatusCandidate === 'tratado' || prevStatusCandidate === 'em_negociacao' || prevStatusCandidate === 'renovado'
+        ? prevStatusCandidate
+        : null
+
+    if (!historyMap[alertKey]) historyMap[alertKey] = []
+    historyMap[alertKey].push({
+      id: String(row.id),
+      alertKey,
+      policyId: normalizeOptionalText(row.policy_id),
+      previousStatus,
+      newStatus,
+      previousAssignedTo: normalizeOptionalText(row.previous_assigned_to),
+      newAssignedTo: normalizeOptionalText(row.new_assigned_to),
+      previousNextAction: normalizeOptionalText(row.previous_next_action),
+      newNextAction: normalizeOptionalText(row.new_next_action),
+      changedAt: typeof row.changed_at === 'string' ? row.changed_at : new Date().toISOString(),
+    })
+  }
+
+  return historyMap
 }
 
 function startOfUtcDay(date: Date): Date {
@@ -562,6 +622,9 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
         daysUntilRenewal,
         urgency,
         status: stateRecord?.status ?? DEFAULT_RENEWAL_ALERT_STATUS,
+        assignedTo: stateRecord?.assignedTo ?? undefined,
+        nextAction: stateRecord?.nextAction ?? undefined,
+        history: [],
         contactEmail: individualClient?.email || company?.contactEmail || company?.accessEmail,
         contactPhone: individualClient?.phone || company?.contactPhone,
       })
@@ -573,6 +636,11 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
       if (a.renewalDate !== b.renewalDate) return a.renewalDate.localeCompare(b.renewalDate)
       return a.policyNumber.localeCompare(b.policyNumber)
     })
+
+    const historyMap = await readRenewalAlertHistoryMap(alerts.map((alert) => alert.key))
+    for (const alert of alerts) {
+      alert.history = historyMap[alert.key] ?? []
+    }
 
     const byUrgency: RenewalAlertsResponse['byUrgency'] = { 30: [], 60: [], 90: [] }
     const countsByStatus: RenewalAlertsResponse['summary']['countsByStatus'] = {
@@ -603,30 +671,41 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
 
 export const adminUpdateRenewalAlertStatus = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
-  .inputValidator((d: { key: string; status: RenewalAlertStatus }) => d)
+  .inputValidator((d: { key: string; status?: RenewalAlertStatus; assignedTo?: string | null; nextAction?: string | null }) => d)
   .handler(async ({ data }) => {
     const key = data.key?.trim()
     if (!key) throw new Error('Chave de alerta inválida')
-    const policyId = key.split(':')[0]?.trim() || null
+    const fallbackPolicyId = key.split(':')[0]?.trim() || null
 
     const validStatuses: RenewalAlertStatus[] = ['pendente', 'tratado', 'em_negociacao', 'renovado']
-    if (!validStatuses.includes(data.status)) throw new Error('Estado de alerta inválido')
-
-    const payload = {
-      alert_key: key,
-      policy_id: policyId,
-      status: data.status,
-      updated_at: new Date().toISOString(),
-    }
+    if (data.status && !validStatuses.includes(data.status)) throw new Error('Estado de alerta inválido')
 
     const { data: existing, error: findError } = await supabaseAdmin
       .from('renewal_alerts_state')
-      .select('alert_key')
+      .select('alert_key, policy_id, status, assigned_to, next_action')
       .eq('alert_key', key)
       .maybeSingle()
 
     if (findError) {
       throw new Error(`Erro ao localizar estado do alerta: ${findError.message}`)
+    }
+
+    const previousStatus = existing?.status as RenewalAlertStatus | null
+    const previousAssignedTo = normalizeOptionalText(existing?.assigned_to)
+    const previousNextAction = normalizeOptionalText(existing?.next_action)
+
+    const policyId = normalizeOptionalText(existing?.policy_id) ?? fallbackPolicyId
+    const status = data.status ?? (validStatuses.includes(previousStatus as RenewalAlertStatus) ? (previousStatus as RenewalAlertStatus) : DEFAULT_RENEWAL_ALERT_STATUS)
+    const assignedTo = data.assignedTo === undefined ? previousAssignedTo : normalizeOptionalText(data.assignedTo)
+    const nextAction = data.nextAction === undefined ? previousNextAction : normalizeOptionalText(data.nextAction)
+
+    const payload = {
+      alert_key: key,
+      policy_id: policyId,
+      status,
+      assigned_to: assignedTo,
+      next_action: nextAction,
+      updated_at: new Date().toISOString(),
     }
 
     if (existing?.alert_key) {
@@ -643,6 +722,30 @@ export const adminUpdateRenewalAlertStatus = createServerFn({ method: 'POST' })
         .insert(payload)
       if (insertError) {
         throw new Error(`Erro ao guardar estado do alerta: ${insertError.message}`)
+      }
+    }
+
+    const hasStateChange =
+      previousStatus !== status ||
+      previousAssignedTo !== assignedTo ||
+      previousNextAction !== nextAction
+
+    if (hasStateChange) {
+      const { error: historyError } = await supabaseAdmin
+        .from('renewal_alerts_history')
+        .insert({
+          alert_key: key,
+          policy_id: policyId,
+          previous_status: previousStatus,
+          new_status: status,
+          previous_assigned_to: previousAssignedTo,
+          new_assigned_to: assignedTo,
+          previous_next_action: previousNextAction,
+          new_next_action: nextAction,
+          changed_at: new Date().toISOString(),
+        })
+      if (historyError) {
+        throw new Error(`Erro ao guardar histórico do alerta: ${historyError.message}`)
       }
     }
 

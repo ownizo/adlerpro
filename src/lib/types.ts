@@ -276,6 +276,19 @@ export interface AdminFinancialDashboardData {
 export type RenewalAlertUrgency = 30 | 60 | 90
 export type RenewalAlertStatus = 'pendente' | 'tratado' | 'em_negociacao' | 'renovado'
 
+export interface RenewalAlertHistoryItem {
+  id: string
+  alertKey: string
+  policyId: string | null
+  previousStatus: RenewalAlertStatus | null
+  newStatus: RenewalAlertStatus
+  previousAssignedTo: string | null
+  newAssignedTo: string | null
+  previousNextAction: string | null
+  newNextAction: string | null
+  changedAt: string
+}
+
 export interface RenewalAlertItem {
   key: string
   policyId: string
@@ -290,6 +303,9 @@ export interface RenewalAlertItem {
   daysUntilRenewal: number
   urgency: RenewalAlertUrgency
   status: RenewalAlertStatus
+  assignedTo?: string
+  nextAction?: string
+  history: RenewalAlertHistoryItem[]
   contactEmail?: string
   contactPhone?: string
 }
