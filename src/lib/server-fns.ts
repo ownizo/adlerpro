@@ -1,6 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
-import { getStore } from '@netlify/blobs'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
 import type {
@@ -451,18 +450,41 @@ const RENEWAL_ALERT_DAYS = [30, 60, 90] as const
 const DEFAULT_RENEWAL_ALERT_STATUS: RenewalAlertStatus = 'pendente'
 
 interface RenewalAlertStateRecord {
+  key: string
+  policyId: string | null
   status: RenewalAlertStatus
   updatedAt: string
 }
 
-function renewalAlertsStateStore() {
-  return getStore({ name: 'renewal-alert-state', consistency: 'strong' })
-}
-
 async function readRenewalAlertStateMap() {
-  const store = renewalAlertsStateStore()
-  const stateMap = await store.get('by-alert-key', { type: 'json' }) as Record<string, RenewalAlertStateRecord> | null
-  return stateMap ?? {}
+  const { data, error } = await supabaseAdmin
+    .from('renewal_alerts_state')
+    .select('alert_key, policy_id, status, updated_at')
+
+  if (error) {
+    console.error('[readRenewalAlertStateMap] supabase error:', error)
+    return {}
+  }
+
+  const stateMap: Record<string, RenewalAlertStateRecord> = {}
+  for (const row of data ?? []) {
+    const alertKey = typeof row.alert_key === 'string' ? row.alert_key : ''
+    if (!alertKey) continue
+
+    const status = row.status as RenewalAlertStatus
+    const normalizedStatus: RenewalAlertStatus =
+      status === 'pendente' || status === 'tratado' || status === 'em_negociacao' || status === 'renovado'
+        ? status
+        : DEFAULT_RENEWAL_ALERT_STATUS
+    stateMap[alertKey] = {
+      key: alertKey,
+      policyId: typeof row.policy_id === 'string' ? row.policy_id : null,
+      status: normalizedStatus,
+      updatedAt: typeof row.updated_at === 'string' ? row.updated_at : new Date().toISOString(),
+    }
+  }
+
+  return stateMap
 }
 
 function startOfUtcDay(date: Date): Date {
@@ -585,17 +607,45 @@ export const adminUpdateRenewalAlertStatus = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const key = data.key?.trim()
     if (!key) throw new Error('Chave de alerta inválida')
+    const policyId = key.split(':')[0]?.trim() || null
 
     const validStatuses: RenewalAlertStatus[] = ['pendente', 'tratado', 'em_negociacao', 'renovado']
     if (!validStatuses.includes(data.status)) throw new Error('Estado de alerta inválido')
 
-    const store = renewalAlertsStateStore()
-    const stateMap = await readRenewalAlertStateMap()
-    stateMap[key] = {
+    const payload = {
+      alert_key: key,
+      policy_id: policyId,
       status: data.status,
-      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     }
-    await store.setJSON('by-alert-key', stateMap)
+
+    const { data: existing, error: findError } = await supabaseAdmin
+      .from('renewal_alerts_state')
+      .select('alert_key')
+      .eq('alert_key', key)
+      .maybeSingle()
+
+    if (findError) {
+      throw new Error(`Erro ao localizar estado do alerta: ${findError.message}`)
+    }
+
+    if (existing?.alert_key) {
+      const { error: updateError } = await supabaseAdmin
+        .from('renewal_alerts_state')
+        .update(payload)
+        .eq('alert_key', key)
+      if (updateError) {
+        throw new Error(`Erro ao atualizar estado do alerta: ${updateError.message}`)
+      }
+    } else {
+      const { error: insertError } = await supabaseAdmin
+        .from('renewal_alerts_state')
+        .insert(payload)
+      if (insertError) {
+        throw new Error(`Erro ao guardar estado do alerta: ${insertError.message}`)
+      }
+    }
+
     return { ok: true }
   })
 
