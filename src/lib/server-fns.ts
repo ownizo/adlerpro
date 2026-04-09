@@ -1,8 +1,15 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
+import { getStore } from '@netlify/blobs'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
-import type { DashboardStats, AdminFinancialDashboardData, RenewalAlertsResponse, RenewalAlertItem } from './types'
+import type {
+  DashboardStats,
+  AdminFinancialDashboardData,
+  RenewalAlertsResponse,
+  RenewalAlertItem,
+  RenewalAlertStatus,
+} from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
 
@@ -441,6 +448,22 @@ function toDeltaPct(current: number, previous: number | null): number | null {
 }
 
 const RENEWAL_ALERT_DAYS = [30, 60, 90] as const
+const DEFAULT_RENEWAL_ALERT_STATUS: RenewalAlertStatus = 'pendente'
+
+interface RenewalAlertStateRecord {
+  status: RenewalAlertStatus
+  updatedAt: string
+}
+
+function renewalAlertsStateStore() {
+  return getStore({ name: 'renewal-alert-state', consistency: 'strong' })
+}
+
+async function readRenewalAlertStateMap() {
+  const store = renewalAlertsStateStore()
+  const stateMap = await store.get('by-alert-key', { type: 'json' }) as Record<string, RenewalAlertStateRecord> | null
+  return stateMap ?? {}
+}
 
 function startOfUtcDay(date: Date): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
@@ -476,6 +499,7 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
         : db.getCompanies(),
       db.getIndividualClients(),
     ])
+    const alertStateMap = await readRenewalAlertStateMap()
 
     const companyById = new Map(companies.map((company) => [company.id, company]))
     const individualClientById = new Map(individualClients.map((client) => [client.id, client]))
@@ -500,6 +524,7 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
       const individualClient = policy.individualClientId
         ? individualClientById.get(policy.individualClientId)
         : undefined
+      const stateRecord = alertStateMap[key]
 
       alerts.push({
         key,
@@ -514,18 +539,31 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
         renewalDate: renewalDate.toISOString().slice(0, 10),
         daysUntilRenewal,
         urgency,
+        status: stateRecord?.status ?? DEFAULT_RENEWAL_ALERT_STATUS,
+        contactEmail: individualClient?.email || company?.contactEmail || company?.accessEmail,
+        contactPhone: individualClient?.phone || company?.contactPhone,
       })
     }
 
     alerts.sort((a, b) => {
       if (a.daysUntilRenewal !== b.daysUntilRenewal) return a.daysUntilRenewal - b.daysUntilRenewal
+      if (a.value !== b.value) return b.value - a.value
       if (a.renewalDate !== b.renewalDate) return a.renewalDate.localeCompare(b.renewalDate)
       return a.policyNumber.localeCompare(b.policyNumber)
     })
 
     const byUrgency: RenewalAlertsResponse['byUrgency'] = { 30: [], 60: [], 90: [] }
+    const countsByStatus: RenewalAlertsResponse['summary']['countsByStatus'] = {
+      pendente: 0,
+      tratado: 0,
+      em_negociacao: 0,
+      renovado: 0,
+    }
+    let totalValueAtRisk = 0
     for (const alert of alerts) {
       byUrgency[alert.urgency].push(alert)
+      countsByStatus[alert.status] += 1
+      if (alert.status !== 'renovado') totalValueAtRisk += alert.value
     }
 
     return {
@@ -533,7 +571,32 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
       total: alerts.length,
       alerts,
       byUrgency,
+      summary: {
+        totalRenewals: alerts.length,
+        totalValueAtRisk,
+        countsByStatus,
+      },
     }
+  })
+
+export const adminUpdateRenewalAlertStatus = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { key: string; status: RenewalAlertStatus }) => d)
+  .handler(async ({ data }) => {
+    const key = data.key?.trim()
+    if (!key) throw new Error('Chave de alerta inválida')
+
+    const validStatuses: RenewalAlertStatus[] = ['pendente', 'tratado', 'em_negociacao', 'renovado']
+    if (!validStatuses.includes(data.status)) throw new Error('Estado de alerta inválido')
+
+    const store = renewalAlertsStateStore()
+    const stateMap = await readRenewalAlertStateMap()
+    stateMap[key] = {
+      status: data.status,
+      updatedAt: new Date().toISOString(),
+    }
+    await store.setJSON('by-alert-key', stateMap)
+    return { ok: true }
   })
 
 export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })

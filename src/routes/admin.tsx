@@ -1,4 +1,4 @@
-import { createFileRoute, Navigate } from '@tanstack/react-router'
+import { createFileRoute, Navigate, Link } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import {
   fetchAdminAll,
@@ -28,6 +28,7 @@ import {
   adminGenerateSocialContent,
   fetchAdminFinancialDashboard,
   getRenewalAlerts,
+  adminUpdateRenewalAlertStatus,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type {
@@ -42,6 +43,7 @@ import type {
   SocialPost,
   AdminFinancialDashboardData,
   RenewalAlertsResponse,
+  RenewalAlertStatus,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef } from 'react'
@@ -50,6 +52,12 @@ import { supabase } from '@/lib/supabase'
 
 const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'social', 'api', 'profiles', 'alerts'] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
+const RENEWAL_ALERT_STATUS_LABELS: Record<RenewalAlertStatus, string> = {
+  pendente: 'Pendente',
+  tratado: 'Tratado',
+  em_negociacao: 'Em negociação',
+  renovado: 'Renovado',
+}
 
 function isAdminTab(value: unknown): value is AdminTab {
   return typeof value === 'string' && ADMIN_TABS.includes(value as AdminTab)
@@ -919,6 +927,7 @@ function AdminDashboardTab({
   const [financialLoading, setFinancialLoading] = useState(false)
   const [renewalAlerts, setRenewalAlerts] = useState<RenewalAlertsResponse | null>(null)
   const [renewalAlertsLoading, setRenewalAlertsLoading] = useState(false)
+  const [updatingRenewalAlertKey, setUpdatingRenewalAlertKey] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
@@ -976,6 +985,32 @@ function AdminDashboardTab({
       active = false
     }
   }, [policies])
+
+  const reloadRenewalAlerts = async () => {
+    setRenewalAlertsLoading(true)
+    try {
+      const result = await getRenewalAlerts()
+      setRenewalAlerts(result)
+    } catch (error) {
+      console.error('[AdminDashboardTab] reloadRenewalAlerts error:', error)
+      setRenewalAlerts(null)
+    } finally {
+      setRenewalAlertsLoading(false)
+    }
+  }
+
+  const handleRenewalAlertStatusUpdate = async (key: string, status: RenewalAlertStatus) => {
+    setUpdatingRenewalAlertKey(key)
+    try {
+      await adminUpdateRenewalAlertStatus({ data: { key, status } })
+      await reloadRenewalAlerts()
+    } catch (error) {
+      console.error('[AdminDashboardTab] adminUpdateRenewalAlertStatus error:', error)
+      alert('Não foi possível atualizar o estado do alerta.')
+    } finally {
+      setUpdatingRenewalAlertKey(null)
+    }
+  }
 
   const monthSelectOptions = [
     { value: '', label: 'Ano completo' },
@@ -1212,6 +1247,26 @@ function AdminDashboardTab({
       <div className="grid lg:grid-cols-2 gap-6">
         <div className="bg-white rounded-[4px] border border-navy-200 p-5">
           <h3 className="text-sm font-semibold text-navy-700 mb-3">Renovações próximas</h3>
+          {renewalAlerts && (
+            <div className="mb-4 space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded border border-navy-200 bg-navy-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-navy-500">Número de renovações</p>
+                  <p className="text-base font-semibold text-navy-700">{renewalAlerts.summary.totalRenewals}</p>
+                </div>
+                <div className="rounded border border-red-200 bg-red-50 px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-red-500">Valor total em risco</p>
+                  <p className="text-base font-semibold text-red-700">{formatCurrency(renewalAlerts.summary.totalValueAtRisk)}</p>
+                </div>
+              </div>
+              <div className="rounded border border-navy-100 bg-white px-3 py-2">
+                <p className="text-[11px] uppercase tracking-wide text-navy-500 mb-1">Estados</p>
+                <p className="text-xs text-navy-600">
+                  Pendente: <strong>{renewalAlerts.summary.countsByStatus.pendente}</strong> · Tratado: <strong>{renewalAlerts.summary.countsByStatus.tratado}</strong> · Em negociação: <strong>{renewalAlerts.summary.countsByStatus.em_negociacao}</strong> · Renovado: <strong>{renewalAlerts.summary.countsByStatus.renovado}</strong>
+                </p>
+              </div>
+            </div>
+          )}
           {renewalAlertsLoading ? (
             <p className="text-sm text-navy-400">A carregar alertas de renovação...</p>
           ) : renewalAlerts && renewalAlerts.total > 0 ? (
@@ -1245,17 +1300,76 @@ function AdminDashboardTab({
                       </span>
                     </div>
                     <div className="space-y-2">
-                      {items.slice(0, 4).map((alert) => (
-                        <div key={alert.key} className="text-xs text-navy-700">
-                          <p className="font-semibold">
-                            {alert.client} · {POLICY_TYPE_LABELS[alert.policyType]}
-                          </p>
-                          <p className="text-navy-600">
+                      {items.map((alert) => (
+                        <div key={alert.key} className="text-xs text-navy-700 rounded border border-navy-200 bg-white p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-semibold">
+                              {alert.client} · {POLICY_TYPE_LABELS[alert.policyType]}
+                            </p>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-700 font-semibold">
+                              {RENEWAL_ALERT_STATUS_LABELS[alert.status]}
+                            </span>
+                          </div>
+                          <p className="text-navy-600 mt-0.5">
                             {alert.company} · {alert.insurer} · {formatCurrency(alert.value)}
                           </p>
-                          <p className="text-navy-500">
+                          <p className="text-navy-500 mt-0.5">
                             Apólice {alert.policyNumber} · Renovação em {formatDate(alert.renewalDate)}
                           </p>
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            <button
+                              type="button"
+                              className="px-2 py-1 text-[11px] rounded border border-navy-200 text-navy-700 bg-white hover:bg-navy-50 disabled:opacity-50"
+                              disabled={updatingRenewalAlertKey === alert.key}
+                              onClick={() => handleRenewalAlertStatusUpdate(alert.key, 'tratado')}
+                            >
+                              Marcar tratado
+                            </button>
+                            <button
+                              type="button"
+                              className="px-2 py-1 text-[11px] rounded border border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 disabled:opacity-50"
+                              disabled={updatingRenewalAlertKey === alert.key}
+                              onClick={() => handleRenewalAlertStatusUpdate(alert.key, 'em_negociacao')}
+                            >
+                              Em negociação
+                            </button>
+                            <button
+                              type="button"
+                              className="px-2 py-1 text-[11px] rounded border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50"
+                              disabled={updatingRenewalAlertKey === alert.key}
+                              onClick={() => handleRenewalAlertStatusUpdate(alert.key, 'renovado')}
+                            >
+                              Marcar renovado
+                            </button>
+                          </div>
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            <Link
+                              to="/admin"
+                              search={{ tab: 'policies' }}
+                              className="px-2 py-1 text-[11px] rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
+                            >
+                              Ver apólice
+                            </Link>
+                            {alert.contactEmail ? (
+                              <a
+                                href={`mailto:${alert.contactEmail}`}
+                                className="px-2 py-1 text-[11px] rounded border border-gold-300 text-navy-700 bg-gold-100 hover:bg-gold-200"
+                              >
+                                Contactar cliente
+                              </a>
+                            ) : alert.contactPhone ? (
+                              <a
+                                href={`tel:${alert.contactPhone}`}
+                                className="px-2 py-1 text-[11px] rounded border border-gold-300 text-navy-700 bg-gold-100 hover:bg-gold-200"
+                              >
+                                Contactar cliente
+                              </a>
+                            ) : (
+                              <span className="px-2 py-1 text-[11px] rounded border border-gray-200 text-gray-400 bg-gray-50">
+                                Sem contacto
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
