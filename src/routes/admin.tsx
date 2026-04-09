@@ -2459,7 +2459,6 @@ function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClien
     if (e.target.value !== 'company') return
     e.target.value = 'individual' // reset immediately
 
-    const hasPolicies = true // we don't have the count here, warn generically
     const authWarning = client.authUserId ? '\n⚠️ Este cliente tem acesso ao Adler One — o acesso será desligado.' : ''
     if (!confirm(`Converter "${client.fullName}" para Empresa?\n\nIsso irá:\n• Criar um registo de Empresa\n• Mover as apólices associadas\n• Apagar o registo de cliente individual${authWarning}`)) return
 
