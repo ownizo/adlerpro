@@ -18,9 +18,15 @@ import {
   adminActivateAdlerOne,
   adminPromoteToCompany,
   adminUpdatePolicy,
+  adminDeletePolicy,
+  adminRestorePolicy,
+  adminBulkPolicyAction,
+  adminSetPolicyUsers,
   adminAssociateDocument,
   adminUploadPolicyDocument,
   adminGetDocumentUrl,
+  fetchPolicyAuditTrail,
+  adminGlobalSearch,
   fetchSocialPosts,
   adminCreateSocialPost,
   adminUpdateSocialPost,
@@ -37,6 +43,8 @@ import type {
   Claim,
   Document as DocType,
   CompanyUser,
+  PolicyUser,
+  PolicyAuditTrailEntry,
   UserMetricEvent,
   ApiConnection,
   IndividualClient,
@@ -47,7 +55,7 @@ import type {
   RenewalAlertStatus,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { Fragment, useState, useEffect, useRef, useMemo } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
 
@@ -276,6 +284,7 @@ function AdminPage() {
   const [policies, setPolicies] = useState<Policy[]>([])
   const [claims, setClaims] = useState<Claim[]>([])
   const [documents, setDocuments] = useState<DocType[]>([])
+  const [policyUsers, setPolicyUsers] = useState<PolicyUser[]>([])
   const [individualClients, setIndividualClients] = useState<IndividualClient[]>([])
   const [socialPosts, setSocialPosts] = useState<SocialPost[]>([])
   const [loading, setLoading] = useState(true)
@@ -288,14 +297,29 @@ function AdminPage() {
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null)
   const [showUserFormForCompanyId, setShowUserFormForCompanyId] = useState<string | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
+  const [showDeletedPolicies, setShowDeletedPolicies] = useState(false)
+  const [globalQuery, setGlobalQuery] = useState('')
+  const [globalResults, setGlobalResults] = useState<Array<{ id: string; type: string; title: string; subtitle: string }>>([])
+  const [globalSearching, setGlobalSearching] = useState(false)
 
   const reload = async () => {
-    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d, individualClients: ic } = await fetchAdminAll()
+    const {
+      companies: c,
+      companyUsers: u,
+      userEvents: e,
+      apiConnections: a,
+      policies: p,
+      policyUsers: pu,
+      claims: cl,
+      documents: d,
+      individualClients: ic,
+    } = await fetchAdminAll()
     setCompanies(c)
     setCompanyUsers(u)
     setUserEvents(e)
     setApiConnections(a)
     setPolicies(p)
+    setPolicyUsers(pu ?? [])
     setClaims(cl)
     setDocuments(d)
     setIndividualClients(ic ?? [])
@@ -330,11 +354,12 @@ function AdminPage() {
   if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
   const expiringPolicies = policies.filter((p) => {
+    if (p.deletedAt) return false
     const endDate = new Date(p.endDate)
     const now = new Date()
     const diffTime = Math.abs(endDate.getTime() - now.getTime())
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays <= 60 && (p.status === 'active' || p.status === 'expiring')
+    return diffDays <= 60 && ['active', 'expiring', 'ativa', 'renovacao', 'renovação'].includes(p.status)
   })
 
   const metricsByUser = companyUsers.map((user) => {
@@ -354,12 +379,61 @@ function AdminPage() {
     }
   })
 
+  useEffect(() => {
+    const query = globalQuery.trim()
+    if (query.length < 2) {
+      setGlobalResults([])
+      return
+    }
+
+    const timeout = setTimeout(async () => {
+      setGlobalSearching(true)
+      try {
+        const response = await adminGlobalSearch({ data: { query, limit: 25 } })
+        setGlobalResults(response.results ?? [])
+      } catch (error) {
+        console.error('[adminGlobalSearch] error:', error)
+        setGlobalResults([])
+      } finally {
+        setGlobalSearching(false)
+      }
+    }, 250)
+
+    return () => clearTimeout(timeout)
+  }, [globalQuery])
+
   return (
     <AppLayout>
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-navy-700">Painel de Administração</h1>
           <p className="text-navy-500 mt-1">Gestão de empresas, acessos, apólices, sinistros e integrações</p>
+        </div>
+
+        <div className="mb-6 bg-white border border-navy-200 rounded-[4px] p-4">
+          <label className="block text-xs font-semibold text-navy-500 uppercase tracking-wide mb-2">Pesquisa Global</label>
+          <input
+            value={globalQuery}
+            onChange={(e) => setGlobalQuery(e.target.value)}
+            placeholder="Pesquisar apólices, empresas, utilizadores, sinistros e clientes..."
+            className="w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+          />
+          {globalQuery.trim().length >= 2 && (
+            <div className="mt-3 border border-navy-100 rounded-[2px] max-h-56 overflow-auto">
+              {globalSearching ? (
+                <p className="px-3 py-2 text-xs text-navy-500">A pesquisar...</p>
+              ) : globalResults.length === 0 ? (
+                <p className="px-3 py-2 text-xs text-navy-500">Sem resultados.</p>
+              ) : (
+                globalResults.map((result) => (
+                  <div key={`${result.type}:${result.id}`} className="px-3 py-2 border-b border-navy-100 last:border-b-0">
+                    <p className="text-sm font-semibold text-navy-700">{result.title}</p>
+                    <p className="text-xs text-navy-500">{result.type} · {result.subtitle}</p>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
 
         {loading ? (
@@ -484,94 +558,123 @@ function AdminPage() {
                               />
                             )}
 
-                            <div className="grid lg:grid-cols-2 gap-6">
-                              <div>
-                                <h4 className="text-sm font-semibold text-navy-700 mb-3">Utilizadores da Empresa</h4>
-                                <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-                                  <table className="w-full">
-                                    <thead>
-                                      <tr className="bg-navy-50 border-b border-navy-200">
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Nome</th>
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Email</th>
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Perfil</th>
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Ações</th>
+                            <div>
+                              <h4 className="text-sm font-semibold text-navy-700 mb-3">Utilizadores da Empresa</h4>
+                              <div className="bg-white rounded-[4px] border border-navy-200 overflow-x-auto">
+                                <table className="w-full min-w-[980px]">
+                                  <thead>
+                                    <tr className="bg-navy-50 border-b border-navy-200">
+                                      <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Nome</th>
+                                      <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Email</th>
+                                      <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Perfil</th>
+                                      <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Estado</th>
+                                      <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Último Acesso</th>
+                                      <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Ações</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-navy-100">
+                                    {users.map((user) => (
+                                      <tr key={user.id}>
+                                        <td className="px-4 py-3 text-sm text-navy-700">{user.name}</td>
+                                        <td className="px-4 py-3 text-sm text-navy-500">{user.email}</td>
+                                        <td className="px-4 py-3 text-sm text-navy-500 capitalize">{user.role}</td>
+                                        <td className="px-4 py-3 text-sm text-navy-500">{user.identityStatus || 'pending_confirmation'}</td>
+                                        <td className="px-4 py-3 text-sm text-navy-500">{user.lastLoginAt ? formatDate(user.lastLoginAt) : '—'}</td>
+                                        <td className="px-4 py-3">
+                                          <div className="flex flex-wrap gap-1.5">
+                                            <button
+                                              onClick={async () => {
+                                                const newName = prompt('Nome do utilizador:', user.name)
+                                                if (newName === null) return
+                                                const newRole = prompt('Perfil (owner | manager | employee):', user.role)
+                                                if (newRole === null) return
+                                                const newStatus = prompt(
+                                                  'Estado (active | pending_confirmation | confirmed | already_registered | inactive):',
+                                                  user.identityStatus || 'active'
+                                                )
+                                                if (newStatus === null) return
+                                                await adminUpdateCompanyUser({
+                                                  data: {
+                                                    id: user.id,
+                                                    updates: {
+                                                      name: newName.trim() || user.name,
+                                                      role: (newRole.trim() || user.role) as CompanyUser['role'],
+                                                      identityStatus: newStatus.trim() || user.identityStatus,
+                                                    },
+                                                  },
+                                                })
+                                                await reload()
+                                              }}
+                                              className="px-2 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                                            >
+                                              Editar
+                                            </button>
+                                            <button
+                                              onClick={async () => {
+                                                const newPassword = prompt('Nova password de acesso (Identity):')
+                                                if (!newPassword) return
+                                                await adminUpdateCompanyUser({
+                                                  data: { id: user.id, updates: { accessPassword: newPassword } },
+                                                })
+                                                await reload()
+                                              }}
+                                              className="px-2 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                                            >
+                                              Reset Password
+                                            </button>
+                                            <button
+                                              onClick={async () => {
+                                                if (!confirm(`Eliminar utilizador ${user.name}?`)) return
+                                                await adminDeleteCompanyUser({ data: user.id })
+                                                await reload()
+                                              }}
+                                              className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                            >
+                                              Eliminar
+                                            </button>
+                                          </div>
+                                        </td>
                                       </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-navy-100">
-                                      {users.map((user) => (
-                                        <tr key={user.id}>
-                                          <td className="px-4 py-3 text-sm text-navy-700">{user.name}</td>
-                                          <td className="px-4 py-3 text-sm text-navy-500">{user.email}</td>
-                                          <td className="px-4 py-3 text-sm text-navy-500 capitalize">{user.role}</td>
-                                          <td className="px-4 py-3">
-                                            <div className="flex gap-1">
-                                              <button
-                                                onClick={async () => {
-                                                  const newPassword = prompt('Nova password de acesso (Identity):')
-                                                  if (!newPassword) return
-                                                  await adminUpdateCompanyUser({
-                                                    data: { id: user.id, updates: { accessPassword: newPassword } },
-                                                  })
-                                                  await reload()
-                                                }}
-                                                className="px-2 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
-                                              >
-                                                Reset Password
-                                              </button>
-                                              <button
-                                                onClick={async () => {
-                                                  if (!confirm(`Eliminar utilizador ${user.name}?`)) return
-                                                  await adminDeleteCompanyUser({ data: user.id })
-                                                  await reload()
-                                                }}
-                                                className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
-                                              >
-                                                Eliminar
-                                              </button>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                      {users.length === 0 && (
-                                        <tr>
-                                          <td colSpan={4} className="px-4 py-4 text-sm text-navy-400 text-center">
-                                            Sem utilizadores registados para esta empresa.
-                                          </td>
-                                        </tr>
-                                      )}
-                                    </tbody>
-                                  </table>
-                                </div>
+                                    ))}
+                                    {users.length === 0 && (
+                                      <tr>
+                                        <td colSpan={6} className="px-4 py-4 text-sm text-navy-400 text-center">
+                                          Sem utilizadores registados para esta empresa.
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
                               </div>
+                            </div>
 
-                              <div>
-                                <h4 className="text-sm font-semibold text-navy-700 mb-3">Métricas e Histórico</h4>
-                                <div className="space-y-3">
-                                  {users.map((user) => {
-                                    const events = userEvents.filter((event) => event.userId === user.id)
-                                    const loginsThisMonth = events.filter((event) => {
-                                      if (event.type !== 'login') return false
-                                      const eventDate = new Date(event.timestamp)
-                                      const now = new Date()
-                                      return eventDate.getMonth() === now.getMonth() && eventDate.getFullYear() === now.getFullYear()
-                                    }).length
+                            <div>
+                              <h4 className="text-sm font-semibold text-navy-700 mb-3">Métricas e Histórico</h4>
+                              <div className="grid lg:grid-cols-2 gap-3">
+                                {users.map((user) => {
+                                  const events = userEvents.filter((event) => event.userId === user.id)
+                                  const loginsThisMonth = events.filter((event) => {
+                                    if (event.type !== 'login') return false
+                                    const eventDate = new Date(event.timestamp)
+                                    const now = new Date()
+                                    return eventDate.getMonth() === now.getMonth() && eventDate.getFullYear() === now.getFullYear()
+                                  }).length
 
-                                    return (
-                                      <div key={user.id} className="bg-white rounded-[4px] border border-navy-200 p-4">
-                                        <p className="text-sm font-semibold text-navy-700">{user.name}</p>
-                                        <p className="text-xs text-navy-500">Último login: {user.lastLoginAt ? formatDate(user.lastLoginAt) : '-'}</p>
-                                        <p className="text-xs text-navy-500">Acessos no mês: {loginsThisMonth}</p>
-                                        <p className="text-xs text-navy-500">Eventos totais: {events.length}</p>
-                                        <div className="mt-2 text-xs text-navy-500 space-y-1 max-h-24 overflow-y-auto">
-                                          {events.slice(-5).reverse().map((event) => (
-                                            <p key={event.id}>• {formatDate(event.timestamp)} · {event.description}</p>
-                                          ))}
-                                          {events.length === 0 && <p>Sem histórico.</p>}
-                                        </div>
+                                  return (
+                                    <div key={user.id} className="bg-white rounded-[4px] border border-navy-200 p-4">
+                                      <p className="text-sm font-semibold text-navy-700">{user.name}</p>
+                                      <p className="text-xs text-navy-500">Último login: {user.lastLoginAt ? formatDate(user.lastLoginAt) : '-'}</p>
+                                      <p className="text-xs text-navy-500">Acessos no mês: {loginsThisMonth}</p>
+                                      <p className="text-xs text-navy-500">Eventos totais: {events.length}</p>
+                                      <div className="mt-2 text-xs text-navy-500 space-y-1 max-h-24 overflow-y-auto">
+                                        {events.slice(-5).reverse().map((event) => (
+                                          <p key={event.id}>• {formatDate(event.timestamp)} · {event.description}</p>
+                                        ))}
+                                        {events.length === 0 && <p>Sem histórico.</p>}
                                       </div>
-                                    )
-                                  })}
-                                </div>
+                                    </div>
+                                  )
+                                })}
                               </div>
                             </div>
 
@@ -581,11 +684,24 @@ function AdminPage() {
                                 rows={companyDocs.map((doc) => `${doc.name} · ${doc.category} · ${formatDate(doc.uploadedAt)}`)}
                                 emptyMessage="Sem documentos carregados."
                               />
-                              <SimpleCollection
-                                title="Apólices da Empresa"
-                                rows={companyPolicies.map((policy) => `${POLICY_TYPE_LABELS[policy.type]} · ${policy.policyNumber} · ${policy.insurer}`)}
-                                emptyMessage="Sem apólices associadas."
-                              />
+                              <div className="bg-white rounded-[4px] border border-navy-200 p-4">
+                                <p className="text-sm font-semibold text-navy-700 mb-2">Apólices da Empresa</p>
+                                {companyPolicies.length === 0 ? (
+                                  <p className="text-sm text-navy-400">Sem apólices associadas.</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {companyPolicies.map((policy) => (
+                                      <a
+                                        key={policy.id}
+                                        href={`/admin/policies/${policy.id}`}
+                                        className="block text-xs text-navy-600 hover:text-navy-800 hover:underline"
+                                      >
+                                        {POLICY_TYPE_LABELS[policy.type]} · {policy.policyNumber} · {policy.insurer}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}
@@ -645,11 +761,15 @@ function AdminPage() {
                     <tbody className="divide-y divide-navy-100">
                       {individualClients.map((client) => {
                         const clientPolicies = policies.filter((p) => p.individualClientId === client.id)
+                        const clientDocuments = documents.filter((doc) => doc.policyId && clientPolicies.some((policy) => policy.id === doc.policyId))
+                        const totalPremium = clientPolicies.reduce((sum, policy) => sum + (policy.annualPremium || 0), 0)
+                        const nearestRenewal = [...clientPolicies]
+                          .filter((policy) => policy.endDate)
+                          .sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime())[0]
                         const isExpanded = expandedIndividualClientId === client.id
                         return (
-                          <>
+                          <Fragment key={client.id}>
                             <tr
-                              key={client.id}
                               className="hover:bg-navy-50/50 cursor-pointer"
                               onClick={() => setExpandedIndividualClientId(isExpanded ? null : client.id)}
                             >
@@ -700,12 +820,46 @@ function AdminPage() {
                               </td>
                             </tr>
                             {isExpanded && (
-                              <tr key={`${client.id}-detail`}>
+                              <tr>
                                 <td colSpan={8} className="bg-navy-50/50 px-6 py-4 border-b border-navy-100">
-                                  <div className="mb-2">
-                                    <p className="text-xs text-navy-500 mb-1">
-                                      <strong>Morada:</strong> {client.address || '—'}
-                                    </p>
+                                  <div className="grid lg:grid-cols-3 gap-4 mb-4">
+                                    <div className="bg-white rounded-[4px] border border-navy-200 p-4">
+                                      <p className="text-xs font-semibold text-navy-500 uppercase">Dados Pessoais</p>
+                                      <p className="text-xs text-navy-500 mt-2"><strong>Nome:</strong> {client.fullName}</p>
+                                      <p className="text-xs text-navy-500"><strong>NIF:</strong> {client.nif || '—'}</p>
+                                      <p className="text-xs text-navy-500"><strong>Email:</strong> {client.email || '—'}</p>
+                                      <p className="text-xs text-navy-500"><strong>Telefone:</strong> {client.phone || '—'}</p>
+                                      <p className="text-xs text-navy-500"><strong>Morada:</strong> {client.address || '—'}</p>
+                                    </div>
+                                    <div className="bg-white rounded-[4px] border border-navy-200 p-4">
+                                      <p className="text-xs font-semibold text-navy-500 uppercase">Métricas de Acesso</p>
+                                      <p className="text-xs text-navy-500 mt-2"><strong>Apólices:</strong> {clientPolicies.length}</p>
+                                      <p className="text-xs text-navy-500"><strong>Documentos:</strong> {clientDocuments.length}</p>
+                                      <p className="text-xs text-navy-500"><strong>Prémio anual total:</strong> {formatCurrency(totalPremium)}</p>
+                                      <p className="text-xs text-navy-500">
+                                        <strong>Próxima renovação:</strong> {nearestRenewal ? formatDate(nearestRenewal.endDate) : '—'}
+                                      </p>
+                                    </div>
+                                    <div className="bg-white rounded-[4px] border border-navy-200 p-4">
+                                      <p className="text-xs font-semibold text-navy-500 uppercase">Módulo de Utilizador</p>
+                                      <p className="text-xs text-navy-500 mt-2">
+                                        <strong>Adler One:</strong> {client.authUserId ? 'Ativo' : 'Não ativado'}
+                                      </p>
+                                      <p className="text-xs text-navy-500 mb-2">
+                                        <strong>ID Utilizador:</strong> {client.authUserId || '—'}
+                                      </p>
+                                      <div className="flex flex-wrap gap-2">
+                                        <ActivateAdlerOneButton client={client} onSuccess={reload} />
+                                        <PromoteToCompanySelect
+                                          client={client}
+                                          onSuccess={async () => {
+                                            setIndividualClients([])
+                                            await reload()
+                                            setExpandedIndividualClientId(null)
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
                                   </div>
                                   <h4 className="text-sm font-semibold text-navy-700 mb-3">
                                     Apólices ({clientPolicies.length})
@@ -727,11 +881,17 @@ function AdminPage() {
                                           </div>
                                           <div className="text-right">
                                             <p className="text-sm font-semibold text-navy-700">{formatCurrency(p.annualPremium)}/ano</p>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                              p.status === 'active' ? 'bg-green-100 text-green-700' :
-                                              p.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
-                                              'bg-red-100 text-red-700'
-                                            }`}>{p.status}</span>
+                                            <span className={`text-xs px-2 py-0.5 rounded-full ${POLICY_STATUS_CLASS[p.status] ?? 'bg-red-100 text-red-700'}`}>
+                                              {POLICY_STATUS_LABEL[p.status] ?? p.status}
+                                            </span>
+                                            <div className="mt-2">
+                                              <a
+                                                href={`/admin/policies/${p.id}`}
+                                                className="text-xs text-navy-600 hover:text-navy-800 hover:underline"
+                                              >
+                                                Abrir detalhe
+                                              </a>
+                                            </div>
                                           </div>
                                         </div>
                                       ))}
@@ -740,12 +900,12 @@ function AdminPage() {
                                 </td>
                               </tr>
                             )}
-                          </>
+                          </Fragment>
                         )
                       })}
                       {individualClients.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="px-4 py-8 text-sm text-navy-400 text-center">
+                          <td colSpan={8} className="px-4 py-8 text-sm text-navy-400 text-center">
                             Sem clientes individuais registados.
                           </td>
                         </tr>
@@ -778,6 +938,15 @@ function AdminPage() {
                         </optgroup>
                       )}
                     </select>
+                    <label className="flex items-center gap-2 text-sm text-navy-600">
+                      <input
+                        type="checkbox"
+                        checked={showDeletedPolicies}
+                        onChange={(e) => setShowDeletedPolicies(e.target.checked)}
+                        className="accent-gold-400"
+                      />
+                      Mostrar eliminadas
+                    </label>
                   </div>
                   <button
                     onClick={() => setShowNewPolicy(!showNewPolicy)}
@@ -801,14 +970,18 @@ function AdminPage() {
 
                 <AdminPolicyList
                   policies={policies.filter((p) => {
+                    if (!showDeletedPolicies && p.deletedAt) return false
                     if (!selectedCompanyId) return true
                     if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
                     return p.companyId === selectedCompanyId
                   })}
                   documents={documents}
+                  companyUsers={companyUsers}
+                  policyUsers={policyUsers}
                   companies={companies}
                   individualClients={individualClients}
                   onReload={reload}
+                  showDeletedPolicies={showDeletedPolicies}
                 />
               </div>
             )}
@@ -2459,7 +2632,6 @@ function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClien
     if (e.target.value !== 'company') return
     e.target.value = 'individual' // reset immediately
 
-    const hasPolicies = true // we don't have the count here, warn generically
     const authWarning = client.authUserId ? '\n⚠️ Este cliente tem acesso ao Adler One — o acesso será desligado.' : ''
     if (!confirm(`Converter "${client.fullName}" para Empresa?\n\nIsso irá:\n• Criar um registo de Empresa\n• Mover as apólices associadas\n• Apagar o registo de cliente individual${authWarning}`)) return
 
@@ -2936,129 +3108,464 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const POLICY_STATUS_LABEL: Record<string, string> = {
-  active: 'Ativa', ativa: 'Ativa',
-  expiring: 'A Renovar',
-  expired: 'Expirada', expirada: 'Expirada',
-  cancelled: 'Cancelada', cancelada: 'Cancelada',
+  active: 'Ativa',
+  ativa: 'Ativa',
+  expiring: 'Renovação',
+  renovacao: 'Renovação',
+  'renovação': 'Renovação',
+  expired: 'Expirada',
+  expirada: 'Expirada',
+  cancelled: 'Cancelada',
+  cancelada: 'Cancelada',
 }
 const POLICY_STATUS_CLASS: Record<string, string> = {
-  active: 'bg-green-100 text-green-700', ativa: 'bg-green-100 text-green-700',
+  active: 'bg-green-100 text-green-700',
+  ativa: 'bg-green-100 text-green-700',
   expiring: 'bg-yellow-100 text-yellow-700',
-  expired: 'bg-red-100 text-red-700', expirada: 'bg-red-100 text-red-700',
-  cancelled: 'bg-gray-100 text-gray-600', cancelada: 'bg-gray-100 text-gray-600',
+  renovacao: 'bg-yellow-100 text-yellow-700',
+  'renovação': 'bg-yellow-100 text-yellow-700',
+  expired: 'bg-red-100 text-red-700',
+  expirada: 'bg-red-100 text-red-700',
+  cancelled: 'bg-gray-100 text-gray-600',
+  cancelada: 'bg-gray-100 text-gray-600',
 }
 
 // ─── Admin Policy List ────────────────────────────────────────────────────────
 
-function AdminPolicyList({ policies, documents, companies, individualClients, onReload }: {
+function AdminPolicyList({ policies, documents, companyUsers, policyUsers, companies, individualClients, onReload }: {
   policies: Policy[]
   documents: DocType[]
+  companyUsers: CompanyUser[]
+  policyUsers: PolicyUser[]
   companies: Company[]
   individualClients: IndividualClient[]
   onReload: () => Promise<void>
+  showDeletedPolicies: boolean
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [bulkStatus, setBulkStatus] = useState<'ativa' | 'renovacao' | 'expirada' | 'cancelada'>('renovacao')
 
   if (policies.length === 0) return <p className="text-navy-500 text-sm">Sem apólices para o filtro selecionado.</p>
 
+  const allSelected = selectedIds.length > 0 && selectedIds.length === policies.length
+
+  const docsByPolicyId = useMemo(() => {
+    const map = new Map<string, DocType[]>()
+    for (const doc of documents) {
+      if (!doc.policyId) continue
+      const list = map.get(doc.policyId) ?? []
+      list.push(doc)
+      map.set(doc.policyId, list)
+    }
+    return map
+  }, [documents])
+
+  const usersByPolicyId = useMemo(() => {
+    const usersById = new Map(companyUsers.map((user) => [user.id, user]))
+    const map = new Map<string, Array<{ user: CompanyUser; role: PolicyUser['role'] }>>()
+    for (const relation of policyUsers) {
+      const user = usersById.get(relation.userId)
+      if (!user) continue
+      const list = map.get(relation.policyId) ?? []
+      list.push({ user, role: relation.role ?? 'viewer' })
+      map.set(relation.policyId, list)
+    }
+    return map
+  }, [policyUsers, companyUsers])
+
+  const toggleSelect = (policyId: string) => {
+    setSelectedIds((current) => (
+      current.includes(policyId)
+        ? current.filter((id) => id !== policyId)
+        : [...current, policyId]
+    ))
+  }
+
+  const runBulkAction = async (action: 'status' | 'delete' | 'restore') => {
+    if (selectedIds.length === 0) return
+    await adminBulkPolicyAction({
+      data: {
+        policyIds: selectedIds,
+        action,
+        status: action === 'status' ? bulkStatus : undefined,
+      },
+    })
+    setSelectedIds([])
+    await onReload()
+  }
+
   return (
-    <div className="flex flex-col gap-3">
-      {policies.map((policy) => {
-        const clientName = companies.find(c => c.id === policy.companyId)?.name
-          ?? individualClients.find(c => c.id === policy.individualClientId)?.fullName
-          ?? '—'
-        const policyDocs = documents.filter(d => d.policyId === policy.id)
-        const availableDocs = documents
-          .filter(d => !d.policyId && (
-            (policy.companyId && d.companyId === policy.companyId) ||
-            (policy.individualClientId && !d.companyId)
-          ))
-          .map(d => ({
-            ...d,
-            clientLabel: companies.find(c => c.id === d.companyId)?.name
-              ?? individualClients.find(c => c.id === (d as any).individualClientId)?.fullName
-              ?? 'Sem cliente',
-          }))
-        const isEditing = editingId === policy.id
-        const isExpanded = expandedId === policy.id
+    <div className="space-y-3">
+      <div className="bg-white border border-navy-200 rounded-[4px] p-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs text-navy-500">Selecionadas: {selectedIds.length}</span>
+        <select
+          value={bulkStatus}
+          onChange={(e) => setBulkStatus(e.target.value as any)}
+          className="text-xs border border-navy-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gold-400"
+        >
+          <option value="ativa">Ativa</option>
+          <option value="renovacao">Renovação</option>
+          <option value="expirada">Expirada</option>
+          <option value="cancelada">Cancelada</option>
+        </select>
+        <button
+          onClick={() => runBulkAction('status')}
+          disabled={selectedIds.length === 0}
+          className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 disabled:opacity-50"
+        >
+          Atualizar Estado
+        </button>
+        <button
+          onClick={() => runBulkAction('delete')}
+          disabled={selectedIds.length === 0}
+          className="px-2.5 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
+        >
+          Eliminar em Lote
+        </button>
+        <button
+          onClick={() => runBulkAction('restore')}
+          disabled={selectedIds.length === 0}
+          className="px-2.5 py-1 text-xs border border-green-300 text-green-700 rounded hover:bg-green-50 disabled:opacity-50"
+        >
+          Recuperar em Lote
+        </button>
+      </div>
 
-        return (
-          <div key={policy.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-            {/* Summary row */}
-            <div className="flex items-center gap-3 px-4 py-3">
-              <button onClick={() => setExpandedId(isExpanded ? null : policy.id)} className="text-navy-400 hover:text-navy-600 text-xs">
-                {isExpanded ? '▾' : '▸'}
-              </button>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-semibold text-navy-700">{POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${POLICY_STATUS_CLASS[policy.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                    {POLICY_STATUS_LABEL[policy.status] ?? policy.status}
-                  </span>
-                  <span className="text-xs text-navy-500">{clientName}</span>
-                  <span className="text-xs text-navy-400">{policy.insurer} · {policy.policyNumber}</span>
-                </div>
-                <p className="text-xs text-navy-400 mt-0.5">{formatCurrency(policy.annualPremium)}/ano · {formatDate(policy.endDate)}</p>
-              </div>
-              <button
-                onClick={() => setEditingId(isEditing ? null : policy.id)}
-                className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 whitespace-nowrap"
-              >
-                {isEditing ? 'Cancelar' : 'Editar'}
-              </button>
-            </div>
+      <div className="bg-white rounded-[4px] border border-navy-200 overflow-x-auto">
+      <table className="w-full min-w-[1200px]">
+        <thead>
+          <tr className="bg-navy-50 border-b border-navy-200">
+            <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => setSelectedIds(allSelected ? [] : policies.map((policy) => policy.id))}
+                className="accent-gold-400"
+              />
+            </th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Apólice</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Cliente</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Seguradora</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Estado</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Fim</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Prémio</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Partilhas</th>
+            <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Ações</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-navy-100">
+          {policies.map((policy) => {
+            const clientName = companies.find((company) => company.id === policy.companyId)?.name
+              ?? individualClients.find((client) => client.id === policy.individualClientId)?.fullName
+              ?? '—'
+            const policyDocs = docsByPolicyId.get(policy.id) ?? []
+            const sharedUsers = usersByPolicyId.get(policy.id) ?? []
+            const companyScopedUsers = companyUsers.filter((user) => user.companyId === policy.companyId)
+            const availableDocs = documents
+              .filter((doc) => !doc.policyId && (
+                (policy.companyId && doc.companyId === policy.companyId) ||
+                (policy.individualClientId && doc.individualClientId === policy.individualClientId)
+              ))
+              .map((doc) => ({
+                ...doc,
+                clientLabel: companies.find((company) => company.id === doc.companyId)?.name
+                  ?? individualClients.find((client) => client.id === doc.individualClientId)?.fullName
+                  ?? 'Sem cliente',
+              }))
+            const isEditing = editingId === policy.id
+            const isExpanded = expandedId === policy.id
+            const isDeleted = Boolean(policy.deletedAt)
 
-            {/* Edit form */}
-            {isEditing && (
-              <div className="border-t border-navy-100 bg-navy-50/30 p-4">
-                <PolicyEditForm
-                  policy={policy}
-                  onSave={async (updates) => {
-                    await adminUpdatePolicy({ data: { id: policy.id, updates } })
-                    setEditingId(null)
-                    await onReload()
-                  }}
-                />
-              </div>
-            )}
-
-            {/* Expanded: documents */}
-            {isExpanded && !isEditing && (
-              <div className="border-t border-navy-100 bg-navy-50/30 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide">Documentos associados</p>
-                  <PolicyDocumentUpload
-                    policyId={policy.id}
-                    companyId={policy.companyId}
-                    individualClientId={policy.individualClientId}
-                    onUploaded={onReload}
-                  />
-                </div>
-                {policyDocs.length === 0
-                  ? <p className="text-xs text-navy-400 mb-3">Nenhum documento associado.</p>
-                  : <ul className="mb-3 space-y-1.5">
-                      {policyDocs.map(d => (
-                        <li key={d.id} className="text-xs text-navy-600 flex items-center gap-2 flex-wrap">
-                          <span>📄</span>
-                          <span className="font-medium">{d.name}</span>
-                          <span className="text-navy-400">· {d.category}</span>
-                          <PolicyDocumentButtons storagePath={d.blobKey} name={d.name} />
-                        </li>
-                      ))}
-                    </ul>
-                }
-                <AssociateDocumentDropdown
-                  policyId={policy.id}
-                  availableDocs={availableDocs}
-                  onAssociated={onReload}
-                />
-              </div>
-            )}
-          </div>
-        )
-      })}
+            return (
+              <Fragment key={policy.id}>
+                <tr className={`hover:bg-navy-50/50 ${isDeleted ? 'opacity-60' : ''}`}>
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(policy.id)}
+                      onChange={() => toggleSelect(policy.id)}
+                      className="accent-gold-400"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setExpandedId(isExpanded ? null : policy.id)}
+                        className="text-navy-400 hover:text-navy-600 text-xs"
+                      >
+                        {isExpanded ? '▾' : '▸'}
+                      </button>
+                      <div>
+                        <p className="text-sm font-semibold text-navy-700">{POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type}</p>
+                        <p className="text-xs text-navy-500">{policy.policyNumber}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-navy-600">{clientName}</td>
+                  <td className="px-4 py-3 text-sm text-navy-600">{policy.insurer}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${POLICY_STATUS_CLASS[policy.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {POLICY_STATUS_LABEL[policy.status] ?? policy.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-navy-600">{formatDate(policy.endDate)}</td>
+                  <td className="px-4 py-3 text-sm text-navy-700 font-semibold">{formatCurrency(policy.annualPremium)}</td>
+                  <td className="px-4 py-3 text-sm text-navy-500">{sharedUsers.length}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      <a
+                        href={`/admin/policies/${policy.id}`}
+                        className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                      >
+                        Abrir
+                      </a>
+                      <button
+                        disabled={isDeleted}
+                        onClick={() => setEditingId(isEditing ? null : policy.id)}
+                        className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 disabled:opacity-50"
+                      >
+                        {isEditing ? 'Cancelar' : 'Editar'}
+                      </button>
+                      {isDeleted ? (
+                        <button
+                          onClick={async () => {
+                            await adminRestorePolicy({ data: { id: policy.id } })
+                            await onReload()
+                          }}
+                          className="px-2.5 py-1 text-xs border border-green-300 text-green-700 rounded hover:bg-green-50"
+                        >
+                          Recuperar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Eliminar a apólice ${policy.policyNumber}? A apólice poderá ser recuperada posteriormente.`)) return
+                            await adminDeletePolicy({ data: { id: policy.id } })
+                            if (expandedId === policy.id) setExpandedId(null)
+                            if (editingId === policy.id) setEditingId(null)
+                            await onReload()
+                          }}
+                          className="px-2.5 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                        >
+                          Eliminar
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setExpandedId(isExpanded ? null : policy.id)}
+                        className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                      >
+                        {isExpanded ? 'Fechar' : 'Detalhes'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+                {isEditing && (
+                  <tr>
+                    <td colSpan={9} className="border-t border-navy-100 bg-navy-50/30 p-4">
+                      <PolicyEditForm
+                        policy={policy}
+                        onSave={async (updates) => {
+                          await adminUpdatePolicy({ data: { id: policy.id, updates } })
+                          setEditingId(null)
+                          await onReload()
+                        }}
+                      />
+                    </td>
+                  </tr>
+                )}
+                {isExpanded && !isEditing && (
+                  <tr>
+                    <td colSpan={9} className="border-t border-navy-100 bg-navy-50/30 p-4">
+                      <div className="grid lg:grid-cols-3 gap-4">
+                        <div className="bg-white border border-navy-200 rounded-[4px] p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide">Documentos da apólice</p>
+                            <PolicyDocumentUpload
+                              policyId={policy.id}
+                              companyId={policy.companyId}
+                              individualClientId={policy.individualClientId}
+                              onUploaded={onReload}
+                            />
+                          </div>
+                          {policyDocs.length === 0
+                            ? <p className="text-xs text-navy-400 mb-3">Nenhum documento associado.</p>
+                            : <ul className="mb-3 space-y-1.5">
+                                {policyDocs.map((doc) => (
+                                  <li key={doc.id} className="text-xs text-navy-600 flex items-center gap-2 flex-wrap">
+                                    <span className="font-medium">{doc.name}</span>
+                                    <span className="text-navy-400">· {doc.category}</span>
+                                    <PolicyDocumentButtons storagePath={doc.blobKey} name={doc.name} />
+                                  </li>
+                                ))}
+                              </ul>
+                          }
+                          <AssociateDocumentDropdown
+                            policyId={policy.id}
+                            availableDocs={availableDocs}
+                            onAssociated={onReload}
+                          />
+                        </div>
+                        <div className="bg-white border border-navy-200 rounded-[4px] p-4">
+                          <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide mb-2">Partilha de Apólice</p>
+                          <PolicyShareManager
+                            policyId={policy.id}
+                            users={companyScopedUsers}
+                            selectedAssignments={sharedUsers.map((item) => ({ userId: item.user.id, role: item.role }))}
+                            onSaved={onReload}
+                            disabled={isDeleted}
+                          />
+                        </div>
+                        <div className="bg-white border border-navy-200 rounded-[4px] p-4">
+                          <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide mb-2">Histórico</p>
+                          <PolicyAuditTrail policyId={policy.id} />
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
+            )
+          })}
+        </tbody>
+      </table>
+      </div>
     </div>
+  )
+}
+
+function PolicyShareManager({
+  policyId,
+  users,
+  selectedAssignments,
+  onSaved,
+  disabled,
+}: {
+  policyId: string
+  users: CompanyUser[]
+  selectedAssignments: Array<{ userId: string; role: PolicyUser['role'] }>
+  onSaved: () => Promise<void>
+  disabled?: boolean
+}) {
+  const [selected, setSelected] = useState<Array<{ userId: string; role: PolicyUser['role'] }>>(selectedAssignments)
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setSelected(selectedAssignments)
+  }, [selectedAssignments])
+
+  const toggleUser = (userId: string) => {
+    setSelected((current) => {
+      const exists = current.some((entry) => entry.userId === userId)
+      if (exists) return current.filter((entry) => entry.userId !== userId)
+      return [...current, { userId, role: 'viewer' }]
+    })
+  }
+
+  const updateRole = (userId: string, role: PolicyUser['role']) => {
+    setSelected((current) => current.map((entry) => entry.userId === userId ? { ...entry, role } : entry))
+  }
+
+  if (users.length === 0) {
+    return <p className="text-xs text-navy-400">Sem utilizadores disponíveis para partilha.</p>
+  }
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        disabled={disabled}
+        className="px-3 py-1.5 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50"
+      >
+        {open ? 'Fechar Partilha' : 'Partilhar apólice'}
+      </button>
+      {open && (
+        <>
+      <div className="mt-3 max-h-40 overflow-y-auto border border-navy-200 rounded-[2px] p-2 space-y-1.5">
+        {users.map((user) => {
+          const assignment = selected.find((entry) => entry.userId === user.id)
+          return (
+            <div key={user.id} className="flex items-center gap-2 text-xs text-navy-600">
+              <input
+                type="checkbox"
+                checked={Boolean(assignment)}
+                onChange={() => toggleUser(user.id)}
+                className="accent-gold-400"
+              />
+              <span>{user.name}</span>
+              <span className="text-navy-400">({user.email})</span>
+              {assignment && (
+                <select
+                  value={assignment.role}
+                  onChange={(e) => updateRole(user.id, e.target.value as PolicyUser['role'])}
+                  className="ml-auto border border-navy-200 rounded px-1 py-0.5 text-xs"
+                >
+                  <option value="owner">owner</option>
+                  <option value="editor">editor</option>
+                  <option value="viewer">viewer</option>
+                </select>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <button
+          disabled={saving || disabled}
+          onClick={async () => {
+            setSaving(true)
+            await adminSetPolicyUsers({ data: { policyId, assignments: selected } })
+            setSaving(false)
+            await onSaved()
+          }}
+          className="px-3 py-1.5 text-xs bg-navy-700 text-white rounded hover:bg-navy-600 disabled:opacity-50"
+        >
+          {saving ? 'A guardar...' : 'Guardar Partilha'}
+        </button>
+        <p className="text-xs text-navy-400">{selected.length} utilizador(es) selecionados</p>
+      </div>
+      </>
+      )}
+    </div>
+  )
+}
+
+function PolicyAuditTrail({ policyId }: { policyId: string }) {
+  const [items, setItems] = useState<PolicyAuditTrailEntry[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    fetchPolicyAuditTrail({ data: { policyId, limit: 30 } })
+      .then((data) => {
+        if (active) setItems(data ?? [])
+      })
+      .catch((error) => {
+        console.error('[fetchPolicyAuditTrail] error:', error)
+        if (active) setItems([])
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+    return () => { active = false }
+  }, [policyId])
+
+  if (loading) return <p className="text-xs text-navy-400">A carregar histórico...</p>
+  if (items.length === 0) return <p className="text-xs text-navy-400">Sem histórico.</p>
+
+  return (
+    <ul className="space-y-2 max-h-64 overflow-auto">
+      {items.map((item) => (
+        <li key={item.id} className="text-xs text-navy-600 border border-navy-100 rounded p-2">
+          <p className="font-semibold">{item.action} · {item.entity}</p>
+          <p className="text-navy-400">{formatDate(item.timestamp)} · user: {item.userId}</p>
+        </li>
+      ))}
+    </ul>
   )
 }
 
@@ -3262,7 +3769,7 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
           <label className={lbl}>Estado</label>
           <select value={form.status} onChange={e => u('status', e.target.value)} className={inp}>
             {Object.entries(POLICY_STATUS_LABEL)
-              .filter(([k]) => ['active','expiring','expired','cancelled'].includes(k))
+              .filter(([k]) => ['ativa', 'renovacao', 'expirada', 'cancelada'].includes(k))
               .map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </div>

@@ -18,11 +18,29 @@ export interface CompanyUser {
   email: string
   role: 'owner' | 'manager' | 'employee'
   accessPassword: string
-  identityStatus?: 'pending_confirmation' | 'confirmed' | 'already_registered' | 'not_found'
+  identityStatus?: 'pending_confirmation' | 'confirmed' | 'already_registered' | 'not_found' | 'active' | 'inactive'
   invitationSentAt?: string
   lastLoginAt?: string
   createdAt: string
   updatedAt?: string
+}
+
+export interface PolicyUser {
+  policyId: string
+  userId: string
+  role: 'owner' | 'editor' | 'viewer'
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface PolicyAuditTrailEntry {
+  id: string
+  policyId: string
+  userId: string
+  action: 'create' | 'update' | 'delete' | 'share' | 'upload'
+  entity: string
+  timestamp: string
+  changes: Record<string, any>
 }
 
 export interface UserMetricEvent {
@@ -55,8 +73,9 @@ export interface Policy {
   endDate: string
   annualPremium: number
   insuredValue: number
-  status: 'active' | 'expiring' | 'expired' | 'cancelled'
+  status: 'active' | 'expiring' | 'expired' | 'cancelled' | 'ativa' | 'renovacao' | 'expirada' | 'cancelada'
   createdAt: string
+  deletedAt?: string | null
   documentKey?: string
   deductible?: number
   coverages?: string[]
@@ -143,6 +162,7 @@ export interface ClaimStep {
 export interface Document {
   id: string
   companyId: string
+  individualClientId?: string
   name: string
   category: DocumentCategory
   size: number
