@@ -179,6 +179,73 @@ export interface Alert {
   createdAt: string
 }
 
+export type NotificationType = 'renewal_due_soon' | 'claim_updated' | 'missing_document'
+export type NotificationSeverity = 'info' | 'warning' | 'critical'
+export type NotificationEntityType = 'policy' | 'claim' | 'document'
+
+export interface BackendNotificationItem {
+  id: string
+  type: NotificationType
+  severity: NotificationSeverity
+  title: string
+  message: string
+  companyId?: string
+  companyName?: string
+  userId?: string
+  entityType: NotificationEntityType
+  entityId: string
+  policyId?: string
+  claimId?: string
+  dueDate?: string
+  createdAt: string
+  requiresAction: boolean
+  metadata?: Record<string, string | number | boolean | null>
+}
+
+export interface NotificationsResponse {
+  generatedAt: string
+  total: number
+  byType: Record<NotificationType, number>
+  items: BackendNotificationItem[]
+}
+
+export type TaskCategory = 'renewal' | 'document' | 'claim'
+export type TaskPriority = 'high' | 'medium' | 'low'
+export type TaskStatus = 'pending' | 'in_progress'
+
+export interface BackendTaskItem {
+  id: string
+  category: TaskCategory
+  title: string
+  description: string
+  priority: TaskPriority
+  status: TaskStatus
+  companyId?: string
+  companyName?: string
+  assignedUserId?: string
+  policyId?: string
+  claimId?: string
+  dueDate?: string
+  createdAt: string
+  metadata?: Record<string, string | number | boolean | null>
+}
+
+export interface TaskAggregationResponse {
+  generatedAt: string
+  total: number
+  byCategory: Record<TaskCategory, number>
+  byCompany: Array<{
+    companyId: string
+    companyName: string
+    total: number
+  }>
+  byUser: Array<{
+    userId: string
+    total: number
+  }>
+  tasks: BackendTaskItem[]
+}
+
 export interface DashboardStats {
   activePolicies: number
   annualPremiums: number

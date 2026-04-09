@@ -9,6 +9,11 @@ import type {
   RenewalAlertItem,
   RenewalAlertHistoryItem,
   RenewalAlertStatus,
+  NotificationsResponse,
+  BackendNotificationItem,
+  TaskAggregationResponse,
+  BackendTaskItem,
+  TaskPriority,
 } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
@@ -498,6 +503,42 @@ async function readRenewalAlertStateMap() {
   return stateMap
 }
 
+async function readRenewalAlertStateByKeys(alertKeys: string[]) {
+  if (alertKeys.length === 0) return {}
+
+  const { data, error } = await supabaseAdmin
+    .from('renewal_alerts_state')
+    .select('alert_key, policy_id, status, assigned_to, next_action, updated_at')
+    .in('alert_key', alertKeys)
+
+  if (error) {
+    console.error('[readRenewalAlertStateByKeys] supabase error:', error)
+    return {}
+  }
+
+  const stateMap: Record<string, RenewalAlertStateRecord> = {}
+  for (const row of data ?? []) {
+    const alertKey = typeof row.alert_key === 'string' ? row.alert_key : ''
+    if (!alertKey) continue
+
+    const status = row.status as RenewalAlertStatus
+    const normalizedStatus: RenewalAlertStatus =
+      status === 'pendente' || status === 'tratado' || status === 'em_negociacao' || status === 'renovado'
+        ? status
+        : DEFAULT_RENEWAL_ALERT_STATUS
+    stateMap[alertKey] = {
+      key: alertKey,
+      policyId: typeof row.policy_id === 'string' ? row.policy_id : null,
+      status: normalizedStatus,
+      assignedTo: normalizeOptionalText(row.assigned_to),
+      nextAction: normalizeOptionalText(row.next_action),
+      updatedAt: typeof row.updated_at === 'string' ? row.updated_at : new Date().toISOString(),
+    }
+  }
+
+  return stateMap
+}
+
 async function readRenewalAlertHistoryMap(alertKeys: string[]) {
   if (alertKeys.length === 0) return {}
 
@@ -567,6 +608,343 @@ function getUtcDayDiff(targetDate: Date, todayUtc: Date): number {
   const MS_PER_DAY = 24 * 60 * 60 * 1000
   return Math.round((targetDate.getTime() - todayUtc.getTime()) / MS_PER_DAY)
 }
+
+const CLAIM_FINAL_STATUSES = new Set(['approved', 'denied', 'paid'])
+
+function getTaskPriorityFromRenewalDays(daysUntilRenewal: number): TaskPriority {
+  if (daysUntilRenewal <= 30) return 'high'
+  if (daysUntilRenewal <= 60) return 'medium'
+  return 'low'
+}
+
+function getTaskPriorityFromClaimStatus(status: string): TaskPriority {
+  if (status === 'documentation' || status === 'assessment') return 'high'
+  if (status === 'under_review') return 'medium'
+  return 'low'
+}
+
+function latestClaimUpdateDate(claim: Awaited<ReturnType<typeof db.getClaims>>[number]): string {
+  const latestStepDate = claim.steps
+    .map((step) => step.date)
+    .filter((date): date is string => typeof date === 'string' && date.length >= 10)
+    .sort((a, b) => b.localeCompare(a))[0]
+
+  return latestStepDate ?? claim.claimDate ?? claim.createdAt
+}
+
+function severityRank(value: BackendNotificationItem['severity']): number {
+  if (value === 'critical') return 0
+  if (value === 'warning') return 1
+  return 2
+}
+
+function taskPriorityRank(value: TaskPriority): number {
+  if (value === 'high') return 0
+  if (value === 'medium') return 1
+  return 2
+}
+
+async function buildNotificationsAndTasks(
+  scope: { companyId: string | null; userId: string },
+): Promise<{ notifications: NotificationsResponse; tasks: TaskAggregationResponse }> {
+  const nowIso = new Date().toISOString()
+  const todayUtc = startOfUtcDay(new Date())
+  const [policies, claims, documents, companies] = await Promise.all([
+    db.getPolicies(scope.companyId ?? undefined),
+    db.getClaims(scope.companyId ?? undefined),
+    db.getDocuments(scope.companyId ?? undefined),
+    scope.companyId
+      ? db.getCompany(scope.companyId).then((company) => (company ? [company] : []))
+      : db.getCompanies(),
+  ])
+
+  const companyById = new Map(companies.map((company) => [company.id, company]))
+  const policyDocumentSet = new Set(
+    documents
+      .map((document) => document.policyId)
+      .filter((policyId): policyId is string => typeof policyId === 'string' && policyId.trim().length > 0),
+  )
+
+  const renewalCandidates: Array<{
+    policy: Awaited<ReturnType<typeof db.getPolicies>>[number]
+    renewalDateIso: string
+    daysUntilRenewal: number
+    urgency: 30 | 60 | 90
+    alertKey: string
+  }> = []
+
+  for (const policy of policies) {
+    if (!['active', 'expiring'].includes(policy.status)) continue
+    const startDate = parseDateToUtc(policy.startDate)
+    if (!startDate) continue
+
+    const renewalDate = computeUpcomingRenewalDate(startDate, todayUtc)
+    const daysUntilRenewal = getUtcDayDiff(renewalDate, todayUtc)
+    if (!RENEWAL_ALERT_DAYS.includes(daysUntilRenewal as (typeof RENEWAL_ALERT_DAYS)[number])) continue
+
+    const urgency = daysUntilRenewal as 30 | 60 | 90
+    const renewalDateIso = renewalDate.toISOString().slice(0, 10)
+    const alertKey = `${policy.id}:${urgency}:${renewalDateIso}`
+    renewalCandidates.push({
+      policy,
+      renewalDateIso,
+      daysUntilRenewal,
+      urgency,
+      alertKey,
+    })
+  }
+
+  const renewalStateMap = await readRenewalAlertStateByKeys(renewalCandidates.map((item) => item.alertKey))
+
+  const notifications: BackendNotificationItem[] = []
+  const tasks: BackendTaskItem[] = []
+
+  for (const item of renewalCandidates) {
+    const company = item.policy.companyId ? companyById.get(item.policy.companyId) : undefined
+    const state = renewalStateMap[item.alertKey]
+    const renewalStatus = state?.status ?? DEFAULT_RENEWAL_ALERT_STATUS
+    const isPendingRenewalAction = renewalStatus === 'pendente' || renewalStatus === 'em_negociacao'
+    const severity: BackendNotificationItem['severity'] = item.daysUntilRenewal <= 30 ? 'critical' : 'warning'
+
+    notifications.push({
+      id: `notif:renewal:${item.alertKey}`,
+      type: 'renewal_due_soon',
+      severity,
+      title: `Renovação próxima: ${item.policy.policyNumber}`,
+      message: `A apólice ${item.policy.policyNumber} vence em ${item.daysUntilRenewal} dias.`,
+      companyId: item.policy.companyId || undefined,
+      companyName: company?.name,
+      userId: scope.userId,
+      entityType: 'policy',
+      entityId: item.policy.id,
+      policyId: item.policy.id,
+      dueDate: item.renewalDateIso,
+      createdAt: nowIso,
+      requiresAction: isPendingRenewalAction,
+      metadata: {
+        insurer: item.policy.insurer,
+        status: renewalStatus,
+        urgency: item.urgency,
+      },
+    })
+
+    if (!isPendingRenewalAction) continue
+    tasks.push({
+      id: `task:renewal:${item.alertKey}`,
+      category: 'renewal',
+      title: `Tratar renovação da apólice ${item.policy.policyNumber}`,
+      description: `Renovação em ${item.daysUntilRenewal} dias com seguradora ${item.policy.insurer}.`,
+      priority: getTaskPriorityFromRenewalDays(item.daysUntilRenewal),
+      status: renewalStatus === 'em_negociacao' ? 'in_progress' : 'pending',
+      companyId: item.policy.companyId || undefined,
+      companyName: company?.name,
+      assignedUserId: scope.userId,
+      policyId: item.policy.id,
+      dueDate: item.renewalDateIso,
+      createdAt: nowIso,
+      metadata: {
+        renewalStatus,
+        annualPremium: item.policy.annualPremium,
+      },
+    })
+  }
+
+  for (const claim of claims) {
+    const company = claim.companyId ? companyById.get(claim.companyId) : undefined
+    const lastUpdateDate = latestClaimUpdateDate(claim)
+    const parsedLastUpdateDate = parseDateToUtc(lastUpdateDate.slice(0, 10))
+    const daysFromLastUpdate = parsedLastUpdateDate ? Math.abs(getUtcDayDiff(todayUtc, parsedLastUpdateDate)) : null
+    const isRecentlyUpdated = daysFromLastUpdate !== null && daysFromLastUpdate <= 14
+
+    if (isRecentlyUpdated) {
+      const severity: BackendNotificationItem['severity'] =
+        claim.status === 'documentation' || claim.status === 'assessment' ? 'warning' : 'info'
+      notifications.push({
+        id: `notif:claim:${claim.id}:${lastUpdateDate.slice(0, 10)}`,
+        type: 'claim_updated',
+        severity,
+        title: `Sinistro atualizado: ${claim.title}`,
+        message: `O sinistro ${claim.title} foi atualizado para o estado ${claim.status}.`,
+        companyId: claim.companyId || undefined,
+        companyName: company?.name,
+        userId: scope.userId,
+        entityType: 'claim',
+        entityId: claim.id,
+        claimId: claim.id,
+        policyId: claim.policyId,
+        dueDate: lastUpdateDate.slice(0, 10),
+        createdAt: nowIso,
+        requiresAction: !CLAIM_FINAL_STATUSES.has(claim.status),
+        metadata: {
+          claimStatus: claim.status,
+          estimatedValue: claim.estimatedValue,
+        },
+      })
+    }
+
+    if (CLAIM_FINAL_STATUSES.has(claim.status)) continue
+    tasks.push({
+      id: `task:claim:${claim.id}`,
+      category: 'claim',
+      title: `Acompanhar sinistro ${claim.title}`,
+      description: `Sinistro em estado ${claim.status}.`,
+      priority: getTaskPriorityFromClaimStatus(claim.status),
+      status: claim.status === 'under_review' || claim.status === 'assessment' ? 'in_progress' : 'pending',
+      companyId: claim.companyId || undefined,
+      companyName: company?.name,
+      assignedUserId: scope.userId,
+      policyId: claim.policyId,
+      claimId: claim.id,
+      dueDate: lastUpdateDate.slice(0, 10),
+      createdAt: nowIso,
+      metadata: {
+        claimStatus: claim.status,
+      },
+    })
+  }
+
+  for (const policy of policies) {
+    if (!['active', 'expiring'].includes(policy.status)) continue
+
+    const hasDocument = Boolean(policy.documentKey) || policyDocumentSet.has(policy.id)
+    if (hasDocument) continue
+
+    const company = policy.companyId ? companyById.get(policy.companyId) : undefined
+    const dueDate = policy.endDate || policy.renewalDate || undefined
+    const dueDateCandidate = dueDate ? parseDateToUtc(dueDate) : null
+    const daysUntilDue = dueDateCandidate ? getUtcDayDiff(dueDateCandidate, todayUtc) : 999
+    const severity: BackendNotificationItem['severity'] = daysUntilDue <= 30 ? 'critical' : 'warning'
+
+    notifications.push({
+      id: `notif:document:${policy.id}`,
+      type: 'missing_document',
+      severity,
+      title: `Documento em falta na apólice ${policy.policyNumber}`,
+      message: `A apólice ${policy.policyNumber} não tem documentação associada.`,
+      companyId: policy.companyId || undefined,
+      companyName: company?.name,
+      userId: scope.userId,
+      entityType: 'document',
+      entityId: policy.id,
+      policyId: policy.id,
+      dueDate,
+      createdAt: nowIso,
+      requiresAction: true,
+      metadata: {
+        insurer: policy.insurer,
+      },
+    })
+
+    tasks.push({
+      id: `task:document:${policy.id}`,
+      category: 'document',
+      title: `Associar documentação da apólice ${policy.policyNumber}`,
+      description: `Sem documento associado para a apólice ${policy.policyNumber}.`,
+      priority: daysUntilDue <= 30 ? 'high' : 'medium',
+      status: 'pending',
+      companyId: policy.companyId || undefined,
+      companyName: company?.name,
+      assignedUserId: scope.userId,
+      policyId: policy.id,
+      dueDate,
+      createdAt: nowIso,
+      metadata: {
+        insurer: policy.insurer,
+      },
+    })
+  }
+
+  notifications.sort((a, b) => {
+    const bySeverity = severityRank(a.severity) - severityRank(b.severity)
+    if (bySeverity !== 0) return bySeverity
+    const aDue = a.dueDate ?? '9999-12-31'
+    const bDue = b.dueDate ?? '9999-12-31'
+    if (aDue !== bDue) return aDue.localeCompare(bDue)
+    return a.id.localeCompare(b.id)
+  })
+
+  tasks.sort((a, b) => {
+    const byPriority = taskPriorityRank(a.priority) - taskPriorityRank(b.priority)
+    if (byPriority !== 0) return byPriority
+    const aDue = a.dueDate ?? '9999-12-31'
+    const bDue = b.dueDate ?? '9999-12-31'
+    if (aDue !== bDue) return aDue.localeCompare(bDue)
+    return a.id.localeCompare(b.id)
+  })
+
+  const notificationByType: NotificationsResponse['byType'] = {
+    renewal_due_soon: 0,
+    claim_updated: 0,
+    missing_document: 0,
+  }
+  for (const item of notifications) {
+    notificationByType[item.type] += 1
+  }
+
+  const taskByCategory: TaskAggregationResponse['byCategory'] = {
+    renewal: 0,
+    document: 0,
+    claim: 0,
+  }
+  for (const item of tasks) {
+    taskByCategory[item.category] += 1
+  }
+
+  const byCompanyMap = new Map<string, { companyId: string; companyName: string; total: number }>()
+  for (const task of tasks) {
+    const companyId = task.companyId || '__individual__'
+    const companyName = task.companyName || 'Cliente individual'
+    const current = byCompanyMap.get(companyId)
+    if (current) {
+      current.total += 1
+      continue
+    }
+    byCompanyMap.set(companyId, { companyId, companyName, total: 1 })
+  }
+
+  const notificationsResponse: NotificationsResponse = {
+    generatedAt: nowIso,
+    total: notifications.length,
+    byType: notificationByType,
+    items: notifications,
+  }
+
+  const tasksResponse: TaskAggregationResponse = {
+    generatedAt: nowIso,
+    total: tasks.length,
+    byCategory: taskByCategory,
+    byCompany: Array.from(byCompanyMap.values()).sort((a, b) => b.total - a.total),
+    byUser: [{ userId: scope.userId, total: tasks.length }],
+    tasks,
+  }
+
+  return {
+    notifications: notificationsResponse,
+    tasks: tasksResponse,
+  }
+}
+
+export const fetchNotifications = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async (): Promise<NotificationsResponse> => {
+    const viewerScope = await getViewerScope()
+    const { notifications } = await buildNotificationsAndTasks({
+      companyId: viewerScope.companyId,
+      userId: viewerScope.user.id,
+    })
+    return notifications
+  })
+
+export const fetchTaskAggregation = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async (): Promise<TaskAggregationResponse> => {
+    const viewerScope = await getViewerScope()
+    const { tasks } = await buildNotificationsAndTasks({
+      companyId: viewerScope.companyId,
+      userId: viewerScope.user.id,
+    })
+    return tasks
+  })
 
 export const getRenewalAlerts = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
