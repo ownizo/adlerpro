@@ -4,7 +4,7 @@ import { fetchPolicies, createPolicy, updatePolicy, deletePolicy } from '@/lib/s
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Policy } from '@/lib/types'
 import { POLICY_TYPE_LABELS } from '@/lib/types'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { getServerUser } from '@/lib/auth'
 import { useTranslation } from 'react-i18next'
 
@@ -18,16 +18,16 @@ export const Route = createFileRoute('/policies')({
 })
 
 const POLICY_TYPE_COLORS: Record<string, { bg: string; text: string; dot: string; border: string }> = {
-  auto:                  { bg: '#EFF6FF', text: '#1D4ED8', dot: '#3B82F6', border: '#BFDBFE' },
-  health:                { bg: '#F0FDF4', text: '#166534', dot: '#22C55E', border: '#BBF7D0' },
-  property:              { bg: '#FFF7ED', text: '#9A3412', dot: '#F97316', border: '#FED7AA' },
-  liability:             { bg: '#FDF4FF', text: '#7E22CE', dot: '#A855F7', border: '#E9D5FF' },
-  workers_comp:          { bg: '#FFF1F2', text: '#9F1239', dot: '#F43F5E', border: '#FECDD3' },
-  cyber:                 { bg: '#F0F9FF', text: '#0C4A6E', dot: '#0EA5E9', border: '#BAE6FD' },
-  directors_officers:    { bg: '#FAFAF9', text: '#44403C', dot: '#78716C', border: '#E7E5E4' },
+  auto: { bg: '#EFF6FF', text: '#1D4ED8', dot: '#3B82F6', border: '#BFDBFE' },
+  health: { bg: '#F0FDF4', text: '#166534', dot: '#22C55E', border: '#BBF7D0' },
+  property: { bg: '#FFF7ED', text: '#9A3412', dot: '#F97316', border: '#FED7AA' },
+  liability: { bg: '#FDF4FF', text: '#7E22CE', dot: '#A855F7', border: '#E9D5FF' },
+  workers_comp: { bg: '#FFF1F2', text: '#9F1239', dot: '#F43F5E', border: '#FECDD3' },
+  cyber: { bg: '#F0F9FF', text: '#0C4A6E', dot: '#0EA5E9', border: '#BAE6FD' },
+  directors_officers: { bg: '#FAFAF9', text: '#44403C', dot: '#78716C', border: '#E7E5E4' },
   business_interruption: { bg: '#FFFBEB', text: '#92400E', dot: '#F59E0B', border: '#FDE68A' },
-  life:                  { bg: '#F0FDF4', text: '#14532D', dot: '#16A34A', border: '#BBF7D0' },
-  other:                 { bg: '#F8F8F8', text: '#444444', dot: '#999999', border: '#E5E5E5' },
+  life: { bg: '#F0FDF4', text: '#14532D', dot: '#16A34A', border: '#BBF7D0' },
+  other: { bg: '#F8F8F8', text: '#444444', dot: '#999999', border: '#E5E5E5' },
 }
 
 const POLICY_TYPE_ICONS: Record<string, string> = {
@@ -36,10 +36,18 @@ const POLICY_TYPE_ICONS: Record<string, string> = {
   business_interruption: '🏭', life: '❤️', other: '📋',
 }
 
+type PortfolioHealthFilter = 'all' | 'active' | 'renewal' | 'critical'
+
+type RiskLevel = 'low' | 'medium' | 'high'
+
 function daysUntil(dateStr: string): number {
   const now = new Date(); now.setHours(0, 0, 0, 0)
   const target = new Date(dateStr); target.setHours(0, 0, 0, 0)
   return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+}
+
+function getRenewalDays(policy: Policy): number {
+  return daysUntil(policy.renewalDate || policy.endDate)
 }
 
 function statusLabel(s: string, t: (k: string) => string): string {
@@ -48,6 +56,45 @@ function statusLabel(s: string, t: (k: string) => string): string {
     expired: t('policies.statusExpired'), cancelled: t('policies.statusCancelled'),
   }
   return m[s] || s
+}
+
+function getRiskLevel(policy: Policy): RiskLevel {
+  const days = getRenewalDays(policy)
+  const premium = policy.annualPremium || 0
+  if (policy.status === 'expired' || days <= 15 || (days <= 30 && premium >= 10000)) return 'high'
+  if (policy.status === 'expiring' || days <= 60 || premium >= 20000) return 'medium'
+  return 'low'
+}
+
+function getPriorityScore(policy: Policy): number {
+  const days = getRenewalDays(policy)
+  const premium = Math.max(0, policy.annualPremium || 0)
+  const urgencyMultiplier = days <= 0
+    ? 2.5
+    : days <= 15
+      ? 2.2
+      : days <= 30
+        ? 1.8
+        : days <= 60
+          ? 1.45
+          : days <= 90
+            ? 1.2
+            : 1
+
+  const statusBoost = policy.status === 'expiring' ? 8000 : policy.status === 'expired' ? 12000 : 0
+  const daysBoost = days > 0 ? Math.max(0, 400 - days) : 450
+
+  return premium * urgencyMultiplier + statusBoost + daysBoost
+}
+
+function compareByPriority(a: Policy, b: Policy): number {
+  const scoreDiff = getPriorityScore(b) - getPriorityScore(a)
+  if (scoreDiff !== 0) return scoreDiff
+
+  const daysDiff = getRenewalDays(a) - getRenewalDays(b)
+  if (daysDiff !== 0) return daysDiff
+
+  return (a.policyNumber || '').localeCompare(b.policyNumber || '')
 }
 
 const inputStyle: React.CSSProperties = {
@@ -77,12 +124,59 @@ function StatusBadge({ status }: { status: string }) {
   return <span style={{ display: 'inline-block', fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 600, padding: '0.15rem 0.5rem', borderRadius: '20px', background: s.bg, color: s.color }}>{statusLabel(status, t)}</span>
 }
 
+function RiskBadge({ level, t }: { level: RiskLevel; t: (k: string) => string }) {
+  const map: Record<RiskLevel, { bg: string; color: string; label: string }> = {
+    high: { bg: '#FEE2E2', color: '#B91C1C', label: t('policies.riskHigh') },
+    medium: { bg: '#FEF3C7', color: '#B45309', label: t('policies.riskMedium') },
+    low: { bg: '#DCFCE7', color: '#166534', label: t('policies.riskLow') },
+  }
+  const style = map[level]
+
+  return (
+    <span style={{ display: 'inline-block', fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, padding: '0.18rem 0.52rem', borderRadius: '999px', background: style.bg, color: style.color }}>
+      {style.label}
+    </span>
+  )
+}
+
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.62rem', color: '#aaaaaa', margin: 0, textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{label}</p>
       <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', fontWeight: 600, color: '#333333', margin: 0 }}>{value}</p>
     </div>
+  )
+}
+
+function PortfolioPill({ active, onClick, label, value, tone }: { active: boolean; onClick: () => void; label: string; value: number; tone: 'green' | 'amber' | 'red' }) {
+  const palette = {
+    green: { bg: '#F0FDF4', border: '#BBF7D0', text: '#166534' },
+    amber: { bg: '#FFFBEB', border: '#FDE68A', text: '#92400E' },
+    red: { bg: '#FEF2F2', border: '#FECACA', text: '#991B1B' },
+  }[tone]
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        border: `1px solid ${active ? '#1f2937' : palette.border}`,
+        background: active ? '#111827' : palette.bg,
+        color: active ? '#ffffff' : palette.text,
+        borderRadius: '999px',
+        padding: '0.42rem 0.8rem',
+        fontFamily: "'Montserrat', sans-serif",
+        fontSize: '0.75rem',
+        fontWeight: 700,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '0.35rem',
+        cursor: 'pointer',
+      }}
+    >
+      <span>{label}</span>
+      <span style={{ opacity: active ? 0.95 : 0.8 }}>{value}</span>
+    </button>
   )
 }
 
@@ -97,7 +191,7 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
 }) {
   const c = POLICY_TYPE_COLORS[policy.type] || POLICY_TYPE_COLORS.other
   const icon = POLICY_TYPE_ICONS[policy.type] || '📋'
-  const days = daysUntil(policy.endDate)
+  const days = getRenewalDays(policy)
 
   return (
     <div
@@ -108,7 +202,6 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
         style={{ background: '#ffffff', borderRadius: '4px', width: '100%', maxWidth: '640px', maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header colorido */}
         <div style={{ background: c.bg, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: `1px solid ${c.border}` }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <span style={{ fontSize: '1.75rem' }}>{icon}</span>
@@ -124,7 +217,6 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
         </div>
 
         <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto' }}>
-          {/* Campos principais */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
             <DetailItem label={t('policies.policyNumber')} value={policy.policyNumber || '—'} />
             <DetailItem label={t('policies.annualPremium')} value={formatCurrency(policy.annualPremium)} />
@@ -144,7 +236,6 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
             </div>
           )}
 
-          {/* Coberturas completas */}
           {policy.coverages && policy.coverages.length > 0 && (
             <div style={{ marginBottom: '1.25rem' }}>
               <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: '0 0 0.5rem' }}>
@@ -161,7 +252,6 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
             </div>
           )}
 
-          {/* Exclusões completas */}
           {policy.exclusions && policy.exclusions.length > 0 && (
             <div style={{ marginBottom: '1.25rem' }}>
               <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#991B1B', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: '0 0 0.5rem' }}>
@@ -179,7 +269,6 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
           )}
         </div>
 
-        {/* Acções */}
         <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #eeeeee', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' as const }}>
           {policy.documentKey && (
             <a
@@ -211,7 +300,9 @@ function PoliciesPage() {
   const [loading, setLoading] = useState(true)
   const [typeFilter, setTypeFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards')
+  const [insurerFilter, setInsurerFilter] = useState('all')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [portfolioFilter, setPortfolioFilter] = useState<PortfolioHealthFilter>('all')
   const [selected, setSelected] = useState<Policy | null>(null)
   const [detailPolicy, setDetailPolicy] = useState<Policy | null>(null)
   const [showForm, setShowForm] = useState(false)
@@ -222,16 +313,54 @@ function PoliciesPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = () => { setLoading(true); fetchPolicies().then((p) => { setPolicies(p); setLoading(false) }) }
+
   useEffect(() => { load() }, [])
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setDetailPolicy(null) }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  const filtered = policies.filter((p) =>
-    (typeFilter === 'all' || p.type === typeFilter) && (statusFilter === 'all' || p.status === statusFilter)
+  const insurers = useMemo(
+    () => Array.from(new Set(policies.map((policy) => policy.insurer.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [policies],
   )
+
+  const statusCounters = useMemo(() => {
+    const active = policies.filter((policy) => policy.status === 'active').length
+    const renewal = policies.filter((policy) => policy.status === 'expiring' || (policy.status === 'active' && getRenewalDays(policy) <= 60)).length
+    const critical = policies.filter((policy) => getRiskLevel(policy) === 'high').length
+    return { active, renewal, critical }
+  }, [policies])
+
+  const sortedPolicies = useMemo(() => {
+    const normalizedSearch = searchTerm.trim().toLowerCase()
+
+    const filtered = policies.filter((policy) => {
+      if (typeFilter !== 'all' && policy.type !== typeFilter) return false
+      if (statusFilter !== 'all' && policy.status !== statusFilter) return false
+      if (insurerFilter !== 'all' && policy.insurer.trim() !== insurerFilter) return false
+
+      if (portfolioFilter === 'active' && policy.status !== 'active') return false
+      if (portfolioFilter === 'renewal' && !(policy.status === 'expiring' || (policy.status === 'active' && getRenewalDays(policy) <= 60))) return false
+      if (portfolioFilter === 'critical' && getRiskLevel(policy) !== 'high') return false
+
+      if (!normalizedSearch) return true
+
+      const searchable = [
+        policy.policyNumber,
+        policy.insurer,
+        POLICY_TYPE_LABELS[policy.type] || policy.type,
+      ]
+        .join(' ')
+        .toLowerCase()
+
+      return searchable.includes(normalizedSearch)
+    })
+
+    return filtered.sort(compareByPriority)
+  }, [policies, typeFilter, statusFilter, insurerFilter, searchTerm, portfolioFilter])
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]; if (!file) return
@@ -282,147 +411,269 @@ function PoliciesPage() {
 
   const openEdit = (p: Policy) => { setFormData(p); setEditMode(true); setShowForm(true); setSelected(p) }
 
-  const selectStyle: React.CSSProperties = { fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', padding: '0.45rem 0.75rem', border: '1px solid #dddddd', borderRadius: '4px', background: '#ffffff', color: '#333333' }
+  const selectStyle: React.CSSProperties = {
+    fontFamily: "'Montserrat', sans-serif",
+    fontSize: '0.8rem',
+    padding: '0.45rem 0.75rem',
+    border: '1px solid #dddddd',
+    borderRadius: '4px',
+    background: '#ffffff',
+    color: '#333333',
+    minWidth: '9.5rem',
+  }
+
+  const headerMetaStyle: React.CSSProperties = {
+    fontFamily: "'Montserrat', sans-serif",
+    fontSize: '0.72rem',
+    fontWeight: 600,
+    letterSpacing: '0.06em',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    marginBottom: '0.2rem',
+  }
 
   return (
     <AppLayout>
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap' as const, gap: '0.75rem' }}>
-          <div>
-            <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1.4rem', color: '#111111', margin: 0 }}>{t('policies.title')}</h1>
-            <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.85rem', color: '#888888', marginTop: '0.25rem' }}>{t(policies.length === 1 ? 'policies.subtitle_one' : 'policies.subtitle_other', { count: policies.length })}</p>
+      <div className="max-w-7xl mx-auto" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '8px', padding: '1rem 1rem 0.9rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.9rem', flexWrap: 'wrap' as const }}>
+            <div>
+              <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1.3rem', color: '#111111', margin: 0 }}>{t('policies.title')}</h1>
+              <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 400, fontSize: '0.82rem', color: '#6B7280', marginTop: '0.28rem' }}>
+                {t('policies.totalPolicies')}: <strong style={{ color: '#111111' }}>{policies.length}</strong>
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' as const }}>
+              <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: uploading ? '#cccccc' : '#C8961A', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                {uploading
+                  ? <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />{t('policies.extracting')}</>
+                  : <>{t('policies.extractViaAI')}</>}
+                <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleUpload} style={{ display: 'none' }} disabled={uploading} />
+              </label>
+              <button onClick={() => { setFormData({}); setEditMode(false); setShowForm(true) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.addManual')}</button>
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' as const }}>
-            <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: uploading ? '#cccccc' : '#C8961A', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-              {uploading
-                ? <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />{t('policies.extracting')}</>
-                : <>{t('policies.extractViaAI')}</>}
-              <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleUpload} style={{ display: 'none' }} disabled={uploading} />
-            </label>
-            <button onClick={() => { setFormData({}); setEditMode(false); setShowForm(true) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.addManual')}</button>
+
+          <div style={{ marginTop: '0.9rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.55rem' }}>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <p style={headerMetaStyle}>{t('policies.search')}</p>
+              <input
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder={t('policies.searchPlaceholder')}
+                style={{ ...inputStyle, padding: '0.58rem 0.75rem' }}
+              />
+            </div>
+
+            <div>
+              <p style={headerMetaStyle}>{t('policies.policyType')}</p>
+              <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={selectStyle}>
+                <option value="all">{t('policies.allTypes')}</option>
+                {Object.entries(POLICY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <p style={headerMetaStyle}>{t('policies.filterStatus')}</p>
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
+                <option value="all">{t('policies.allStatuses')}</option>
+                <option value="active">{t('policies.statusActive')}</option>
+                <option value="expiring">{t('policies.statusExpiring')}</option>
+                <option value="expired">{t('policies.statusExpired')}</option>
+                <option value="cancelled">{t('policies.statusCancelled')}</option>
+              </select>
+            </div>
+
+            <div>
+              <p style={headerMetaStyle}>{t('policies.insurer')}</p>
+              <select value={insurerFilter} onChange={(e) => setInsurerFilter(e.target.value)} style={selectStyle}>
+                <option value="all">{t('policies.allInsurers')}</option>
+                {insurers.map((insurer) => <option key={insurer} value={insurer}>{insurer}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '8px', padding: '0.8rem 1rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap' as const, alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', fontWeight: 700, color: '#6b7280', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>
+              {t('policies.portfolioStatus')}
+            </span>
+
+            <PortfolioPill
+              active={portfolioFilter === 'active'}
+              onClick={() => setPortfolioFilter((prev) => prev === 'active' ? 'all' : 'active')}
+              label={t('policies.activeShort')}
+              value={statusCounters.active}
+              tone="green"
+            />
+            <PortfolioPill
+              active={portfolioFilter === 'renewal'}
+              onClick={() => setPortfolioFilter((prev) => prev === 'renewal' ? 'all' : 'renewal')}
+              label={t('policies.renewalShort')}
+              value={statusCounters.renewal}
+              tone="amber"
+            />
+            <PortfolioPill
+              active={portfolioFilter === 'critical'}
+              onClick={() => setPortfolioFilter((prev) => prev === 'critical' ? 'all' : 'critical')}
+              label={t('policies.criticalShort')}
+              value={statusCounters.critical}
+              tone="red"
+            />
+
+            <button
+              type="button"
+              onClick={() => setPortfolioFilter('all')}
+              style={{ marginLeft: 'auto', fontFamily: "'Montserrat', sans-serif", border: 'none', background: 'transparent', color: '#6b7280', fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer' }}
+            >
+              {t('policies.clearStatusFilter')}
+            </button>
           </div>
         </div>
 
         {uploadError && (
-          <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.75rem 1rem', marginBottom: '1rem', fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.75rem 1rem', fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span>⚠️ {uploadError}</span>
             <button onClick={() => setUploadError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626', fontSize: '1rem' }}>×</button>
           </div>
         )}
 
-        {/* Filters + View toggle */}
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', flexWrap: 'wrap' as const, alignItems: 'center' }}>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} style={selectStyle}>
-            <option value="all">{t('policies.allTypes')}</option>
-            {Object.entries(POLICY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={selectStyle}>
-            <option value="all">{t('policies.allStatuses')}</option>
-            <option value="active">{t('policies.statusActive')}</option>
-            <option value="expiring">{t('policies.statusExpiring')}</option>
-            <option value="expired">{t('policies.statusExpired')}</option>
-            <option value="cancelled">{t('policies.statusCancelled')}</option>
-          </select>
-          <div style={{ marginLeft: 'auto', display: 'flex', border: '1px solid #dddddd', borderRadius: '4px', overflow: 'hidden' }}>
-            <button onClick={() => setViewMode('cards')} style={{ padding: '0.4rem 0.65rem', background: viewMode === 'cards' ? '#111111' : '#ffffff', color: viewMode === 'cards' ? '#ffffff' : '#666666', border: 'none', cursor: 'pointer' }}>
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
-            </button>
-            <button onClick={() => setViewMode('list')} style={{ padding: '0.4rem 0.65rem', background: viewMode === 'list' ? '#111111' : '#ffffff', color: viewMode === 'list' ? '#ffffff' : '#666666', border: 'none', cursor: 'pointer' }}>
-              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
         {loading ? (
           <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem' }}>
             <div style={{ width: '32px', height: '32px', border: '3px solid #eeeeee', borderTopColor: '#C8961A', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           </div>
-        ) : filtered.length === 0 ? (
+        ) : sortedPolicies.length === 0 ? (
           <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', padding: '3rem', textAlign: 'center' as const }}>
             <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.9rem', color: '#aaaaaa', marginBottom: '0.5rem' }}>{policies.length === 0 ? t('policies.noPolicies') : t('policies.noResults')}</p>
             {policies.length === 0 && <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', color: '#cccccc' }}>{t('policies.noPoliciesHint')}</p>}
           </div>
-        ) : viewMode === 'cards' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1rem' }}>
-            {filtered.map((policy) => {
-              const c = POLICY_TYPE_COLORS[policy.type] || POLICY_TYPE_COLORS.other
-              const icon = POLICY_TYPE_ICONS[policy.type] || '📋'
-              const days = daysUntil(policy.endDate)
-              return (
-                <div key={policy.id} onClick={() => setDetailPolicy(policy)} style={{ background: '#ffffff', border: `1px solid ${days >= 0 && days <= 30 ? '#FECDD3' : '#eeeeee'}`, borderRadius: '4px', overflow: 'hidden', cursor: 'pointer', transition: 'box-shadow 0.15s' }}
-                  onMouseEnter={(e) => (e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.boxShadow = 'none')}
-                >
-                  <div style={{ background: c.bg, padding: '1rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                      <span style={{ fontSize: '1.4rem' }}>{icon}</span>
-                      <div>
-                        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.82rem', color: c.text, margin: 0 }}>{POLICY_TYPE_LABELS[policy.type] || policy.type}</p>
-                        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.72rem', color: c.text, opacity: 0.8, margin: 0 }}>{policy.insurer}</p>
-                      </div>
-                    </div>
-                    <StatusBadge status={policy.status} />
-                  </div>
-                  <div style={{ padding: '0.85rem 1rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                      <div>
-                        <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.62rem', color: '#aaaaaa', margin: 0 }}>N.º Apólice</p>
-                        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.8rem', color: '#333333', margin: 0 }}>{policy.policyNumber || '—'}</p>
-                      </div>
-                      <div style={{ textAlign: 'right' as const }}>
-                        <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.62rem', color: '#aaaaaa', margin: 0 }}>Prémio Anual</p>
-                        <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#111111', margin: 0 }}>{formatCurrency(policy.annualPremium)}</p>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#888888', margin: 0 }}>{t('policies.validUntil')} {formatDate(policy.endDate)}</p>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        {days >= 0 && days <= 90 && (
-                          <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: days <= 14 ? '#dc2626' : days <= 30 ? '#d97706' : '#C8961A', background: days <= 14 ? '#FEE2E2' : days <= 30 ? '#FEF3C7' : '#FFFBEB', padding: '0.15rem 0.5rem', borderRadius: '20px' }}>{days}d</span>
-                        )}
-                        {policy.coverages && policy.coverages.length > 0 && (
-                          <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', color: '#aaaaaa' }}>{t('policies.coveragesCount', { count: policy.coverages.length })}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
         ) : (
-          <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', overflow: 'hidden' }}>
-            {filtered.map((policy, idx) => {
-              const c = POLICY_TYPE_COLORS[policy.type] || POLICY_TYPE_COLORS.other
-              const icon = POLICY_TYPE_ICONS[policy.type] || '📋'
-              const days = daysUntil(policy.endDate)
-              return (
-                <div key={policy.id} style={{ borderBottom: idx < filtered.length - 1 ? '1px solid #f5f5f5' : 'none' }}>
-                  <div onClick={() => setDetailPolicy(policy)} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.85rem 1.25rem', cursor: 'pointer' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = '#fafafa')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                  >
-                    <div style={{ width: '36px', height: '36px', borderRadius: '4px', background: c.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '1.1rem' }}>{icon}</div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', color: '#111111', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{POLICY_TYPE_LABELS[policy.type] || policy.type} — {policy.insurer}</p>
-                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.72rem', color: '#888888', margin: 0 }}>{policy.policyNumber} · {t('policies.validUntil')} {formatDate(policy.endDate)}</p>
-                    </div>
-                    <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
-                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.85rem', color: '#111111', margin: 0 }}>{formatCurrency(policy.annualPremium)}</p>
-                      <StatusBadge status={policy.status} />
-                    </div>
-                    {days >= 0 && days <= 90 && <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: days <= 30 ? '#dc2626' : '#C8961A', background: days <= 30 ? '#FEE2E2' : '#FFFBEB', padding: '0.15rem 0.5rem', borderRadius: '20px', flexShrink: 0 }}>{days}d</span>}
-                  </div>
-                </div>
-              )
-            })}
+          <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '8px', overflow: 'hidden' }}>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1100px' }}>
+                <thead>
+                  <tr style={{ background: '#F9FAFB' }}>
+                    {[
+                      t('policies.policyType'),
+                      t('policies.insurer'),
+                      t('policies.policyNumber'),
+                      t('policies.renewalDate'),
+                      t('policies.annualPremium'),
+                      t('policies.filterStatus'),
+                      t('policies.riskIndicator'),
+                      t('policies.documentsAvailable'),
+                      t('policies.share'),
+                    ].map((header) => (
+                      <th key={header} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#6B7280', textAlign: 'left', padding: '0.72rem 0.78rem', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>
+                        {header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {sortedPolicies.map((policy) => {
+                    const riskLevel = getRiskLevel(policy)
+                    const renewalDays = getRenewalDays(policy)
+                    const showRenewalTag = renewalDays <= 60
+                    const hasDocument = Boolean(policy.documentKey)
+                    const visiblePortal = Boolean(policy.visiblePortal)
+                    const icon = POLICY_TYPE_ICONS[policy.type] || '📋'
+                    const renewalDate = policy.renewalDate || policy.endDate
+
+                    return (
+                      <tr
+                        key={policy.id}
+                        onClick={() => setDetailPolicy(policy)}
+                        style={{ cursor: 'pointer', borderBottom: '1px solid #F3F4F6' }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = '#FAFAFA' }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <td style={{ padding: '0.75rem 0.78rem', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.95rem' }}>{icon}</span>
+                            <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#111111', fontWeight: 600 }}>
+                              {POLICY_TYPE_LABELS[policy.type] || policy.type}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#111111', padding: '0.75rem 0.78rem', verticalAlign: 'middle' }}>
+                          {policy.insurer || '—'}
+                        </td>
+
+                        <td style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#111111', padding: '0.75rem 0.78rem', verticalAlign: 'middle', fontWeight: 600 }}>
+                          {policy.policyNumber || '—'}
+                        </td>
+
+                        <td style={{ padding: '0.75rem 0.78rem', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' as const }}>
+                            <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#111111' }}>{formatDate(renewalDate)}</span>
+                            {showRenewalTag && (
+                              <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.66rem', fontWeight: 700, borderRadius: '999px', padding: '0.14rem 0.45rem', background: renewalDays <= 15 ? '#FEE2E2' : '#FEF3C7', color: renewalDays <= 15 ? '#B91C1C' : '#B45309' }}>
+                                {renewalDays <= 0 ? t('policies.todayOrOverdue') : t('policies.daysToRenew', { count: renewalDays })}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        <td style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', color: '#111111', fontWeight: 700, padding: '0.75rem 0.78rem', verticalAlign: 'middle' }}>
+                          {formatCurrency(policy.annualPremium || 0)}
+                        </td>
+
+                        <td style={{ padding: '0.75rem 0.78rem', verticalAlign: 'middle' }}>
+                          <StatusBadge status={policy.status} />
+                        </td>
+
+                        <td style={{ padding: '0.75rem 0.78rem', verticalAlign: 'middle' }}>
+                          <RiskBadge level={riskLevel} t={t} />
+                        </td>
+
+                        <td style={{ padding: '0.75rem 0.78rem', verticalAlign: 'middle' }}>
+                          {hasDocument ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                              <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.74rem', color: '#166534', fontWeight: 600 }}>{t('policies.documentsYes')}</span>
+                              <a
+                                href={`/api/download-document?key=${encodeURIComponent(policy.documentKey!)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', fontWeight: 700, color: '#1D4ED8', textDecoration: 'none', border: '1px solid #BFDBFE', background: '#EFF6FF', padding: '0.13rem 0.42rem', borderRadius: '999px' }}
+                              >
+                                {t('policies.openDocument')}
+                              </a>
+                            </div>
+                          ) : (
+                            <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.74rem', color: '#9CA3AF', fontWeight: 600 }}>{t('policies.documentsNo')}</span>
+                          )}
+                        </td>
+
+                        <td style={{ padding: '0.75rem 0.78rem', verticalAlign: 'middle' }}>
+                          <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.74rem', color: visiblePortal ? '#166534' : '#6B7280', fontWeight: 700 }}>
+                            {visiblePortal ? t('policies.yes') : t('policies.no')}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div style={{ padding: '0.7rem 0.9rem', borderTop: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' as const }}>
+              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#6B7280', margin: 0 }}>
+                {t('policies.sortedByPriority')}
+              </p>
+              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#9CA3AF', margin: 0 }}>
+                {t('policies.clickRowToOpen')}
+              </p>
+            </div>
           </div>
         )}
       </div>
 
-      {/* Modal Detalhe */}
       {detailPolicy && (
         <PolicyDetailModal
           policy={detailPolicy}
@@ -435,7 +686,6 @@ function PoliciesPage() {
         />
       )}
 
-      {/* Modal Add/Edit */}
       {showForm && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
           <div style={{ background: '#ffffff', borderRadius: '4px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
