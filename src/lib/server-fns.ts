@@ -815,7 +815,7 @@ function escSvg(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function buildCarouselSlide(topic: string, text: string, slideNumber: number, totalSlides: number): string {
+function buildCarouselSlide(_topic: string, text: string, slideNumber: number, totalSlides: number): string {
   const H = 1080
   const gold = '#C9A84C'
   const white = '#FFFFFF'
