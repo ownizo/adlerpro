@@ -3,7 +3,8 @@ import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
 import { Resend } from 'resend'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
-import { getClaimOperationalData, getClaimOperationalSummaryMap, saveClaimOperationalData, updateClaimOperationalData } from './claim-ops'
+import { getClaimOperationalData, saveClaimOperationalData, updateClaimOperationalData } from './claim-ops'
+import { mergeClaimMessages, mergeClaimOperationalMessages } from './claim-message-sync'
 import type {
   DashboardStats,
   AdminFinancialDashboardData,
@@ -12,6 +13,8 @@ import type {
   RenewalAlertHistoryItem,
   RenewalAlertStatus,
   Claim,
+  ClaimMessage,
+  ClaimOperationalData,
   ClaimTimelineEvent,
   ClaimParticipant,
   ClaimTicketMessage,
@@ -223,6 +226,33 @@ async function sendClaimMessageEmail(params: {
   }
 }
 
+async function getLegacyClaimMessages(claim: Claim): Promise<ClaimMessage[]> {
+  return db.getClaimMessages(claim.id, claim.companyId ?? undefined)
+}
+
+async function getMergedClaimOperationalData(claim: Claim): Promise<ClaimOperationalData> {
+  const [ops, legacyMessages] = await Promise.all([
+    getClaimOperationalData(claim.id),
+    getLegacyClaimMessages(claim),
+  ])
+
+  return mergeClaimOperationalMessages(ops, legacyMessages)
+}
+
+async function getMergedClaimMessages(claim: Claim): Promise<ClaimMessage[]> {
+  const [legacyMessages, ops] = await Promise.all([
+    getLegacyClaimMessages(claim),
+    getClaimOperationalData(claim.id),
+  ])
+
+  return mergeClaimMessages({
+    claimId: claim.id,
+    companyId: claim.companyId,
+    legacyMessages,
+    ticketMessages: ops.messages,
+  })
+}
+
 // Dashboard — endpoint unificado: retorna stats + alertas + apólices numa só chamada
 export const fetchDashboardAll = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
@@ -400,11 +430,11 @@ export const fetchClaimMessages = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: string) => d)
   .handler(async ({ data: claimId }) => {
-    const scope = await getViewerScope()
+    const ctx = await getViewerAccessContext()
     const claim = await db.getClaim(claimId)
     if (!claim) return []
-    if (scope.companyId && claim.companyId !== scope.companyId) return []
-    return db.getClaimMessages(claimId, scope.companyId ?? claim.companyId)
+    if (!canAccessClaimByContext(claim, ctx)) return []
+    return getMergedClaimMessages(claim)
   })
 
 export const sendClaimMessage = createServerFn({ method: 'POST' })
@@ -603,7 +633,24 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       db.getDocuments(),
       db.getIndividualClients(),
     ])
-    const claimOperationalSummary = await getClaimOperationalSummaryMap(claims.map((claim) => claim.id))
+    const claimOperationalSummary = Object.fromEntries(
+      await Promise.all(
+        claims.map(async (claim) => {
+          const ops = await getMergedClaimOperationalData(claim)
+          const lastMessage = ops.messages[ops.messages.length - 1]
+          return [
+            claim.id,
+            {
+              responsibleName: ops.responsible?.name,
+              messagesCount: ops.messages.length,
+              documentsCount: ops.documents.length,
+              lastMessageAt: lastMessage?.createdAt,
+              updatedAt: ops.updatedAt,
+            },
+          ] as const
+        }),
+      ),
+    )
 
     const normalizeNif = (value?: string | null) => (value ?? '').replace(/\D/g, '')
     const normalizeEmail = (value?: string | null) => (value ?? '').trim().toLowerCase()
@@ -1620,7 +1667,7 @@ export const fetchClaimWorkspace = createServerFn({ method: 'GET' })
       db.getPolicy(claim.policyId),
       claim.companyId ? db.getCompany(claim.companyId) : Promise.resolve(undefined),
       claim.individualClientId ? db.getIndividualClient(claim.individualClientId) : Promise.resolve(undefined),
-      getClaimOperationalData(claim.id),
+      getMergedClaimOperationalData(claim),
     ])
 
     return {
@@ -1719,6 +1766,20 @@ export const addClaimMessage = createServerFn({ method: 'POST' })
       senderRole,
       senderName,
       senderEmail,
+    }
+
+    if (claim.companyId) {
+      await db.createClaimMessage({
+        id: crypto.randomUUID(),
+        claimId: claim.id,
+        companyId: claim.companyId,
+        senderType: senderRole,
+        senderName,
+        senderUserId: ctx.user.id,
+        message: body,
+        createdAt: message.createdAt,
+        readAt: senderRole === 'client' ? message.createdAt : null,
+      })
     }
 
     const ops = await updateClaimOperationalData(data.claimId, (current) => ({
