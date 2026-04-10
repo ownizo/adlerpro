@@ -146,10 +146,13 @@ export interface Document {
   name: string
   category: DocumentCategory
   size: number
+  mimeType?: string
   uploadedBy: string
+  uploadedByType?: 'admin' | 'client' | 'system'
   uploadedAt: string
   blobKey: string
   policyId?: string
+  claimId?: string
 }
 
 export type DocumentCategory =
@@ -177,6 +180,18 @@ export interface Alert {
   message: string
   read: boolean
   createdAt: string
+}
+
+export interface ClaimMessage {
+  id: string
+  claimId: string
+  companyId: string
+  senderType: 'admin' | 'client'
+  senderName: string
+  senderUserId?: string
+  message: string
+  createdAt: string
+  readAt?: string | null
 }
 
 export interface DashboardStats {

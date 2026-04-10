@@ -248,7 +248,152 @@ export const submitClaim = createServerFn({ method: 'POST' })
       steps: [{ status: 'submitted', date: now.split('T')[0], notes: 'Sinistro participado' }],
       createdAt: now,
     })
+    await db.createClaimMessage({
+      id: crypto.randomUUID(),
+      claimId: id,
+      companyId,
+      senderType: 'client',
+      senderName: scope.user.name || scope.user.email || 'Cliente',
+      senderUserId: scope.user.id,
+      message: 'Sinistro submetido pelo cliente.',
+      createdAt: now,
+      readAt: now,
+    })
     return { id }
+  })
+
+export const updateClaimDetails = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { claimId: string; description: string; estimatedValue: number }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+    if (scope.companyId && claim.companyId !== scope.companyId) throw new Error('Sem permissões para editar este sinistro')
+
+    await db.updateClaim(data.claimId, {
+      description: data.description,
+      estimatedValue: data.estimatedValue,
+    })
+    return { success: true }
+  })
+
+export const fetchClaimDocuments = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: string) => d)
+  .handler(async ({ data: claimId }) => {
+    const scope = await getViewerScope()
+    const claim = await db.getClaim(claimId)
+    if (!claim) return []
+    if (scope.companyId && claim.companyId !== scope.companyId) return []
+    return db.getClaimDocuments(claimId, scope.companyId ?? claim.companyId)
+  })
+
+export const registerClaimDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { claimId: string; name: string; storagePath: string; size: number; mimeType?: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+    if (scope.companyId && claim.companyId !== scope.companyId) throw new Error('Sem permissões para este sinistro')
+
+    const now = new Date().toISOString()
+    await db.createDocument({
+      id: crypto.randomUUID(),
+      companyId: claim.companyId,
+      claimId: claim.id,
+      name: data.name,
+      category: 'claim',
+      size: data.size,
+      mimeType: data.mimeType,
+      uploadedBy: scope.user.name || scope.user.email || 'Cliente',
+      uploadedByType: scope.isAdmin ? 'admin' : 'client',
+      uploadedAt: now,
+      blobKey: data.storagePath,
+      policyId: claim.policyId,
+    })
+    return { success: true }
+  })
+
+export const getClaimDocumentUrl = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { documentId: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const document = await db.getDocument(data.documentId)
+    if (!document?.blobKey) throw new Error('Documento não encontrado')
+    if (!document.claimId) throw new Error('Documento não associado a sinistro')
+    if (scope.companyId && document.companyId !== scope.companyId) throw new Error('Sem permissões para este documento')
+
+    const { data: urlData, error } = await supabaseAdmin.storage
+      .from('documents')
+      .createSignedUrl(document.blobKey, 3600)
+    if (error) throw new Error(error.message)
+    return { url: urlData.signedUrl }
+  })
+
+export const fetchClaimMessages = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: string) => d)
+  .handler(async ({ data: claimId }) => {
+    const scope = await getViewerScope()
+    const claim = await db.getClaim(claimId)
+    if (!claim) return []
+    if (scope.companyId && claim.companyId !== scope.companyId) return []
+    return db.getClaimMessages(claimId, scope.companyId ?? claim.companyId)
+  })
+
+export const sendClaimMessage = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { claimId: string; message: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+    if (scope.companyId && claim.companyId !== scope.companyId) throw new Error('Sem permissões para este sinistro')
+
+    const message = data.message.trim()
+    if (!message) throw new Error('Mensagem vazia')
+
+    const now = new Date().toISOString()
+    await db.createClaimMessage({
+      id: crypto.randomUUID(),
+      claimId: claim.id,
+      companyId: claim.companyId,
+      senderType: scope.isAdmin ? 'admin' : 'client',
+      senderName: scope.user.name || scope.user.email || (scope.isAdmin ? 'Admin' : 'Cliente'),
+      senderUserId: scope.user.id,
+      message,
+      createdAt: now,
+      readAt: scope.isAdmin ? null : now,
+    })
+
+    if (scope.isAdmin) {
+      await db.createAlert({
+        id: crypto.randomUUID(),
+        companyId: claim.companyId,
+        type: 'claim_update',
+        title: `Nova mensagem no sinistro ${claim.id.slice(-8).toUpperCase()}`,
+        message,
+        read: false,
+        createdAt: now,
+      })
+    }
+
+    return { success: true }
+  })
+
+export const markClaimMessagesAsRead = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: string) => d)
+  .handler(async ({ data: claimId }) => {
+    const scope = await getViewerScope()
+    if (!scope.companyId) return { success: true }
+    const claim = await db.getClaim(claimId)
+    if (!claim || claim.companyId !== scope.companyId) return { success: true }
+    await db.markClaimMessagesReadForClient(claimId, scope.companyId)
+    return { success: true }
   })
 
 export const fetchDocuments = createServerFn({ method: 'GET' })
@@ -1136,17 +1281,74 @@ export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { claimId: string; status: string; notes?: string }) => d)
   .handler(async ({ data }) => {
+    const scope = await getViewerScope()
     const claim = await db.getClaim(data.claimId)
     if (!claim) throw new Error('Sinistro não encontrado')
+    const now = new Date().toISOString()
     const steps = [
       ...claim.steps,
       {
         status: data.status as any,
-        date: new Date().toISOString().split('T')[0],
+        date: now.split('T')[0],
         notes: data.notes,
       },
     ]
     await db.updateClaim(data.claimId, { status: data.status as any, steps })
+    const label = String(data.status).replaceAll('_', ' ')
+    await db.createClaimMessage({
+      id: crypto.randomUUID(),
+      claimId: claim.id,
+      companyId: claim.companyId,
+      senderType: 'admin',
+      senderName: scope.user.name || scope.user.email || 'Admin',
+      senderUserId: scope.user.id,
+      message: data.notes?.trim() || `Estado do sinistro atualizado para "${label}".`,
+      createdAt: now,
+      readAt: null,
+    })
+    await db.createAlert({
+      id: crypto.randomUUID(),
+      companyId: claim.companyId,
+      type: 'claim_update',
+      title: `Atualização de sinistro ${claim.id.slice(-8).toUpperCase()}`,
+      message: data.notes?.trim() || `Estado atualizado para ${label}.`,
+      read: false,
+      createdAt: now,
+    })
+    return { success: true }
+  })
+
+export const adminSendClaimMessage = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { claimId: string; message: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+    const message = data.message.trim()
+    if (!message) throw new Error('Mensagem vazia')
+    const now = new Date().toISOString()
+
+    await db.createClaimMessage({
+      id: crypto.randomUUID(),
+      claimId: claim.id,
+      companyId: claim.companyId,
+      senderType: 'admin',
+      senderName: scope.user.name || scope.user.email || 'Admin',
+      senderUserId: scope.user.id,
+      message,
+      createdAt: now,
+      readAt: null,
+    })
+    await db.createAlert({
+      id: crypto.randomUUID(),
+      companyId: claim.companyId,
+      type: 'claim_update',
+      title: `Nova mensagem no sinistro ${claim.id.slice(-8).toUpperCase()}`,
+      message,
+      read: false,
+      createdAt: now,
+    })
     return { success: true }
   })
 

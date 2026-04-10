@@ -4,6 +4,7 @@ import {
   fetchAdminAll,
   adminCreatePolicy,
   adminUpdateClaimStatus,
+  adminSendClaimMessage,
   adminCreateCompany,
   adminUpdateCompany,
   adminDeleteCompany,
@@ -828,6 +829,10 @@ function AdminPage() {
                         company={company}
                         onStatusUpdate={async (status, notes) => {
                           await adminUpdateClaimStatus({ data: { claimId: claim.id, status, notes } })
+                          await reload()
+                        }}
+                        onSendMessage={async (message) => {
+                          await adminSendClaimMessage({ data: { claimId: claim.id, message } })
                           await reload()
                         }}
                       />
@@ -2273,15 +2278,19 @@ function AdminClaimCard({
   policy,
   company,
   onStatusUpdate,
+  onSendMessage,
 }: {
   claim: Claim
   policy?: Policy
   company?: Company
   onStatusUpdate: (status: string, notes?: string) => Promise<void>
+  onSendMessage: (message: string) => Promise<void>
 }) {
   const [updating, setUpdating] = useState(false)
   const [newStatus, setNewStatus] = useState('')
   const [notes, setNotes] = useState('')
+  const [messageDraft, setMessageDraft] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
 
   const handleUpdate = async () => {
     if (!newStatus) return
@@ -2290,6 +2299,15 @@ function AdminClaimCard({
     setNewStatus('')
     setNotes('')
     setUpdating(false)
+  }
+
+  const handleSendMessage = async () => {
+    const message = messageDraft.trim()
+    if (!message) return
+    setSendingMessage(true)
+    await onSendMessage(message)
+    setMessageDraft('')
+    setSendingMessage(false)
   }
 
   return (
@@ -2329,6 +2347,21 @@ function AdminClaimCard({
           className="px-4 py-2 bg-navy-700 text-white text-sm font-medium rounded-[2px] hover:bg-navy-600 disabled:opacity-50 transition-colors"
         >
           {updating ? 'A atualizar...' : 'Atualizar'}
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <input
+          value={messageDraft}
+          onChange={(e) => setMessageDraft(e.target.value)}
+          placeholder="Mensagem ao cliente"
+          className="px-3 py-2 border border-navy-200 rounded-[2px] text-sm flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-gold-400"
+        />
+        <button
+          onClick={handleSendMessage}
+          disabled={!messageDraft.trim() || sendingMessage}
+          className="px-4 py-2 bg-white text-navy-700 border border-navy-300 text-sm font-medium rounded-[2px] hover:bg-navy-50 disabled:opacity-50 transition-colors"
+        >
+          {sendingMessage ? 'A enviar...' : 'Enviar mensagem'}
         </button>
       </div>
     </div>

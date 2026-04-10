@@ -16,6 +16,7 @@ import type {
   UserMetricEvent,
   IndividualClient,
   SocialPost,
+  ClaimMessage,
 } from './types'
 
 // ============================================================
@@ -112,6 +113,7 @@ export async function deleteCompanyRelations(companyId: string): Promise<void> {
     sb.from('policies').delete().eq('company_id', companyId),
     sb.from('claims').delete().eq('company_id', companyId),
     sb.from('documents').delete().eq('company_id', companyId),
+    sb.from('claim_messages').delete().eq('company_id', companyId),
     sb.from('alerts').delete().eq('company_id', companyId),
     sb.from('risk_reports').delete().eq('company_id', companyId),
     sb.from('company_users').delete().eq('company_id', companyId),
@@ -246,6 +248,13 @@ export async function createDocument(doc: Document): Promise<void> {
   if (error) console.error('createDocument error:', error)
 }
 
+export async function getDocument(id: string): Promise<Document | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('documents').select('*').eq('id', id).single()
+  if (error) return undefined
+  return objectToCamel(data) as Document
+}
+
 export async function updateDocument(id: string, updates: Partial<Document>): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('documents').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
@@ -258,6 +267,54 @@ export async function deleteDocument(id: string): Promise<void> {
   if (error) console.error('deleteDocument error:', error)
 }
 
+export async function getClaimDocuments(claimId: string, companyId?: string): Promise<Document[]> {
+  const sb = getSupabaseAdmin()
+  let query = sb
+    .from('documents')
+    .select('*')
+    .eq('claim_id', claimId)
+    .order('uploaded_at', { ascending: false })
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query
+  if (error) { console.error('getClaimDocuments error:', error); return [] }
+  return rowsToCamel<Document>(data ?? [])
+}
+
+// ============================================================
+// Claim Messages
+// ============================================================
+export async function getClaimMessages(claimId: string, companyId?: string): Promise<ClaimMessage[]> {
+  const sb = getSupabaseAdmin()
+  let query = sb
+    .from('claim_messages')
+    .select('*')
+    .eq('claim_id', claimId)
+    .order('created_at', { ascending: true })
+  if (companyId) query = query.eq('company_id', companyId)
+  const { data, error } = await query
+  if (error) { console.error('getClaimMessages error:', error); return [] }
+  return rowsToCamel<ClaimMessage>(data ?? [])
+}
+
+export async function createClaimMessage(message: ClaimMessage): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('claim_messages').insert(objectToSnake(message as unknown as Record<string, unknown>))
+  if (error) console.error('createClaimMessage error:', error)
+}
+
+export async function markClaimMessagesReadForClient(claimId: string, companyId: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const now = new Date().toISOString()
+  const { error } = await sb
+    .from('claim_messages')
+    .update({ read_at: now })
+    .eq('claim_id', claimId)
+    .eq('company_id', companyId)
+    .eq('sender_type', 'admin')
+    .is('read_at', null)
+  if (error) console.error('markClaimMessagesReadForClient error:', error)
+}
+
 // ============================================================
 // Alerts
 // ============================================================
@@ -268,6 +325,12 @@ export async function getAlerts(companyId?: string): Promise<Alert[]> {
   const { data, error } = await query
   if (error) { console.error('getAlerts error:', error); return [] }
   return rowsToCamel<Alert>(data ?? [])
+}
+
+export async function createAlert(alert: Alert): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('alerts').insert(objectToSnake(alert as unknown as Record<string, unknown>))
+  if (error) console.error('createAlert error:', error)
 }
 
 export async function markAlertRead(id: string): Promise<void> {

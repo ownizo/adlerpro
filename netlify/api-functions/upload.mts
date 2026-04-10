@@ -48,15 +48,34 @@ export default async (req: Request) => {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     const uploadType = (formData.get('type') as string) || 'document'
+    const claimId = (formData.get('claimId') as string) || ''
 
     if (!file) {
       return Response.json({ error: 'Ficheiro nao fornecido' }, { status: 400 })
     }
 
+    const allowedMime = new Set(['application/pdf', 'image/jpeg', 'image/png'])
+    const allowedExt = new Set(['pdf', 'jpg', 'jpeg', 'png'])
+    const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
+    const maxSizeBytes = 10 * 1024 * 1024
+
+    if (uploadType === 'claim_document') {
+      if (file.size > maxSizeBytes) {
+        return Response.json({ error: 'Ficheiro excede o tamanho máximo de 10MB' }, { status: 400 })
+      }
+      if (!allowedMime.has(file.type) || !allowedExt.has(ext)) {
+        return Response.json({ error: 'Formato inválido. Use PDF, JPG ou PNG' }, { status: 400 })
+      }
+      if (!claimId.trim()) {
+        return Response.json({ error: 'claimId é obrigatório para upload de sinistro' }, { status: 400 })
+      }
+    }
+
     const bucket = uploadType === 'avatar' ? 'avatars' : 'documents'
-    const ext = file.name.split('.').pop() || 'bin'
     const path = uploadType === 'avatar'
       ? `${user.id}/avatar.${ext}`
+      : uploadType === 'claim_document'
+      ? `${user.user_metadata?.company_id || 'general'}/claims/${claimId}/${Date.now()}_${file.name}`
       : `${user.user_metadata?.company_id || 'general'}/${Date.now()}_${file.name}`
 
     const buffer = await file.arrayBuffer()
