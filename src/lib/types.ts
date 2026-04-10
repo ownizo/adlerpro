@@ -95,7 +95,8 @@ export const POLICY_TYPE_LABELS: Record<PolicyType, string> = {
 export interface Claim {
   id: string
   policyId: string
-  companyId: string
+  companyId?: string
+  individualClientId?: string
   title: string
   description: string
   claimDate: string
@@ -142,7 +143,8 @@ export interface ClaimStep {
 
 export interface Document {
   id: string
-  companyId: string
+  companyId?: string
+  individualClientId?: string
   name: string
   category: DocumentCategory
   size: number
@@ -174,7 +176,7 @@ export const DOCUMENT_CATEGORY_LABELS: Record<DocumentCategory, string> = {
 
 export interface Alert {
   id: string
-  companyId: string
+  companyId?: string
   type: 'renewal' | 'claim_update' | 'payment' | 'document' | 'general'
   title: string
   message: string
@@ -185,13 +187,67 @@ export interface Alert {
 export interface ClaimMessage {
   id: string
   claimId: string
-  companyId: string
+  companyId?: string
   senderType: 'admin' | 'client'
   senderName: string
   senderUserId?: string
   message: string
   createdAt: string
   readAt?: string | null
+}
+
+export interface ClaimParticipant {
+  id: string
+  name: string
+  email?: string
+  role: 'admin' | 'client'
+}
+
+export interface ClaimTimelineEvent {
+  id: string
+  type: 'created' | 'status' | 'assignment' | 'note' | 'message' | 'document'
+  message: string
+  createdAt: string
+  actorName: string
+  actorRole: 'admin' | 'client' | 'system'
+}
+
+export interface ClaimTeamNote {
+  id: string
+  note: string
+  createdAt: string
+  authorName: string
+}
+
+export interface ClaimTicketMessage {
+  id: string
+  body: string
+  createdAt: string
+  senderRole: 'admin' | 'client'
+  senderName: string
+  senderEmail?: string
+}
+
+export interface ClaimFileRef {
+  id: string
+  claimId: string
+  name: string
+  contentType: string
+  uploadedAt: string
+  uploadedByName: string
+  uploadedByRole: 'admin' | 'client'
+  storagePath: string
+  size: number
+}
+
+export interface ClaimOperationalData {
+  claimId: string
+  responsible?: ClaimParticipant
+  timeline: ClaimTimelineEvent[]
+  teamNotes: ClaimTeamNote[]
+  messages: ClaimTicketMessage[]
+  documents: ClaimFileRef[]
+  updatedAt: string
 }
 
 export interface DashboardStats {

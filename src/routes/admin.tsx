@@ -4,7 +4,6 @@ import {
   fetchAdminAll,
   adminCreatePolicy,
   adminUpdateClaimStatus,
-  adminSendClaimMessage,
   adminCreateCompany,
   adminUpdateCompany,
   adminDeleteCompany,
@@ -22,6 +21,14 @@ import {
   adminAssociateDocument,
   adminUploadPolicyDocument,
   adminGetDocumentUrl,
+  adminCreateClaim,
+  fetchClaimWorkspace,
+  adminAssignClaimResponsible,
+  adminAddClaimTeamNote,
+  addClaimMessage,
+  registerClaimDocument,
+  removeClaimDocument,
+  getClaimDocumentUrl,
   fetchSocialPosts,
   adminCreateSocialPost,
   adminUpdateSocialPost,
@@ -46,6 +53,7 @@ import type {
   RenewalAlertItem,
   RenewalAlertsResponse,
   RenewalAlertStatus,
+  ClaimOperationalData,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef, useMemo } from 'react'
@@ -276,6 +284,7 @@ function AdminPage() {
   const [apiConnections, setApiConnections] = useState<ApiConnection[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
   const [claims, setClaims] = useState<Claim[]>([])
+  const [claimOperationalSummary, setClaimOperationalSummary] = useState<Record<string, { responsibleName?: string; messagesCount: number; documentsCount: number; lastMessageAt?: string; updatedAt?: string }>>({})
   const [documents, setDocuments] = useState<DocType[]>([])
   const [individualClients, setIndividualClients] = useState<IndividualClient[]>([])
   const [socialPosts, setSocialPosts] = useState<SocialPost[]>([])
@@ -289,15 +298,26 @@ function AdminPage() {
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null)
   const [showUserFormForCompanyId, setShowUserFormForCompanyId] = useState<string | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
+  const [showNewClaim, setShowNewClaim] = useState(false)
+  const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null)
+  const [claimWorkspace, setClaimWorkspace] = useState<{
+    claim: Claim
+    policy?: Policy
+    company?: Company
+    individualClient?: IndividualClient
+    operations: ClaimOperationalData
+  } | null>(null)
+  const [loadingClaimWorkspace, setLoadingClaimWorkspace] = useState(false)
 
   const reload = async () => {
-    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d, individualClients: ic } = await fetchAdminAll()
+    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, claimOperationalSummary: cos, documents: d, individualClients: ic } = await fetchAdminAll()
     setCompanies(c)
     setCompanyUsers(u)
     setUserEvents(e)
     setApiConnections(a)
     setPolicies(p)
     setClaims(cl)
+    setClaimOperationalSummary(cos ?? {})
     setDocuments(d)
     setIndividualClients(ic ?? [])
     try {
@@ -318,6 +338,23 @@ function AdminPage() {
         setLoading(false)
       })
   }, [ready, user])
+
+  useEffect(() => {
+    if (!selectedClaimId) {
+      setClaimWorkspace(null)
+      return
+    }
+    setLoadingClaimWorkspace(true)
+    fetchClaimWorkspace({ data: { claimId: selectedClaimId } })
+      .then((payload) => {
+        setClaimWorkspace(payload as any)
+      })
+      .catch((err) => {
+        console.error('[AdminPage] fetchClaimWorkspace error:', err)
+        setClaimWorkspace(null)
+      })
+      .finally(() => setLoadingClaimWorkspace(false))
+  }, [selectedClaimId, claims.length])
 
   if (!ready) {
     return (
@@ -816,29 +853,66 @@ function AdminPage() {
 
             {tab === 'claims' && (
               <div>
-                <h2 className="text-lg font-semibold text-navy-700 mb-4">Sinistros ({claims.length})</h2>
-                <div className="grid gap-4">
-                  {claims.map((claim) => {
-                    const policy = policies.find((p) => p.id === claim.policyId)
-                    const company = companies.find((c) => c.id === claim.companyId)
-                    return (
-                      <AdminClaimCard
-                        key={claim.id}
-                        claim={claim}
-                        policy={policy}
-                        company={company}
-                        onStatusUpdate={async (status, notes) => {
-                          await adminUpdateClaimStatus({ data: { claimId: claim.id, status, notes } })
-                          await reload()
-                        }}
-                        onSendMessage={async (message) => {
-                          await adminSendClaimMessage({ data: { claimId: claim.id, message } })
-                          await reload()
-                        }}
-                      />
-                    )
-                  })}
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <h2 className="text-lg font-semibold text-navy-700">Sinistros ({claims.length})</h2>
+                  <button
+                    onClick={() => setShowNewClaim((prev) => !prev)}
+                    className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm"
+                  >
+                    {showNewClaim ? 'Cancelar' : 'Novo Sinistro'}
+                  </button>
                 </div>
+
+                {showNewClaim && (
+                  <NewAdminClaimForm
+                    companies={companies}
+                    companyUsers={companyUsers}
+                    policies={policies}
+                    individualClients={individualClients}
+                    onSubmit={async (data) => {
+                      await adminCreateClaim({ data })
+                      await reload()
+                      setShowNewClaim(false)
+                    }}
+                  />
+                )}
+
+                <AdminClaimsBoard
+                  claims={claims}
+                  policies={policies}
+                  companies={companies}
+                  individualClients={individualClients}
+                  summaryMap={claimOperationalSummary}
+                  selectedClaimId={selectedClaimId}
+                  onSelectClaim={setSelectedClaimId}
+                  onQuickStatusUpdate={async (claimId, status, notes) => {
+                    await adminUpdateClaimStatus({ data: { claimId, status, notes } })
+                    await reload()
+                  }}
+                />
+
+                {loadingClaimWorkspace ? (
+                  <div className="mt-4 bg-white border border-navy-200 rounded-[4px] p-6 text-sm text-navy-500">
+                    A carregar detalhe do sinistro...
+                  </div>
+                ) : claimWorkspace ? (
+                  <AdminClaimWorkspace
+                    key={claimWorkspace.claim.id}
+                    workspace={claimWorkspace}
+                    companyUsers={companyUsers}
+                    onUpdated={async () => {
+                      await reload()
+                      if (selectedClaimId) {
+                        const fresh = await fetchClaimWorkspace({ data: { claimId: selectedClaimId } })
+                        setClaimWorkspace(fresh as any)
+                      }
+                    }}
+                  />
+                ) : (
+                  <div className="mt-4 bg-white border border-navy-200 rounded-[4px] p-6 text-sm text-navy-500">
+                    Selecionar um sinistro para abrir o detalhe operacional.
+                  </div>
+                )}
               </div>
             )}
 
@@ -2273,96 +2347,440 @@ function CompanyUserForm({
   )
 }
 
-function AdminClaimCard({
-  claim,
-  policy,
-  company,
-  onStatusUpdate,
-  onSendMessage,
+function NewAdminClaimForm({
+  companies,
+  companyUsers,
+  policies,
+  individualClients,
+  onSubmit,
 }: {
-  claim: Claim
-  policy?: Policy
-  company?: Company
-  onStatusUpdate: (status: string, notes?: string) => Promise<void>
-  onSendMessage: (message: string) => Promise<void>
+  companies: Company[]
+  companyUsers: CompanyUser[]
+  policies: Policy[]
+  individualClients: IndividualClient[]
+  onSubmit: (data: {
+    targetType: 'company' | 'individual'
+    companyId?: string
+    individualClientId?: string
+    clientUserId?: string
+    policyId: string
+    type: string
+    description: string
+    incidentDate: string
+    estimatedValue?: number
+  }) => Promise<void>
 }) {
-  const [updating, setUpdating] = useState(false)
-  const [newStatus, setNewStatus] = useState('')
-  const [notes, setNotes] = useState('')
-  const [messageDraft, setMessageDraft] = useState('')
-  const [sendingMessage, setSendingMessage] = useState(false)
+  const [targetType, setTargetType] = useState<'company' | 'individual'>('company')
+  const [companyId, setCompanyId] = useState('')
+  const [clientUserId, setClientUserId] = useState('')
+  const [individualClientId, setIndividualClientId] = useState('')
+  const [policyId, setPolicyId] = useState('')
+  const [type, setType] = useState('')
+  const [description, setDescription] = useState('')
+  const [incidentDate, setIncidentDate] = useState('')
+  const [estimatedValue, setEstimatedValue] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleUpdate = async () => {
-    if (!newStatus) return
-    setUpdating(true)
-    await onStatusUpdate(newStatus, notes || undefined)
-    setNewStatus('')
-    setNotes('')
-    setUpdating(false)
-  }
+  const availableUsers = companyUsers.filter((user) => user.companyId === companyId)
+  const availablePolicies = policies.filter((policy) => {
+    if (targetType === 'company') return policy.companyId === companyId
+    return policy.individualClientId === individualClientId
+  })
 
-  const handleSendMessage = async () => {
-    const message = messageDraft.trim()
-    if (!message) return
-    setSendingMessage(true)
-    await onSendMessage(message)
-    setMessageDraft('')
-    setSendingMessage(false)
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setSubmitting(true)
+    await onSubmit({
+      targetType,
+      companyId: targetType === 'company' ? companyId : undefined,
+      individualClientId: targetType === 'individual' ? individualClientId : undefined,
+      clientUserId: targetType === 'company' ? (clientUserId || undefined) : undefined,
+      policyId,
+      type,
+      description,
+      incidentDate,
+      estimatedValue: estimatedValue ? Number(estimatedValue) : undefined,
+    })
+    setSubmitting(false)
+    setPolicyId('')
+    setType('')
+    setDescription('')
+    setIncidentDate('')
+    setEstimatedValue('')
   }
 
   return (
-    <div className="bg-white rounded-[4px] border border-navy-200 p-6">
-      <div className="flex items-start justify-between mb-3">
-        <div>
-          <h3 className="text-lg font-semibold text-navy-700">{claim.title}</h3>
-          <p className="text-sm text-navy-400">
-            {company?.name} | {policy ? `${POLICY_TYPE_LABELS[policy.type]} — ${policy.policyNumber}` : 'N/A'}
-          </p>
-        </div>
-        <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getStatusColor(claim.status)}`}>
-          {CLAIM_STATUS_LABELS[claim.status]}
-        </span>
+    <form onSubmit={handleSubmit} className="bg-white border border-navy-200 rounded-[4px] p-5 mb-4 grid md:grid-cols-2 gap-4">
+      <div>
+        <label className="block text-sm text-navy-600 mb-1">Tipo de cliente</label>
+        <select value={targetType} onChange={(e) => setTargetType(e.target.value as 'company' | 'individual')} className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
+          <option value="company">Empresa</option>
+          <option value="individual">Cliente individual</option>
+        </select>
       </div>
-      <p className="text-sm text-navy-500 mb-4">{claim.description}</p>
-      <div className="flex flex-wrap items-end gap-3 pt-3 border-t border-navy-100">
-        <select
-          value={newStatus}
-          onChange={(e) => setNewStatus(e.target.value)}
-          className="px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
-        >
-          <option value="">Alterar estado...</option>
-          {Object.entries(CLAIM_STATUS_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
+
+      {targetType === 'company' ? (
+        <div>
+          <label className="block text-sm text-navy-600 mb-1">Empresa</label>
+          <select value={companyId} onChange={(e) => { setCompanyId(e.target.value); setPolicyId('') }} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
+            <option value="">Selecionar...</option>
+            {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+          </select>
+        </div>
+      ) : (
+        <div>
+          <label className="block text-sm text-navy-600 mb-1">Cliente individual</label>
+          <select value={individualClientId} onChange={(e) => { setIndividualClientId(e.target.value); setPolicyId('') }} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
+            <option value="">Selecionar...</option>
+            {individualClients.map((client) => <option key={client.id} value={client.id}>{client.fullName}</option>)}
+          </select>
+        </div>
+      )}
+
+      <div>
+        <label className="block text-sm text-navy-600 mb-1">Utilizador/cliente associado</label>
+        {targetType === 'company' ? (
+          <select value={clientUserId} onChange={(e) => setClientUserId(e.target.value)} className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
+            <option value="">Sem responsável inicial</option>
+            {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.name} ({user.email})</option>)}
+          </select>
+        ) : (
+          <input value={individualClients.find((c) => c.id === individualClientId)?.fullName || ''} readOnly className="w-full px-3 py-2 border border-navy-200 rounded text-sm bg-navy-50 text-navy-500" />
+        )}
+      </div>
+
+      <div>
+        <label className="block text-sm text-navy-600 mb-1">Apólice associada</label>
+        <select value={policyId} onChange={(e) => setPolicyId(e.target.value)} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
+          <option value="">Selecionar...</option>
+          {availablePolicies.map((policy) => (
+            <option key={policy.id} value={policy.id}>
+              {policy.policyNumber} · {POLICY_TYPE_LABELS[policy.type] ?? policy.type}
+            </option>
           ))}
         </select>
-        <input
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notas (opcional)"
-          className="px-3 py-2 border border-navy-200 rounded-[2px] text-sm flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-gold-400"
-        />
-        <button
-          onClick={handleUpdate}
-          disabled={!newStatus || updating}
-          className="px-4 py-2 bg-navy-700 text-white text-sm font-medium rounded-[2px] hover:bg-navy-600 disabled:opacity-50 transition-colors"
-        >
-          {updating ? 'A atualizar...' : 'Atualizar'}
+      </div>
+
+      <div>
+        <label className="block text-sm text-navy-600 mb-1">Tipo de sinistro</label>
+        <input value={type} onChange={(e) => setType(e.target.value)} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm" placeholder="Ex: Inundação" />
+      </div>
+
+      <div>
+        <label className="block text-sm text-navy-600 mb-1">Data do sinistro</label>
+        <input type="date" value={incidentDate} onChange={(e) => setIncidentDate(e.target.value)} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm" />
+      </div>
+
+      <div>
+        <label className="block text-sm text-navy-600 mb-1">Valor estimado (opcional)</label>
+        <input type="number" min="0" step="0.01" value={estimatedValue} onChange={(e) => setEstimatedValue(e.target.value)} className="w-full px-3 py-2 border border-navy-200 rounded text-sm" placeholder="0.00" />
+      </div>
+
+      <div className="md:col-span-2">
+        <label className="block text-sm text-navy-600 mb-1">Descrição inicial</label>
+        <textarea value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} className="w-full px-3 py-2 border border-navy-200 rounded text-sm" />
+      </div>
+
+      <div className="md:col-span-2">
+        <button disabled={submitting} className="px-4 py-2 bg-navy-700 text-white rounded text-sm disabled:opacity-50">
+          {submitting ? 'A criar...' : 'Criar sinistro'}
         </button>
       </div>
-      <div className="mt-3 flex flex-wrap items-end gap-3">
-        <input
-          value={messageDraft}
-          onChange={(e) => setMessageDraft(e.target.value)}
-          placeholder="Mensagem ao cliente"
-          className="px-3 py-2 border border-navy-200 rounded-[2px] text-sm flex-1 min-w-48 focus:outline-none focus:ring-2 focus:ring-gold-400"
-        />
-        <button
-          onClick={handleSendMessage}
-          disabled={!messageDraft.trim() || sendingMessage}
-          className="px-4 py-2 bg-white text-navy-700 border border-navy-300 text-sm font-medium rounded-[2px] hover:bg-navy-50 disabled:opacity-50 transition-colors"
-        >
-          {sendingMessage ? 'A enviar...' : 'Enviar mensagem'}
-        </button>
+    </form>
+  )
+}
+
+function AdminClaimsBoard({
+  claims,
+  policies,
+  companies,
+  individualClients,
+  summaryMap,
+  selectedClaimId,
+  onSelectClaim,
+  onQuickStatusUpdate,
+}: {
+  claims: Claim[]
+  policies: Policy[]
+  companies: Company[]
+  individualClients: IndividualClient[]
+  summaryMap: Record<string, { responsibleName?: string; messagesCount: number; documentsCount: number; lastMessageAt?: string; updatedAt?: string }>
+  selectedClaimId: string | null
+  onSelectClaim: (claimId: string) => void
+  onQuickStatusUpdate: (claimId: string, status: string, notes?: string) => Promise<void>
+}) {
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  if (claims.length === 0) {
+    return <div className="bg-white border border-navy-200 rounded-[4px] p-5 text-sm text-navy-500">Sem sinistros registados.</div>
+  }
+
+  return (
+    <div className="bg-white border border-navy-200 rounded-[4px] overflow-auto">
+      <table className="min-w-full text-sm">
+        <thead className="bg-navy-50 text-navy-600">
+          <tr>
+            <th className="text-left px-3 py-2">Cliente/Empresa</th>
+            <th className="text-left px-3 py-2">Apólice</th>
+            <th className="text-left px-3 py-2">Tipo</th>
+            <th className="text-left px-3 py-2">Data</th>
+            <th className="text-left px-3 py-2">Estado</th>
+            <th className="text-left px-3 py-2">Valor</th>
+            <th className="text-left px-3 py-2">Responsável</th>
+          </tr>
+        </thead>
+        <tbody>
+          {claims.map((claim) => {
+            const policy = policies.find((item) => item.id === claim.policyId)
+            const companyName = claim.companyId ? (companies.find((item) => item.id === claim.companyId)?.name || claim.companyId) : undefined
+            const individualName = claim.individualClientId ? (individualClients.find((item) => item.id === claim.individualClientId)?.fullName || claim.individualClientId) : undefined
+            const ownerLabel = companyName || individualName || '—'
+            const summary = summaryMap[claim.id]
+            return (
+              <tr
+                key={claim.id}
+                onClick={() => onSelectClaim(claim.id)}
+                className={`border-t border-navy-100 cursor-pointer hover:bg-navy-50/40 ${selectedClaimId === claim.id ? 'bg-navy-50/70' : ''}`}
+              >
+                <td className="px-3 py-2">{ownerLabel}</td>
+                <td className="px-3 py-2">{policy ? `${policy.policyNumber}` : '—'}</td>
+                <td className="px-3 py-2">{claim.title}</td>
+                <td className="px-3 py-2">{formatDate(claim.incidentDate)}</td>
+                <td className="px-3 py-2">
+                  <select
+                    value={claim.status}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={async (e) => {
+                      const status = e.target.value
+                      setUpdatingId(claim.id)
+                      await onQuickStatusUpdate(claim.id, status, 'Atualização rápida')
+                      setUpdatingId(null)
+                    }}
+                    className="px-2 py-1 border border-navy-200 rounded text-xs"
+                  >
+                    {Object.entries(CLAIM_STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                  {updatingId === claim.id && <span className="ml-2 text-xs text-navy-400">...</span>}
+                </td>
+                <td className="px-3 py-2">{formatCurrency(claim.estimatedValue || 0)}</td>
+                <td className="px-3 py-2">{summary?.responsibleName || '—'}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function AdminClaimWorkspace({
+  workspace,
+  companyUsers,
+  onUpdated,
+}: {
+  workspace: {
+    claim: Claim
+    policy?: Policy
+    company?: Company
+    individualClient?: IndividualClient
+    operations: ClaimOperationalData
+  }
+  companyUsers: CompanyUser[]
+  onUpdated: () => Promise<void>
+}) {
+  const { claim, policy, company, individualClient, operations } = workspace
+  const [selectedResponsible, setSelectedResponsible] = useState(operations.responsible?.id || '')
+  const [newNote, setNewNote] = useState('')
+  const [newMessage, setNewMessage] = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const responsibleCandidates = claim.companyId
+    ? companyUsers.filter((user) => user.companyId === claim.companyId)
+    : []
+
+  const handleUploadDocument = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const storagePath = `claims/${claim.id}/${Date.now()}-${file.name}`
+      const { error } = await supabase.storage.from('documents').upload(storagePath, file)
+      if (error) throw new Error(error.message)
+      await registerClaimDocument({
+        data: {
+          claimId: claim.id,
+          name: file.name,
+          contentType: file.type,
+          storagePath,
+          size: file.size,
+        },
+      })
+      await onUpdated()
+    } finally {
+      setUploading(false)
+      event.target.value = ''
+    }
+  }
+
+  return (
+    <div className="mt-4 bg-white border border-navy-200 rounded-[4px] p-5 space-y-5">
+      <div className="flex flex-wrap justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-semibold text-navy-700">{claim.title}</h3>
+          <p className="text-sm text-navy-500">{company?.name || individualClient?.fullName || '—'} · {policy?.policyNumber || 'Sem apólice'}</p>
+          <p className="text-xs text-navy-400 mt-1">Data do sinistro: {formatDate(claim.incidentDate)} · Valor estimado: {formatCurrency(claim.estimatedValue || 0)}</p>
+        </div>
+        <div className="text-right">
+          <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getStatusColor(claim.status)}`}>
+            {CLAIM_STATUS_LABELS[claim.status]}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="border border-navy-100 rounded p-3">
+          <p className="text-xs uppercase tracking-wide text-navy-500 mb-2">Responsável</p>
+          <div className="flex gap-2">
+            <select value={selectedResponsible} onChange={(e) => setSelectedResponsible(e.target.value)} className="flex-1 px-2 py-2 border border-navy-200 rounded text-sm">
+              <option value="">Sem responsável</option>
+              {responsibleCandidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+            </select>
+            <button
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true)
+                const selected = responsibleCandidates.find((user) => user.id === selectedResponsible)
+                await adminAssignClaimResponsible({
+                  data: {
+                    claimId: claim.id,
+                    responsible: selected ? { id: selected.id, name: selected.name, email: selected.email } : undefined,
+                  },
+                })
+                await onUpdated()
+                setSaving(false)
+              }}
+              className="px-3 py-2 bg-navy-700 text-white rounded text-sm disabled:opacity-50"
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+
+        <div className="border border-navy-100 rounded p-3">
+          <p className="text-xs uppercase tracking-wide text-navy-500 mb-2">Links</p>
+          <p className="text-sm text-navy-600">Apólice: {policy ? `${policy.policyNumber} (${POLICY_TYPE_LABELS[policy.type] ?? policy.type})` : '—'}</p>
+          <p className="text-sm text-navy-600">Cliente/Empresa: {company?.name || individualClient?.fullName || '—'}</p>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="border border-navy-100 rounded p-3">
+          <p className="text-xs uppercase tracking-wide text-navy-500 mb-3">Timeline</p>
+          <div className="max-h-56 overflow-auto space-y-2">
+            {operations.timeline.length === 0 ? <p className="text-sm text-navy-400">Sem eventos.</p> : operations.timeline.slice().reverse().map((event) => (
+              <div key={event.id} className="text-sm border border-navy-100 rounded p-2">
+                <p className="text-navy-700">{event.message}</p>
+                <p className="text-xs text-navy-400 mt-1">{event.actorName} · {formatDateTime(event.createdAt)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="border border-navy-100 rounded p-3">
+          <p className="text-xs uppercase tracking-wide text-navy-500 mb-3">Notas da equipa</p>
+          <div className="max-h-40 overflow-auto space-y-2 mb-3">
+            {operations.teamNotes.length === 0 ? <p className="text-sm text-navy-400">Sem notas.</p> : operations.teamNotes.slice().reverse().map((note) => (
+              <div key={note.id} className="text-sm border border-navy-100 rounded p-2">
+                <p>{note.note}</p>
+                <p className="text-xs text-navy-400 mt-1">{note.authorName} · {formatDateTime(note.createdAt)}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input value={newNote} onChange={(e) => setNewNote(e.target.value)} className="flex-1 px-2 py-2 border border-navy-200 rounded text-sm" placeholder="Adicionar nota interna..." />
+            <button
+              onClick={async () => {
+                if (!newNote.trim()) return
+                await adminAddClaimTeamNote({ data: { claimId: claim.id, note: newNote } })
+                setNewNote('')
+                await onUpdated()
+              }}
+              className="px-3 py-2 bg-navy-700 text-white rounded text-sm"
+            >
+              Adicionar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="border border-navy-100 rounded p-3">
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-xs uppercase tracking-wide text-navy-500">Documentos</p>
+          <label className="px-3 py-1.5 bg-navy-700 text-white rounded text-xs cursor-pointer">
+            {uploading ? 'A carregar...' : 'Upload'}
+            <input type="file" className="hidden" onChange={handleUploadDocument} />
+          </label>
+        </div>
+        <div className="space-y-2">
+          {operations.documents.length === 0 ? <p className="text-sm text-navy-400">Sem ficheiros.</p> : operations.documents.map((doc) => (
+            <div key={doc.id} className="border border-navy-100 rounded p-2 flex flex-wrap items-center gap-2 justify-between">
+              <div>
+                <p className="text-sm text-navy-700">{doc.name}</p>
+                <p className="text-xs text-navy-400">{doc.contentType} · {formatDateTime(doc.uploadedAt)} · {doc.uploadedByName}</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={async () => {
+                    const { url } = await getClaimDocumentUrl({ data: { claimId: claim.id, documentId: doc.id } })
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = doc.name
+                    a.click()
+                  }}
+                  className="px-2 py-1 border border-navy-200 rounded text-xs"
+                >
+                  Download
+                </button>
+                <button
+                  onClick={async () => {
+                    await removeClaimDocument({ data: { claimId: claim.id, documentId: doc.id } })
+                    await onUpdated()
+                  }}
+                  className="px-2 py-1 border border-red-200 text-red-600 rounded text-xs"
+                >
+                  Remover
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="border border-navy-100 rounded p-3">
+        <p className="text-xs uppercase tracking-wide text-navy-500 mb-3">Mensagens (ticket)</p>
+        <div className="max-h-60 overflow-auto space-y-2 mb-3">
+          {operations.messages.length === 0 ? <p className="text-sm text-navy-400">Sem mensagens.</p> : operations.messages.map((message) => (
+            <div key={message.id} className={`rounded p-2 text-sm ${message.senderRole === 'admin' ? 'bg-navy-50 border border-navy-100' : 'bg-gold-50 border border-gold-100'}`}>
+              <p className="text-navy-700">{message.body}</p>
+              <p className="text-xs text-navy-400 mt-1">{message.senderName} · {formatDateTime(message.createdAt)}</p>
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-2">
+          <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 px-2 py-2 border border-navy-200 rounded text-sm" placeholder="Responder ao cliente..." />
+          <button
+            onClick={async () => {
+              if (!newMessage.trim()) return
+              await addClaimMessage({ data: { claimId: claim.id, body: newMessage } })
+              setNewMessage('')
+              await onUpdated()
+            }}
+            className="px-3 py-2 bg-gold-400 text-navy-700 font-semibold rounded text-sm"
+          >
+            Enviar
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -2379,6 +2797,17 @@ function getStatusColor(status: string): string {
     paid: 'bg-emerald-100 text-emerald-700',
   }
   return colors[status] || 'bg-gray-100 text-gray-600'
+}
+
+function formatDateTime(value?: string) {
+  if (!value) return '—'
+  return new Date(value).toLocaleString('pt-PT', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: Company[]; individualClients: IndividualClient[]; onSubmit: (data: any) => Promise<void> }) {

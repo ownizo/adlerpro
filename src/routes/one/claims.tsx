@@ -2,6 +2,8 @@ import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { OneLayout } from './__root'
+import { fetchClaimWorkspace, addClaimMessage, registerClaimDocument, getClaimDocumentUrl } from '@/lib/server-fns'
+import type { ClaimOperationalData } from '@/lib/types'
 
 export const Route = createFileRoute('/one/claims')({
   component: OneClaims,
@@ -61,6 +63,11 @@ function formatCurrency(n: number) {
 function formatDate(s: string) {
   if (!s) return '—'
   return new Date(s).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+function formatDateTime(s: string) {
+  if (!s) return '—'
+  return new Date(s).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 function OneClaims() {
@@ -242,7 +249,29 @@ function OneClaims() {
 
 function ClaimCard({ claim }: { claim: Claim }) {
   const [expanded, setExpanded] = useState(false)
+  const [ops, setOps] = useState<ClaimOperationalData | null>(null)
+  const [loadingOps, setLoadingOps] = useState(false)
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const st = CLAIM_STATUS[claim.status] ?? { bg: '#F3F4F6', color: '#6B7280', label: claim.status }
+
+  async function loadOps() {
+    setLoadingOps(true)
+    try {
+      const data = await fetchClaimWorkspace({ data: { claimId: claim.id } })
+      setOps((data as any).operations ?? null)
+    } catch (error) {
+      console.error('[OneClaims] fetchClaimWorkspace error:', error)
+      setOps(null)
+    } finally {
+      setLoadingOps(false)
+    }
+  }
+
+  useEffect(() => {
+    if (expanded) loadOps()
+  }, [expanded])
 
   return (
     <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
@@ -271,10 +300,131 @@ function ClaimCard({ claim }: { claim: Claim }) {
         </div>
       </button>
 
-      {expanded && claim.description && (
-        <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC' }}>
-          <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.25rem' }}>Descrição</p>
-          <p style={{ fontSize: '0.82rem', color: navy, margin: 0, lineHeight: 1.5 }}>{claim.description}</p>
+      {expanded && (
+        <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC', display: 'grid', gap: '0.9rem' }}>
+          {claim.description && (
+            <div>
+              <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.25rem' }}>Descrição</p>
+              <p style={{ fontSize: '0.82rem', color: navy, margin: 0, lineHeight: 1.5 }}>{claim.description}</p>
+            </div>
+          )}
+
+          <div>
+            <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>Documentos</p>
+            {loadingOps ? (
+              <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: 0 }}>A carregar...</p>
+            ) : (
+              <>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 0.75rem', background: navy, color: '#fff', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', marginBottom: '0.6rem' }}>
+                  {uploading ? 'A carregar...' : 'Adicionar ficheiro'}
+                  <input
+                    type="file"
+                    style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      setUploading(true)
+                      try {
+                        const storagePath = `claims/${claim.id}/${Date.now()}-${file.name}`
+                        const { error } = await supabase.storage.from('documents').upload(storagePath, file)
+                        if (error) throw error
+                        await registerClaimDocument({
+                          data: {
+                            claimId: claim.id,
+                            name: file.name,
+                            contentType: file.type || 'application/octet-stream',
+                            storagePath,
+                            size: file.size,
+                          },
+                        })
+                        await loadOps()
+                      } catch (error) {
+                        console.error('[OneClaims] registerClaimDocument error:', error)
+                      } finally {
+                        setUploading(false)
+                        e.target.value = ''
+                      }
+                    }}
+                  />
+                </label>
+                {ops?.documents?.length ? (
+                  <div style={{ display: 'grid', gap: '0.45rem' }}>
+                    {ops.documents.map((doc) => (
+                      <div key={doc.id} style={{ padding: '0.55rem 0.65rem', border: '1px solid #E2E8F0', borderRadius: 6, display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'center' }}>
+                        <div>
+                          <p style={{ fontSize: '0.78rem', color: navy, margin: 0, fontWeight: 600 }}>{doc.name}</p>
+                          <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '0.1rem 0 0' }}>{formatDateTime(doc.uploadedAt)} · {doc.uploadedByName}</p>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            const { url, name } = await getClaimDocumentUrl({ data: { claimId: claim.id, documentId: doc.id } })
+                            const a = document.createElement('a')
+                            a.href = url
+                            a.download = name
+                            a.click()
+                          }}
+                          style={{ border: '1px solid #CBD5E1', background: '#fff', color: '#334155', borderRadius: 4, padding: '0.3rem 0.6rem', fontSize: '0.72rem', cursor: 'pointer' }}
+                        >
+                          Download
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: 0 }}>Sem documentos neste sinistro.</p>
+                )}
+              </>
+            )}
+          </div>
+
+          <div>
+            <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>Mensagens</p>
+            {ops?.messages?.length ? (
+              <div style={{ display: 'grid', gap: '0.45rem', marginBottom: '0.65rem', maxHeight: 220, overflowY: 'auto' }}>
+                {ops.messages.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      padding: '0.55rem 0.65rem',
+                      border: item.senderRole === 'client' ? '1px solid #BFDBFE' : '1px solid #FDE68A',
+                      background: item.senderRole === 'client' ? '#EFF6FF' : '#FFFBEB',
+                      borderRadius: 6,
+                    }}
+                  >
+                    <p style={{ fontSize: '0.78rem', color: navy, margin: 0 }}>{item.body}</p>
+                    <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '0.18rem 0 0' }}>{item.senderName} · {formatDateTime(item.createdAt)}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '0 0 0.65rem' }}>Ainda sem mensagens.</p>
+            )}
+            <div style={{ display: 'flex', gap: '0.45rem' }}>
+              <input
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Escreva a sua resposta..."
+                style={{ ...inputStyle, flex: 1, padding: '0.5rem 0.65rem', fontSize: '0.78rem' }}
+              />
+              <button
+                onClick={async () => {
+                  if (!message.trim()) return
+                  setSending(true)
+                  try {
+                    await addClaimMessage({ data: { claimId: claim.id, body: message } })
+                    setMessage('')
+                    await loadOps()
+                  } finally {
+                    setSending(false)
+                  }
+                }}
+                disabled={sending}
+                style={{ padding: '0.5rem 0.8rem', border: 'none', background: gold, color: navy, borderRadius: 4, fontSize: '0.74rem', fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer' }}
+              >
+                {sending ? '...' : 'Enviar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

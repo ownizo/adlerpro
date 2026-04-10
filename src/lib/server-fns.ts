@@ -1,7 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
+import { Resend } from 'resend'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
+import { getClaimOperationalData, getClaimOperationalSummaryMap, saveClaimOperationalData, updateClaimOperationalData } from './claim-ops'
 import type {
   DashboardStats,
   AdminFinancialDashboardData,
@@ -9,6 +11,11 @@ import type {
   RenewalAlertItem,
   RenewalAlertHistoryItem,
   RenewalAlertStatus,
+  Claim,
+  ClaimTimelineEvent,
+  ClaimParticipant,
+  ClaimTicketMessage,
+  ClaimFileRef,
 } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
@@ -114,6 +121,106 @@ async function getViewerScope() {
     }
   }
   return scope
+}
+
+async function resolveIndividualClientScope(user: { id: string; email?: string | null }) {
+  const byAuthId = await supabaseAdmin
+    .from('individual_clients')
+    .select('id, full_name, email')
+    .eq('auth_user_id', user.id)
+    .maybeSingle()
+
+  if (byAuthId.data?.id) return byAuthId.data
+
+  if (user.email) {
+    const byEmail = await supabaseAdmin
+      .from('individual_clients')
+      .select('id, full_name, email')
+      .ilike('email', user.email)
+      .maybeSingle()
+    if (byEmail.data?.id) return byEmail.data
+  }
+
+  return null
+}
+
+async function getViewerAccessContext() {
+  const token = extractAccessToken()
+  if (!token) throw new Error('Authentication required')
+
+  const { data: { user: supaUser }, error } = await supabaseAdmin.auth.getUser(token)
+  if (error || !supaUser) throw new Error('Authentication required')
+
+  const meta = supaUser.user_metadata ?? {}
+  const appMeta = supaUser.app_metadata ?? {}
+  const user = {
+    id: supaUser.id,
+    email: supaUser.email,
+    name: meta.full_name ?? meta.name ?? supaUser.email ?? 'Utilizador',
+    roles: appMeta.roles as string[] | undefined,
+  }
+
+  const isAdmin = Boolean(user.roles?.includes('admin'))
+  const companyUser = user.email ? await db.getCompanyUserByEmail(user.email) : undefined
+  const individualClient = await resolveIndividualClientScope(user)
+
+  return {
+    user,
+    isAdmin,
+    companyId: companyUser?.companyId ?? null,
+    individualClientId: individualClient?.id ?? null,
+    individualClientName: individualClient?.full_name ?? null,
+    individualClientEmail: individualClient?.email ?? null,
+  }
+}
+
+function canAccessClaimByContext(claim: Claim, ctx: Awaited<ReturnType<typeof getViewerAccessContext>>) {
+  if (ctx.isAdmin) return true
+  if (ctx.companyId && claim.companyId && claim.companyId === ctx.companyId) return true
+  if (ctx.individualClientId && claim.individualClientId && claim.individualClientId === ctx.individualClientId) return true
+  return false
+}
+
+function buildTimelineEvent(data: Omit<ClaimTimelineEvent, 'id' | 'createdAt'>): ClaimTimelineEvent {
+  return {
+    id: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    ...data,
+  }
+}
+
+async function sendClaimMessageEmail(params: {
+  to?: string | null
+  claimId: string
+  senderName: string
+  senderRole: 'admin' | 'client'
+  body: string
+}) {
+  const to = params.to?.trim()
+  const apiKey = process.env['RESEND_API_KEY']
+  if (!to || !apiKey) return
+
+  const resend = new Resend(apiKey)
+  const from = process.env['RESEND_FROM_EMAIL'] || 'noreply@adlerrochefort.com'
+  const preview = params.body.length > 220 ? `${params.body.slice(0, 220)}...` : params.body
+
+  try {
+    await resend.emails.send({
+      from,
+      to: [to],
+      subject: `Atualização de sinistro ${params.claimId}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a">
+          <h2 style="margin:0 0 12px">Nova mensagem no sinistro ${params.claimId}</h2>
+          <p style="margin:0 0 8px"><strong>Remetente:</strong> ${params.senderName} (${params.senderRole === 'admin' ? 'Admin' : 'Cliente'})</p>
+          <p style="margin:0 0 16px"><strong>Mensagem:</strong><br>${preview.replace(/\n/g, '<br>')}</p>
+          <p style="margin:0">Aceda ao portal para responder e acompanhar o processo.</p>
+        </div>
+      `,
+    })
+  } catch (error) {
+    console.error('[sendClaimMessageEmail] error:', error)
+  }
 }
 
 // Dashboard — endpoint unificado: retorna stats + alertas + apólices numa só chamada
@@ -289,50 +396,6 @@ export const fetchClaimDocuments = createServerFn({ method: 'GET' })
     return db.getClaimDocuments(claimId, scope.companyId ?? claim.companyId)
   })
 
-export const registerClaimDocument = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
-  .inputValidator((d: { claimId: string; name: string; storagePath: string; size: number; mimeType?: string }) => d)
-  .handler(async ({ data }) => {
-    const scope = await getViewerScope()
-    const claim = await db.getClaim(data.claimId)
-    if (!claim) throw new Error('Sinistro não encontrado')
-    if (scope.companyId && claim.companyId !== scope.companyId) throw new Error('Sem permissões para este sinistro')
-
-    const now = new Date().toISOString()
-    await db.createDocument({
-      id: crypto.randomUUID(),
-      companyId: claim.companyId,
-      claimId: claim.id,
-      name: data.name,
-      category: 'claim',
-      size: data.size,
-      mimeType: data.mimeType,
-      uploadedBy: scope.user.name || scope.user.email || 'Cliente',
-      uploadedByType: scope.isAdmin ? 'admin' : 'client',
-      uploadedAt: now,
-      blobKey: data.storagePath,
-      policyId: claim.policyId,
-    })
-    return { success: true }
-  })
-
-export const getClaimDocumentUrl = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
-  .inputValidator((d: { documentId: string }) => d)
-  .handler(async ({ data }) => {
-    const scope = await getViewerScope()
-    const document = await db.getDocument(data.documentId)
-    if (!document?.blobKey) throw new Error('Documento não encontrado')
-    if (!document.claimId) throw new Error('Documento não associado a sinistro')
-    if (scope.companyId && document.companyId !== scope.companyId) throw new Error('Sem permissões para este documento')
-
-    const { data: urlData, error } = await supabaseAdmin.storage
-      .from('documents')
-      .createSignedUrl(document.blobKey, 3600)
-    if (error) throw new Error(error.message)
-    return { url: urlData.signedUrl }
-  })
-
 export const fetchClaimMessages = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: string) => d)
@@ -348,38 +411,76 @@ export const sendClaimMessage = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: { claimId: string; message: string }) => d)
   .handler(async ({ data }) => {
-    const scope = await getViewerScope()
+    const ctx = await getViewerAccessContext()
     const claim = await db.getClaim(data.claimId)
     if (!claim) throw new Error('Sinistro não encontrado')
-    if (scope.companyId && claim.companyId !== scope.companyId) throw new Error('Sem permissões para este sinistro')
+    if (!canAccessClaimByContext(claim, ctx)) throw new Error('Sem acesso a este sinistro')
 
     const message = data.message.trim()
     if (!message) throw new Error('Mensagem vazia')
 
     const now = new Date().toISOString()
+    const senderType = ctx.isAdmin ? 'admin' : 'client'
+    const senderName = ctx.user.name || ctx.user.email || (ctx.isAdmin ? 'Admin' : 'Cliente')
     await db.createClaimMessage({
       id: crypto.randomUUID(),
       claimId: claim.id,
       companyId: claim.companyId,
-      senderType: scope.isAdmin ? 'admin' : 'client',
-      senderName: scope.user.name || scope.user.email || (scope.isAdmin ? 'Admin' : 'Cliente'),
-      senderUserId: scope.user.id,
+      senderType,
+      senderName,
+      senderUserId: ctx.user.id,
       message,
       createdAt: now,
-      readAt: scope.isAdmin ? null : now,
+      readAt: ctx.isAdmin ? null : now,
     })
 
-    if (scope.isAdmin) {
+    await updateClaimOperationalData(data.claimId, (current) => ({
+      ...current,
+      messages: [
+        ...current.messages,
+        {
+          id: crypto.randomUUID(),
+          body: message,
+          createdAt: now,
+          senderRole: senderType,
+          senderName,
+          senderEmail: ctx.user.email ?? undefined,
+        },
+      ],
+      timeline: [
+        ...current.timeline,
+        buildTimelineEvent({
+          type: 'message',
+          message: `${senderType === 'admin' ? 'Admin' : 'Cliente'} adicionou uma mensagem`,
+          actorName: senderName,
+          actorRole: senderType,
+        }),
+      ],
+    }))
+
+    if (claim.companyId) {
       await db.createAlert({
         id: crypto.randomUUID(),
         companyId: claim.companyId,
         type: 'claim_update',
         title: `Nova mensagem no sinistro ${claim.id.slice(-8).toUpperCase()}`,
-        message,
+        message: senderType === 'admin' ? message : 'O cliente enviou uma nova mensagem.',
         read: false,
         createdAt: now,
       })
     }
+
+    const recipientEmail = senderType === 'admin'
+      ? (claim.individualClientId ? (await db.getIndividualClient(claim.individualClientId))?.email : (claim.companyId ? (await db.getCompany(claim.companyId))?.contactEmail : undefined))
+      : (claim.companyId ? (await db.getCompany(claim.companyId))?.contactEmail : process.env['CLAIMS_NOTIFICATIONS_TO'])
+
+    await sendClaimMessageEmail({
+      to: recipientEmail,
+      claimId: claim.id,
+      senderName,
+      senderRole: senderType,
+      body: message,
+    })
 
     return { success: true }
   })
@@ -502,6 +603,7 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       db.getDocuments(),
       db.getIndividualClients(),
     ])
+    const claimOperationalSummary = await getClaimOperationalSummaryMap(claims.map((claim) => claim.id))
 
     const normalizeNif = (value?: string | null) => (value ?? '').replace(/\D/g, '')
     const normalizeEmail = (value?: string | null) => (value ?? '').trim().toLowerCase()
@@ -531,6 +633,7 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       apiConnections,
       policies,
       claims,
+      claimOperationalSummary,
       documents,
       individualClients: filteredIndividualClients,
     }
@@ -1285,6 +1388,8 @@ export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
     const claim = await db.getClaim(data.claimId)
     if (!claim) throw new Error('Sinistro não encontrado')
     const now = new Date().toISOString()
+    const currentStatus = claim.status
+    const statusLabel = String(data.status).replaceAll('_', ' ')
     const steps = [
       ...claim.steps,
       {
@@ -1294,7 +1399,20 @@ export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
       },
     ]
     await db.updateClaim(data.claimId, { status: data.status as any, steps })
-    const label = String(data.status).replaceAll('_', ' ')
+
+    await updateClaimOperationalData(data.claimId, (current) => ({
+      ...current,
+      timeline: [
+        ...current.timeline,
+        buildTimelineEvent({
+          type: 'status',
+          message: `Estado alterado de ${currentStatus} para ${data.status}${data.notes ? ` (${data.notes})` : ''}`,
+          actorName: scope.user.name || scope.user.email || 'Admin',
+          actorRole: 'admin',
+        }),
+      ],
+    }))
+
     await db.createClaimMessage({
       id: crypto.randomUUID(),
       claimId: claim.id,
@@ -1302,19 +1420,22 @@ export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
       senderType: 'admin',
       senderName: scope.user.name || scope.user.email || 'Admin',
       senderUserId: scope.user.id,
-      message: data.notes?.trim() || `Estado do sinistro atualizado para "${label}".`,
+      message: data.notes?.trim() || `Estado do sinistro atualizado para "${statusLabel}".`,
       createdAt: now,
       readAt: null,
     })
-    await db.createAlert({
-      id: crypto.randomUUID(),
-      companyId: claim.companyId,
-      type: 'claim_update',
-      title: `Atualização de sinistro ${claim.id.slice(-8).toUpperCase()}`,
-      message: data.notes?.trim() || `Estado atualizado para ${label}.`,
-      read: false,
-      createdAt: now,
-    })
+    if (claim.companyId) {
+      await db.createAlert({
+        id: `alt_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+        companyId: claim.companyId,
+        type: 'claim_update',
+        title: `Sinistro ${claim.id} atualizado`,
+        message: data.notes?.trim() || `Novo estado: ${statusLabel}`,
+        read: false,
+        createdAt: now,
+      })
+    }
+
     return { success: true }
   })
 
@@ -1325,31 +1446,445 @@ export const adminSendClaimMessage = createServerFn({ method: 'POST' })
     const scope = await getViewerScope()
     const claim = await db.getClaim(data.claimId)
     if (!claim) throw new Error('Sinistro não encontrado')
+
     const message = data.message.trim()
     if (!message) throw new Error('Mensagem vazia')
-    const now = new Date().toISOString()
 
+    const now = new Date().toISOString()
+    const senderName = scope.user.name || scope.user.email || 'Admin'
     await db.createClaimMessage({
       id: crypto.randomUUID(),
       claimId: claim.id,
       companyId: claim.companyId,
       senderType: 'admin',
-      senderName: scope.user.name || scope.user.email || 'Admin',
+      senderName,
       senderUserId: scope.user.id,
       message,
       createdAt: now,
       readAt: null,
     })
-    await db.createAlert({
-      id: crypto.randomUUID(),
-      companyId: claim.companyId,
-      type: 'claim_update',
-      title: `Nova mensagem no sinistro ${claim.id.slice(-8).toUpperCase()}`,
-      message,
-      read: false,
-      createdAt: now,
+
+    await updateClaimOperationalData(data.claimId, (current) => ({
+      ...current,
+      messages: [
+        ...current.messages,
+        {
+          id: crypto.randomUUID(),
+          body: message,
+          createdAt: now,
+          senderRole: 'admin',
+          senderName,
+          senderEmail: scope.user.email ?? undefined,
+        },
+      ],
+      timeline: [
+        ...current.timeline,
+        buildTimelineEvent({
+          type: 'message',
+          message: 'Admin adicionou uma mensagem',
+          actorName: senderName,
+          actorRole: 'admin',
+        }),
+      ],
+    }))
+
+    if (claim.companyId) {
+      await db.createAlert({
+        id: crypto.randomUUID(),
+        companyId: claim.companyId,
+        type: 'claim_update',
+        title: `Nova mensagem no sinistro ${claim.id.slice(-8).toUpperCase()}`,
+        message,
+        read: false,
+        createdAt: now,
+      })
+    }
+
+    const recipientEmail = claim.individualClientId
+      ? (await db.getIndividualClient(claim.individualClientId))?.email
+      : (claim.companyId ? (await db.getCompany(claim.companyId))?.contactEmail : undefined)
+
+    await sendClaimMessageEmail({
+      to: recipientEmail,
+      claimId: claim.id,
+      senderName,
+      senderRole: 'admin',
+      body: message,
     })
+
     return { success: true }
+  })
+
+export const adminCreateClaim = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: {
+    targetType: 'company' | 'individual'
+    companyId?: string
+    individualClientId?: string
+    clientUserId?: string
+    policyId: string
+    type: string
+    description: string
+    incidentDate: string
+    estimatedValue?: number
+  }) => d)
+  .handler(async ({ data }) => {
+    if (data.targetType === 'company' && !data.companyId) {
+      throw new Error('Empresa é obrigatória para este tipo de sinistro')
+    }
+    if (data.targetType === 'individual' && !data.individualClientId) {
+      throw new Error('Cliente individual é obrigatório para este tipo de sinistro')
+    }
+
+    const policy = await db.getPolicy(data.policyId)
+    if (!policy) throw new Error('Apólice não encontrada')
+
+    if (data.targetType === 'company' && policy.companyId !== data.companyId) {
+      throw new Error('A apólice selecionada não pertence à empresa indicada')
+    }
+    if (data.targetType === 'individual' && policy.individualClientId !== data.individualClientId) {
+      throw new Error('A apólice selecionada não pertence ao cliente indicado')
+    }
+
+    const claimId = `clm_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`
+    const nowIso = new Date().toISOString()
+    await db.createClaim({
+      id: claimId,
+      policyId: data.policyId,
+      companyId: data.targetType === 'company' ? data.companyId : undefined,
+      individualClientId: data.targetType === 'individual' ? data.individualClientId : undefined,
+      title: data.type,
+      description: data.description,
+      claimDate: nowIso.slice(0, 10),
+      incidentDate: data.incidentDate,
+      estimatedValue: Number(data.estimatedValue || 0),
+      status: 'submitted',
+      steps: [{ status: 'submitted', date: nowIso.slice(0, 10), notes: 'Sinistro criado pelo Admin' }],
+      createdAt: nowIso,
+    })
+
+    let responsible: ClaimParticipant | undefined
+    if (data.clientUserId) {
+      const companyUsers = await db.getCompanyUsers()
+      const selected = companyUsers.find((user) => user.id === data.clientUserId)
+      responsible = {
+        id: data.clientUserId,
+        name: selected?.name || 'Responsável',
+        email: selected?.email,
+        role: 'admin',
+      }
+    }
+
+    await saveClaimOperationalData({
+      claimId,
+      responsible,
+      teamNotes: [],
+      messages: [],
+      documents: [],
+      timeline: [
+        buildTimelineEvent({
+          type: 'created',
+          message: `Sinistro criado (${data.type})`,
+          actorName: 'Admin',
+          actorRole: 'admin',
+        }),
+      ],
+      updatedAt: nowIso,
+    })
+
+    if (data.targetType === 'company' && data.companyId) {
+      await db.createAlert({
+        id: `alt_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+        companyId: data.companyId,
+        type: 'claim_update',
+        title: `Novo sinistro ${claimId}`,
+        message: `Foi criado um novo sinistro (${data.type})`,
+        read: false,
+        createdAt: nowIso,
+      })
+    }
+
+    return { id: claimId }
+  })
+
+export const fetchClaimWorkspace = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { claimId: string }) => d)
+  .handler(async ({ data }) => {
+    const ctx = await getViewerAccessContext()
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+    if (!canAccessClaimByContext(claim, ctx)) throw new Error('Sem acesso a este sinistro')
+
+    const [policy, company, individualClient, ops] = await Promise.all([
+      db.getPolicy(claim.policyId),
+      claim.companyId ? db.getCompany(claim.companyId) : Promise.resolve(undefined),
+      claim.individualClientId ? db.getIndividualClient(claim.individualClientId) : Promise.resolve(undefined),
+      getClaimOperationalData(claim.id),
+    ])
+
+    return {
+      claim,
+      policy,
+      company,
+      individualClient,
+      operations: ops,
+    }
+  })
+
+export const adminAssignClaimResponsible = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { claimId: string; responsible?: { id: string; name: string; email?: string } }) => d)
+  .handler(async ({ data }) => {
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+
+    await updateClaimOperationalData(data.claimId, (current) => {
+      const nextResponsible = data.responsible
+        ? {
+            id: data.responsible.id,
+            name: data.responsible.name,
+            email: data.responsible.email,
+            role: 'admin' as const,
+          }
+        : undefined
+      const timeline = [...current.timeline]
+      timeline.push(
+        buildTimelineEvent({
+          type: 'assignment',
+          message: nextResponsible ? `Responsável definido: ${nextResponsible.name}` : 'Responsável removido',
+          actorName: 'Admin',
+          actorRole: 'admin',
+        }),
+      )
+      return { ...current, responsible: nextResponsible, timeline }
+    })
+
+    return { success: true }
+  })
+
+export const adminAddClaimTeamNote = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { claimId: string; note: string; authorName?: string }) => d)
+  .handler(async ({ data }) => {
+    const trimmed = data.note.trim()
+    if (!trimmed) throw new Error('Nota vazia')
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+
+    await updateClaimOperationalData(data.claimId, (current) => ({
+      ...current,
+      teamNotes: [
+        ...current.teamNotes,
+        {
+          id: crypto.randomUUID(),
+          note: trimmed,
+          createdAt: new Date().toISOString(),
+          authorName: data.authorName || 'Admin',
+        },
+      ],
+      timeline: [
+        ...current.timeline,
+        buildTimelineEvent({
+          type: 'note',
+          message: 'Nota interna adicionada',
+          actorName: data.authorName || 'Admin',
+          actorRole: 'admin',
+        }),
+      ],
+    }))
+
+    return { success: true }
+  })
+
+export const addClaimMessage = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { claimId: string; body: string }) => d)
+  .handler(async ({ data }) => {
+    const body = data.body.trim()
+    if (!body) throw new Error('Mensagem vazia')
+
+    const ctx = await getViewerAccessContext()
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+    if (!canAccessClaimByContext(claim, ctx)) throw new Error('Sem acesso a este sinistro')
+
+    const senderRole: ClaimTicketMessage['senderRole'] = ctx.isAdmin ? 'admin' : 'client'
+    const senderName = ctx.user.name || (ctx.isAdmin ? 'Admin' : 'Cliente')
+    const senderEmail = ctx.user.email ?? undefined
+    const message: ClaimTicketMessage = {
+      id: crypto.randomUUID(),
+      body,
+      createdAt: new Date().toISOString(),
+      senderRole,
+      senderName,
+      senderEmail,
+    }
+
+    const ops = await updateClaimOperationalData(data.claimId, (current) => ({
+      ...current,
+      messages: [...current.messages, message],
+      timeline: [
+        ...current.timeline,
+        buildTimelineEvent({
+          type: 'message',
+          message: `${senderRole === 'admin' ? 'Admin' : 'Cliente'} adicionou uma mensagem`,
+          actorName: senderName,
+          actorRole: senderRole,
+        }),
+      ],
+    }))
+
+    if (claim.companyId) {
+      await db.createAlert({
+        id: `alt_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+        companyId: claim.companyId,
+        type: 'claim_update',
+        title: `Nova mensagem no sinistro ${claim.id}`,
+        message: senderRole === 'admin' ? 'Admin respondeu no ticket' : 'Cliente respondeu no ticket',
+        read: false,
+        createdAt: new Date().toISOString(),
+      })
+    }
+
+    const recipientEmail = senderRole === 'admin'
+      ? (claim.individualClientId ? (await db.getIndividualClient(claim.individualClientId))?.email : (await db.getCompany(claim.companyId || ''))?.contactEmail)
+      : (claim.companyId ? (await db.getCompany(claim.companyId))?.contactEmail : process.env['CLAIMS_NOTIFICATIONS_TO'])
+
+    await sendClaimMessageEmail({
+      to: recipientEmail,
+      claimId: claim.id,
+      senderName,
+      senderRole,
+      body,
+    })
+
+    return { success: true, operations: ops }
+  })
+
+export const registerClaimDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { claimId: string; name: string; contentType?: string; mimeType?: string; storagePath: string; size: number }) => d)
+  .handler(async ({ data }) => {
+    const ctx = await getViewerAccessContext()
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+    if (!canAccessClaimByContext(claim, ctx)) throw new Error('Sem acesso a este sinistro')
+
+    const uploadedByRole: ClaimFileRef['uploadedByRole'] = ctx.isAdmin ? 'admin' : 'client'
+    const uploadedByName = ctx.user.name || (ctx.isAdmin ? 'Admin' : 'Cliente')
+    const uploadedAt = new Date().toISOString()
+    const contentType = data.contentType || data.mimeType || 'application/octet-stream'
+    const fileRef: ClaimFileRef = {
+      id: crypto.randomUUID(),
+      claimId: claim.id,
+      name: data.name,
+      contentType,
+      uploadedAt,
+      uploadedByName,
+      uploadedByRole,
+      storagePath: data.storagePath,
+      size: Number(data.size || 0),
+    }
+
+    await db.createDocument({
+      id: fileRef.id,
+      companyId: claim.companyId ?? '',
+      individualClientId: claim.individualClientId,
+      claimId: claim.id,
+      name: data.name,
+      category: 'claim',
+      size: fileRef.size,
+      mimeType: contentType,
+      uploadedBy: uploadedByName,
+      uploadedByType: uploadedByRole,
+      uploadedAt,
+      blobKey: data.storagePath,
+      policyId: claim.policyId,
+    })
+
+    const ops = await updateClaimOperationalData(data.claimId, (current) => ({
+      ...current,
+      documents: [...current.documents, fileRef],
+      timeline: [
+        ...current.timeline,
+        buildTimelineEvent({
+          type: 'document',
+          message: `Documento adicionado: ${data.name}`,
+          actorName: uploadedByName,
+          actorRole: uploadedByRole,
+        }),
+      ],
+    }))
+
+    return { success: true, operations: ops }
+  })
+
+export const removeClaimDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { claimId: string; documentId: string }) => d)
+  .handler(async ({ data }) => {
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+
+    const ops = await updateClaimOperationalData(data.claimId, (current) => {
+      const target = current.documents.find((item) => item.id === data.documentId)
+      const documents = current.documents.filter((item) => item.id !== data.documentId)
+      const timeline = [...current.timeline]
+      if (target) {
+        timeline.push(
+          buildTimelineEvent({
+            type: 'document',
+            message: `Documento removido: ${target.name}`,
+            actorName: 'Admin',
+            actorRole: 'admin',
+          }),
+        )
+      }
+      return { ...current, documents, timeline }
+    })
+
+    return { success: true, operations: ops }
+  })
+
+export const getClaimDocumentUrl = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { claimId?: string; documentId: string }) => d)
+  .handler(async ({ data }) => {
+    const ctx = await getViewerAccessContext()
+
+    const dbDocument = await db.getDocument(data.documentId)
+    if (dbDocument?.blobKey) {
+      if (dbDocument.claimId) {
+        const claim = await db.getClaim(dbDocument.claimId)
+        if (!claim) throw new Error('Sinistro não encontrado')
+        if (!canAccessClaimByContext(claim, ctx)) throw new Error('Sem acesso a este sinistro')
+      } else if (ctx.companyId && dbDocument.companyId && dbDocument.companyId !== ctx.companyId) {
+        throw new Error('Sem permissões para este documento')
+      }
+
+      const { data: urlData, error } = await supabaseAdmin.storage
+        .from('documents')
+        .createSignedUrl(dbDocument.blobKey, 3600)
+      if (error) throw new Error(error.message)
+      return { url: urlData.signedUrl, name: dbDocument.name }
+    }
+
+    if (!data.claimId) throw new Error('Sinistro não encontrado')
+
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Sinistro não encontrado')
+    if (!canAccessClaimByContext(claim, ctx)) throw new Error('Sem acesso a este sinistro')
+
+    const ops = await getClaimOperationalData(data.claimId)
+    const doc = ops.documents.find((item) => item.id === data.documentId)
+    if (!doc) throw new Error('Documento não encontrado')
+
+    const { data: urlData, error } = await supabaseAdmin.storage
+      .from('documents')
+      .createSignedUrl(doc.storagePath, 3600)
+    if (error) throw new Error(error.message)
+    return { url: urlData.signedUrl, name: doc.name }
   })
 
 export const adminCreateCompany = createServerFn({ method: 'POST' })

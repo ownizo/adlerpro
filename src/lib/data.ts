@@ -413,6 +413,13 @@ export async function getIndividualClients(): Promise<IndividualClient[]> {
   return rowsToCamel<IndividualClient>(data ?? [])
 }
 
+export async function getIndividualClient(id: string): Promise<IndividualClient | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('individual_clients').select('*').eq('id', id).single()
+  if (error) return undefined
+  return objectToCamel(data) as IndividualClient
+}
+
 export async function createIndividualClient(client: Omit<IndividualClient, 'id' | 'createdAt'>): Promise<{ id: string }> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb
