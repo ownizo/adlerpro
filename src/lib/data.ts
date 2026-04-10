@@ -270,6 +270,12 @@ export async function getAlerts(companyId?: string): Promise<Alert[]> {
   return rowsToCamel<Alert>(data ?? [])
 }
 
+export async function createAlert(alert: Alert): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('alerts').insert(objectToSnake(alert as unknown as Record<string, unknown>))
+  if (error) console.error('createAlert error:', error)
+}
+
 export async function markAlertRead(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('alerts').update({ read: true }).eq('id', id)
@@ -348,6 +354,13 @@ export async function getIndividualClients(): Promise<IndividualClient[]> {
   const { data, error } = await sb.from('individual_clients').select('*').order('full_name', { ascending: true })
   if (error) { console.error('getIndividualClients error:', error); return [] }
   return rowsToCamel<IndividualClient>(data ?? [])
+}
+
+export async function getIndividualClient(id: string): Promise<IndividualClient | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('individual_clients').select('*').eq('id', id).single()
+  if (error) return undefined
+  return objectToCamel(data) as IndividualClient
 }
 
 export async function createIndividualClient(client: Omit<IndividualClient, 'id' | 'createdAt'>): Promise<{ id: string }> {
