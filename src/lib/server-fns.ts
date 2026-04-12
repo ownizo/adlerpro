@@ -504,18 +504,6 @@ export const submitClaim = createServerFn({ method: 'POST' })
         readAt: now,
       })
     }
-    if (created) {
-      await persistClaimMessage({
-        claim,
-        senderType: 'client',
-        senderName: ctx.user.name || ctx.user.email || 'Cliente',
-        senderUserId: ctx.user.id,
-        message: 'Sinistro submetido pelo cliente.',
-        createdAt: claim.createdAt,
-        readAt: claim.createdAt,
-      })
-    }
-
     return { id: claim.id, reused: !created }
   })
 
@@ -679,11 +667,16 @@ export const markClaimMessagesAsRead = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: string) => d)
   .handler(async ({ data: claimId }) => {
-    const scope = await getViewerScope()
-    if (!scope.companyId) return { success: true }
+    const ctx = await getViewerAccessContext()
     const claim = await db.getClaim(claimId)
-    if (!claim || claim.companyId !== scope.companyId) return { success: true }
-    await db.markClaimMessagesReadForClient(claimId, scope.companyId)
+    if (!claim || !canAccessClaimByContext(claim, ctx)) return { success: true }
+
+    if (ctx.companyId && claim.companyId === ctx.companyId) {
+      await db.markClaimMessagesReadForClient(claimId, ctx.companyId)
+    } else if (ctx.individualClientId && claim.individualClientId === ctx.individualClientId) {
+      await db.markClaimMessagesReadForIndividualClient(claimId, ctx.individualClientId)
+    }
+
     return { success: true }
   })
 

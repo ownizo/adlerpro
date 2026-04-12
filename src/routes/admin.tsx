@@ -25,7 +25,7 @@ import {
   fetchClaimWorkspace,
   adminAssignClaimResponsible,
   adminAddClaimTeamNote,
-  addClaimMessage,
+  adminSendClaimMessage,
   registerClaimDocument,
   removeClaimDocument,
   getClaimDocumentUrl,
@@ -2772,7 +2772,7 @@ function AdminClaimWorkspace({
           <button
             onClick={async () => {
               if (!newMessage.trim()) return
-              await addClaimMessage({ data: { claimId: claim.id, body: newMessage } })
+              await adminSendClaimMessage({ data: { claimId: claim.id, message: newMessage } })
               setNewMessage('')
               await onUpdated()
             }}

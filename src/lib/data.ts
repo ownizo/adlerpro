@@ -320,7 +320,10 @@ export async function getClaimMessages(claimId: string): Promise<ClaimMessage[]>
 export async function createClaimMessage(message: ClaimMessage): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('claim_messages').insert(objectToSnake(message as unknown as Record<string, unknown>))
-  if (error) console.error('createClaimMessage error:', error)
+  if (error) {
+    console.error('createClaimMessage error:', error)
+    throw new Error(`Falha ao guardar mensagem: ${error.message}`)
+  }
 }
 
 export async function markClaimMessagesReadForClient(claimId: string, companyId: string): Promise<void> {
@@ -334,6 +337,19 @@ export async function markClaimMessagesReadForClient(claimId: string, companyId:
     .eq('sender_type', 'admin')
     .is('read_at', null)
   if (error) console.error('markClaimMessagesReadForClient error:', error)
+}
+
+export async function markClaimMessagesReadForIndividualClient(claimId: string, individualClientId: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const now = new Date().toISOString()
+  const { error } = await sb
+    .from('claim_messages')
+    .update({ read_at: now })
+    .eq('claim_id', claimId)
+    .eq('individual_client_id', individualClientId)
+    .eq('sender_type', 'admin')
+    .is('read_at', null)
+  if (error) console.error('markClaimMessagesReadForIndividualClient error:', error)
 }
 
 // ============================================================
