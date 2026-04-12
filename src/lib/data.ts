@@ -211,6 +211,28 @@ export async function getClaims(companyId?: string): Promise<Claim[]> {
   return rowsToCamel<Claim>(data ?? [])
 }
 
+export async function getClaimsByIndividualClientId(individualClientId: string): Promise<Claim[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('claims')
+    .select('*')
+    .eq('individual_client_id', individualClientId)
+    .order('created_at', { ascending: true })
+  if (error) { console.error('getClaimsByIndividualClientId error:', error); return [] }
+  return rowsToCamel<Claim>(data ?? [])
+}
+
+export async function getClaimsByPolicyId(policyId: string): Promise<Claim[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('claims')
+    .select('*')
+    .eq('policy_id', policyId)
+    .order('created_at', { ascending: true })
+  if (error) { console.error('getClaimsByPolicyId error:', error); return [] }
+  return rowsToCamel<Claim>(data ?? [])
+}
+
 export async function getClaim(id: string): Promise<Claim | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('claims').select('*').eq('id', id).single()
@@ -283,14 +305,13 @@ export async function getClaimDocuments(claimId: string, companyId?: string): Pr
 // ============================================================
 // Claim Messages
 // ============================================================
-export async function getClaimMessages(claimId: string, companyId?: string): Promise<ClaimMessage[]> {
+export async function getClaimMessages(claimId: string): Promise<ClaimMessage[]> {
   const sb = getSupabaseAdmin()
-  let query = sb
+  const query = sb
     .from('claim_messages')
     .select('*')
     .eq('claim_id', claimId)
     .order('created_at', { ascending: true })
-  if (companyId) query = query.eq('company_id', companyId)
   const { data, error } = await query
   if (error) { console.error('getClaimMessages error:', error); return [] }
   return rowsToCamel<ClaimMessage>(data ?? [])

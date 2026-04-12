@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { OneLayout } from './__root'
-import { fetchClaimWorkspace, addClaimMessage, registerClaimDocument, getClaimDocumentUrl } from '@/lib/server-fns'
+import { fetchClaimWorkspace, addClaimMessage, registerClaimDocument, getClaimDocumentUrl, fetchIndividualClaims, submitIndividualClaim } from '@/lib/server-fns'
 import type { ClaimOperationalData } from '@/lib/types'
 
 export const Route = createFileRoute('/one/claims')({
@@ -114,13 +114,10 @@ function OneClaims() {
             .select('id, policy_number, type, insurer')
             .eq('individual_client_id', cid)
             .order('end_date', { ascending: true }),
-          supabase.from('claims')
-            .select('id, title, description, incident_date, claim_date, estimated_value, status')
-            .eq('individual_client_id', cid)
-            .order('claim_date', { ascending: false }),
+          fetchIndividualClaims(),
         ])
         setPolicies(pData ?? [])
-        setClaims(cData ?? [])
+        setClaims((cData as Claim[]) ?? [])
       }
     } catch (e: any) {
       setError('Erro ao carregar sinistros.')
@@ -136,21 +133,15 @@ function OneClaims() {
     setFormError('')
     setSubmitting(true)
     try {
-      const now = new Date().toISOString()
-      const { error: err } = await supabase.from('claims').insert({
-        id: crypto.randomUUID(),
-        individual_client_id: clientId,
-        policy_id: form.policyId || null,
-        title: form.title,
-        description: form.description,
-        incident_date: form.incidentDate,
-        claim_date: now.split('T')[0],
-        estimated_value: Number(form.estimatedValue) || 0,
-        status: 'submitted',
-        steps: [{ status: 'submitted', date: now.split('T')[0] }],
-        created_at: now,
+      await submitIndividualClaim({
+        data: {
+          policyId: form.policyId,
+          title: form.title,
+          description: form.description,
+          incidentDate: form.incidentDate,
+          estimatedValue: Number(form.estimatedValue) || 0,
+        },
       })
-      if (err) throw err
       setForm({ policyId: '', title: '', description: '', incidentDate: '', estimatedValue: '' })
       setShowForm(false)
       await loadData()

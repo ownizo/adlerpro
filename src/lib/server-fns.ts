@@ -4,7 +4,8 @@ import { Resend } from 'resend'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
 import { getClaimOperationalData, saveClaimOperationalData, updateClaimOperationalData } from './claim-ops'
-import { mergeClaimMessages, mergeClaimOperationalMessages } from './claim-message-sync'
+import { claimMessageToTicketMessage, mergeClaimMessages } from './claim-message-sync'
+import { normalizeClaimsByPolicy, selectPreferredClaimForPolicy } from './claim-resolution'
 import type {
   DashboardStats,
   AdminFinancialDashboardData,
@@ -227,30 +228,127 @@ async function sendClaimMessageEmail(params: {
 }
 
 async function getLegacyClaimMessages(claim: Claim): Promise<ClaimMessage[]> {
-  return db.getClaimMessages(claim.id, claim.companyId ?? undefined)
+  return db.getClaimMessages(claim.id)
 }
 
-async function getMergedClaimOperationalData(claim: Claim): Promise<ClaimOperationalData> {
-  const [ops, legacyMessages] = await Promise.all([
-    getClaimOperationalData(claim.id),
-    getLegacyClaimMessages(claim),
-  ])
-
-  return mergeClaimOperationalMessages(ops, legacyMessages)
+function claimMessageIdentity(message: Pick<ClaimMessage, 'senderType' | 'senderName' | 'message' | 'createdAt'>) {
+  return [
+    message.senderType,
+    message.senderName.trim().replace(/\s+/g, ' '),
+    message.message.trim().replace(/\s+/g, ' '),
+    message.createdAt,
+  ].join('::')
 }
 
-async function getMergedClaimMessages(claim: Claim): Promise<ClaimMessage[]> {
-  const [legacyMessages, ops] = await Promise.all([
+async function persistClaimMessage(params: {
+  claim: Claim
+  senderType: 'admin' | 'client'
+  senderName: string
+  senderUserId?: string
+  message: string
+  createdAt: string
+  readAt?: string | null
+}) {
+  await db.createClaimMessage({
+    id: crypto.randomUUID(),
+    claimId: params.claim.id,
+    companyId: params.claim.companyId,
+    individualClientId: params.claim.individualClientId,
+    senderType: params.senderType,
+    senderName: params.senderName,
+    senderUserId: params.senderUserId,
+    message: params.message,
+    createdAt: params.createdAt,
+    readAt: params.readAt,
+  })
+}
+
+async function backfillClaimMessagesFromOperationalData(claim: Claim): Promise<ClaimMessage[]> {
+  const [storedMessages, ops] = await Promise.all([
     getLegacyClaimMessages(claim),
     getClaimOperationalData(claim.id),
   ])
 
-  return mergeClaimMessages({
+  if (ops.messages.length === 0) return storedMessages
+
+  const mergedMessages = mergeClaimMessages({
     claimId: claim.id,
     companyId: claim.companyId,
-    legacyMessages,
+    individualClientId: claim.individualClientId,
+    legacyMessages: storedMessages,
     ticketMessages: ops.messages,
   })
+
+  const existingKeys = new Set(storedMessages.map((message) => claimMessageIdentity(message)))
+  const missingMessages = mergedMessages.filter((message) => !existingKeys.has(claimMessageIdentity(message)))
+
+  for (const message of missingMessages) {
+    await persistClaimMessage({
+      claim,
+      senderType: message.senderType,
+      senderName: message.senderName,
+      senderUserId: message.senderUserId,
+      message: message.message,
+      createdAt: message.createdAt,
+      readAt: message.readAt,
+    })
+  }
+
+  return missingMessages.length > 0 ? getLegacyClaimMessages(claim) : storedMessages
+}
+
+async function getCanonicalClaimMessages(claim: Claim): Promise<ClaimMessage[]> {
+  return backfillClaimMessagesFromOperationalData(claim)
+}
+
+async function getCanonicalClaimOperationalData(claim: Claim): Promise<ClaimOperationalData> {
+  const [ops, canonicalMessages] = await Promise.all([
+    getClaimOperationalData(claim.id),
+    getCanonicalClaimMessages(claim),
+  ])
+
+  const mappedMessages = canonicalMessages.map(claimMessageToTicketMessage)
+  const lastMessageAt = mappedMessages[mappedMessages.length - 1]?.createdAt
+  const updatedAt = [ops.updatedAt, lastMessageAt]
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+    .at(-1) ?? ops.updatedAt
+
+  return {
+    ...ops,
+    messages: mappedMessages,
+    updatedAt,
+  }
+}
+
+async function getOrCreateClaimByPolicy(input: {
+  policyId: string
+  buildNewClaim: (claimId: string, nowIso: string) => Claim
+  updatesIfExisting?: Partial<Claim>
+}) {
+  const existingClaims = await db.getClaimsByPolicyId(input.policyId)
+  const existing = selectPreferredClaimForPolicy(existingClaims)
+
+  if (existing) {
+    if (input.updatesIfExisting && Object.keys(input.updatesIfExisting).length > 0) {
+      await db.updateClaim(existing.id, input.updatesIfExisting)
+      return {
+        claim: {
+          ...existing,
+          ...input.updatesIfExisting,
+        },
+        created: false as const,
+      }
+    }
+
+    return { claim: existing, created: false as const }
+  }
+
+  const nowIso = new Date().toISOString()
+  const claimId = `clm_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`
+  const claim = input.buildNewClaim(claimId, nowIso)
+  await db.createClaim(claim)
+  return { claim, created: true as const }
 }
 
 // Dashboard — endpoint unificado: retorna stats + alertas + apólices numa só chamada
@@ -339,7 +437,8 @@ export const fetchClaims = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
-    return db.getClaims(scope.companyId ?? undefined)
+    const claims = await db.getClaims(scope.companyId ?? undefined)
+    return normalizeClaimsByPolicy(claims)
   })
 
 export const fetchClaim = createServerFn({ method: 'GET' })
@@ -370,33 +469,107 @@ export const submitClaim = createServerFn({ method: 'POST' })
     const companyId = scope.companyId ?? data.companyId
     if (!companyId) throw new Error('Empresa não associada ao utilizador')
 
-    const id = `clm_${Date.now()}`
-    const now = new Date().toISOString()
-    await db.createClaim({
-      id,
+    const { claim, created } = await getOrCreateClaimByPolicy({
       policyId: data.policyId,
-      companyId,
-      title: data.title,
-      description: data.description,
-      claimDate: now.split('T')[0],
-      incidentDate: data.incidentDate,
-      estimatedValue: data.estimatedValue,
-      status: 'submitted',
-      steps: [{ status: 'submitted', date: now.split('T')[0], notes: 'Sinistro participado' }],
-      createdAt: now,
+      buildNewClaim: (id, nowIso) => ({
+        id,
+        policyId: data.policyId,
+        companyId,
+        title: data.title,
+        description: data.description,
+        claimDate: nowIso.split('T')[0],
+        incidentDate: data.incidentDate,
+        estimatedValue: data.estimatedValue,
+        status: 'submitted',
+        steps: [{ status: 'submitted', date: nowIso.split('T')[0], notes: 'Sinistro participado' }],
+        createdAt: nowIso,
+      }),
+      updatesIfExisting: {
+        companyId,
+        title: data.title,
+        description: data.description,
+        incidentDate: data.incidentDate,
+        estimatedValue: data.estimatedValue,
+      },
     })
-    await db.createClaimMessage({
-      id: crypto.randomUUID(),
-      claimId: id,
-      companyId,
-      senderType: 'client',
-      senderName: scope.user.name || scope.user.email || 'Cliente',
-      senderUserId: scope.user.id,
-      message: 'Sinistro submetido pelo cliente.',
-      createdAt: now,
-      readAt: now,
+    const now = new Date().toISOString()
+    if (created) {
+      await persistClaimMessage({
+        claim,
+        senderType: 'client',
+        senderName: scope.user.name || scope.user.email || 'Cliente',
+        senderUserId: scope.user.id,
+        message: 'Sinistro submetido pelo cliente.',
+        createdAt: now,
+        readAt: now,
+      })
+    }
+    if (created) {
+      await persistClaimMessage({
+        claim,
+        senderType: 'client',
+        senderName: ctx.user.name || ctx.user.email || 'Cliente',
+        senderUserId: ctx.user.id,
+        message: 'Sinistro submetido pelo cliente.',
+        createdAt: claim.createdAt,
+        readAt: claim.createdAt,
+      })
+    }
+
+    return { id: claim.id, reused: !created }
+  })
+
+export const fetchIndividualClaims = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    const ctx = await getViewerAccessContext()
+    if (!ctx.individualClientId) return []
+    const claims = await db.getClaimsByIndividualClientId(ctx.individualClientId)
+    return normalizeClaimsByPolicy(claims)
+  })
+
+export const submitIndividualClaim = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: {
+    policyId: string
+    title: string
+    description: string
+    incidentDate: string
+    estimatedValue?: number
+  }) => d)
+  .handler(async ({ data }) => {
+    const ctx = await getViewerAccessContext()
+    if (!ctx.individualClientId) throw new Error('Cliente individual não identificado')
+
+    const policy = await db.getPolicy(data.policyId)
+    if (!policy) throw new Error('Apólice não encontrada')
+    if (policy.individualClientId !== ctx.individualClientId) throw new Error('Sem acesso a esta apólice')
+
+    const { claim, created } = await getOrCreateClaimByPolicy({
+      policyId: data.policyId,
+      buildNewClaim: (id, nowIso) => ({
+        id,
+        policyId: data.policyId,
+        individualClientId: ctx.individualClientId,
+        title: data.title,
+        description: data.description,
+        claimDate: nowIso.split('T')[0],
+        incidentDate: data.incidentDate,
+        estimatedValue: Number(data.estimatedValue || 0),
+        status: 'submitted',
+        steps: [{ status: 'submitted', date: nowIso.split('T')[0], notes: 'Sinistro submetido pelo cliente' }],
+        createdAt: nowIso,
+      }),
+      updatesIfExisting: {
+        individualClientId: ctx.individualClientId,
+        title: data.title,
+        description: data.description,
+        incidentDate: data.incidentDate,
+        estimatedValue: Number(data.estimatedValue || 0),
+      },
     })
-    return { id }
+
+    return { id: claim.id, reused: !created }
   })
 
 export const updateClaimDetails = createServerFn({ method: 'POST' })
@@ -434,7 +607,7 @@ export const fetchClaimMessages = createServerFn({ method: 'GET' })
     const claim = await db.getClaim(claimId)
     if (!claim) return []
     if (!canAccessClaimByContext(claim, ctx)) return []
-    return getMergedClaimMessages(claim)
+    return getCanonicalClaimMessages(claim)
   })
 
 export const sendClaimMessage = createServerFn({ method: 'POST' })
@@ -452,10 +625,8 @@ export const sendClaimMessage = createServerFn({ method: 'POST' })
     const now = new Date().toISOString()
     const senderType = ctx.isAdmin ? 'admin' : 'client'
     const senderName = ctx.user.name || ctx.user.email || (ctx.isAdmin ? 'Admin' : 'Cliente')
-    await db.createClaimMessage({
-      id: crypto.randomUUID(),
-      claimId: claim.id,
-      companyId: claim.companyId,
+    await persistClaimMessage({
+      claim,
       senderType,
       senderName,
       senderUserId: ctx.user.id,
@@ -466,17 +637,6 @@ export const sendClaimMessage = createServerFn({ method: 'POST' })
 
     await updateClaimOperationalData(data.claimId, (current) => ({
       ...current,
-      messages: [
-        ...current.messages,
-        {
-          id: crypto.randomUUID(),
-          body: message,
-          createdAt: now,
-          senderRole: senderType,
-          senderName,
-          senderEmail: ctx.user.email ?? undefined,
-        },
-      ],
       timeline: [
         ...current.timeline,
         buildTimelineEvent({
@@ -623,7 +783,7 @@ export const fetchApiConnections = createServerFn({ method: 'GET' })
 export const fetchAdminAll = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
-    const [companies, companyUsers, userEvents, apiConnections, policies, claims, documents, individualClients] = await Promise.all([
+    const [companies, companyUsers, userEvents, apiConnections, policies, rawClaims, documents, individualClients] = await Promise.all([
       db.getCompanies(),
       db.getCompanyUsers(),
       db.getUserMetricEvents(),
@@ -633,10 +793,11 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       db.getDocuments(),
       db.getIndividualClients(),
     ])
+    const claims = normalizeClaimsByPolicy(rawClaims)
     const claimOperationalSummary = Object.fromEntries(
       await Promise.all(
         claims.map(async (claim) => {
-          const ops = await getMergedClaimOperationalData(claim)
+          const ops = await getCanonicalClaimOperationalData(claim)
           const lastMessage = ops.messages[ops.messages.length - 1]
           return [
             claim.id,
@@ -1460,10 +1621,8 @@ export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
       ],
     }))
 
-    await db.createClaimMessage({
-      id: crypto.randomUUID(),
-      claimId: claim.id,
-      companyId: claim.companyId,
+    await persistClaimMessage({
+      claim,
       senderType: 'admin',
       senderName: scope.user.name || scope.user.email || 'Admin',
       senderUserId: scope.user.id,
@@ -1499,10 +1658,8 @@ export const adminSendClaimMessage = createServerFn({ method: 'POST' })
 
     const now = new Date().toISOString()
     const senderName = scope.user.name || scope.user.email || 'Admin'
-    await db.createClaimMessage({
-      id: crypto.randomUUID(),
-      claimId: claim.id,
-      companyId: claim.companyId,
+    await persistClaimMessage({
+      claim,
       senderType: 'admin',
       senderName,
       senderUserId: scope.user.id,
@@ -1513,17 +1670,6 @@ export const adminSendClaimMessage = createServerFn({ method: 'POST' })
 
     await updateClaimOperationalData(data.claimId, (current) => ({
       ...current,
-      messages: [
-        ...current.messages,
-        {
-          id: crypto.randomUUID(),
-          body: message,
-          createdAt: now,
-          senderRole: 'admin',
-          senderName,
-          senderEmail: scope.user.email ?? undefined,
-        },
-      ],
       timeline: [
         ...current.timeline,
         buildTimelineEvent({
@@ -1593,21 +1739,30 @@ export const adminCreateClaim = createServerFn({ method: 'POST' })
       throw new Error('A apólice selecionada não pertence ao cliente indicado')
     }
 
-    const claimId = `clm_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`
-    const nowIso = new Date().toISOString()
-    await db.createClaim({
-      id: claimId,
+    const { claim, created } = await getOrCreateClaimByPolicy({
       policyId: data.policyId,
-      companyId: data.targetType === 'company' ? data.companyId : undefined,
-      individualClientId: data.targetType === 'individual' ? data.individualClientId : undefined,
-      title: data.type,
-      description: data.description,
-      claimDate: nowIso.slice(0, 10),
-      incidentDate: data.incidentDate,
-      estimatedValue: Number(data.estimatedValue || 0),
-      status: 'submitted',
-      steps: [{ status: 'submitted', date: nowIso.slice(0, 10), notes: 'Sinistro criado pelo Admin' }],
-      createdAt: nowIso,
+      buildNewClaim: (claimId, nowIso) => ({
+        id: claimId,
+        policyId: data.policyId,
+        companyId: data.targetType === 'company' ? data.companyId : undefined,
+        individualClientId: data.targetType === 'individual' ? data.individualClientId : undefined,
+        title: data.type,
+        description: data.description,
+        claimDate: nowIso.slice(0, 10),
+        incidentDate: data.incidentDate,
+        estimatedValue: Number(data.estimatedValue || 0),
+        status: 'submitted',
+        steps: [{ status: 'submitted', date: nowIso.slice(0, 10), notes: 'Sinistro criado pelo Admin' }],
+        createdAt: nowIso,
+      }),
+      updatesIfExisting: {
+        companyId: data.targetType === 'company' ? data.companyId : undefined,
+        individualClientId: data.targetType === 'individual' ? data.individualClientId : undefined,
+        title: data.type,
+        description: data.description,
+        incidentDate: data.incidentDate,
+        estimatedValue: Number(data.estimatedValue || 0),
+      },
     })
 
     let responsible: ClaimParticipant | undefined
@@ -1622,36 +1777,44 @@ export const adminCreateClaim = createServerFn({ method: 'POST' })
       }
     }
 
-    await saveClaimOperationalData({
-      claimId,
-      responsible,
-      teamNotes: [],
-      messages: [],
-      documents: [],
-      timeline: [
-        buildTimelineEvent({
-          type: 'created',
-          message: `Sinistro criado (${data.type})`,
-          actorName: 'Admin',
-          actorRole: 'admin',
-        }),
-      ],
-      updatedAt: nowIso,
-    })
+    if (created) {
+      const nowIso = claim.createdAt
+      await saveClaimOperationalData({
+        claimId: claim.id,
+        responsible,
+        teamNotes: [],
+        messages: [],
+        documents: [],
+        timeline: [
+          buildTimelineEvent({
+            type: 'created',
+            message: `Sinistro criado (${data.type})`,
+            actorName: 'Admin',
+            actorRole: 'admin',
+          }),
+        ],
+        updatedAt: nowIso,
+      })
+    } else if (responsible) {
+      await updateClaimOperationalData(claim.id, (current) => ({
+        ...current,
+        responsible,
+      }))
+    }
 
-    if (data.targetType === 'company' && data.companyId) {
+    if (created && data.targetType === 'company' && data.companyId) {
       await db.createAlert({
         id: `alt_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
         companyId: data.companyId,
         type: 'claim_update',
-        title: `Novo sinistro ${claimId}`,
+        title: `Novo sinistro ${claim.id}`,
         message: `Foi criado um novo sinistro (${data.type})`,
         read: false,
-        createdAt: nowIso,
+        createdAt: new Date().toISOString(),
       })
     }
 
-    return { id: claimId }
+    return { id: claim.id, reused: !created }
   })
 
 export const fetchClaimWorkspace = createServerFn({ method: 'GET' })
@@ -1667,7 +1830,7 @@ export const fetchClaimWorkspace = createServerFn({ method: 'GET' })
       db.getPolicy(claim.policyId),
       claim.companyId ? db.getCompany(claim.companyId) : Promise.resolve(undefined),
       claim.individualClientId ? db.getIndividualClient(claim.individualClientId) : Promise.resolve(undefined),
-      getMergedClaimOperationalData(claim),
+      getCanonicalClaimOperationalData(claim),
     ])
 
     return {
@@ -1758,33 +1921,20 @@ export const addClaimMessage = createServerFn({ method: 'POST' })
 
     const senderRole: ClaimTicketMessage['senderRole'] = ctx.isAdmin ? 'admin' : 'client'
     const senderName = ctx.user.name || (ctx.isAdmin ? 'Admin' : 'Cliente')
-    const senderEmail = ctx.user.email ?? undefined
-    const message: ClaimTicketMessage = {
-      id: crypto.randomUUID(),
-      body,
-      createdAt: new Date().toISOString(),
-      senderRole,
-      senderName,
-      senderEmail,
-    }
+    const createdAt = new Date().toISOString()
 
-    if (claim.companyId) {
-      await db.createClaimMessage({
-        id: crypto.randomUUID(),
-        claimId: claim.id,
-        companyId: claim.companyId,
-        senderType: senderRole,
-        senderName,
-        senderUserId: ctx.user.id,
-        message: body,
-        createdAt: message.createdAt,
-        readAt: senderRole === 'client' ? message.createdAt : null,
-      })
-    }
+    await persistClaimMessage({
+      claim,
+      senderType: senderRole,
+      senderName,
+      senderUserId: ctx.user.id,
+      message: body,
+      createdAt,
+      readAt: senderRole === 'client' ? createdAt : null,
+    })
 
     const ops = await updateClaimOperationalData(data.claimId, (current) => ({
       ...current,
-      messages: [...current.messages, message],
       timeline: [
         ...current.timeline,
         buildTimelineEvent({

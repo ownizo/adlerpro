@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev --port 3000",
-    "build": "vite build"
+    "build": "vite build",
+    "backfill:claim-messages": "node --experimental-strip-types scripts/backfill-claim-messages.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",

@@ -42,11 +42,13 @@ export function claimTicketMessageToClaimMessage(
   message: ClaimTicketMessage,
   claimId: string,
   companyId?: string,
+  individualClientId?: string,
 ): ClaimMessage {
   return {
     id: message.id,
     claimId,
     companyId,
+    individualClientId,
     senderType: message.senderRole,
     senderName: message.senderName,
     message: message.body,
@@ -59,13 +61,14 @@ export function claimTicketMessageToClaimMessage(
 export function mergeClaimMessages(params: {
   claimId: string
   companyId?: string
+  individualClientId?: string
   legacyMessages: ClaimMessage[]
   ticketMessages: ClaimTicketMessage[]
 }): ClaimMessage[] {
   const merged = new Map<string, ClaimMessage>()
 
   for (const message of params.ticketMessages) {
-    const asLegacy = claimTicketMessageToClaimMessage(message, params.claimId, params.companyId)
+    const asLegacy = claimTicketMessageToClaimMessage(message, params.claimId, params.companyId, params.individualClientId)
     merged.set(
       claimMessageKey({
         senderRole: asLegacy.senderType,

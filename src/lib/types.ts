@@ -188,6 +188,7 @@ export interface ClaimMessage {
   id: string
   claimId: string
   companyId?: string
+  individualClientId?: string
   senderType: 'admin' | 'client'
   senderName: string
   senderUserId?: string
