@@ -319,36 +319,34 @@ export async function getClaimMessages(claimId: string): Promise<ClaimMessage[]>
 
 export async function createClaimMessage(message: ClaimMessage): Promise<void> {
   const sb = getSupabaseAdmin()
-  const { error } = await sb.from('claim_messages').insert(objectToSnake(message as unknown as Record<string, unknown>))
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { companyId: _c, individualClientId: _i, readAt: _r, ...insertable } = message
+  const { error } = await sb.from('claim_messages').insert(objectToSnake(insertable as unknown as Record<string, unknown>))
   if (error) {
     console.error('createClaimMessage error:', error)
     throw new Error(`Falha ao guardar mensagem: ${error.message}`)
   }
 }
 
-export async function markClaimMessagesReadForClient(claimId: string, companyId: string): Promise<void> {
+export async function markClaimMessagesReadForClient(claimId: string): Promise<void> {
   const sb = getSupabaseAdmin()
-  const now = new Date().toISOString()
   const { error } = await sb
     .from('claim_messages')
-    .update({ read_at: now })
+    .update({ is_read: true })
     .eq('claim_id', claimId)
-    .eq('company_id', companyId)
     .eq('sender_type', 'admin')
-    .is('read_at', null)
+    .eq('is_read', false)
   if (error) console.error('markClaimMessagesReadForClient error:', error)
 }
 
-export async function markClaimMessagesReadForIndividualClient(claimId: string, individualClientId: string): Promise<void> {
+export async function markClaimMessagesReadForIndividualClient(claimId: string): Promise<void> {
   const sb = getSupabaseAdmin()
-  const now = new Date().toISOString()
   const { error } = await sb
     .from('claim_messages')
-    .update({ read_at: now })
+    .update({ is_read: true })
     .eq('claim_id', claimId)
-    .eq('individual_client_id', individualClientId)
     .eq('sender_type', 'admin')
-    .is('read_at', null)
+    .eq('is_read', false)
   if (error) console.error('markClaimMessagesReadForIndividualClient error:', error)
 }
 

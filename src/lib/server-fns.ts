@@ -252,14 +252,11 @@ async function persistClaimMessage(params: {
   await db.createClaimMessage({
     id: crypto.randomUUID(),
     claimId: params.claim.id,
-    companyId: params.claim.companyId,
-    individualClientId: params.claim.individualClientId,
     senderType: params.senderType,
     senderName: params.senderName,
     senderUserId: params.senderUserId,
     message: params.message,
     createdAt: params.createdAt,
-    readAt: params.readAt,
   })
 }
 
@@ -672,9 +669,9 @@ export const markClaimMessagesAsRead = createServerFn({ method: 'POST' })
     if (!claim || !canAccessClaimByContext(claim, ctx)) return { success: true }
 
     if (ctx.companyId && claim.companyId === ctx.companyId) {
-      await db.markClaimMessagesReadForClient(claimId, ctx.companyId)
+      await db.markClaimMessagesReadForClient(claimId)
     } else if (ctx.individualClientId && claim.individualClientId === ctx.individualClientId) {
-      await db.markClaimMessagesReadForIndividualClient(claimId, ctx.individualClientId)
+      await db.markClaimMessagesReadForIndividualClient(claimId)
     }
 
     return { success: true }
