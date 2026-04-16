@@ -3,7 +3,7 @@
  * Substitui o Netlify Blobs por Supabase PostgreSQL.
  * Converte automaticamente entre camelCase (TypeScript) e snake_case (Supabase).
  */
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type {
   Company,
   CompanyUser,
@@ -23,9 +23,10 @@ import type {
 // Cliente Supabase (server-side — usa service_role key)
 // Singleton: criado uma vez e reutilizado em todas as chamadas
 // ============================================================
-let _sbAdmin: ReturnType<typeof createClient> | null = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _sbAdmin: SupabaseClient<any, any, any> | null = null
 
-function getSupabaseAdmin() {
+function getSupabaseAdmin(): SupabaseClient<any, any, any> {
   if (_sbAdmin) return _sbAdmin
   const url =
     (typeof import.meta !== 'undefined' && import.meta.env?.VITE_SUPABASE_URL) ||
@@ -86,7 +87,7 @@ export async function getCompany(id: string): Promise<Company | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('companies').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as Company
+  return objectToCamel(data) as unknown as Company
 }
 
 export async function createCompany(company: Company): Promise<void> {
@@ -141,7 +142,7 @@ export async function getCompanyUserByEmail(email: string): Promise<CompanyUser 
     .ilike('email', email)
     .single()
   if (error) return undefined
-  return objectToCamel(data) as CompanyUser
+  return objectToCamel(data) as unknown as CompanyUser
 }
 
 export async function createCompanyUser(user: CompanyUser): Promise<void> {
@@ -178,7 +179,7 @@ export async function getPolicy(id: string): Promise<Policy | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('policies').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as Policy
+  return objectToCamel(data) as unknown as Policy
 }
 
 export async function createPolicy(policy: Policy): Promise<void> {
@@ -237,7 +238,7 @@ export async function getClaim(id: string): Promise<Claim | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('claims').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as Claim
+  return objectToCamel(data) as unknown as Claim
 }
 
 export async function createClaim(claim: Claim): Promise<void> {
@@ -274,7 +275,7 @@ export async function getDocument(id: string): Promise<Document | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('documents').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as Document
+  return objectToCamel(data) as unknown as Document
 }
 
 export async function updateDocument(id: string, updates: Partial<Document>): Promise<void> {
@@ -452,15 +453,14 @@ export async function getIndividualClient(id: string): Promise<IndividualClient 
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('individual_clients').select('*').eq('id', id).single()
   if (error) return undefined
-  return objectToCamel(data) as IndividualClient
+  return objectToCamel(data) as unknown as IndividualClient
 }
 
 export async function createIndividualClient(client: Omit<IndividualClient, 'id' | 'createdAt'>): Promise<{ id: string }> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb
     .from('individual_clients')
-    .insert(objectToSnake(client as unknown as Record<string, unknown>))
-    .select('id')
+    .insert(objectToSnake(client as unknown as Record<string, unknown>))    .select('id')
     .single()
   if (error) throw error
   return { id: data.id }
@@ -470,8 +470,7 @@ export async function updateIndividualClient(id: string, updates: Partial<Indivi
   const sb = getSupabaseAdmin()
   const { error } = await sb
     .from('individual_clients')
-    .update(objectToSnake(updates as Record<string, unknown>))
-    .eq('id', id)
+    .update(objectToSnake(updates as Record<string, unknown>))    .eq('id', id)
   if (error) console.error('updateIndividualClient error:', error)
 }
 

@@ -56,7 +56,7 @@ export async function updateIdentityUserPasswordByEmail(email: string, password:
   const user = data.users.find((u) => u.email?.toLowerCase() === normalizedEmail)
   if (!user) {
     // Se o utilizador não existe no Auth, criar com a nova password
-    const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    const { error: createError } = await supabaseAdmin.auth.admin.createUser({
       email: normalizedEmail,
       password,
       email_confirm: true,

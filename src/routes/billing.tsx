@@ -37,15 +37,8 @@ import {
   getIXInvoicePdf,
 } from '@/lib/server-fns'
 import type {
-  IXInvoice,
-  IXCreditNote,
-  IXDebitNote,
-  IXReceipt,
-  IXEstimate,
-  IXGuide,
   IXClient,
   IXItem,
-  IXTax,
   IXDocState,
   IXInvoiceItem,
 } from '@/lib/invoicexpress'
@@ -199,41 +192,41 @@ function CreateDocumentModal({
       let result: any
       switch (tab) {
         case 'invoices':
-          result = await createIXInvoice({ invoice: base })
+          result = await createIXInvoice({ data: { invoice: base } })
           break
         case 'simplifiedInvoices':
-          result = await createIXSimplifiedInvoice({ invoice: base })
+          result = await createIXSimplifiedInvoice({ data: { invoice: base } })
           break
         case 'invoiceReceipts':
-          result = await createIXInvoiceReceipt({ invoice: base })
+          result = await createIXInvoiceReceipt({ data: { invoice: base } })
           break
         case 'creditNotes':
-          result = await createIXCreditNote({ note: base })
+          result = await createIXCreditNote({ data: { note: base } })
           break
         case 'debitNotes':
-          result = await createIXDebitNote({ note: base })
+          result = await createIXDebitNote({ data: { note: base } })
           break
         case 'receipts':
           result = await createIXReceipt({
-            receipt: {
+            data: { receipt: {
               ...base,
               invoice_id: form.invoice_id ? Number(form.invoice_id) : undefined,
               amount: form.amount ? Number(form.amount) : undefined,
               payment_mechanism: form.payment_mechanism || undefined,
-            },
+            } },
           })
           break
         case 'estimates':
-          result = await createIXEstimate({ estimate: base })
+          result = await createIXEstimate({ data: { estimate: base } })
           break
         case 'guides':
           result = await createIXGuide({
-            guide: {
+            data: { guide: {
               ...base,
               loaded_at: form.loaded_at?.replace(/-/g, '/') || undefined,
               address_from: form.address_from || undefined,
               address_to: form.address_to || undefined,
-            },
+            } },
           })
           break
         default:
@@ -400,9 +393,9 @@ function ClientModal({
     try {
       let result: any
       if (existing?.id) {
-        result = await updateIXClient({ id: existing.id, client: form })
+        result = await updateIXClient({ data: { id: existing.id, client: form } })
       } else {
-        result = await createIXClient({ client: form })
+        result = await createIXClient({ data: { client: form } })
       }
       if (result && !result.ok) throw new Error(result.error)
       onSuccess()
@@ -472,9 +465,9 @@ function ItemModal({
     try {
       let result: any
       if (existing && (existing as any).id) {
-        result = await updateIXItem({ id: (existing as any).id, item: form })
+        result = await updateIXItem({ data: { id: (existing as any).id, item: form } })
       } else {
-        result = await createIXItem({ item: form })
+        result = await createIXItem({ data: { item: form } })
       }
       if (result && !result.ok) throw new Error(result.error)
       onSuccess()
@@ -536,7 +529,7 @@ function EmailModal({
     setError('')
     try {
       const fn = docType === 'invoice' ? sendIXInvoiceEmail : sendIXEstimateEmail
-      const result = await fn({ id: docId, email, subject, body })
+      const result = await fn({ data: { id: docId, email, subject, body } })
       if (result && !result.ok) throw new Error(result.error)
       setSent(true)
       setTimeout(onClose, 1500)
@@ -635,11 +628,11 @@ function BillingPage() {
         case 'invoices':
         case 'simplifiedInvoices':
         case 'invoiceReceipts':
-          result = await changeIXInvoiceState({ id, state }); break
-        case 'creditNotes': result = await changeIXCreditNoteState({ id, state }); break
-        case 'debitNotes': result = await changeIXDebitNoteState({ id, state }); break
-        case 'receipts': result = await changeIXReceiptState({ id, state }); break
-        case 'estimates': result = await changeIXEstimateState({ id, state: state as any }); break
+          result = await changeIXInvoiceState({ data: { id, state } }); break
+        case 'creditNotes': result = await changeIXCreditNoteState({ data: { id, state } }); break
+        case 'debitNotes': result = await changeIXDebitNoteState({ data: { id, state } }); break
+        case 'receipts': result = await changeIXReceiptState({ data: { id, state } }); break
+        case 'estimates': result = await changeIXEstimateState({ data: { id, state: state as any } }); break
       }
       if (result && !result.ok) throw new Error(result.error)
       showToast(t('billing.success.stateChanged'))
@@ -651,7 +644,7 @@ function BillingPage() {
 
   const handlePdfDownload = async (id: number) => {
     try {
-      const result = await getIXInvoicePdf({ id })
+      const result = await getIXInvoicePdf({ data: { id } })
       if (result && !result.ok) throw new Error(result.error)
       if (result.pdf) {
         const link = document.createElement('a')

@@ -109,7 +109,7 @@ function OneClaims() {
       setClientId(cid)
 
       if (cid) {
-        const [{ data: pData }, { data: cData }] = await Promise.all([
+        const [{ data: pData }, cData] = await Promise.all([
           supabase.from('policies')
             .select('id, policy_number, type, insurer')
             .eq('individual_client_id', cid)
@@ -117,7 +117,7 @@ function OneClaims() {
           fetchIndividualClaims(),
         ])
         setPolicies(pData ?? [])
-        setClaims((cData as Claim[]) ?? [])
+        setClaims((cData as unknown as Claim[]) ?? [])
       }
     } catch (e: any) {
       setError('Erro ao carregar sinistros.')

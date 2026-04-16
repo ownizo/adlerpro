@@ -1578,6 +1578,30 @@ export const adminGetDocumentUrl = createServerFn({ method: 'POST' })
     return { url: urlData.signedUrl }
   })
 
+export const adminDeletePolicyDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { documentId: string; storagePath?: string }) => d)
+  .handler(async ({ data }) => {
+    if (data.storagePath) {
+      await supabaseAdmin.storage.from('documents').remove([data.storagePath])
+    }
+    await db.deleteDocument(data.documentId)
+    return { success: true }
+  })
+
+export const adminClearAllDocuments = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .handler(async () => {
+    const docs = await db.getDocuments()
+    for (const doc of docs) {
+      if (doc.blobKey) {
+        await supabaseAdmin.storage.from('documents').remove([doc.blobKey])
+      }
+      await db.deleteDocument(doc.id)
+    }
+    return { success: true, deleted: docs.length }
+  })
+
 export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { claimId: string; status: string; notes?: string }) => d)
@@ -2169,7 +2193,7 @@ export const adminCreateCompanyUser = createServerFn({ method: 'POST' })
 
       if (result.created) {
         await db.updateCompanyUser(id, {
-          identityStatus: 'active',
+          identityStatus: 'confirmed',
           updatedAt: new Date().toISOString(),
         })
       } else if (result.reason === 'already_exists') {
@@ -2494,7 +2518,7 @@ function escSvg(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
-function buildCarouselSlide(topic: string, text: string, slideNumber: number, totalSlides: number): string {
+function buildCarouselSlide(_topic: string, text: string, slideNumber: number, totalSlides: number): string {
   const H = 1080
   const gold = '#C9A84C'
   const white = '#FFFFFF'
@@ -2619,7 +2643,7 @@ import * as ix from './invoicexpress'
 
 export const fetchIXInvoices = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .handler(async ({ context }) => {
+  .handler(async ({ context: _ctx }) => {
     try {
       const result = await ix.listInvoices(1, 100)
       return { ok: true as const, invoices: result.invoices ?? [] }
@@ -2630,7 +2654,7 @@ export const fetchIXInvoices = createServerFn({ method: 'GET' })
 
 export const createIXInvoice = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { invoice: Partial<ix.IXInvoice> }) => d)
+  .inputValidator((d: { invoice: Partial<ix.IXInvoice> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.createInvoice(data.invoice)
@@ -2642,7 +2666,7 @@ export const createIXInvoice = createServerFn({ method: 'POST' })
 
 export const updateIXInvoice = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number; invoice: Partial<ix.IXInvoice> }) => d)
+  .inputValidator((d: { id: number; invoice: Partial<ix.IXInvoice> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.updateInvoice(data.id, data.invoice)
@@ -2654,7 +2678,7 @@ export const updateIXInvoice = createServerFn({ method: 'POST' })
 
 export const changeIXInvoiceState = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number; state: ix.IXDocState }) => d)
+  .inputValidator((d: { id: number; state: ix.IXDocState }) => d)
   .handler(async ({ data }) => {
     try {
       await ix.changeInvoiceState(data.id, data.state)
@@ -2666,7 +2690,7 @@ export const changeIXInvoiceState = createServerFn({ method: 'POST' })
 
 export const sendIXInvoiceEmail = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number; email: string; subject?: string; body?: string }) => d)
+  .inputValidator((d: { id: number; email: string; subject?: string; body?: string }) => d)
   .handler(async ({ data }) => {
     try {
       await ix.sendInvoiceByEmail(data.id, data.email, data.subject, data.body)
@@ -2678,7 +2702,7 @@ export const sendIXInvoiceEmail = createServerFn({ method: 'POST' })
 
 export const getIXInvoicePdf = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number }) => d)
+  .inputValidator((d: { id: number }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.getInvoicePdf(data.id)
@@ -2703,7 +2727,7 @@ export const fetchIXSimplifiedInvoices = createServerFn({ method: 'GET' })
 
 export const createIXSimplifiedInvoice = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { invoice: Partial<ix.IXInvoice> }) => d)
+  .inputValidator((d: { invoice: Partial<ix.IXInvoice> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.createSimplifiedInvoice(data.invoice)
@@ -2728,7 +2752,7 @@ export const fetchIXInvoiceReceipts = createServerFn({ method: 'GET' })
 
 export const createIXInvoiceReceipt = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { invoice: Partial<ix.IXInvoice> }) => d)
+  .inputValidator((d: { invoice: Partial<ix.IXInvoice> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.createInvoiceReceipt(data.invoice)
@@ -2753,7 +2777,7 @@ export const fetchIXCreditNotes = createServerFn({ method: 'GET' })
 
 export const createIXCreditNote = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { note: Partial<ix.IXCreditNote> }) => d)
+  .inputValidator((d: { note: Partial<ix.IXCreditNote> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.createCreditNote(data.note)
@@ -2765,7 +2789,7 @@ export const createIXCreditNote = createServerFn({ method: 'POST' })
 
 export const changeIXCreditNoteState = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number; state: ix.IXDocState }) => d)
+  .inputValidator((d: { id: number; state: ix.IXDocState }) => d)
   .handler(async ({ data }) => {
     try {
       await ix.changeCreditNoteState(data.id, data.state)
@@ -2790,7 +2814,7 @@ export const fetchIXDebitNotes = createServerFn({ method: 'GET' })
 
 export const createIXDebitNote = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { note: Partial<ix.IXDebitNote> }) => d)
+  .inputValidator((d: { note: Partial<ix.IXDebitNote> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.createDebitNote(data.note)
@@ -2802,7 +2826,7 @@ export const createIXDebitNote = createServerFn({ method: 'POST' })
 
 export const changeIXDebitNoteState = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number; state: ix.IXDocState }) => d)
+  .inputValidator((d: { id: number; state: ix.IXDocState }) => d)
   .handler(async ({ data }) => {
     try {
       await ix.changeDebitNoteState(data.id, data.state)
@@ -2827,7 +2851,7 @@ export const fetchIXReceipts = createServerFn({ method: 'GET' })
 
 export const createIXReceipt = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { receipt: Partial<ix.IXReceipt> }) => d)
+  .inputValidator((d: { receipt: Partial<ix.IXReceipt> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.createReceipt(data.receipt)
@@ -2839,7 +2863,7 @@ export const createIXReceipt = createServerFn({ method: 'POST' })
 
 export const changeIXReceiptState = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number; state: ix.IXDocState }) => d)
+  .inputValidator((d: { id: number; state: ix.IXDocState }) => d)
   .handler(async ({ data }) => {
     try {
       await ix.changeReceiptState(data.id, data.state)
@@ -2864,7 +2888,7 @@ export const fetchIXEstimates = createServerFn({ method: 'GET' })
 
 export const createIXEstimate = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { estimate: Partial<ix.IXEstimate> }) => d)
+  .inputValidator((d: { estimate: Partial<ix.IXEstimate> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.createEstimate(data.estimate)
@@ -2876,7 +2900,7 @@ export const createIXEstimate = createServerFn({ method: 'POST' })
 
 export const changeIXEstimateState = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number; state: 'finalized' | 'deleted' | 'canceled' | 'accepted' | 'refused' }) => d)
+  .inputValidator((d: { id: number; state: 'finalized' | 'deleted' | 'canceled' | 'accepted' | 'refused' }) => d)
   .handler(async ({ data }) => {
     try {
       await ix.changeEstimateState(data.id, data.state)
@@ -2888,7 +2912,7 @@ export const changeIXEstimateState = createServerFn({ method: 'POST' })
 
 export const sendIXEstimateEmail = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number; email: string; subject?: string; body?: string }) => d)
+  .inputValidator((d: { id: number; email: string; subject?: string; body?: string }) => d)
   .handler(async ({ data }) => {
     try {
       await ix.sendEstimateByEmail(data.id, data.email, data.subject, data.body)
@@ -2913,7 +2937,7 @@ export const fetchIXGuides = createServerFn({ method: 'GET' })
 
 export const createIXGuide = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { guide: Partial<ix.IXGuide> }) => d)
+  .inputValidator((d: { guide: Partial<ix.IXGuide> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.createGuide(data.guide)
@@ -2938,7 +2962,7 @@ export const fetchIXClients = createServerFn({ method: 'GET' })
 
 export const getIXClient = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number }) => d)
+  .inputValidator((d: { id: number }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.getClient(data.id)
@@ -2950,7 +2974,7 @@ export const getIXClient = createServerFn({ method: 'GET' })
 
 export const createIXClient = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { client: Partial<ix.IXClient> }) => d)
+  .inputValidator((d: { client: Partial<ix.IXClient> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.createClient(data.client)
@@ -2962,7 +2986,7 @@ export const createIXClient = createServerFn({ method: 'POST' })
 
 export const updateIXClient = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number; client: Partial<ix.IXClient> }) => d)
+  .inputValidator((d: { id: number; client: Partial<ix.IXClient> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.updateClient(data.id, data.client)
@@ -2987,7 +3011,7 @@ export const fetchIXItems = createServerFn({ method: 'GET' })
 
 export const createIXItem = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { item: Partial<ix.IXItem> }) => d)
+  .inputValidator((d: { item: Partial<ix.IXItem> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.createItem(data.item)
@@ -2999,7 +3023,7 @@ export const createIXItem = createServerFn({ method: 'POST' })
 
 export const updateIXItem = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
-  .validator((d: { id: number; item: Partial<ix.IXItem> }) => d)
+  .inputValidator((d: { id: number; item: Partial<ix.IXItem> }) => d)
   .handler(async ({ data }) => {
     try {
       const result = await ix.updateItem(data.id, data.item)

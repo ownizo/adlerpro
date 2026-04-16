@@ -37,6 +37,8 @@ import {
   fetchAdminFinancialDashboard,
   getRenewalAlerts,
   adminUpdateRenewalAlertStatus,
+  adminDeletePolicyDocument,
+  adminClearAllDocuments,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type {
@@ -308,6 +310,9 @@ function AdminPage() {
     operations: ClaimOperationalData
   } | null>(null)
   const [loadingClaimWorkspace, setLoadingClaimWorkspace] = useState(false)
+  const [globalSearch, setGlobalSearch] = useState('')
+  const [expandedClientPolicyId, setExpandedClientPolicyId] = useState<string | null>(null)
+  const [expandedCompanyPolicyId, setExpandedCompanyPolicyId] = useState<string | null>(null)
 
   const reload = async () => {
     const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, claimOperationalSummary: cos, documents: d, individualClients: ic } = await fetchAdminAll()
@@ -406,6 +411,18 @@ function AdminPage() {
           </div>
         ) : (
           <>
+            {(tab === 'companies' || tab === 'individual_clients' || tab === 'policies') && (
+              <div className="mb-6">
+                <input
+                  type="text"
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
+                  placeholder="Pesquisar por nome de cliente, apólice, seguradora..."
+                  className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 bg-white"
+                />
+              </div>
+            )}
+
             {tab === 'dashboard' && (
               <AdminDashboardTab
                 companies={companies}
@@ -452,7 +469,20 @@ function AdminPage() {
                 )}
 
                 <div className="grid gap-4">
-                  {companies.map((company) => {
+                  {companies.filter((company) => {
+                    if (!globalSearch.trim()) return true
+                    const q = globalSearch.toLowerCase()
+                    const companyPolicies = policies.filter((p) => p.companyId === company.id)
+                    return (
+                      company.name.toLowerCase().includes(q) ||
+                      company.nif.toLowerCase().includes(q) ||
+                      companyPolicies.some((p) =>
+                        p.policyNumber.toLowerCase().includes(q) ||
+                        p.insurer.toLowerCase().includes(q) ||
+                        (POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type).toLowerCase().includes(q)
+                      )
+                    )
+                  }).map((company) => {
                     const companyPolicies = policies.filter((policy) => policy.companyId === company.id)
                     const companyDocs = documents.filter((doc) => doc.companyId === company.id)
                     const users = companyUsers.filter((user) => user.companyId === company.id)
@@ -619,11 +649,73 @@ function AdminPage() {
                                 rows={companyDocs.map((doc) => `${doc.name} · ${doc.category} · ${formatDate(doc.uploadedAt)}`)}
                                 emptyMessage="Sem documentos carregados."
                               />
-                              <SimpleCollection
-                                title="Apólices da Empresa"
-                                rows={companyPolicies.map((policy) => `${POLICY_TYPE_LABELS[policy.type]} · ${policy.policyNumber} · ${policy.insurer}`)}
-                                emptyMessage="Sem apólices associadas."
-                              />
+                              <div>
+                                <h4 className="text-sm font-semibold text-navy-700 mb-3">Apólices da Empresa ({companyPolicies.length})</h4>
+                                {companyPolicies.length === 0 ? (
+                                  <p className="text-sm text-navy-400">Sem apólices associadas.</p>
+                                ) : (
+                                  <div className="space-y-2">
+                                    {companyPolicies.map((p) => {
+                                      const pDocs = documents.filter(d => d.policyId === p.id)
+                                      const isPolExpanded = expandedCompanyPolicyId === p.id
+                                      return (
+                                        <div key={p.id} className="bg-white rounded border border-navy-200 overflow-hidden">
+                                          <button
+                                            onClick={() => setExpandedCompanyPolicyId(isPolExpanded ? null : p.id)}
+                                            className="w-full px-4 py-3 text-left hover:bg-navy-50/50 transition-colors"
+                                          >
+                                            <div className="flex items-center justify-between gap-2">
+                                              <div className="flex items-center gap-2">
+                                                <span className="text-navy-400 text-xs">{isPolExpanded ? '▾' : '▸'}</span>
+                                                <span className="text-sm font-medium text-navy-700">
+                                                  {POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type} — {p.insurer}
+                                                </span>
+                                              </div>
+                                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                                p.status === 'active' ? 'bg-green-100 text-green-700' :
+                                                p.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
+                                                'bg-red-100 text-red-700'
+                                              }`}>{POLICY_STATUS_LABEL[p.status] ?? p.status}</span>
+                                            </div>
+                                            <p className="text-xs text-navy-500 mt-1 ml-5">Apólice {p.policyNumber} · {formatCurrency(p.annualPremium)}/ano</p>
+                                          </button>
+                                          {isPolExpanded && (
+                                            <div className="border-t border-navy-100 bg-navy-50/30 px-4 py-3 space-y-2">
+                                              <div className="grid grid-cols-2 gap-2 text-xs text-navy-600">
+                                                <p><strong>Início:</strong> {formatDate(p.startDate)}</p>
+                                                <p><strong>Fim:</strong> {formatDate(p.endDate)}</p>
+                                                {p.renewalDate && <p><strong>Renovação:</strong> {formatDate(p.renewalDate)}</p>}
+                                                {p.deductible != null && <p><strong>Franquia:</strong> {formatCurrency(p.deductible)}</p>}
+                                                {p.paymentFrequency && <p><strong>Pagamento:</strong> {p.paymentFrequency}</p>}
+                                                <p><strong>Capital Seguro:</strong> {formatCurrency(p.insuredValue)}</p>
+                                              </div>
+                                              {p.description && <p className="text-xs text-navy-500"><strong>Descrição:</strong> {p.description}</p>}
+                                              {p.coverages && p.coverages.length > 0 && (
+                                                <div className="text-xs text-navy-600">
+                                                  <strong>Coberturas:</strong> {p.coverages.join(', ')}
+                                                </div>
+                                              )}
+                                              {pDocs.length > 0 && (
+                                                <div className="text-xs text-navy-600">
+                                                  <strong>Documentos ({pDocs.length}):</strong>
+                                                  <ul className="mt-1 space-y-1">
+                                                    {pDocs.map(d => (
+                                                      <li key={d.id} className="flex items-center gap-2">
+                                                        <span>📄</span> <span>{d.name}</span>
+                                                        <PolicyDocumentButtons storagePath={d.blobKey} name={d.name} />
+                                                      </li>
+                                                    ))}
+                                                  </ul>
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         )}
@@ -681,7 +773,21 @@ function AdminPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-navy-100">
-                      {individualClients.map((client) => {
+                      {individualClients.filter((client) => {
+                        if (!globalSearch.trim()) return true
+                        const q = globalSearch.toLowerCase()
+                        const clientPolicies = policies.filter((p) => p.individualClientId === client.id)
+                        return (
+                          client.fullName.toLowerCase().includes(q) ||
+                          (client.nif ?? '').toLowerCase().includes(q) ||
+                          (client.email ?? '').toLowerCase().includes(q) ||
+                          clientPolicies.some((p) =>
+                            p.policyNumber.toLowerCase().includes(q) ||
+                            p.insurer.toLowerCase().includes(q) ||
+                            (POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type).toLowerCase().includes(q)
+                          )
+                        )
+                      }).map((client) => {
                         const clientPolicies = policies.filter((p) => p.individualClientId === client.id)
                         const isExpanded = expandedIndividualClientId === client.id
                         return (
@@ -752,27 +858,70 @@ function AdminPage() {
                                     <p className="text-sm text-navy-400">Sem apólices associadas.</p>
                                   ) : (
                                     <div className="grid gap-2">
-                                      {clientPolicies.map((p) => (
-                                        <div key={p.id} className="bg-white rounded border border-navy-200 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-                                          <div>
-                                            <p className="text-sm font-medium text-navy-700">
-                                              {POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type}
-                                              {' — '}{p.insurer}
-                                            </p>
-                                            <p className="text-xs text-navy-500">
-                                              Apólice {p.policyNumber} · {p.startDate} → {p.endDate}
-                                            </p>
+                                      {clientPolicies.map((p) => {
+                                        const pDocs = documents.filter(d => d.policyId === p.id)
+                                        const isPolExpanded = expandedClientPolicyId === p.id
+                                        return (
+                                          <div key={p.id} className="bg-white rounded border border-navy-200 overflow-hidden">
+                                            <button
+                                              onClick={() => setExpandedClientPolicyId(isPolExpanded ? null : p.id)}
+                                              className="w-full px-4 py-3 text-left hover:bg-navy-50/50 transition-colors"
+                                            >
+                                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                  <span className="text-navy-400 text-xs">{isPolExpanded ? '▾' : '▸'}</span>
+                                                  <p className="text-sm font-medium text-navy-700">
+                                                    {POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type}
+                                                    {' — '}{p.insurer}
+                                                  </p>
+                                                </div>
+                                                <div className="text-right flex items-center gap-3">
+                                                  <p className="text-sm font-semibold text-navy-700">{formatCurrency(p.annualPremium)}/ano</p>
+                                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                                    p.status === 'active' ? 'bg-green-100 text-green-700' :
+                                                    p.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
+                                                    'bg-red-100 text-red-700'
+                                                  }`}>{POLICY_STATUS_LABEL[p.status] ?? p.status}</span>
+                                                </div>
+                                              </div>
+                                              <p className="text-xs text-navy-500 ml-5">
+                                                Apólice {p.policyNumber} · {formatDate(p.startDate)} → {formatDate(p.endDate)}
+                                              </p>
+                                            </button>
+                                            {isPolExpanded && (
+                                              <div className="border-t border-navy-100 bg-navy-50/30 px-4 py-3 space-y-2">
+                                                <div className="grid grid-cols-2 gap-2 text-xs text-navy-600">
+                                                  <p><strong>Início:</strong> {formatDate(p.startDate)}</p>
+                                                  <p><strong>Fim:</strong> {formatDate(p.endDate)}</p>
+                                                  {p.renewalDate && <p><strong>Renovação:</strong> {formatDate(p.renewalDate)}</p>}
+                                                  {p.deductible != null && <p><strong>Franquia:</strong> {formatCurrency(p.deductible)}</p>}
+                                                  {p.paymentFrequency && <p><strong>Pagamento:</strong> {p.paymentFrequency}</p>}
+                                                  <p><strong>Capital Seguro:</strong> {formatCurrency(p.insuredValue)}</p>
+                                                </div>
+                                                {p.description && <p className="text-xs text-navy-500"><strong>Descrição:</strong> {p.description}</p>}
+                                                {p.coverages && p.coverages.length > 0 && (
+                                                  <div className="text-xs text-navy-600">
+                                                    <strong>Coberturas:</strong> {p.coverages.join(', ')}
+                                                  </div>
+                                                )}
+                                                {pDocs.length > 0 && (
+                                                  <div className="text-xs text-navy-600">
+                                                    <strong>Documentos ({pDocs.length}):</strong>
+                                                    <ul className="mt-1 space-y-1">
+                                                      {pDocs.map(d => (
+                                                        <li key={d.id} className="flex items-center gap-2">
+                                                          <span>📄</span> <span>{d.name}</span>
+                                                          <PolicyDocumentButtons storagePath={d.blobKey} name={d.name} />
+                                                        </li>
+                                                      ))}
+                                                    </ul>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
                                           </div>
-                                          <div className="text-right">
-                                            <p className="text-sm font-semibold text-navy-700">{formatCurrency(p.annualPremium)}/ano</p>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                              p.status === 'active' ? 'bg-green-100 text-green-700' :
-                                              p.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
-                                              'bg-red-100 text-red-700'
-                                            }`}>{p.status}</span>
-                                          </div>
-                                        </div>
-                                      ))}
+                                        )
+                                      })}
                                     </div>
                                   )}
                                 </td>
@@ -817,12 +966,24 @@ function AdminPage() {
                       )}
                     </select>
                   </div>
-                  <button
-                    onClick={() => setShowNewPolicy(!showNewPolicy)}
-                    className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm whitespace-nowrap"
-                  >
-                    {showNewPolicy ? 'Cancelar' : 'Nova Apólice'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowNewPolicy(!showNewPolicy)}
+                      className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm whitespace-nowrap"
+                    >
+                      {showNewPolicy ? 'Cancelar' : 'Nova Apólice'}
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (!confirm('Eliminar TODOS os documentos do sistema? Esta ação não pode ser revertida.')) return
+                        await adminClearAllDocuments()
+                        await reload()
+                      }}
+                      className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 font-semibold rounded-[2px] hover:bg-red-100 transition-colors text-sm whitespace-nowrap"
+                    >
+                      Limpar Documentos
+                    </button>
+                  </div>
                 </div>
 
                 {showNewPolicy && (
@@ -839,9 +1000,20 @@ function AdminPage() {
 
                 <AdminPolicyList
                   policies={policies.filter((p) => {
-                    if (!selectedCompanyId) return true
-                    if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
-                    return p.companyId === selectedCompanyId
+                    const clientFilter = !selectedCompanyId ? true :
+                      selectedCompanyId.startsWith('ic:') ? p.individualClientId === selectedCompanyId.slice(3) :
+                      p.companyId === selectedCompanyId
+                    if (!clientFilter) return false
+                    if (!globalSearch.trim()) return true
+                    const q = globalSearch.toLowerCase()
+                    const clientName = companies.find(c => c.id === p.companyId)?.name
+                      ?? individualClients.find(c => c.id === p.individualClientId)?.fullName ?? ''
+                    return (
+                      clientName.toLowerCase().includes(q) ||
+                      p.policyNumber.toLowerCase().includes(q) ||
+                      p.insurer.toLowerCase().includes(q) ||
+                      (POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type).toLowerCase().includes(q)
+                    )
                   })}
                   documents={documents}
                   companies={companies}
@@ -2921,7 +3093,6 @@ function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClien
     if (e.target.value !== 'company') return
     e.target.value = 'individual' // reset immediately
 
-    const hasPolicies = true // we don't have the count here, warn generically
     const authWarning = client.authUserId ? '\n⚠️ Este cliente tem acesso ao Adler One — o acesso será desligado.' : ''
     if (!confirm(`Converter "${client.fullName}" para Empresa?\n\nIsso irá:\n• Criar um registo de Empresa\n• Mover as apólices associadas\n• Apagar o registo de cliente individual${authWarning}`)) return
 
@@ -3464,57 +3635,88 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
                 <p className="text-xs text-navy-400 mt-0.5">{formatCurrency(policy.annualPremium)}/ano · {formatDate(policy.endDate)}</p>
               </div>
               <button
-                onClick={() => setEditingId(isEditing ? null : policy.id)}
+                onClick={() => {
+                  if (isEditing) {
+                    setEditingId(null)
+                  } else {
+                    setEditingId(policy.id)
+                    setExpandedId(policy.id)
+                  }
+                }}
                 className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 whitespace-nowrap"
               >
                 {isEditing ? 'Cancelar' : 'Editar'}
               </button>
             </div>
 
-            {/* Edit form */}
-            {isEditing && (
-              <div className="border-t border-navy-100 bg-navy-50/30 p-4">
-                <PolicyEditForm
-                  policy={policy}
-                  onSave={async (updates) => {
-                    await adminUpdatePolicy({ data: { id: policy.id, updates } })
-                    setEditingId(null)
-                    await onReload()
-                  }}
-                />
-              </div>
-            )}
+            {/* Expanded content: edit form OR details, plus documents (always shown when expanded or editing) */}
+            {(isExpanded || isEditing) && (
+              <div className="border-t border-navy-100 bg-navy-50/30 p-4 space-y-4">
+                {isEditing ? (
+                  <PolicyEditForm
+                    policy={policy}
+                    onSave={async (updates) => {
+                      await adminUpdatePolicy({ data: { id: policy.id, updates } })
+                      setEditingId(null)
+                      await onReload()
+                    }}
+                  />
+                ) : (
+                  <div>
+                    <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide mb-2">Detalhes da Apólice</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-navy-600">
+                      <p><strong>Seguradora:</strong> {policy.insurer}</p>
+                      <p><strong>N.º Apólice:</strong> {policy.policyNumber}</p>
+                      <p><strong>Estado:</strong> {POLICY_STATUS_LABEL[policy.status] ?? policy.status}</p>
+                      <p><strong>Início:</strong> {formatDate(policy.startDate)}</p>
+                      <p><strong>Fim:</strong> {formatDate(policy.endDate)}</p>
+                      {policy.renewalDate && <p><strong>Renovação:</strong> {formatDate(policy.renewalDate)}</p>}
+                      <p><strong>Prémio Anual:</strong> {formatCurrency(policy.annualPremium)}</p>
+                      <p><strong>Capital Seguro:</strong> {formatCurrency(policy.insuredValue)}</p>
+                      {policy.deductible != null && <p><strong>Franquia:</strong> {formatCurrency(policy.deductible)}</p>}
+                      {policy.paymentFrequency && <p><strong>Pagamento:</strong> {policy.paymentFrequency}</p>}
+                    </div>
+                    {policy.description && <p className="text-xs text-navy-500 mt-2"><strong>Descrição:</strong> {policy.description}</p>}
+                    {policy.coverages && policy.coverages.length > 0 && (
+                      <p className="text-xs text-navy-600 mt-1"><strong>Coberturas:</strong> {policy.coverages.join(', ')}</p>
+                    )}
+                    {policy.exclusions && policy.exclusions.length > 0 && (
+                      <p className="text-xs text-navy-600 mt-1"><strong>Exclusões:</strong> {policy.exclusions.join(', ')}</p>
+                    )}
+                  </div>
+                )}
 
-            {/* Expanded: documents */}
-            {isExpanded && !isEditing && (
-              <div className="border-t border-navy-100 bg-navy-50/30 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide">Documentos associados</p>
-                  <PolicyDocumentUpload
+                {/* Documents — always visible when row is expanded or editing */}
+                <div className="border-t border-navy-200 pt-4">
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide">Documentos associados</p>
+                    <PolicyDocumentUpload
+                      policyId={policy.id}
+                      companyId={policy.companyId}
+                      individualClientId={policy.individualClientId}
+                      onUploaded={onReload}
+                    />
+                  </div>
+                  {policyDocs.length === 0
+                    ? <p className="text-xs text-navy-400 mb-3">Nenhum documento associado.</p>
+                    : <ul className="mb-3 space-y-1.5">
+                        {policyDocs.map(d => (
+                          <li key={d.id} className="text-xs text-navy-600 flex items-center gap-2 flex-wrap">
+                            <span>📄</span>
+                            <span className="font-medium">{d.name}</span>
+                            <span className="text-navy-400">· {d.category}</span>
+                            <PolicyDocumentButtons storagePath={d.blobKey} name={d.name} />
+                            <DeleteDocumentButton documentId={d.id} storagePath={d.blobKey} name={d.name} onDeleted={onReload} />
+                          </li>
+                        ))}
+                      </ul>
+                  }
+                  <AssociateDocumentDropdown
                     policyId={policy.id}
-                    companyId={policy.companyId}
-                    individualClientId={policy.individualClientId}
-                    onUploaded={onReload}
+                    availableDocs={availableDocs}
+                    onAssociated={onReload}
                   />
                 </div>
-                {policyDocs.length === 0
-                  ? <p className="text-xs text-navy-400 mb-3">Nenhum documento associado.</p>
-                  : <ul className="mb-3 space-y-1.5">
-                      {policyDocs.map(d => (
-                        <li key={d.id} className="text-xs text-navy-600 flex items-center gap-2 flex-wrap">
-                          <span>📄</span>
-                          <span className="font-medium">{d.name}</span>
-                          <span className="text-navy-400">· {d.category}</span>
-                          <PolicyDocumentButtons storagePath={d.blobKey} name={d.name} />
-                        </li>
-                      ))}
-                    </ul>
-                }
-                <AssociateDocumentDropdown
-                  policyId={policy.id}
-                  availableDocs={availableDocs}
-                  onAssociated={onReload}
-                />
               </div>
             )}
           </div>
@@ -3599,6 +3801,37 @@ function PolicyDocumentButtons({ storagePath, name }: { storagePath: string; nam
         ↓
       </button>
     </span>
+  )
+}
+
+function DeleteDocumentButton({ documentId, storagePath, name, onDeleted }: {
+  documentId: string
+  storagePath: string
+  name: string
+  onDeleted: () => Promise<void>
+}) {
+  const [deleting, setDeleting] = useState(false)
+
+  return (
+    <button
+      disabled={deleting}
+      onClick={async () => {
+        if (!confirm(`Eliminar o documento "${name}"?`)) return
+        setDeleting(true)
+        try {
+          await adminDeletePolicyDocument({ data: { documentId, storagePath } })
+          await onDeleted()
+        } catch (err: any) {
+          alert(err?.message ?? 'Erro ao eliminar documento')
+        } finally {
+          setDeleting(false)
+        }
+      }}
+      className="px-1.5 py-0.5 text-xs border border-red-200 text-red-600 rounded hover:bg-red-50 disabled:opacity-50"
+      title="Eliminar"
+    >
+      {deleting ? '...' : '✕'}
+    </button>
   )
 }
 
