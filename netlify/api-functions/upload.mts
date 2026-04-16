@@ -84,7 +84,25 @@ export default async (req: Request) => {
       }
     }
 
-    const companyId = user.user_metadata?.company_id || 'general'
+    // Resolve companyId: from user metadata (company users) or from policy lookup (individual clients)
+    let companyId = user.user_metadata?.company_id || ''
+    let individualClientId: string | null = null
+
+    if (uploadType === 'policy_document' && policyId) {
+      // Look up the policy to get its companyId and individualClientId
+      const { data: policy } = await supabase
+        .from('policies')
+        .select('company_id, individual_client_id')
+        .eq('id', policyId)
+        .maybeSingle()
+      if (policy) {
+        companyId = policy.company_id || companyId
+        individualClientId = policy.individual_client_id || null
+      }
+    }
+
+    if (!companyId) companyId = 'general'
+
     const bucket = uploadType === 'avatar' ? 'avatars' : 'documents'
     const path = uploadType === 'avatar'
       ? `${user.id}/avatar.${ext}`
@@ -105,6 +123,45 @@ export default async (req: Request) => {
     if (uploadError) {
       console.error('Upload error:', uploadError)
       return Response.json({ error: 'Erro ao guardar ficheiro: ' + uploadError.message }, { status: 500 })
+    }
+
+    // Create DB record for cross-portal visibility
+    if (uploadType === 'policy_document') {
+      const docRecord = {
+        id: crypto.randomUUID(),
+        company_id: companyId !== 'general' ? companyId : null,
+        individual_client_id: individualClientId,
+        name: file.name,
+        category: 'policy',
+        size: file.size,
+        uploaded_by: user.email || user.id,
+        uploaded_at: new Date().toISOString(),
+        storage_path: uploadData.path,
+      }
+      const { error: dbError } = await supabase.from('documents').insert(docRecord)
+      if (dbError) console.error('DB record error (non-fatal):', dbError.message)
+    }
+
+    if (uploadType === 'document') {
+      // Generic document upload — link to individual client if authenticated as one
+      let clientId: string | null = null
+      const { data: byAuthId } = await supabase
+        .from('individual_clients').select('id').eq('auth_user_id', user.id).maybeSingle()
+      clientId = byAuthId?.id ?? null
+
+      const docRecord = {
+        id: crypto.randomUUID(),
+        company_id: companyId !== 'general' ? companyId : null,
+        individual_client_id: clientId,
+        name: file.name,
+        category: 'other',
+        size: file.size,
+        uploaded_by: user.email || user.id,
+        uploaded_at: new Date().toISOString(),
+        storage_path: uploadData.path,
+      }
+      const { error: dbError } = await supabase.from('documents').insert(docRecord)
+      if (dbError) console.error('DB record error (non-fatal):', dbError.message)
     }
 
     const { data: { publicUrl } } = supabase.storage.from(bucket).getPublicUrl(uploadData.path)

@@ -152,9 +152,7 @@ export interface Document {
   uploadedBy: string
   uploadedByType?: 'admin' | 'client' | 'system'
   uploadedAt: string
-  blobKey: string
-  policyId?: string
-  claimId?: string
+  storagePath: string
 }
 
 export type DocumentCategory =

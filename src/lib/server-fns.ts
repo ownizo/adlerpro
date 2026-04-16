@@ -1541,14 +1541,6 @@ export const adminUpdatePolicy = createServerFn({ method: 'POST' })
     return { success: true }
   })
 
-export const adminAssociateDocument = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
-  .inputValidator((d: { documentId: string; policyId: string }) => d)
-  .handler(async ({ data }) => {
-    await db.updateDocument(data.documentId, { policyId: data.policyId })
-    return { success: true }
-  })
-
 export const adminUploadPolicyDocument = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { policyId: string; companyId?: string; individualClientId?: string; name: string; storagePath: string; size: number; category: string }) => d)
@@ -1556,19 +1548,19 @@ export const adminUploadPolicyDocument = createServerFn({ method: 'POST' })
     await db.createDocument({
       id: crypto.randomUUID(),
       companyId: data.companyId ?? '',
+      individualClientId: data.individualClientId,
       name: data.name,
       category: data.category as any,
       size: data.size,
       uploadedBy: 'admin',
       uploadedAt: new Date().toISOString(),
-      blobKey: data.storagePath,
-      policyId: data.policyId,
+      storagePath: data.storagePath,
     })
     return { success: true }
   })
 
-export const adminGetDocumentUrl = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+export const getDocumentUrl = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
   .inputValidator((d: { storagePath: string }) => d)
   .handler(async ({ data }) => {
     const { data: urlData, error } = await supabaseAdmin.storage
@@ -1576,6 +1568,26 @@ export const adminGetDocumentUrl = createServerFn({ method: 'POST' })
       .createSignedUrl(data.storagePath, 3600)
     if (error) throw new Error(error.message)
     return { url: urlData.signedUrl }
+  })
+
+// Keep alias for backwards compatibility
+export const adminGetDocumentUrl = getDocumentUrl
+
+export const fetchClientDocuments = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { individualClientId?: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    // Admin can pass explicit clientId; individual client uses own ID from scope
+    const clientId = scope.isAdmin ? data.individualClientId : scope.individualClientId
+    if (!clientId) return []
+    const { data: docs, error } = await supabaseAdmin
+      .from('documents')
+      .select('id, name, category, size, uploaded_by, uploaded_at, storage_path')
+      .eq('individual_client_id', clientId)
+      .order('uploaded_at', { ascending: false })
+    if (error) throw new Error(error.message)
+    return docs ?? []
   })
 
 export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
@@ -1992,16 +2004,12 @@ export const registerClaimDocument = createServerFn({ method: 'POST' })
       id: fileRef.id,
       companyId: claim.companyId ?? '',
       individualClientId: claim.individualClientId,
-      claimId: claim.id,
       name: data.name,
       category: 'claim',
       size: fileRef.size,
-      mimeType: contentType,
       uploadedBy: uploadedByName,
-      uploadedByType: uploadedByRole,
       uploadedAt,
-      blobKey: data.storagePath,
-      policyId: claim.policyId,
+      storagePath: data.storagePath,
     })
 
     const ops = await updateClaimOperationalData(data.claimId, (current) => ({

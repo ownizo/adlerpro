@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
-import { fetchPolicies, createPolicy, updatePolicy, deletePolicy, fetchPolicyDocuments, adminDeletePolicyDocument, adminGetDocumentUrl } from '@/lib/server-fns'
+import { fetchPolicies, createPolicy, updatePolicy, deletePolicy, fetchPolicyDocuments, adminDeletePolicyDocument, getDocumentUrl } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Policy } from '@/lib/types'
 import { POLICY_TYPE_LABELS } from '@/lib/types'
@@ -169,7 +169,7 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
 
   const handleDocPreview = async (doc: PolicyDoc) => {
     try {
-      const { url } = await adminGetDocumentUrl({ data: { storagePath: doc.storagePath } })
+      const { url } = await getDocumentUrl({ data: { storagePath: doc.storagePath } })
       setPreviewName(doc.name)
       setPreviewUrl(url)
     } catch (e: any) {
