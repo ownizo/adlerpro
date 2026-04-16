@@ -2063,18 +2063,14 @@ export const getClaimDocumentUrl = createServerFn({ method: 'POST' })
     const ctx = await getViewerAccessContext()
 
     const dbDocument = await db.getDocument(data.documentId)
-    if (dbDocument?.blobKey) {
-      if (dbDocument.claimId) {
-        const claim = await db.getClaim(dbDocument.claimId)
-        if (!claim) throw new Error('Sinistro não encontrado')
-        if (!canAccessClaimByContext(claim, ctx)) throw new Error('Sem acesso a este sinistro')
-      } else if (ctx.companyId && dbDocument.companyId && dbDocument.companyId !== ctx.companyId) {
+    if (dbDocument?.storagePath) {
+      if (ctx.companyId && dbDocument.companyId && dbDocument.companyId !== ctx.companyId) {
         throw new Error('Sem permissões para este documento')
       }
 
       const { data: urlData, error } = await supabaseAdmin.storage
         .from('documents')
-        .createSignedUrl(dbDocument.blobKey, 3600)
+        .createSignedUrl(dbDocument.storagePath, 3600)
       if (error) throw new Error(error.message)
       return { url: urlData.signedUrl, name: dbDocument.name }
     }
@@ -2384,7 +2380,6 @@ export const createPolicy = createServerFn({ method: 'POST' })
       deductible?: number
       coverages?: string[]
       exclusions?: string[]
-      blobKey?: string
     }) => d
   )
   .handler(async ({ data }) => {

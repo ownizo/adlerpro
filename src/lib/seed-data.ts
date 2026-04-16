@@ -341,7 +341,7 @@ export function getSeedDocuments(): Document[] {
       size: 245000,
       uploadedBy: 'Sistema',
       uploadedAt: '2024-01-02T10:00:00Z',
-      blobKey: 'documents/comp_001/doc_001.pdf',
+      storagePath: 'documents/comp_001/doc_001.pdf',
     },
     {
       id: 'doc_002',
@@ -351,7 +351,7 @@ export function getSeedDocuments(): Document[] {
       size: 180000,
       uploadedBy: 'Ana Ferreira',
       uploadedAt: '2024-03-05T14:20:00Z',
-      blobKey: 'documents/comp_001/doc_002.pdf',
+      storagePath: 'documents/comp_001/doc_002.pdf',
     },
     {
       id: 'doc_003',
@@ -361,7 +361,7 @@ export function getSeedDocuments(): Document[] {
       size: 520000,
       uploadedBy: 'Sistema',
       uploadedAt: '2024-09-16T09:15:00Z',
-      blobKey: 'documents/comp_001/doc_003.pdf',
+      storagePath: 'documents/comp_001/doc_003.pdf',
     },
     {
       id: 'doc_004',
@@ -371,7 +371,7 @@ export function getSeedDocuments(): Document[] {
       size: 95000,
       uploadedBy: 'Sistema',
       uploadedAt: '2024-10-01T08:00:00Z',
-      blobKey: 'documents/comp_001/doc_004.pdf',
+      storagePath: 'documents/comp_001/doc_004.pdf',
     },
     {
       id: 'doc_005',
@@ -381,7 +381,7 @@ export function getSeedDocuments(): Document[] {
       size: 890000,
       uploadedBy: 'IA Adler & Rochefort',
       uploadedAt: '2024-12-15T11:30:00Z',
-      blobKey: 'documents/comp_001/doc_005.pdf',
+      storagePath: 'documents/comp_001/doc_005.pdf',
     },
   ]
 }

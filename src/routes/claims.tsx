@@ -273,7 +273,7 @@ function ClaimsPage() {
       setClaimDocuments((s) => ({ ...s, [claim.id]: docs }))
 
       if (file.type.startsWith('image/')) {
-        const latestDoc = docs.find((doc) => doc.blobKey === payload.path)
+        const latestDoc = docs.find((doc) => doc.storagePath === payload.path)
         if (latestDoc) {
           const { url } = await getClaimDocumentUrl({ data: { documentId: latestDoc.id } })
           setDocumentUrls((s) => ({ ...s, [latestDoc.id]: url }))
