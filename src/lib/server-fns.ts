@@ -2608,3 +2608,429 @@ Responde APENAS com um JSON válido neste formato exato (sem markdown, sem texto
 
     return { ...parsed, carouselSlides }
   })
+
+// =====================================================================
+// InvoiceXpress — Billing Module
+// =====================================================================
+
+import * as ix from './invoicexpress'
+
+// --- Invoices ---
+
+export const fetchIXInvoices = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async ({ context }) => {
+    try {
+      const result = await ix.listInvoices(1, 100)
+      return { ok: true as const, invoices: result.invoices ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const createIXInvoice = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { invoice: Partial<ix.IXInvoice> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.createInvoice(data.invoice)
+      return { ok: true as const, invoice: result.invoice }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const updateIXInvoice = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number; invoice: Partial<ix.IXInvoice> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.updateInvoice(data.id, data.invoice)
+      return { ok: true as const, invoice: result.invoice }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const changeIXInvoiceState = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number; state: ix.IXDocState }) => d)
+  .handler(async ({ data }) => {
+    try {
+      await ix.changeInvoiceState(data.id, data.state)
+      return { ok: true as const }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const sendIXInvoiceEmail = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number; email: string; subject?: string; body?: string }) => d)
+  .handler(async ({ data }) => {
+    try {
+      await ix.sendInvoiceByEmail(data.id, data.email, data.subject, data.body)
+      return { ok: true as const }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const getIXInvoicePdf = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.getInvoicePdf(data.id)
+      return { ok: true as const, ...result }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Simplified Invoices ---
+
+export const fetchIXSimplifiedInvoices = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listSimplifiedInvoices(1, 100)
+      return { ok: true as const, invoices: result.simplified_invoices ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const createIXSimplifiedInvoice = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { invoice: Partial<ix.IXInvoice> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.createSimplifiedInvoice(data.invoice)
+      return { ok: true as const, invoice: result.simplified_invoice }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Invoice Receipts ---
+
+export const fetchIXInvoiceReceipts = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listInvoiceReceipts(1, 100)
+      return { ok: true as const, invoices: result.invoice_receipts ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const createIXInvoiceReceipt = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { invoice: Partial<ix.IXInvoice> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.createInvoiceReceipt(data.invoice)
+      return { ok: true as const, invoice: result.invoice_receipt }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Credit Notes ---
+
+export const fetchIXCreditNotes = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listCreditNotes(1, 100)
+      return { ok: true as const, notes: result.credit_notes ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const createIXCreditNote = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { note: Partial<ix.IXCreditNote> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.createCreditNote(data.note)
+      return { ok: true as const, note: result.credit_note }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const changeIXCreditNoteState = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number; state: ix.IXDocState }) => d)
+  .handler(async ({ data }) => {
+    try {
+      await ix.changeCreditNoteState(data.id, data.state)
+      return { ok: true as const }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Debit Notes ---
+
+export const fetchIXDebitNotes = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listDebitNotes(1, 100)
+      return { ok: true as const, notes: result.debit_notes ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const createIXDebitNote = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { note: Partial<ix.IXDebitNote> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.createDebitNote(data.note)
+      return { ok: true as const, note: result.debit_note }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const changeIXDebitNoteState = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number; state: ix.IXDocState }) => d)
+  .handler(async ({ data }) => {
+    try {
+      await ix.changeDebitNoteState(data.id, data.state)
+      return { ok: true as const }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Receipts ---
+
+export const fetchIXReceipts = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listReceipts(1, 100)
+      return { ok: true as const, receipts: result.receipts ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const createIXReceipt = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { receipt: Partial<ix.IXReceipt> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.createReceipt(data.receipt)
+      return { ok: true as const, receipt: result.receipt }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const changeIXReceiptState = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number; state: ix.IXDocState }) => d)
+  .handler(async ({ data }) => {
+    try {
+      await ix.changeReceiptState(data.id, data.state)
+      return { ok: true as const }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Estimates ---
+
+export const fetchIXEstimates = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listEstimates(1, 100)
+      return { ok: true as const, estimates: result.estimates ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const createIXEstimate = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { estimate: Partial<ix.IXEstimate> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.createEstimate(data.estimate)
+      return { ok: true as const, estimate: result.estimate }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const changeIXEstimateState = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number; state: 'finalized' | 'deleted' | 'canceled' | 'accepted' | 'refused' }) => d)
+  .handler(async ({ data }) => {
+    try {
+      await ix.changeEstimateState(data.id, data.state)
+      return { ok: true as const }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const sendIXEstimateEmail = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number; email: string; subject?: string; body?: string }) => d)
+  .handler(async ({ data }) => {
+    try {
+      await ix.sendEstimateByEmail(data.id, data.email, data.subject, data.body)
+      return { ok: true as const }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Guides ---
+
+export const fetchIXGuides = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listGuides(1, 100)
+      return { ok: true as const, guides: result.guides ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const createIXGuide = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { guide: Partial<ix.IXGuide> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.createGuide(data.guide)
+      return { ok: true as const, guide: result.guide }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Clients ---
+
+export const fetchIXClients = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listClients(1, 100)
+      return { ok: true as const, clients: result.clients ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const getIXClient = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.getClient(data.id)
+      return { ok: true as const, client: result.client }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const createIXClient = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { client: Partial<ix.IXClient> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.createClient(data.client)
+      return { ok: true as const, client: result.client }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const updateIXClient = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number; client: Partial<ix.IXClient> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.updateClient(data.id, data.client)
+      return { ok: true as const, client: result.client }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Items ---
+
+export const fetchIXItems = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listItems(1, 100)
+      return { ok: true as const, items: result.items ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const createIXItem = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { item: Partial<ix.IXItem> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.createItem(data.item)
+      return { ok: true as const, item: result.item }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+export const updateIXItem = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .validator((d: { id: number; item: Partial<ix.IXItem> }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const result = await ix.updateItem(data.id, data.item)
+      return { ok: true as const, item: result.item }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Sequences ---
+
+export const fetchIXSequences = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listSequences()
+      return { ok: true as const, sequences: result.sequences ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })
+
+// --- Taxes ---
+
+export const fetchIXTaxes = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    try {
+      const result = await ix.listTaxes()
+      return { ok: true as const, taxes: result.taxes ?? [] }
+    } catch (e: any) {
+      return { ok: false as const, error: e.message }
+    }
+  })

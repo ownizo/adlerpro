@@ -21,6 +21,7 @@ import { Route as LicensePlatesRouteImport } from './routes/license-plates'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ClaimsRouteImport } from './routes/claims'
+import { Route as BillingRouteImport } from './routes/billing'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -92,6 +93,11 @@ const ClaimsRoute = ClaimsRouteImport.update({
   path: '/claims',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BillingRoute = BillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AlertsRoute = AlertsRouteImport.update({
   id: '/alerts',
   path: '/alerts',
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
+  '/billing': typeof BillingRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
@@ -171,6 +178,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
+  '/billing': typeof BillingRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
@@ -196,6 +204,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
+  '/billing': typeof BillingRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
@@ -222,6 +231,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/alerts'
+    | '/billing'
     | '/claims'
     | '/contact'
     | '/dashboard'
@@ -246,6 +256,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/alerts'
+    | '/billing'
     | '/claims'
     | '/contact'
     | '/dashboard'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/alerts'
+    | '/billing'
     | '/claims'
     | '/contact'
     | '/dashboard'
@@ -295,6 +307,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AlertsRoute: typeof AlertsRoute
+  BillingRoute: typeof BillingRoute
   ClaimsRoute: typeof ClaimsRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
@@ -402,6 +415,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ClaimsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/billing': {
+      id: '/billing'
+      path: '/billing'
+      fullPath: '/billing'
+      preLoaderRoute: typeof BillingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/alerts': {
       id: '/alerts'
       path: '/alerts'
@@ -479,6 +499,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AlertsRoute: AlertsRoute,
+  BillingRoute: BillingRoute,
   ClaimsRoute: ClaimsRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
