@@ -3850,9 +3850,16 @@ function PolicyDocumentUpload({ policyId, companyId, individualClientId, onUploa
     if (!file) return
     setUploading(true); setError('')
     try {
-      const storagePath = `policies/${policyId}/${Date.now()}-${file.name}`
-      const { error: upErr } = await supabase.storage.from('documents').upload(storagePath, file)
-      if (upErr) throw new Error(upErr.message)
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('type', 'policy_document')
+      formData.append('policyId', policyId)
+      const res = await fetch('/api/upload', { method: 'POST', body: formData, credentials: 'include' })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body?.error || 'Erro no upload')
+      }
+      const { path: storagePath } = await res.json()
       await adminUploadPolicyDocument({
         data: {
           policyId,
