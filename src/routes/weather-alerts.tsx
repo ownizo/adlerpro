@@ -1,8 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { useState } from 'react'
-import { Sun, CloudRain, Cloud, CloudSun, CloudLightning, Wind, Droplets, MapPin, AlertTriangle } from 'lucide-react'
+import { Sun, CloudRain, Cloud, CloudSun, CloudLightning, Wind, Droplets, MapPin, AlertTriangle, Navigation } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import type { IpmaForecastDay, IpmaWarning } from '@/lib/types'
+import { getSeverityColor, getSeverityBg, getAlertIcon } from '@/lib/weather'
 
 export const Route = createFileRoute('/weather-alerts')({
   component: WeatherAlertsPage,
@@ -81,11 +83,42 @@ function findLocationByName(query: string) {
   ) || null
 }
 
+const DISTRITO_TO_AREA: Record<string, string> = {
+  'Aveiro': 'AVR', 'Beja': 'BJA', 'Braga': 'BGC', 'Bragança': 'BGN',
+  'Castelo Branco': 'CTB', 'Coimbra': 'CBR', 'Évora': 'EVR', 'Faro': 'FAR',
+  'Guarda': 'GRD', 'Leiria': 'LEI', 'Lisboa': 'LIS', 'Portalegre': 'PTL',
+  'Porto': 'PRT', 'Santarém': 'STR', 'Setúbal': 'STB',
+  'Viana do Castelo': 'VCT', 'Vila Real': 'VRL', 'Viseu': 'VSU',
+  'Madeira': 'MAD', 'Açores': 'AMP',
+}
+
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371
+  const dLat = ((lat2 - lat1) * Math.PI) / 180
+  const dLon = ((lon2 - lon1) * Math.PI) / 180
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
+function nearestLocation(lat: number, lon: number) {
+  return IPMA_LOCATIONS.reduce(
+    (best, loc) => {
+      const d = haversineKm(lat, lon, loc.lat, loc.lon)
+      return d < best.dist ? { loc, dist: d } : best
+    },
+    { loc: IPMA_LOCATIONS[0], dist: Infinity }
+  ).loc
+}
+
 function WeatherAlertsPage() {
   const { t } = useTranslation()
   const [address, setAddress] = useState('')
   const [loading, setLoading] = useState(false)
-  const [weatherData, setWeatherData] = useState<any[] | null>(null)
+  const [geoLoading, setGeoLoading] = useState(false)
+  const [weatherData, setWeatherData] = useState<IpmaForecastDay[] | null>(null)
+  const [warnings, setWarnings] = useState<IpmaWarning[]>([])
   const [foundLocation, setFoundLocation] = useState<(typeof IPMA_LOCATIONS)[0] | null>(null)
   const [error, setError] = useState('')
   const [suggestions, setSuggestions] = useState<typeof IPMA_LOCATIONS>([])
@@ -115,18 +148,38 @@ function WeatherAlertsPage() {
     setLoading(true)
     setError('')
     setWeatherData(null)
+    setWarnings([])
     setSuggestions([])
     setFoundLocation(location)
     try {
-      const res = await fetch(`https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/${location.id}.json`)
-      if (!res.ok) throw new Error(t('weatherAlerts.fetchError', { name: location.name }))
-      const data = await res.json()
-      const sorted = (data.data || [])
-        .sort((a: any, b: any) => new Date(a.forecastDate).getTime() - new Date(b.forecastDate).getTime())
+      const [forecastRes, warningsRes] = await Promise.allSettled([
+        fetch(`https://api.ipma.pt/open-data/forecast/meteorology/cities/daily/${location.id}.json`),
+        fetch('https://api.ipma.pt/open-data/forecast/warnings/warnings_www.json'),
+      ])
+
+      if (forecastRes.status === 'rejected' || !forecastRes.value.ok) {
+        throw new Error(t('weatherAlerts.fetchError', { name: location.name }))
+      }
+      const forecastJson = await forecastRes.value.json()
+      const sorted: IpmaForecastDay[] = (forecastJson.data || [])
+        .sort(
+          (a: IpmaForecastDay, b: IpmaForecastDay) =>
+            new Date(a.forecastDate).getTime() - new Date(b.forecastDate).getTime()
+        )
         .slice(0, 7)
       setWeatherData(sorted)
-    } catch (err: any) {
-      setError(err.message || t('weatherAlerts.genericError'))
+
+      if (warningsRes.status === 'fulfilled' && warningsRes.value.ok) {
+        const warningsJson: IpmaWarning[] = await warningsRes.value.json()
+        const idAreaAviso = DISTRITO_TO_AREA[location.district] ?? null
+        const now = new Date()
+        const active = warningsJson.filter(
+          (w) => (!idAreaAviso || w.idAreaAviso === idAreaAviso) && new Date(w.endTime) > now
+        )
+        setWarnings(active)
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : t('weatherAlerts.genericError'))
     } finally {
       setLoading(false)
     }
@@ -190,9 +243,39 @@ function WeatherAlertsPage() {
                   </div>
                 )}
               </div>
-              <button type="submit" disabled={loading}
-                style={{ background: '#111', color: '#fff', padding: '0.625rem 1.5rem', borderRadius: '4px', border: 'none', fontFamily: "'Montserrat', sans-serif", fontSize: '0.875rem', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+              <button type="submit" disabled={loading || geoLoading}
+                style={{ background: '#111', color: '#fff', padding: '0.625rem 1.5rem', borderRadius: '4px', border: 'none', fontFamily: "'Montserrat', sans-serif", fontSize: '0.875rem', fontWeight: 600, cursor: (loading || geoLoading) ? 'not-allowed' : 'pointer', opacity: (loading || geoLoading) ? 0.6 : 1, whiteSpace: 'nowrap' }}>
                 {loading ? t('weatherAlerts.searching') : t('weatherAlerts.searchBtn')}
+              </button>
+              <button
+                type="button"
+                disabled={loading || geoLoading}
+                aria-label="Usar a minha localização atual"
+                onClick={() => {
+                  if (!navigator.geolocation) {
+                    setError('Geolocalização não suportada neste browser.')
+                    return
+                  }
+                  setGeoLoading(true)
+                  setError('')
+                  navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                      const loc = nearestLocation(pos.coords.latitude, pos.coords.longitude)
+                      setAddress(loc.name)
+                      setGeoLoading(false)
+                      fetchWeatherForLocation(loc)
+                    },
+                    () => {
+                      setGeoLoading(false)
+                      setError('Não foi possível obter a sua localização. Verifique as permissões do browser.')
+                    },
+                    { timeout: 8000 }
+                  )
+                }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', background: geoLoading ? '#f5f5f5' : '#fff', border: '1px solid #ddd', borderRadius: '4px', cursor: (loading || geoLoading) ? 'not-allowed' : 'pointer', flexShrink: 0, opacity: (loading || geoLoading) ? 0.6 : 1 }}
+                title="Usar a minha localização atual"
+              >
+                <Navigation style={{ width: '16px', height: '16px', color: geoLoading ? '#C8961A' : '#555' }} />
               </button>
             </div>
             {error && (
@@ -224,7 +307,7 @@ function WeatherAlertsPage() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              {weatherData.map((item: any, i: number) => {
+              {weatherData.map((item: IpmaForecastDay, i: number) => {
                 const risk = getRiskLabel(item.precipitaProb, item.classWindSpeed)
                 return (
                   <div key={i} style={{ background: '#fff', border: i === 0 ? '2px solid #111' : '1px solid #eee', borderRadius: '4px', padding: '1rem 0.75rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', position: 'relative' }}>
@@ -257,6 +340,55 @@ function WeatherAlertsPage() {
                   </div>
                 )
               })}
+            </div>
+
+            {/* Avisos IPMA */}
+            <div style={{ marginBottom: '1.5rem' }} aria-label="Avisos meteorológicos IPMA">
+              <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#111', margin: '0 0 0.75rem' }}>
+                Avisos IPMA
+              </h3>
+              {warnings.length === 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 0.875rem', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '4px' }}>
+                  <span style={{ fontSize: '0.9rem' }} aria-hidden="true">✅</span>
+                  <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.82rem', fontWeight: 600, color: '#16a34a', margin: 0 }}>
+                    Sem avisos ativos para {foundLocation?.district ?? foundLocation?.name}
+                  </p>
+                </div>
+              ) : (
+                <div role="list" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {warnings.map((w, i) => (
+                    <div
+                      key={i}
+                      role="listitem"
+                      style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', padding: '0.75rem 1rem', background: getSeverityBg(w.awarenessLevelID), border: `1px solid ${getSeverityColor(w.awarenessLevelID)}44`, borderRadius: '4px' }}
+                    >
+                      <span style={{ fontSize: '1.1rem', flexShrink: 0, lineHeight: 1.2 }} aria-hidden="true">
+                        {getAlertIcon(w.awarenessTypeName)}
+                      </span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.25rem' }}>
+                          <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.8rem', color: getSeverityColor(w.awarenessLevelID) }}>
+                            {w.awarenessTypeName}
+                          </span>
+                          <span style={{ display: 'inline-block', fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, padding: '1px 7px', borderRadius: '10px', background: getSeverityColor(w.awarenessLevelID), color: '#fff', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                            {w.awarenessLevelID}
+                          </span>
+                        </div>
+                        {w.text && (
+                          <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#444', margin: '0 0 0.25rem', lineHeight: 1.4 }}>
+                            {w.text}
+                          </p>
+                        )}
+                        <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', color: '#888', margin: 0 }}>
+                          {new Date(w.startTime).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                          {' — '}
+                          {new Date(w.endTime).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div style={{ background: '#f8f8f8', border: '1px solid #eee', borderRadius: '4px', padding: '1.25rem 1.5rem' }}>

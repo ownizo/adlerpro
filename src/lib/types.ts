@@ -412,6 +412,28 @@ export interface IndividualClient {
   createdAt?: string
 }
 
+export interface IpmaForecastDay {
+  forecastDate: string
+  idWeatherType: number
+  tMin: string
+  tMax: string
+  precipitaProb: string
+  classWindSpeed: number
+  predWindDir: string
+  classPrecInt?: number
+  latitude?: string
+  longitude?: string
+}
+
+export interface IpmaWarning {
+  awarenessTypeName: string
+  awarenessLevelID: 'green' | 'yellow' | 'orange' | 'red'
+  idAreaAviso: string
+  startTime: string
+  endTime: string
+  text: string
+}
+
 export type SocialPostStatus = 'draft' | 'scheduled' | 'published'
 export type SocialNetwork = 'instagram' | 'linkedin' | 'facebook'
 

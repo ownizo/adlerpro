@@ -1,6 +1,7 @@
 import { createFileRoute, Navigate, Link } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { OnboardingBanner } from '@/components/OnboardingBanner'
+import { WeatherWidget } from '@/components/WeatherWidget'
 import { fetchDashboardAll } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { DashboardStats, Alert, Policy } from '@/lib/types'
@@ -373,8 +374,9 @@ function DashboardPage() {
                 </div>
               </div>
 
-              {/* Right column: Alertas */}
-              <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', overflow: 'hidden', alignSelf: 'start' }}>
+              {/* Right column: Alertas + Clima */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignSelf: 'start' }}>
+              <div style={{ background: '#ffffff', border: '1px solid #eeeeee', borderRadius: '4px', overflow: 'hidden' }}>
                 <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #eeeeee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.9rem', color: '#111111', margin: 0 }}>
                     {t('dashboard.alerts')}
@@ -433,7 +435,14 @@ function DashboardPage() {
                   )}
                 </div>
               </div>
+              <WeatherWidget
+                lat={38.7167}
+                lon={-9.1333}
+                distrito="lisboa"
+                cityName="Lisboa"
+              />
             </div>
+          </div>
           </>
         )}
       </div>
