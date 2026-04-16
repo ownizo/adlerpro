@@ -49,13 +49,14 @@ export default async (req: Request) => {
     const file = formData.get('file') as File | null
     const uploadType = (formData.get('type') as string) || 'document'
     const claimId = (formData.get('claimId') as string) || ''
+    const policyId = (formData.get('policyId') as string) || ''
 
     if (!file) {
       return Response.json({ error: 'Ficheiro nao fornecido' }, { status: 400 })
     }
 
-    const allowedMime = new Set(['application/pdf', 'image/jpeg', 'image/png'])
-    const allowedExt = new Set(['pdf', 'jpg', 'jpeg', 'png'])
+    const allowedMime = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
+    const allowedExt = new Set(['pdf', 'jpg', 'jpeg', 'png', 'webp'])
     const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
     const maxSizeBytes = 10 * 1024 * 1024
 
@@ -71,12 +72,27 @@ export default async (req: Request) => {
       }
     }
 
+    if (uploadType === 'policy_document') {
+      if (file.size > maxSizeBytes) {
+        return Response.json({ error: 'Ficheiro excede o tamanho máximo de 10MB' }, { status: 400 })
+      }
+      if (!allowedMime.has(file.type) || !allowedExt.has(ext)) {
+        return Response.json({ error: 'Formato inválido. Use PDF, JPG ou PNG' }, { status: 400 })
+      }
+      if (!policyId.trim()) {
+        return Response.json({ error: 'policyId é obrigatório para upload de apólice' }, { status: 400 })
+      }
+    }
+
+    const companyId = user.user_metadata?.company_id || 'general'
     const bucket = uploadType === 'avatar' ? 'avatars' : 'documents'
     const path = uploadType === 'avatar'
       ? `${user.id}/avatar.${ext}`
       : uploadType === 'claim_document'
-      ? `${user.user_metadata?.company_id || 'general'}/claims/${claimId}/${Date.now()}_${file.name}`
-      : `${user.user_metadata?.company_id || 'general'}/${Date.now()}_${file.name}`
+      ? `${companyId}/claims/${claimId}/${Date.now()}_${file.name}`
+      : uploadType === 'policy_document'
+      ? `${companyId}/policies/${policyId}/${Date.now()}_${file.name}`
+      : `${companyId}/${Date.now()}_${file.name}`
 
     const buffer = await file.arrayBuffer()
     const { data: uploadData, error: uploadError } = await supabase.storage

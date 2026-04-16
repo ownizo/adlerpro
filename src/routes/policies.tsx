@@ -1,10 +1,10 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
-import { fetchPolicies, createPolicy, updatePolicy, deletePolicy } from '@/lib/server-fns'
+import { fetchPolicies, createPolicy, updatePolicy, deletePolicy, fetchPolicyDocuments, adminDeletePolicyDocument, adminGetDocumentUrl } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Policy } from '@/lib/types'
 import { POLICY_TYPE_LABELS } from '@/lib/types'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { getServerUser } from '@/lib/auth'
 import { useTranslation } from 'react-i18next'
 
@@ -86,6 +86,15 @@ function DetailItem({ label, value }: { label: string; value: string }) {
   )
 }
 
+type PolicyDoc = { id: string; name: string; storagePath: string; size: number; mimeType: string; uploadedAt: string }
+
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '—'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
 function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, formatDate, t }: {
   policy: Policy
   onClose: () => void
@@ -99,109 +108,269 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
   const icon = POLICY_TYPE_ICONS[policy.type] || '📋'
   const days = daysUntil(policy.endDate)
 
+  const [docs, setDocs] = useState<PolicyDoc[]>([])
+  const [docsLoading, setDocsLoading] = useState(true)
+  const [docsError, setDocsError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<string[]>([])
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewName, setPreviewName] = useState<string>('')
+  const docInputRef = useRef<HTMLInputElement>(null)
+
+  const loadDocs = useCallback(() => {
+    setDocsLoading(true)
+    setDocsError(null)
+    fetchPolicyDocuments({ data: { policyId: policy.id } })
+      .then((d) => { setDocs(d); setDocsLoading(false) })
+      .catch((e) => { setDocsError(e.message); setDocsLoading(false) })
+  }, [policy.id])
+
+  useEffect(() => { loadDocs() }, [loadDocs])
+
+  const handleDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    setUploading(true)
+    setUploadProgress([])
+    const errors: string[] = []
+    for (const file of files) {
+      setUploadProgress((prev) => [...prev, `A carregar ${file.name}…`])
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('type', 'policy_document')
+        fd.append('policyId', policy.id)
+        const res = await fetch('/api/upload', { method: 'POST', body: fd })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          errors.push(`${file.name}: ${err.error || 'Erro desconhecido'}`)
+        } else {
+          setUploadProgress((prev) => prev.map((p) => p.includes(file.name) ? `✓ ${file.name}` : p))
+        }
+      } catch {
+        errors.push(`${file.name}: Erro de rede`)
+      }
+    }
+    setUploading(false)
+    if (docInputRef.current) docInputRef.current.value = ''
+    if (errors.length) setDocsError(errors.join(' | '))
+    setTimeout(() => { setUploadProgress([]); loadDocs() }, 800)
+  }
+
+  const handleDocDelete = async (doc: PolicyDoc) => {
+    if (!confirm(`Eliminar "${doc.name}"?`)) return
+    try {
+      await adminDeletePolicyDocument({ data: { storagePath: doc.storagePath } })
+      setDocs((prev) => prev.filter((d) => d.id !== doc.id))
+    } catch (e: any) {
+      alert('Erro ao eliminar: ' + e.message)
+    }
+  }
+
+  const handleDocPreview = async (doc: PolicyDoc) => {
+    try {
+      const { url } = await adminGetDocumentUrl({ data: { storagePath: doc.storagePath } })
+      setPreviewName(doc.name)
+      setPreviewUrl(url)
+    } catch (e: any) {
+      alert('Erro ao obter URL: ' + e.message)
+    }
+  }
+
   return (
-    <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
-      onClick={onClose}
-    >
+    <>
       <div
-        style={{ background: '#ffffff', borderRadius: '4px', width: '100%', maxWidth: '640px', maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
-        onClick={(e) => e.stopPropagation()}
+        style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+        onClick={onClose}
       >
-        {/* Header colorido */}
-        <div style={{ background: c.bg, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: `1px solid ${c.border}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <span style={{ fontSize: '1.75rem' }}>{icon}</span>
-            <div>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: c.text, margin: 0 }}>{POLICY_TYPE_LABELS[policy.type] || policy.type}</p>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 400, fontSize: '0.82rem', color: c.text, opacity: 0.8, margin: 0 }}>{policy.insurer}</p>
+        <div
+          style={{ background: '#ffffff', borderRadius: '4px', width: '100%', maxWidth: '640px', maxHeight: '92vh', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header colorido */}
+          <div style={{ background: c.bg, padding: '1.25rem 1.5rem', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: `1px solid ${c.border}` }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <span style={{ fontSize: '1.75rem' }}>{icon}</span>
+              <div>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: c.text, margin: 0 }}>{POLICY_TYPE_LABELS[policy.type] || policy.type}</p>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 400, fontSize: '0.82rem', color: c.text, opacity: 0.8, margin: 0 }}>{policy.insurer}</p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+              <StatusBadge status={policy.status} />
+              <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888888', fontSize: '1.4rem', lineHeight: 1, padding: '0.1rem 0.25rem' }}>×</button>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <StatusBadge status={policy.status} />
-            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888888', fontSize: '1.4rem', lineHeight: 1, padding: '0.1rem 0.25rem' }}>×</button>
+
+          <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto' }}>
+            {/* Campos principais */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
+              <DetailItem label={t('policies.policyNumber')} value={policy.policyNumber || '—'} />
+              <DetailItem label={t('policies.annualPremium')} value={formatCurrency(policy.annualPremium)} />
+              <DetailItem label={t('policies.insuredValue')} value={policy.insuredValue > 0 ? formatCurrency(policy.insuredValue) : '—'} />
+              <DetailItem label={t('policies.deductible')} value={policy.deductible ? formatCurrency(policy.deductible) : '—'} />
+              <DetailItem label={t('policies.startDate')} value={formatDate(policy.startDate)} />
+              <DetailItem label={t('policies.endDate')} value={
+                days >= 0 && days <= 90
+                  ? `${formatDate(policy.endDate)} (${days}d)`
+                  : formatDate(policy.endDate)
+              } />
+            </div>
+
+            {policy.description && (
+              <div style={{ marginBottom: '1.25rem', padding: '0.75rem', background: '#f9f9f9', borderRadius: '4px', border: '1px solid #eeeeee' }}>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#666666', margin: 0 }}>{policy.description}</p>
+              </div>
+            )}
+
+            {/* Coberturas completas */}
+            {policy.coverages && policy.coverages.length > 0 && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: '0 0 0.5rem' }}>
+                  {t('policies.coverages')} ({policy.coverages.length})
+                </p>
+                <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyle: 'none' }}>
+                  {policy.coverages.map((cov: string, i: number) => (
+                    <li key={i} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#333333', marginBottom: '0.4rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
+                      <span style={{ color: '#22C55E', flexShrink: 0, marginTop: '0.1rem' }}>✓</span>
+                      {cov}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Exclusões completas */}
+            {policy.exclusions && policy.exclusions.length > 0 && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#991B1B', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: '0 0 0.5rem' }}>
+                  {t('policies.exclusions')} ({policy.exclusions.length})
+                </p>
+                <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyle: 'none' }}>
+                  {policy.exclusions.map((exc: string, i: number) => (
+                    <li key={i} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#555555', marginBottom: '0.4rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
+                      <span style={{ color: '#EF4444', flexShrink: 0, marginTop: '0.1rem' }}>✕</span>
+                      {exc}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Documentos da apólice */}
+            <div style={{ borderTop: '1px solid #eeeeee', paddingTop: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#444444', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: 0 }}>
+                  Documentos {docs.length > 0 ? `(${docs.length})` : ''}
+                </p>
+                <label style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', fontWeight: 600, padding: '0.35rem 0.75rem', background: uploading ? '#cccccc' : '#111111', color: '#ffffff', borderRadius: '4px', cursor: uploading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  {uploading
+                    ? <><span style={{ display: 'inline-block', width: '10px', height: '10px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> A carregar…</>
+                    : <>+ Adicionar</>}
+                  <input ref={docInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple onChange={handleDocUpload} style={{ display: 'none' }} disabled={uploading} />
+                </label>
+              </div>
+
+              {uploadProgress.length > 0 && (
+                <div style={{ marginBottom: '0.75rem', padding: '0.5rem 0.75rem', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: '4px' }}>
+                  {uploadProgress.map((p, i) => (
+                    <p key={i} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#0369a1', margin: '0.1rem 0' }}>{p}</p>
+                  ))}
+                </div>
+              )}
+
+              {docsError && (
+                <div style={{ marginBottom: '0.75rem', padding: '0.5rem 0.75rem', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#dc2626' }}>⚠ {docsError}</span>
+                  <button onClick={() => setDocsError(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#dc2626' }}>×</button>
+                </div>
+              )}
+
+              {docsLoading ? (
+                <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}>
+                  <div style={{ width: '20px', height: '20px', border: '2px solid #eeeeee', borderTopColor: '#C8961A', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                </div>
+              ) : docs.length === 0 ? (
+                <div style={{ padding: '1.25rem', background: '#f9f9f9', borderRadius: '4px', border: '1px dashed #dddddd', textAlign: 'center' as const }}>
+                  <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#aaaaaa', margin: 0 }}>Sem documentos. Clique em "+ Adicionar" para carregar.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '0.4rem' }}>
+                  {docs.map((doc) => {
+                    const isPdf = doc.mimeType?.includes('pdf') || doc.name.toLowerCase().endsWith('.pdf')
+                    const isImage = doc.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(doc.name)
+                    return (
+                      <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.5rem 0.75rem', background: '#f9f9f9', borderRadius: '4px', border: '1px solid #eeeeee' }}>
+                        <span style={{ fontSize: '1.1rem', flexShrink: 0 }}>{isPdf ? '📄' : isImage ? '🖼️' : '📎'}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.78rem', color: '#333333', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{doc.name}</p>
+                          <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', color: '#aaaaaa', margin: 0 }}>{formatFileSize(doc.size)}</p>
+                        </div>
+                        <button
+                          onClick={() => handleDocPreview(doc)}
+                          title="Ver documento"
+                          style={{ padding: '0.3rem 0.6rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: '4px', cursor: 'pointer', fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', fontWeight: 600, flexShrink: 0 }}
+                        >
+                          Ver
+                        </button>
+                        <button
+                          onClick={() => handleDocDelete(doc)}
+                          title="Eliminar"
+                          style={{ padding: '0.3rem 0.6rem', background: '#FFF1F2', color: '#9F1239', border: '1px solid #FECDD3', borderRadius: '4px', cursor: 'pointer', fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', fontWeight: 600, flexShrink: 0 }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div style={{ padding: '1.25rem 1.5rem', overflowY: 'auto' }}>
-          {/* Campos principais */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '1.25rem' }}>
-            <DetailItem label={t('policies.policyNumber')} value={policy.policyNumber || '—'} />
-            <DetailItem label={t('policies.annualPremium')} value={formatCurrency(policy.annualPremium)} />
-            <DetailItem label={t('policies.insuredValue')} value={policy.insuredValue > 0 ? formatCurrency(policy.insuredValue) : '—'} />
-            <DetailItem label={t('policies.deductible')} value={policy.deductible ? formatCurrency(policy.deductible) : '—'} />
-            <DetailItem label={t('policies.startDate')} value={formatDate(policy.startDate)} />
-            <DetailItem label={t('policies.endDate')} value={
-              days >= 0 && days <= 90
-                ? `${formatDate(policy.endDate)} (${days}d)`
-                : formatDate(policy.endDate)
-            } />
+          {/* Acções */}
+          <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #eeeeee', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' as const }}>
+            <button onClick={() => { onClose(); onEdit(policy) }} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#ffffff', color: '#333333', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>
+              {t('policies.edit')}
+            </button>
+            <button onClick={() => onDelete(policy.id)} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#FFF1F2', color: '#9F1239', border: '1px solid #FECDD3', borderRadius: '4px', cursor: 'pointer' }}>
+              {t('policies.delete')}
+            </button>
+            <button onClick={onClose} style={{ marginLeft: 'auto', fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>
+              {t('policies.close')}
+            </button>
           </div>
-
-          {policy.description && (
-            <div style={{ marginBottom: '1.25rem', padding: '0.75rem', background: '#f9f9f9', borderRadius: '4px', border: '1px solid #eeeeee' }}>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#666666', margin: 0 }}>{policy.description}</p>
-            </div>
-          )}
-
-          {/* Coberturas completas */}
-          {policy.coverages && policy.coverages.length > 0 && (
-            <div style={{ marginBottom: '1.25rem' }}>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: '0 0 0.5rem' }}>
-                {t('policies.coverages')} ({policy.coverages.length})
-              </p>
-              <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyle: 'none' }}>
-                {policy.coverages.map((cov: string, i: number) => (
-                  <li key={i} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#333333', marginBottom: '0.4rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
-                    <span style={{ color: '#22C55E', flexShrink: 0, marginTop: '0.1rem' }}>✓</span>
-                    {cov}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Exclusões completas */}
-          {policy.exclusions && policy.exclusions.length > 0 && (
-            <div style={{ marginBottom: '1.25rem' }}>
-              <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', fontWeight: 700, color: '#991B1B', textTransform: 'uppercase' as const, letterSpacing: '0.08em', margin: '0 0 0.5rem' }}>
-                {t('policies.exclusions')} ({policy.exclusions.length})
-              </p>
-              <ul style={{ margin: 0, paddingLeft: '1.1rem', listStyle: 'none' }}>
-                {policy.exclusions.map((exc: string, i: number) => (
-                  <li key={i} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', color: '#555555', marginBottom: '0.4rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
-                    <span style={{ color: '#EF4444', flexShrink: 0, marginTop: '0.1rem' }}>✕</span>
-                    {exc}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        {/* Acções */}
-        <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid #eeeeee', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' as const }}>
-          {policy.documentKey && (
-            <a
-              href={`/api/download-document?key=${encodeURIComponent(policy.documentKey)}`}
-              target="_blank" rel="noreferrer"
-              style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: '4px', textDecoration: 'none' }}
-            >
-              {t('policies.viewDocument')}
-            </a>
-          )}
-          <button onClick={() => { onClose(); onEdit(policy) }} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#ffffff', color: '#333333', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>
-            {t('policies.edit')}
-          </button>
-          <button onClick={() => onDelete(policy.id)} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#FFF1F2', color: '#9F1239', border: '1px solid #FECDD3', borderRadius: '4px', cursor: 'pointer' }}>
-            {t('policies.delete')}
-          </button>
-          <button onClick={onClose} style={{ marginLeft: 'auto', fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 600, padding: '0.5rem 1rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>
-            {t('policies.close')}
-          </button>
         </div>
       </div>
-    </div>
+
+      {/* Preview modal */}
+      {previewUrl && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', zIndex: 300, display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', padding: '1rem' }}
+          onClick={() => setPreviewUrl(null)}
+        >
+          <div
+            style={{ background: '#ffffff', borderRadius: '4px', width: '100%', maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #eeeeee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', color: '#333333', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{previewName}</p>
+              <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
+                <a href={previewUrl} target="_blank" rel="noreferrer" style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', fontWeight: 600, padding: '0.3rem 0.75rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: '4px', textDecoration: 'none' }}>Abrir</a>
+                <button onClick={() => setPreviewUrl(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888888', fontSize: '1.25rem', lineHeight: 1 }}>×</button>
+              </div>
+            </div>
+            <div style={{ flex: 1, overflow: 'hidden' }}>
+              {/\.(jpg|jpeg|png|webp)$/i.test(previewName) ? (
+                <img src={previewUrl} alt={previewName} style={{ width: '100%', height: '100%', objectFit: 'contain' as const }} />
+              ) : (
+                <iframe src={previewUrl} title={previewName} style={{ width: '100%', height: '70vh', border: 'none' }} />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 

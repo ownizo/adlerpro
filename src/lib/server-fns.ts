@@ -3034,3 +3034,41 @@ export const fetchIXTaxes = createServerFn({ method: 'GET' })
       return { ok: false as const, error: e.message }
     }
   })
+
+// ============================================================
+// Policy Documents (Supabase Storage)
+// ============================================================
+
+export const fetchPolicyDocuments = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { policyId: string; companyId?: string }) => d)
+  .handler(async ({ data }) => {
+    const scope = await getViewerScope()
+    const companyId = scope.companyId ?? data.companyId ?? 'general'
+    const prefix = `${companyId}/policies/${data.policyId}`
+    const { data: files, error } = await supabaseAdmin.storage
+      .from('documents')
+      .list(prefix, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } })
+    if (error) throw new Error(error.message)
+    return (files ?? [])
+      .filter((f) => f.name !== '.emptyFolderPlaceholder')
+      .map((f) => ({
+        id: f.id ?? f.name,
+        name: f.name,
+        storagePath: `${prefix}/${f.name}`,
+        size: (f.metadata as any)?.size ?? 0,
+        mimeType: (f.metadata as any)?.mimetype ?? '',
+        uploadedAt: f.created_at ?? '',
+      }))
+  })
+
+export const adminDeletePolicyDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { storagePath: string }) => d)
+  .handler(async ({ data }) => {
+    const { error } = await supabaseAdmin.storage
+      .from('documents')
+      .remove([data.storagePath])
+    if (error) throw new Error(error.message)
+    return { success: true }
+  })
