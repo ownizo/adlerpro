@@ -2621,7 +2621,7 @@ import * as ix from './invoicexpress'
 // --- Invoices ---
 
 export const fetchIXInvoices = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async ({ context }) => {
     try {
       const result = await ix.listInvoices(1, 100)
@@ -2632,7 +2632,7 @@ export const fetchIXInvoices = createServerFn({ method: 'GET' })
   })
 
 export const createIXInvoice = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { invoice: Partial<ix.IXInvoice> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2644,7 +2644,7 @@ export const createIXInvoice = createServerFn({ method: 'POST' })
   })
 
 export const updateIXInvoice = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number; invoice: Partial<ix.IXInvoice> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2656,7 +2656,7 @@ export const updateIXInvoice = createServerFn({ method: 'POST' })
   })
 
 export const changeIXInvoiceState = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number; state: ix.IXDocState }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2668,7 +2668,7 @@ export const changeIXInvoiceState = createServerFn({ method: 'POST' })
   })
 
 export const sendIXInvoiceEmail = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number; email: string; subject?: string; body?: string }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2680,7 +2680,7 @@ export const sendIXInvoiceEmail = createServerFn({ method: 'POST' })
   })
 
 export const getIXInvoicePdf = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2694,7 +2694,7 @@ export const getIXInvoicePdf = createServerFn({ method: 'GET' })
 // --- Simplified Invoices ---
 
 export const fetchIXSimplifiedInvoices = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listSimplifiedInvoices(1, 100)
@@ -2705,7 +2705,7 @@ export const fetchIXSimplifiedInvoices = createServerFn({ method: 'GET' })
   })
 
 export const createIXSimplifiedInvoice = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { invoice: Partial<ix.IXInvoice> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2719,7 +2719,7 @@ export const createIXSimplifiedInvoice = createServerFn({ method: 'POST' })
 // --- Invoice Receipts ---
 
 export const fetchIXInvoiceReceipts = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listInvoiceReceipts(1, 100)
@@ -2730,7 +2730,7 @@ export const fetchIXInvoiceReceipts = createServerFn({ method: 'GET' })
   })
 
 export const createIXInvoiceReceipt = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { invoice: Partial<ix.IXInvoice> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2744,7 +2744,7 @@ export const createIXInvoiceReceipt = createServerFn({ method: 'POST' })
 // --- Credit Notes ---
 
 export const fetchIXCreditNotes = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listCreditNotes(1, 100)
@@ -2755,7 +2755,7 @@ export const fetchIXCreditNotes = createServerFn({ method: 'GET' })
   })
 
 export const createIXCreditNote = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { note: Partial<ix.IXCreditNote> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2767,7 +2767,7 @@ export const createIXCreditNote = createServerFn({ method: 'POST' })
   })
 
 export const changeIXCreditNoteState = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number; state: ix.IXDocState }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2781,7 +2781,7 @@ export const changeIXCreditNoteState = createServerFn({ method: 'POST' })
 // --- Debit Notes ---
 
 export const fetchIXDebitNotes = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listDebitNotes(1, 100)
@@ -2792,7 +2792,7 @@ export const fetchIXDebitNotes = createServerFn({ method: 'GET' })
   })
 
 export const createIXDebitNote = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { note: Partial<ix.IXDebitNote> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2804,7 +2804,7 @@ export const createIXDebitNote = createServerFn({ method: 'POST' })
   })
 
 export const changeIXDebitNoteState = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number; state: ix.IXDocState }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2818,7 +2818,7 @@ export const changeIXDebitNoteState = createServerFn({ method: 'POST' })
 // --- Receipts ---
 
 export const fetchIXReceipts = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listReceipts(1, 100)
@@ -2829,7 +2829,7 @@ export const fetchIXReceipts = createServerFn({ method: 'GET' })
   })
 
 export const createIXReceipt = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { receipt: Partial<ix.IXReceipt> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2841,7 +2841,7 @@ export const createIXReceipt = createServerFn({ method: 'POST' })
   })
 
 export const changeIXReceiptState = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number; state: ix.IXDocState }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2855,7 +2855,7 @@ export const changeIXReceiptState = createServerFn({ method: 'POST' })
 // --- Estimates ---
 
 export const fetchIXEstimates = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listEstimates(1, 100)
@@ -2866,7 +2866,7 @@ export const fetchIXEstimates = createServerFn({ method: 'GET' })
   })
 
 export const createIXEstimate = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { estimate: Partial<ix.IXEstimate> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2878,7 +2878,7 @@ export const createIXEstimate = createServerFn({ method: 'POST' })
   })
 
 export const changeIXEstimateState = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number; state: 'finalized' | 'deleted' | 'canceled' | 'accepted' | 'refused' }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2890,7 +2890,7 @@ export const changeIXEstimateState = createServerFn({ method: 'POST' })
   })
 
 export const sendIXEstimateEmail = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number; email: string; subject?: string; body?: string }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2904,7 +2904,7 @@ export const sendIXEstimateEmail = createServerFn({ method: 'POST' })
 // --- Guides ---
 
 export const fetchIXGuides = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listGuides(1, 100)
@@ -2915,7 +2915,7 @@ export const fetchIXGuides = createServerFn({ method: 'GET' })
   })
 
 export const createIXGuide = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { guide: Partial<ix.IXGuide> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2929,7 +2929,7 @@ export const createIXGuide = createServerFn({ method: 'POST' })
 // --- Clients ---
 
 export const fetchIXClients = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listClients(1, 100)
@@ -2940,7 +2940,7 @@ export const fetchIXClients = createServerFn({ method: 'GET' })
   })
 
 export const getIXClient = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2952,7 +2952,7 @@ export const getIXClient = createServerFn({ method: 'GET' })
   })
 
 export const createIXClient = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { client: Partial<ix.IXClient> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2964,7 +2964,7 @@ export const createIXClient = createServerFn({ method: 'POST' })
   })
 
 export const updateIXClient = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number; client: Partial<ix.IXClient> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -2978,7 +2978,7 @@ export const updateIXClient = createServerFn({ method: 'POST' })
 // --- Items ---
 
 export const fetchIXItems = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listItems(1, 100)
@@ -2989,7 +2989,7 @@ export const fetchIXItems = createServerFn({ method: 'GET' })
   })
 
 export const createIXItem = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { item: Partial<ix.IXItem> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -3001,7 +3001,7 @@ export const createIXItem = createServerFn({ method: 'POST' })
   })
 
 export const updateIXItem = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: number; item: Partial<ix.IXItem> }) => d)
   .handler(async ({ data }) => {
     try {
@@ -3015,7 +3015,7 @@ export const updateIXItem = createServerFn({ method: 'POST' })
 // --- Sequences ---
 
 export const fetchIXSequences = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listSequences()
@@ -3028,7 +3028,7 @@ export const fetchIXSequences = createServerFn({ method: 'GET' })
 // --- Taxes ---
 
 export const fetchIXTaxes = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
     try {
       const result = await ix.listTaxes()
