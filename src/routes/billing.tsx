@@ -625,6 +625,7 @@ function BillingPage() {
 
   if (!ready) return <AppLayout><div style={{ fontFamily: font, color: '#999', padding: '3rem', textAlign: 'center' }}>{t('common.loading')}</div></AppLayout>
   if (!user) return <Navigate to="/login" />
+  if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
   const handleStateChange = async (id: number, state: IXDocState, tabType: string) => {
     const confirmMsg = state === 'finalized' ? t('billing.confirm.finalize') : state === 'canceled' ? t('billing.confirm.cancel') : state === 'deleted' ? t('billing.confirm.delete') : ''
