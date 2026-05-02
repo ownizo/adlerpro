@@ -295,6 +295,10 @@ function AdminPage() {
   const [expandedIndividualClientId, setExpandedIndividualClientId] = useState<string | null>(null)
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null)
   const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null)
+  const [selectedIndividualClientIds, setSelectedIndividualClientIds] = useState<Set<string>>(new Set())
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<Set<string>>(new Set())
+  const [bulkDeletingClients, setBulkDeletingClients] = useState(false)
+  const [bulkDeletingCompanies, setBulkDeletingCompanies] = useState(false)
   const [showUserFormForCompanyId, setShowUserFormForCompanyId] = useState<string | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
   const [showNewClaim, setShowNewClaim] = useState(false)
@@ -450,33 +454,124 @@ function AdminPage() {
                   />
                 )}
 
+                {companies.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3 px-3 py-2 bg-navy-50 border border-navy-200 rounded-[4px]">
+                    <label className="flex items-center gap-2 text-sm text-navy-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={companies.length > 0 && selectedCompanyIds.size === companies.length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCompanyIds(new Set(companies.map((c) => c.id)))
+                          } else {
+                            setSelectedCompanyIds(new Set())
+                          }
+                        }}
+                        className="w-4 h-4 accent-gold-400"
+                      />
+                      Selecionar tudo
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-navy-500">
+                        {selectedCompanyIds.size} selecionada(s)
+                      </span>
+                      <button
+                        disabled={selectedCompanyIds.size === 0 || bulkDeletingCompanies}
+                        onClick={async () => {
+                          if (selectedCompanyIds.size === 0) return
+                          if (!confirm(`Eliminar ${selectedCompanyIds.size} empresa(s) e os respetivos dados? Esta ação não pode ser revertida.`)) return
+                          setBulkDeletingCompanies(true)
+                          try {
+                            const ids = Array.from(selectedCompanyIds)
+                            await Promise.all(ids.map((id) => adminDeleteCompany({ data: id })))
+                            setSelectedCompanyIds(new Set())
+                            setExpandedCompanyId(null)
+                            await reload()
+                          } finally {
+                            setBulkDeletingCompanies(false)
+                          }
+                        }}
+                        className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {bulkDeletingCompanies ? 'A eliminar...' : 'Eliminar selecionadas'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid gap-4">
                   {companies.map((company) => {
                     const companyPolicies = policies.filter((policy) => policy.companyId === company.id)
                     const companyDocs = documents.filter((doc) => doc.companyId === company.id)
                     const users = companyUsers.filter((user) => user.companyId === company.id)
                     const isExpanded = expandedCompanyId === company.id
+                    const isSelected = selectedCompanyIds.has(company.id)
 
                     return (
                       <div key={company.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-                        <button
-                          onClick={() => setExpandedCompanyId(isExpanded ? null : company.id)}
-                          className="w-full p-6 text-left hover:bg-navy-50/50 transition-colors"
-                        >
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <h3 className="text-lg font-semibold text-navy-700">{company.name}</h3>
-                              <p className="text-sm text-navy-500 mt-1">NIF {company.nif} · {company.sector}</p>
-                              <p className="text-xs text-navy-400 mt-1">{company.address}</p>
-                              <p className="text-xs text-navy-500 mt-2">Acesso da empresa: {company.accessEmail || '-'}</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm font-medium text-navy-700">{users.length} utilizadores</p>
-                              <p className="text-sm text-navy-500">{companyPolicies.length} apólices</p>
-                              <p className="text-sm text-navy-500">{companyDocs.length} documentos</p>
-                            </div>
+                        <div className="flex items-stretch">
+                          <div className="flex items-start pl-4 pt-6">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => {
+                                setSelectedCompanyIds((prev) => {
+                                  const next = new Set(prev)
+                                  if (e.target.checked) next.add(company.id)
+                                  else next.delete(company.id)
+                                  return next
+                                })
+                              }}
+                              className="w-4 h-4 accent-gold-400 cursor-pointer"
+                            />
                           </div>
-                        </button>
+                          <button
+                            onClick={() => setExpandedCompanyId(isExpanded ? null : company.id)}
+                            className="flex-1 p-6 text-left hover:bg-navy-50/50 transition-colors"
+                          >
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <h3 className="text-lg font-semibold text-navy-700">{company.name}</h3>
+                                <p className="text-sm text-navy-500 mt-1">NIF {company.nif} · {company.sector}</p>
+                                <p className="text-xs text-navy-400 mt-1">{company.address}</p>
+                                <p className="text-xs text-navy-500 mt-2">Acesso da empresa: {company.accessEmail || '-'}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-medium text-navy-700">{users.length} utilizadores</p>
+                                <p className="text-sm text-navy-500">{companyPolicies.length} apólices</p>
+                                <p className="text-sm text-navy-500">{companyDocs.length} documentos</p>
+                              </div>
+                            </div>
+                          </button>
+                          <div className="flex flex-col gap-1 p-4 border-l border-navy-100" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => {
+                                setEditingCompanyId(company.id)
+                                setShowNewCompany(true)
+                              }}
+                              className="px-3 py-1.5 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Eliminar a empresa ${company.name} e os respetivos dados?`)) return
+                                await adminDeleteCompany({ data: company.id })
+                                setSelectedCompanyIds((prev) => {
+                                  const next = new Set(prev)
+                                  next.delete(company.id)
+                                  return next
+                                })
+                                if (expandedCompanyId === company.id) setExpandedCompanyId(null)
+                                await reload()
+                              }}
+                              className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+                            >
+                              Eliminar
+                            </button>
+                          </div>
+                        </div>
 
                         {isExpanded && (
                           <div className="border-t border-navy-100 bg-navy-50/50 p-6 space-y-6">
@@ -665,10 +760,52 @@ function AdminPage() {
                   />
                 )}
 
+                {individualClients.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3 px-3 py-2 bg-navy-50 border border-navy-200 rounded-[4px]">
+                    <span className="text-xs text-navy-500">
+                      {selectedIndividualClientIds.size} selecionado(s)
+                    </span>
+                    <button
+                      disabled={selectedIndividualClientIds.size === 0 || bulkDeletingClients}
+                      onClick={async () => {
+                        if (selectedIndividualClientIds.size === 0) return
+                        if (!confirm(`Eliminar ${selectedIndividualClientIds.size} cliente(s)? Esta ação não pode ser revertida.`)) return
+                        setBulkDeletingClients(true)
+                        try {
+                          const ids = Array.from(selectedIndividualClientIds)
+                          await Promise.all(ids.map((id) => adminDeleteIndividualClient({ data: id })))
+                          setSelectedIndividualClientIds(new Set())
+                          setExpandedIndividualClientId(null)
+                          await reload()
+                        } finally {
+                          setBulkDeletingClients(false)
+                        }
+                      }}
+                      className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {bulkDeletingClients ? 'A eliminar...' : 'Eliminar selecionados'}
+                    </button>
+                  </div>
+                )}
+
                 <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-navy-50 border-b border-navy-200">
+                        <th className="px-4 py-3 w-10">
+                          <input
+                            type="checkbox"
+                            checked={individualClients.length > 0 && selectedIndividualClientIds.size === individualClients.length}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedIndividualClientIds(new Set(individualClients.map((c) => c.id)))
+                              } else {
+                                setSelectedIndividualClientIds(new Set())
+                              }
+                            }}
+                            className="w-4 h-4 accent-gold-400 cursor-pointer"
+                          />
+                        </th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Nome</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">NIF</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Email</th>
@@ -683,6 +820,7 @@ function AdminPage() {
                       {individualClients.map((client) => {
                         const clientPolicies = policies.filter((p) => p.individualClientId === client.id)
                         const isExpanded = expandedIndividualClientId === client.id
+                        const isSelected = selectedIndividualClientIds.has(client.id)
                         return (
                           <>
                             <tr
@@ -690,6 +828,21 @@ function AdminPage() {
                               className="hover:bg-navy-50/50 cursor-pointer"
                               onClick={() => setExpandedIndividualClientId(isExpanded ? null : client.id)}
                             >
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    setSelectedIndividualClientIds((prev) => {
+                                      const next = new Set(prev)
+                                      if (e.target.checked) next.add(client.id)
+                                      else next.delete(client.id)
+                                      return next
+                                    })
+                                  }}
+                                  className="w-4 h-4 accent-gold-400 cursor-pointer"
+                                />
+                              </td>
                               <td className="px-4 py-3 text-sm font-medium text-navy-700">
                                 <span className="mr-1 text-navy-400">{isExpanded ? '▾' : '▸'}</span>
                                 {client.fullName}
@@ -726,6 +879,11 @@ function AdminPage() {
                                     onClick={async () => {
                                       if (!confirm(`Eliminar cliente ${client.fullName}?`)) return
                                       await adminDeleteIndividualClient({ data: client.id })
+                                      setSelectedIndividualClientIds((prev) => {
+                                        const next = new Set(prev)
+                                        next.delete(client.id)
+                                        return next
+                                      })
                                       await reload()
                                       setExpandedIndividualClientId(null)
                                     }}
@@ -738,7 +896,7 @@ function AdminPage() {
                             </tr>
                             {isExpanded && (
                               <tr key={`${client.id}-detail`}>
-                                <td colSpan={8} className="bg-navy-50/50 px-6 py-4 border-b border-navy-100">
+                                <td colSpan={9} className="bg-navy-50/50 px-6 py-4 border-b border-navy-100">
                                   <div className="mb-2">
                                     <p className="text-xs text-navy-500 mb-1">
                                       <strong>Morada:</strong> {client.address || '—'}
@@ -782,7 +940,7 @@ function AdminPage() {
                       })}
                       {individualClients.length === 0 && (
                         <tr>
-                          <td colSpan={6} className="px-4 py-8 text-sm text-navy-400 text-center">
+                          <td colSpan={9} className="px-4 py-8 text-sm text-navy-400 text-center">
                             Sem clientes individuais registados.
                           </td>
                         </tr>
