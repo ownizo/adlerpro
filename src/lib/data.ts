@@ -517,9 +517,21 @@ export async function deleteIndividualClientRelations(clientId: string): Promise
     if (fkErrors.length > 0) throw new Error(`deleteIndividualClientRelations (renewal alerts): ${fkErrors.join('; ')}`)
   }
 
+  const { data: clientClaims } = await sb
+    .from('claims')
+    .select('id')
+    .eq('individual_client_id', clientId)
+  const claimIds = (clientClaims ?? []).map((c: { id: string }) => c.id)
+
+  if (claimIds.length > 0) {
+    const msgResult = await sb.from('claim_messages').delete().in('claim_id', claimIds)
+    if (msgResult.error) throw new Error(`deleteIndividualClientRelations (claim_messages): ${msgResult.error.message}`)
+  }
+
+  const docResult = await sb.from('documents').delete().eq('individual_client_id', clientId)
+  if (docResult.error) throw new Error(`deleteIndividualClientRelations (documents): ${docResult.error.message}`)
+
   const results = await Promise.all([
-    sb.from('claim_messages').delete().eq('individual_client_id', clientId),
-    sb.from('documents').delete().eq('individual_client_id', clientId),
     sb.from('claims').delete().eq('individual_client_id', clientId),
     sb.from('policies').delete().eq('individual_client_id', clientId),
   ])
