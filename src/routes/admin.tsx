@@ -485,10 +485,16 @@ function AdminPage() {
                           setBulkDeletingCompanies(true)
                           try {
                             const ids = Array.from(selectedCompanyIds)
-                            await Promise.all(ids.map((id) => adminDeleteCompany({ data: id })))
+                            const results = await Promise.allSettled(ids.map((id) => adminDeleteCompany({ data: id })))
+                            const failed = results.filter((r) => r.status === 'rejected')
+                            if (failed.length > 0) {
+                              alert(`Falha ao eliminar ${failed.length} de ${ids.length} empresa(s). Verifique e tente novamente.`)
+                            }
                             setSelectedCompanyIds(new Set())
                             setExpandedCompanyId(null)
                             await reload()
+                          } catch (err) {
+                            alert(`Erro ao eliminar empresas: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
                           } finally {
                             setBulkDeletingCompanies(false)
                           }
@@ -559,14 +565,18 @@ function AdminPage() {
                             <button
                               onClick={async () => {
                                 if (!confirm(`Eliminar a empresa ${company.name} e os respetivos dados?`)) return
-                                await adminDeleteCompany({ data: company.id })
-                                setSelectedCompanyIds((prev) => {
-                                  const next = new Set(prev)
-                                  next.delete(company.id)
-                                  return next
-                                })
-                                if (expandedCompanyId === company.id) setExpandedCompanyId(null)
-                                await reload()
+                                try {
+                                  await adminDeleteCompany({ data: company.id })
+                                  setSelectedCompanyIds((prev) => {
+                                    const next = new Set(prev)
+                                    next.delete(company.id)
+                                    return next
+                                  })
+                                  if (expandedCompanyId === company.id) setExpandedCompanyId(null)
+                                  await reload()
+                                } catch (err) {
+                                  alert(`Erro ao eliminar empresa: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                                }
                               }}
                               className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
                             >
@@ -624,9 +634,13 @@ function AdminPage() {
                               <button
                                 onClick={async () => {
                                   if (!confirm(`Eliminar a empresa ${company.name} e os respetivos dados?`)) return
-                                  await adminDeleteCompany({ data: company.id })
-                                  await reload()
-                                  setExpandedCompanyId(null)
+                                  try {
+                                    await adminDeleteCompany({ data: company.id })
+                                    await reload()
+                                    setExpandedCompanyId(null)
+                                  } catch (err) {
+                                    alert(`Erro ao eliminar empresa: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                                  }
                                 }}
                                 className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
                               >
@@ -689,8 +703,12 @@ function AdminPage() {
                                               <button
                                                 onClick={async () => {
                                                   if (!confirm(`Eliminar utilizador ${user.name}?`)) return
-                                                  await adminDeleteCompanyUser({ data: user.id })
-                                                  await reload()
+                                                  try {
+                                                    await adminDeleteCompanyUser({ data: user.id })
+                                                    await reload()
+                                                  } catch (err) {
+                                                    alert(`Erro ao eliminar utilizador: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                                                  }
                                                 }}
                                                 className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
                                               >
@@ -809,10 +827,16 @@ function AdminPage() {
                         setBulkDeletingClients(true)
                         try {
                           const ids = Array.from(selectedIndividualClientIds)
-                          await Promise.all(ids.map((id) => adminDeleteIndividualClient({ data: id })))
+                          const results = await Promise.allSettled(ids.map((id) => adminDeleteIndividualClient({ data: id })))
+                          const failed = results.filter((r) => r.status === 'rejected')
+                          if (failed.length > 0) {
+                            alert(`Falha ao eliminar ${failed.length} de ${ids.length} cliente(s). Verifique e tente novamente.`)
+                          }
                           setSelectedIndividualClientIds(new Set())
                           setExpandedIndividualClientId(null)
                           await reload()
+                        } catch (err) {
+                          alert(`Erro ao eliminar clientes: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
                         } finally {
                           setBulkDeletingClients(false)
                         }
@@ -914,14 +938,18 @@ function AdminPage() {
                                   <button
                                     onClick={async () => {
                                       if (!confirm(`Eliminar cliente ${client.fullName}?`)) return
-                                      await adminDeleteIndividualClient({ data: client.id })
-                                      setSelectedIndividualClientIds((prev) => {
-                                        const next = new Set(prev)
-                                        next.delete(client.id)
-                                        return next
-                                      })
-                                      await reload()
-                                      setExpandedIndividualClientId(null)
+                                      try {
+                                        await adminDeleteIndividualClient({ data: client.id })
+                                        setSelectedIndividualClientIds((prev) => {
+                                          const next = new Set(prev)
+                                          next.delete(client.id)
+                                          return next
+                                        })
+                                        await reload()
+                                        setExpandedIndividualClientId(null)
+                                      } catch (err) {
+                                        alert(`Erro ao eliminar cliente: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                                      }
                                     }}
                                     className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
                                   >
@@ -3588,9 +3616,14 @@ function DeletePostButton({ postId, onDeleted }: { postId: string; onDeleted: ()
   const handleDelete = async () => {
     if (!confirm('Apagar este post?')) return
     setDeleting(true)
-    await adminDeleteSocialPost({ data: { id: postId } })
-    await onDeleted()
-    setDeleting(false)
+    try {
+      await adminDeleteSocialPost({ data: { id: postId } })
+      await onDeleted()
+    } catch (err) {
+      alert(`Erro ao apagar post: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+    } finally {
+      setDeleting(false)
+    }
   }
   return (
     <button
