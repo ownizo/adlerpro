@@ -20,6 +20,8 @@ import {
   adminUpdatePolicy,
   adminUploadPolicyDocument,
   adminGetDocumentUrl,
+  fetchPolicyDocuments,
+  adminDeletePolicyDocument,
   adminCreateClaim,
   fetchClaimWorkspace,
   adminAssignClaimResponsible,
@@ -37,7 +39,7 @@ import {
   getRenewalAlerts,
   adminUpdateRenewalAlertStatus,
 } from '@/lib/server-fns'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate, formatFileSize } from '@/lib/utils'
 import type {
   Company,
   Policy,
@@ -55,7 +57,7 @@ import type {
   ClaimOperationalData,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
 
@@ -575,6 +577,40 @@ function AdminPage() {
 
                         {isExpanded && (
                           <div className="border-t border-navy-100 bg-navy-50/50 p-6 space-y-6">
+                            <div>
+                              <h4 className="text-sm font-semibold text-navy-700 mb-3">Dados de Contacto</h4>
+                              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white rounded border border-navy-200 p-4">
+                                <div>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Pessoa de Contacto</p>
+                                  <p className="text-sm text-navy-700">{company.contactName || '—'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Email</p>
+                                  <p className="text-sm text-navy-700 break-all">{company.contactEmail || '—'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Telefone</p>
+                                  <p className="text-sm text-navy-700">{company.contactPhone || '—'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">NIF</p>
+                                  <p className="text-sm text-navy-700">{company.nif || '—'}</p>
+                                </div>
+                                <div className="sm:col-span-2 lg:col-span-2">
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Morada</p>
+                                  <p className="text-sm text-navy-700">{company.address || '—'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Setor</p>
+                                  <p className="text-sm text-navy-700">{company.sector || '—'}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Email de Acesso</p>
+                                  <p className="text-sm text-navy-700 break-all">{company.accessEmail || '—'}</p>
+                                </div>
+                              </div>
+                            </div>
+
                             <div className="flex flex-wrap gap-2">
                               <button
                                 onClick={() => {
@@ -707,17 +743,17 @@ function AdminPage() {
                               </div>
                             </div>
 
-                            <div className="grid lg:grid-cols-2 gap-6">
-                              <SimpleCollection
-                                title="Documentos da Empresa"
-                                rows={companyDocs.map((doc) => `${doc.name} · ${doc.category} · ${formatDate(doc.uploadedAt)}`)}
-                                emptyMessage="Sem documentos carregados."
-                              />
-                              <SimpleCollection
-                                title="Apólices da Empresa"
-                                rows={companyPolicies.map((policy) => `${POLICY_TYPE_LABELS[policy.type]} · ${policy.policyNumber} · ${policy.insurer}`)}
-                                emptyMessage="Sem apólices associadas."
-                              />
+                            <div>
+                              <h4 className="text-sm font-semibold text-navy-700 mb-3">Apólices da Empresa ({companyPolicies.length})</h4>
+                              {companyPolicies.length === 0 ? (
+                                <p className="text-sm text-navy-400">Sem apólices associadas.</p>
+                              ) : (
+                                <div className="grid gap-2">
+                                  {companyPolicies.map((policy) => (
+                                    <PolicyExpandableCard key={policy.id} policy={policy} />
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         )}
@@ -788,8 +824,8 @@ function AdminPage() {
                   </div>
                 )}
 
-                <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-                  <table className="w-full">
+                <div className="bg-white rounded-[4px] border border-navy-200 overflow-x-auto">
+                  <table className="w-full min-w-[1100px]">
                     <thead>
                       <tr className="bg-navy-50 border-b border-navy-200">
                         <th className="px-4 py-3 w-10">
@@ -897,10 +933,23 @@ function AdminPage() {
                             {isExpanded && (
                               <tr key={`${client.id}-detail`}>
                                 <td colSpan={9} className="bg-navy-50/50 px-6 py-4 border-b border-navy-100">
-                                  <div className="mb-2">
-                                    <p className="text-xs text-navy-500 mb-1">
-                                      <strong>Morada:</strong> {client.address || '—'}
-                                    </p>
+                                  <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                                    <div>
+                                      <p className="text-[11px] uppercase tracking-wide text-navy-400">Email</p>
+                                      <p className="text-sm text-navy-700 break-all">{client.email || '—'}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[11px] uppercase tracking-wide text-navy-400">Telefone</p>
+                                      <p className="text-sm text-navy-700">{client.phone || '—'}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[11px] uppercase tracking-wide text-navy-400">NIF</p>
+                                      <p className="text-sm text-navy-700">{client.nif || '—'}</p>
+                                    </div>
+                                    <div className="sm:col-span-2 lg:col-span-1">
+                                      <p className="text-[11px] uppercase tracking-wide text-navy-400">Morada</p>
+                                      <p className="text-sm text-navy-700">{client.address || '—'}</p>
+                                    </div>
                                   </div>
                                   <h4 className="text-sm font-semibold text-navy-700 mb-3">
                                     Apólices ({clientPolicies.length})
@@ -910,25 +959,7 @@ function AdminPage() {
                                   ) : (
                                     <div className="grid gap-2">
                                       {clientPolicies.map((p) => (
-                                        <div key={p.id} className="bg-white rounded border border-navy-200 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-                                          <div>
-                                            <p className="text-sm font-medium text-navy-700">
-                                              {POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type}
-                                              {' — '}{p.insurer}
-                                            </p>
-                                            <p className="text-xs text-navy-500">
-                                              Apólice {p.policyNumber} · {p.startDate} → {p.endDate}
-                                            </p>
-                                          </div>
-                                          <div className="text-right">
-                                            <p className="text-sm font-semibold text-navy-700">{formatCurrency(p.annualPremium)}/ano</p>
-                                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                              p.status === 'active' ? 'bg-green-100 text-green-700' :
-                                              p.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
-                                              'bg-red-100 text-red-700'
-                                            }`}>{p.status}</span>
-                                          </div>
-                                        </div>
+                                        <PolicyExpandableCard key={p.id} policy={p} />
                                       ))}
                                     </div>
                                   )}
@@ -2355,16 +2386,255 @@ function SendRenewalAlertsButton() {
   )
 }
 
-function SimpleCollection({ title, rows, emptyMessage }: { title: string; rows: string[]; emptyMessage: string }) {
+
+type PolicyDocFile = {
+  id: string
+  name: string
+  storagePath: string
+  size: number
+  mimeType?: string
+  uploadedAt?: string
+}
+
+function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
+  const [docs, setDocs] = useState<PolicyDocFile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewName, setPreviewName] = useState<string>('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await fetchPolicyDocuments({
+        data: { policyId: policy.id, companyId: policy.companyId || undefined },
+      })
+      setDocs(data as PolicyDocFile[])
+    } catch (e: any) {
+      setError(e?.message ?? 'Erro ao carregar documentos')
+    } finally {
+      setLoading(false)
+    }
+  }, [policy.id, policy.companyId])
+
+  useEffect(() => { load() }, [load])
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    setUploading(true)
+    setError(null)
+    const errors: string[] = []
+    const { data: { session } } = await supabase.auth.getSession()
+    const headers: Record<string, string> = {}
+    if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`
+    for (const file of files) {
+      setUploadStatus(`A carregar ${file.name}…`)
+      try {
+        const fd = new FormData()
+        fd.append('file', file)
+        fd.append('type', 'policy_document')
+        fd.append('policyId', policy.id)
+        const res = await fetch('/api/upload', { method: 'POST', headers, body: fd })
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}))
+          errors.push(`${file.name}: ${err.error ?? 'Erro'}`)
+        }
+      } catch {
+        errors.push(`${file.name}: Erro de rede`)
+      }
+    }
+    if (inputRef.current) inputRef.current.value = ''
+    setUploading(false)
+    setUploadStatus(null)
+    if (errors.length) setError(errors.join(' | '))
+    await load()
+  }
+
+  const openSignedUrl = async (storagePath: string): Promise<string> => {
+    const { url } = await adminGetDocumentUrl({ data: { storagePath } })
+    return url
+  }
+
+  const handlePreview = async (doc: PolicyDocFile) => {
+    try {
+      const url = await openSignedUrl(doc.storagePath)
+      setPreviewName(doc.name)
+      setPreviewUrl(url)
+    } catch (e: any) {
+      alert('Erro ao obter URL: ' + (e?.message ?? ''))
+    }
+  }
+
+  const handleDownload = async (doc: PolicyDocFile) => {
+    try {
+      const url = await openSignedUrl(doc.storagePath)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = doc.name
+      a.target = '_blank'
+      a.rel = 'noopener'
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } catch (e: any) {
+      alert('Erro ao descarregar: ' + (e?.message ?? ''))
+    }
+  }
+
+  const handleDelete = async (doc: PolicyDocFile) => {
+    if (!confirm(`Eliminar "${doc.name}"?`)) return
+    try {
+      await adminDeletePolicyDocument({ data: { storagePath: doc.storagePath } })
+      setDocs((prev) => prev.filter((d) => d.id !== doc.id))
+    } catch (e: any) {
+      alert('Erro ao eliminar: ' + (e?.message ?? ''))
+    }
+  }
+
   return (
-    <div>
-      <h3 className="text-md font-semibold text-navy-700 mb-3">{title}</h3>
-      <div className="bg-white rounded-[4px] border border-navy-200 p-4 space-y-2 min-h-24">
-        {rows.map((row, idx) => (
-          <p key={`${row}_${idx}`} className="text-sm text-navy-600">• {row}</p>
-        ))}
-        {rows.length === 0 && <p className="text-sm text-navy-400">{emptyMessage}</p>}
+    <div className="bg-white rounded border border-navy-100 p-3">
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <p className="text-xs font-semibold text-navy-500 uppercase tracking-wide">
+          Documentos {docs.length > 0 ? `(${docs.length})` : ''}
+        </p>
+        <label className={`text-xs font-semibold px-2.5 py-1 rounded inline-flex items-center gap-1 ${uploading ? 'bg-navy-100 text-navy-400 cursor-not-allowed' : 'bg-gold-400 text-navy-700 hover:bg-gold-300 cursor-pointer'}`}>
+          {uploading ? 'A carregar…' : '+ Carregar'}
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".pdf,.jpg,.jpeg,.png,.webp"
+            multiple
+            onChange={handleUpload}
+            className="hidden"
+            disabled={uploading}
+          />
+        </label>
       </div>
+      {uploadStatus && <p className="text-xs text-navy-500 mb-2">{uploadStatus}</p>}
+      {error && (
+        <div className="mb-2 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-600 flex items-start gap-2">
+          <span>⚠ {error}</span>
+          <button onClick={() => setError(null)} className="ml-auto text-red-500">×</button>
+        </div>
+      )}
+      {loading ? (
+        <p className="text-xs text-navy-400">A carregar documentos…</p>
+      ) : docs.length === 0 ? (
+        <p className="text-xs text-navy-400">Sem documentos. Carregue um ficheiro para começar.</p>
+      ) : (
+        <div className="space-y-1.5">
+          {docs.map((doc) => {
+            const isPdf = (doc.mimeType ?? '').includes('pdf') || doc.name.toLowerCase().endsWith('.pdf')
+            const isImage = (doc.mimeType ?? '').startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(doc.name)
+            return (
+              <div key={doc.id} className="flex items-center gap-2 px-2 py-1.5 bg-navy-50/40 rounded border border-navy-100">
+                <span className="text-base flex-shrink-0">{isPdf ? '📄' : isImage ? '🖼️' : '📎'}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-navy-700 truncate">{doc.name}</p>
+                  <p className="text-[11px] text-navy-400">{formatFileSize(doc.size)}</p>
+                </div>
+                <button
+                  onClick={() => handlePreview(doc)}
+                  title="Pré-visualizar"
+                  className="px-2 py-1 text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+                >
+                  Ver
+                </button>
+                <button
+                  onClick={() => handleDownload(doc)}
+                  title="Descarregar"
+                  className="px-2 py-1 text-[11px] font-semibold bg-navy-50 text-navy-700 border border-navy-200 rounded hover:bg-navy-100"
+                >
+                  ↓
+                </button>
+                <button
+                  onClick={() => handleDelete(doc)}
+                  title="Eliminar"
+                  className="px-2 py-1 text-[11px] font-semibold bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+                >
+                  ✕
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {previewUrl && (
+        <div
+          className="fixed inset-0 z-[300] bg-black/75 flex items-center justify-center p-4"
+          onClick={() => setPreviewUrl(null)}
+        >
+          <div
+            className="bg-white rounded w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-2 border-b border-navy-100 flex items-center justify-between gap-2">
+              <p className="font-semibold text-sm text-navy-700 truncate">{previewName}</p>
+              <div className="flex gap-2 items-center">
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-2 py-1 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded"
+                >
+                  Abrir em nova janela
+                </a>
+                <button onClick={() => setPreviewUrl(null)} className="text-navy-500 text-xl leading-none">×</button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {/\.(jpg|jpeg|png|webp)$/i.test(previewName) ? (
+                <img src={previewUrl} alt={previewName} className="w-full h-full object-contain" />
+              ) : (
+                <iframe src={previewUrl} title={previewName} className="w-full h-[70vh] border-none" />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function PolicyExpandableCard({ policy, defaultOpen = false }: { policy: Policy; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const typeLabel = POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type
+  return (
+    <div className="bg-white rounded border border-navy-200 overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-left hover:bg-navy-50/40"
+      >
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-navy-700">
+            <span className="mr-1 text-navy-400">{open ? '▾' : '▸'}</span>
+            {typeLabel}
+            {' — '}{policy.insurer}
+          </p>
+          <p className="text-xs text-navy-500">
+            Apólice {policy.policyNumber} · {policy.startDate} → {policy.endDate}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold text-navy-700">{formatCurrency(policy.annualPremium)}/ano</p>
+          <span className={`text-xs px-2 py-0.5 rounded-full ${
+            policy.status === 'active' ? 'bg-green-100 text-green-700' :
+            policy.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
+            'bg-red-100 text-red-700'
+          }`}>{policy.status}</span>
+        </div>
+      </button>
+      {open && (
+        <div className="border-t border-navy-100 bg-navy-50/40 p-3">
+          <PolicyDocumentsPanel policy={policy} />
+        </div>
+      )}
     </div>
   )
 }
