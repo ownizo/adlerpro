@@ -2274,6 +2274,7 @@ export const adminDeleteIndividualClient = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((id: string) => id)
   .handler(async ({ data: id }) => {
+    await db.deleteIndividualClientRelations(id)
     await db.deleteIndividualClient(id)
     return { success: true }
   })
@@ -2416,6 +2417,10 @@ export const deletePolicy = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((id: string) => id)
   .handler(async ({ data: id }) => {
+    await Promise.all([
+      supabaseAdmin.from('renewal_alerts_state').delete().eq('policy_id', id),
+      supabaseAdmin.from('renewal_alerts_history').delete().eq('policy_id', id),
+    ])
     await db.deletePolicy(id)
     return { success: true }
   })

@@ -104,21 +104,39 @@ export async function updateCompany(id: string, updates: Partial<Company>): Prom
 export async function deleteCompany(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('companies').delete().eq('id', id)
-  if (error) console.error('deleteCompany error:', error)
+  if (error) throw new Error(`deleteCompany: ${error.message}`)
 }
 
 export async function deleteCompanyRelations(companyId: string): Promise<void> {
   const sb = getSupabaseAdmin()
-  await Promise.all([
-    sb.from('policies').delete().eq('company_id', companyId),
-    sb.from('claims').delete().eq('company_id', companyId),
-    sb.from('documents').delete().eq('company_id', companyId),
+
+  const { data: companyPolicies } = await sb
+    .from('policies')
+    .select('id')
+    .eq('company_id', companyId)
+  const policyIds = (companyPolicies ?? []).map((p: { id: string }) => p.id)
+
+  if (policyIds.length > 0) {
+    const fkResults = await Promise.all([
+      sb.from('renewal_alerts_state').delete().in('policy_id', policyIds),
+      sb.from('renewal_alerts_history').delete().in('policy_id', policyIds),
+    ])
+    const fkErrors = fkResults.filter((r) => r.error).map((r) => r.error!.message)
+    if (fkErrors.length > 0) throw new Error(`deleteCompanyRelations (renewal alerts): ${fkErrors.join('; ')}`)
+  }
+
+  const results = await Promise.all([
     sb.from('claim_messages').delete().eq('company_id', companyId),
+    sb.from('documents').delete().eq('company_id', companyId),
+    sb.from('claims').delete().eq('company_id', companyId),
+    sb.from('policies').delete().eq('company_id', companyId),
     sb.from('alerts').delete().eq('company_id', companyId),
     sb.from('risk_reports').delete().eq('company_id', companyId),
     sb.from('company_users').delete().eq('company_id', companyId),
     sb.from('user_metric_events').delete().eq('company_id', companyId),
   ])
+  const errors = results.filter((r) => r.error).map((r) => r.error!.message)
+  if (errors.length > 0) throw new Error(`deleteCompanyRelations: ${errors.join('; ')}`)
 }
 
 // ============================================================
@@ -159,7 +177,7 @@ export async function updateCompanyUser(id: string, updates: Partial<CompanyUser
 export async function deleteCompanyUser(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('company_users').delete().eq('id', id)
-  if (error) console.error('deleteCompanyUser error:', error)
+  if (error) throw new Error(`deleteCompanyUser: ${error.message}`)
 }
 
 // ============================================================
@@ -196,7 +214,7 @@ export async function updatePolicy(id: string, updates: Partial<Policy>): Promis
 export async function deletePolicy(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('policies').delete().eq('id', id)
-  if (error) console.error('deletePolicy error:', error)
+  if (error) throw new Error(`deletePolicy: ${error.message}`)
 }
 
 // ============================================================
@@ -286,7 +304,7 @@ export async function updateDocument(id: string, updates: Partial<Document>): Pr
 export async function deleteDocument(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('documents').delete().eq('id', id)
-  if (error) console.error('deleteDocument error:', error)
+  if (error) throw new Error(`deleteDocument: ${error.message}`)
 }
 
 export async function getClaimDocuments(claimId: string, companyId?: string): Promise<Document[]> {
@@ -478,7 +496,35 @@ export async function updateIndividualClient(id: string, updates: Partial<Indivi
 export async function deleteIndividualClient(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('individual_clients').delete().eq('id', id)
-  if (error) console.error('deleteIndividualClient error:', error)
+  if (error) throw new Error(`deleteIndividualClient: ${error.message}`)
+}
+
+export async function deleteIndividualClientRelations(clientId: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+
+  const { data: clientPolicies } = await sb
+    .from('policies')
+    .select('id')
+    .eq('individual_client_id', clientId)
+  const policyIds = (clientPolicies ?? []).map((p: { id: string }) => p.id)
+
+  if (policyIds.length > 0) {
+    const fkResults = await Promise.all([
+      sb.from('renewal_alerts_state').delete().in('policy_id', policyIds),
+      sb.from('renewal_alerts_history').delete().in('policy_id', policyIds),
+    ])
+    const fkErrors = fkResults.filter((r) => r.error).map((r) => r.error!.message)
+    if (fkErrors.length > 0) throw new Error(`deleteIndividualClientRelations (renewal alerts): ${fkErrors.join('; ')}`)
+  }
+
+  const results = await Promise.all([
+    sb.from('claim_messages').delete().eq('individual_client_id', clientId),
+    sb.from('documents').delete().eq('individual_client_id', clientId),
+    sb.from('claims').delete().eq('individual_client_id', clientId),
+    sb.from('policies').delete().eq('individual_client_id', clientId),
+  ])
+  const errors = results.filter((r) => r.error).map((r) => r.error!.message)
+  if (errors.length > 0) throw new Error(`deleteIndividualClientRelations: ${errors.join('; ')}`)
 }
 
 // ============================================================
@@ -506,7 +552,7 @@ export async function updateSocialPost(id: string, updates: Partial<SocialPost>)
 export async function deleteSocialPost(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('social_posts').delete().eq('id', id)
-  if (error) console.error('deleteSocialPost error:', error)
+  if (error) throw new Error(`deleteSocialPost: ${error.message}`)
 }
 
 // ============================================================
