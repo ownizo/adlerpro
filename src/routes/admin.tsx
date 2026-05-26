@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/AppLayout'
 import {
   fetchAdminAll,
   adminCreatePolicy,
+  deletePolicy,
   adminUpdateClaimStatus,
   adminCreateCompany,
   adminUpdateCompany,
@@ -60,6 +61,14 @@ import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
+import * as XLSX from 'xlsx'
+
+function exportToExcel(data: Record<string, unknown>[], filename: string) {
+  const ws = XLSX.utils.json_to_sheet(data)
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Dados')
+  XLSX.writeFile(wb, `${filename}.xlsx`)
+}
 
 const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'social', 'api', 'profiles', 'alerts'] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
@@ -301,6 +310,8 @@ function AdminPage() {
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<Set<string>>(new Set())
   const [bulkDeletingClients, setBulkDeletingClients] = useState(false)
   const [bulkDeletingCompanies, setBulkDeletingCompanies] = useState(false)
+  const [selectedPolicyIds, setSelectedPolicyIds] = useState<Set<string>>(new Set())
+  const [bulkDeletingPolicies, setBulkDeletingPolicies] = useState(false)
   const [showUserFormForCompanyId, setShowUserFormForCompanyId] = useState<string | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
   const [showNewClaim, setShowNewClaim] = useState(false)
@@ -428,15 +439,36 @@ function AdminPage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-navy-700">Empresas ({companies.length})</h2>
-                  <button
-                    onClick={() => {
-                      setEditingCompanyId(null)
-                      setShowNewCompany(!showNewCompany)
-                    }}
-                    className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm"
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        exportToExcel(companies.map((c) => ({
+                          Nome: c.name,
+                          NIF: c.nif,
+                          Setor: c.sector,
+                          'Pessoa de Contacto': c.contactName,
+                          Email: c.contactEmail,
+                          Telefone: c.contactPhone,
+                          Morada: c.address,
+                          'Email de Acesso': c.accessEmail || '',
+                          'Criado em': c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-PT') : '',
+                        })), 'empresas')
+                      }}
+                      disabled={companies.length === 0}
+                      className="px-4 py-2 border border-navy-300 text-navy-700 font-medium rounded-[2px] hover:bg-navy-50 transition-colors text-sm disabled:opacity-50"
+                    >
+                      Exportar Excel
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingCompanyId(null)
+                        setShowNewCompany(!showNewCompany)
+                      }}
+                      className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm"
                   >
                     {showNewCompany ? 'Cancelar' : 'Nova Empresa'}
                   </button>
+                  </div>
                 </div>
 
                 {showNewCompany && (
@@ -786,15 +818,34 @@ function AdminPage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold text-navy-700">Clientes Individuais ({individualClients.length})</h2>
-                  <button
-                    onClick={() => {
-                      setEditingIndividualClientId(null)
-                      setShowNewIndividualClient(!showNewIndividualClient)
-                    }}
-                    className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm"
-                  >
-                    {showNewIndividualClient ? 'Cancelar' : 'Novo Cliente'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        exportToExcel(individualClients.map((c) => ({
+                          Nome: c.fullName,
+                          NIF: c.nif || '',
+                          Email: c.email || '',
+                          Telefone: c.phone || '',
+                          Morada: c.address || '',
+                          Estado: c.status === 'active' ? 'Ativo' : c.status,
+                          'Criado em': c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-PT') : '',
+                        })), 'clientes-individuais')
+                      }}
+                      disabled={individualClients.length === 0}
+                      className="px-4 py-2 border border-navy-300 text-navy-700 font-medium rounded-[2px] hover:bg-navy-50 transition-colors text-sm disabled:opacity-50"
+                    >
+                      Exportar Excel
+                    </button>
+                    <button
+                      onClick={() => {
+                        setEditingIndividualClientId(null)
+                        setShowNewIndividualClient(!showNewIndividualClient)
+                      }}
+                      className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm"
+                    >
+                      {showNewIndividualClient ? 'Cancelar' : 'Novo Cliente'}
+                    </button>
+                  </div>
                 </div>
 
                 {showNewIndividualClient && (
@@ -1033,12 +1084,42 @@ function AdminPage() {
                       )}
                     </select>
                   </div>
-                  <button
-                    onClick={() => setShowNewPolicy(!showNewPolicy)}
-                    className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm whitespace-nowrap"
-                  >
-                    {showNewPolicy ? 'Cancelar' : 'Nova Apólice'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const filtered = policies.filter((p) => {
+                          if (!selectedCompanyId) return true
+                          if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
+                          return p.companyId === selectedCompanyId
+                        })
+                        exportToExcel(filtered.map((p) => ({
+                          'N.º Apólice': p.policyNumber,
+                          Tipo: POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type,
+                          Seguradora: p.insurer,
+                          Cliente: companies.find(c => c.id === p.companyId)?.name ?? individualClients.find(c => c.id === p.individualClientId)?.fullName ?? '',
+                          Descrição: p.description,
+                          'Data Início': p.startDate ? new Date(p.startDate).toLocaleDateString('pt-PT') : '',
+                          'Data Fim': p.endDate ? new Date(p.endDate).toLocaleDateString('pt-PT') : '',
+                          'Prémio Anual (€)': p.annualPremium ?? '',
+                          'Capital Segurado (€)': p.insuredValue ?? '',
+                          'Comissão (%)': p.commissionPercentage ?? '',
+                          'Comissão (€)': p.commissionValue ?? '',
+                          Estado: p.status === 'active' ? 'Ativa' : p.status === 'expiring' ? 'A Renovar' : p.status === 'expired' ? 'Expirada' : p.status === 'cancelled' ? 'Cancelada' : p.status,
+                          Fracionamento: p.paymentFrequency ?? '',
+                        })), 'apolices')
+                      }}
+                      disabled={policies.length === 0}
+                      className="px-4 py-2 border border-navy-300 text-navy-700 font-medium rounded-[2px] hover:bg-navy-50 transition-colors text-sm whitespace-nowrap disabled:opacity-50"
+                    >
+                      Exportar Excel
+                    </button>
+                    <button
+                      onClick={() => setShowNewPolicy(!showNewPolicy)}
+                      className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm whitespace-nowrap"
+                    >
+                      {showNewPolicy ? 'Cancelar' : 'Nova Apólice'}
+                    </button>
+                  </div>
                 </div>
 
                 {showNewPolicy && (
@@ -1046,11 +1127,74 @@ function AdminPage() {
                     companies={companies}
                     individualClients={individualClients}
                     onSubmit={async (data) => {
-                      await adminCreatePolicy({ data })
-                      await reload()
-                      setShowNewPolicy(false)
+                      try {
+                        await adminCreatePolicy({ data })
+                        await reload()
+                        setShowNewPolicy(false)
+                      } catch (err) {
+                        alert(`Erro ao criar apólice: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                      }
                     }}
                   />
+                )}
+
+                {policies.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3 px-3 py-2 bg-navy-50 border border-navy-200 rounded-[4px]">
+                    <label className="flex items-center gap-2 text-sm text-navy-700 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={policies.length > 0 && selectedPolicyIds.size === policies.filter((p) => {
+                          if (!selectedCompanyId) return true
+                          if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
+                          return p.companyId === selectedCompanyId
+                        }).length}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            const filtered = policies.filter((p) => {
+                              if (!selectedCompanyId) return true
+                              if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
+                              return p.companyId === selectedCompanyId
+                            })
+                            setSelectedPolicyIds(new Set(filtered.map((p) => p.id)))
+                          } else {
+                            setSelectedPolicyIds(new Set())
+                          }
+                        }}
+                        className="w-4 h-4 accent-gold-400"
+                      />
+                      Selecionar tudo
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-navy-500">
+                        {selectedPolicyIds.size} selecionada(s)
+                      </span>
+                      <button
+                        disabled={selectedPolicyIds.size === 0 || bulkDeletingPolicies}
+                        onClick={async () => {
+                          if (selectedPolicyIds.size === 0) return
+                          if (!confirm(`Eliminar ${selectedPolicyIds.size} apólice(s)? Esta ação não pode ser revertida.`)) return
+                          setBulkDeletingPolicies(true)
+                          try {
+                            const ids = Array.from(selectedPolicyIds)
+                            const results = await Promise.allSettled(ids.map((id) => deletePolicy({ data: id })))
+                            const failed = results.filter((r) => r.status === 'rejected')
+                            if (failed.length > 0) {
+                              alert(`Falha ao eliminar ${failed.length} de ${ids.length} apólice(s). Verifique e tente novamente.`)
+                            }
+                            setSelectedPolicyIds(new Set())
+                            await reload()
+                          } catch (err) {
+                            alert(`Erro ao eliminar apólices: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                          } finally {
+                            setBulkDeletingPolicies(false)
+                          }
+                        }}
+                        className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {bulkDeletingPolicies ? 'A eliminar...' : 'Eliminar selecionadas'}
+                      </button>
+                    </div>
+                  </div>
                 )}
 
                 <AdminPolicyList
@@ -1063,6 +1207,8 @@ function AdminPage() {
                   companies={companies}
                   individualClients={individualClients}
                   onReload={reload}
+                  selectedPolicyIds={selectedPolicyIds}
+                  setSelectedPolicyIds={setSelectedPolicyIds}
                 />
               </div>
             )}
@@ -3272,23 +3418,60 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
     paymentFrequency: 'anual', commissionPercentage: '', commissionValue: '',
   })
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }))
+
+  const updateCommissionPercentage = (value: string) => {
+    const pct = parseFloat(value)
+    const premium = parseFloat(form.annualPremium)
+    setForm((f) => ({
+      ...f,
+      commissionPercentage: value,
+      commissionValue: (!isNaN(pct) && !isNaN(premium) && premium > 0) ? (premium * pct / 100).toFixed(2) : f.commissionValue,
+    }))
+  }
+
+  const updateCommissionValue = (value: string) => {
+    const val = parseFloat(value)
+    const premium = parseFloat(form.annualPremium)
+    setForm((f) => ({
+      ...f,
+      commissionValue: value,
+      commissionPercentage: (!isNaN(val) && !isNaN(premium) && premium > 0) ? (val / premium * 100).toFixed(2) : f.commissionPercentage,
+    }))
+  }
+
+  const updatePremium = (value: string) => {
+    const premium = parseFloat(value)
+    const pct = parseFloat(form.commissionPercentage)
+    setForm((f) => ({
+      ...f,
+      annualPremium: value,
+      commissionValue: (!isNaN(pct) && !isNaN(premium) && premium > 0) ? (premium * pct / 100).toFixed(2) : f.commissionValue,
+    }))
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitting(true)
-    await onSubmit({
-      ...form,
-      companyId: clientType === 'company' ? form.companyId : undefined,
-      individualClientId: clientType === 'individual' ? form.individualClientId : undefined,
-      annualPremium: Number(form.annualPremium),
-      insuredValue: Number(form.insuredValue),
-      paymentFrequency: form.paymentFrequency || undefined,
-      commissionPercentage: form.commissionPercentage ? Number(form.commissionPercentage) : undefined,
-      commissionValue: form.commissionValue ? Number(form.commissionValue) : undefined,
-    })
-    setSubmitting(false)
+    setError(null)
+    try {
+      await onSubmit({
+        ...form,
+        companyId: clientType === 'company' ? form.companyId : undefined,
+        individualClientId: clientType === 'individual' ? form.individualClientId : undefined,
+        annualPremium: Number(form.annualPremium),
+        insuredValue: Number(form.insuredValue),
+        paymentFrequency: form.paymentFrequency || undefined,
+        commissionPercentage: form.commissionPercentage ? Number(form.commissionPercentage) : undefined,
+        commissionValue: form.commissionValue ? Number(form.commissionValue) : undefined,
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao criar apólice')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -3342,7 +3525,7 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
         </div>
         <FormField label="Data Início" value={form.startDate} onChange={(v) => update('startDate', v)} type="date" required />
         <FormField label="Data Fim" value={form.endDate} onChange={(v) => update('endDate', v)} type="date" required />
-        <FormField label="Prémio Anual (EUR)" value={form.annualPremium} onChange={(v) => update('annualPremium', v)} type="number" required />
+        <FormField label="Prémio Anual (EUR)" value={form.annualPremium} onChange={(v) => updatePremium(v)} type="number" required />
         <FormField label="Capital Segurado (EUR)" value={form.insuredValue} onChange={(v) => update('insuredValue', v)} type="number" required />
         <div>
           <label className="block text-sm font-medium text-navy-600 mb-1">Fracionamento</label>
@@ -3357,9 +3540,10 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
             <option value="anual">Anual</option>
           </select>
         </div>
-        <FormField label="Comissão (%)" value={form.commissionPercentage} onChange={(v) => update('commissionPercentage', v)} type="number" />
-        <FormField label="Comissão (€)" value={form.commissionValue} onChange={(v) => update('commissionValue', v)} type="number" />
+        <FormField label="Comissão (%)" value={form.commissionPercentage} onChange={(v) => updateCommissionPercentage(v)} type="number" />
+        <FormField label="Comissão (€)" value={form.commissionValue} onChange={(v) => updateCommissionValue(v)} type="number" />
         <div className="sm:col-span-2">
+          {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
           <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 text-sm">
             {submitting ? 'A criar...' : 'Criar Apólice'}
           </button>
@@ -3872,12 +4056,14 @@ const POLICY_STATUS_CLASS: Record<string, string> = {
 
 // ─── Admin Policy List ────────────────────────────────────────────────────────
 
-function AdminPolicyList({ policies, documents, companies, individualClients, onReload }: {
+function AdminPolicyList({ policies, documents, companies, individualClients, onReload, selectedPolicyIds, setSelectedPolicyIds }: {
   policies: Policy[]
   documents: DocType[]
   companies: Company[]
   individualClients: IndividualClient[]
   onReload: () => Promise<void>
+  selectedPolicyIds: Set<string>
+  setSelectedPolicyIds: React.Dispatch<React.SetStateAction<Set<string>>>
 }) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -3909,6 +4095,20 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
           <div key={policy.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
             {/* Summary row */}
             <div className="flex items-center gap-3 px-4 py-3">
+              <input
+                type="checkbox"
+                checked={selectedPolicyIds.has(policy.id)}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  setSelectedPolicyIds((prev) => {
+                    const next = new Set(prev)
+                    if (e.target.checked) next.add(policy.id)
+                    else next.delete(policy.id)
+                    return next
+                  })
+                }}
+                className="w-4 h-4 accent-gold-400 cursor-pointer"
+              />
               <button onClick={() => setExpandedId(isExpanded ? null : policy.id)} className="text-navy-400 hover:text-navy-600 text-xs">
                 {isExpanded ? '▾' : '▸'}
               </button>
@@ -4138,6 +4338,36 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
   const [saving, setSaving] = useState(false)
   const u = (k: string, v: any) => setForm(f => ({ ...f, [k]: v }))
 
+  const updateCommissionPct = (v: string) => {
+    const pct = parseFloat(v)
+    const premium = parseFloat(form.annualPremium)
+    setForm(f => ({
+      ...f,
+      commissionPercentage: v,
+      commissionValue: (!isNaN(pct) && !isNaN(premium) && premium > 0) ? (premium * pct / 100).toFixed(2) : f.commissionValue,
+    }))
+  }
+
+  const updateCommissionVal = (v: string) => {
+    const val = parseFloat(v)
+    const premium = parseFloat(form.annualPremium)
+    setForm(f => ({
+      ...f,
+      commissionValue: v,
+      commissionPercentage: (!isNaN(val) && !isNaN(premium) && premium > 0) ? (val / premium * 100).toFixed(2) : f.commissionPercentage,
+    }))
+  }
+
+  const updateEditPremium = (v: string) => {
+    const premium = parseFloat(v)
+    const pct = parseFloat(form.commissionPercentage)
+    setForm(f => ({
+      ...f,
+      annualPremium: v,
+      commissionValue: (!isNaN(pct) && !isNaN(premium) && premium > 0) ? (premium * pct / 100).toFixed(2) : f.commissionValue,
+    }))
+  }
+
   const handleSave = async () => {
     setSaving(true)
     await onSave({
@@ -4203,7 +4433,7 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
         </div>
         <div>
           <label className={lbl}>Prémio Anual (€)</label>
-          <input type="number" className={inp} value={form.annualPremium} onChange={e => u('annualPremium', e.target.value)} />
+          <input type="number" className={inp} value={form.annualPremium} onChange={e => updateEditPremium(e.target.value)} />
         </div>
         <div>
           <label className={lbl}>Periodicidade</label>
@@ -4227,11 +4457,11 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
         <div>
           <label className={lbl}>Comissão %</label>
-          <input type="number" className={inp} value={form.commissionPercentage} onChange={e => u('commissionPercentage', e.target.value)} />
+          <input type="number" className={inp} value={form.commissionPercentage} onChange={e => updateCommissionPct(e.target.value)} />
         </div>
         <div>
           <label className={lbl}>Comissão €</label>
-          <input type="number" className={inp} value={form.commissionValue} onChange={e => u('commissionValue', e.target.value)} />
+          <input type="number" className={inp} value={form.commissionValue} onChange={e => updateCommissionVal(e.target.value)} />
         </div>
         <div>
           <label className={lbl}>Franquia (€)</label>

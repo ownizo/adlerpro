@@ -202,7 +202,7 @@ export async function getPolicy(id: string): Promise<Policy | undefined> {
 export async function createPolicy(policy: Policy): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('policies').insert(objectToSnake(policy as unknown as Record<string, unknown>))
-  if (error) console.error('createPolicy error:', error)
+  if (error) throw new Error(`createPolicy: ${error.message}`)
 }
 
 export async function updatePolicy(id: string, updates: Partial<Policy>): Promise<void> {
