@@ -2151,9 +2151,10 @@ export const adminCreateCompanyUser = createServerFn({ method: 'POST' })
     const id = `usr_${Date.now()}`
     const now = new Date().toISOString()
     const normalizedEmail = data.email.toLowerCase()
+    const { accessPassword, ...safeCompanyUserData } = data
     await db.createCompanyUser({
       id,
-      ...data,
+      ...safeCompanyUserData,
       email: normalizedEmail,
       identityStatus: 'pending_confirmation',
       invitationSentAt: now,
@@ -2164,7 +2165,7 @@ export const adminCreateCompanyUser = createServerFn({ method: 'POST' })
     try {
       const result = await createIdentityUserWithConfirmation({
         email: normalizedEmail,
-        password: data.accessPassword,
+        password: accessPassword,
         fullName: data.name,
         companyId: data.companyId,
         companyUserId: id,
@@ -2202,19 +2203,20 @@ export const adminUpdateCompanyUser = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { id: string; updates: any }) => d)
   .handler(async ({ data }) => {
-    if (typeof data.updates?.accessPassword === 'string' && data.updates.accessPassword.length > 0) {
+    const { accessPassword: updatedPassword, ...safeUpdates } = data.updates ?? {}
+    if (typeof updatedPassword === 'string' && updatedPassword.length > 0) {
       const users = await db.getCompanyUsers()
       const current = users.find((user) => user.id === data.id)
       if (!current?.email) throw new Error('Utilizador não encontrado para atualizar password no Identity.')
-      await updateIdentityUserPasswordByEmail(current.email, data.updates.accessPassword)
+      await updateIdentityUserPasswordByEmail(current.email, updatedPassword)
       // Garantir que o identity_status fica como active após reset de password
-      if (!data.updates.identityStatus) {
-        data.updates.identityStatus = 'active'
+      if (!safeUpdates.identityStatus) {
+        safeUpdates.identityStatus = 'active'
       }
     }
 
     await db.updateCompanyUser(data.id, {
-      ...data.updates,
+      ...safeUpdates,
       updatedAt: new Date().toISOString(),
     })
     return { success: true }
