@@ -1,4 +1,5 @@
 import { createFileRoute, Navigate, Link } from '@tanstack/react-router'
+import { BillingTab } from '@/components/billing/BillingTab'
 import { AppLayout } from '@/components/AppLayout'
 import {
   fetchAdminAll,
@@ -69,7 +70,7 @@ async function exportToExcel(data: Record<string, unknown>[], filename: string) 
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
 
-const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'social', 'api', 'profiles', 'alerts'] as const
+const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'social', 'api', 'profiles', 'alerts'] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
 const RENEWAL_ALERT_STATUS_LABELS: Record<RenewalAlertStatus, string> = {
   pending: 'Pendente',
@@ -1477,6 +1478,8 @@ function AdminPage() {
                 </div>
               </div>
             )}
+
+            {tab === 'billing' && <BillingTab />}
 
             {tab === 'social' && (
               <SocialHubTab

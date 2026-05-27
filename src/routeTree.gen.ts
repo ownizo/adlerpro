@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WeatherAlertsRouteImport } from './routes/weather-alerts'
 import { Route as TermsAndConditionsRouteImport } from './routes/terms-and-conditions'
 import { Route as QuotesComparisonRouteImport } from './routes/quotes-comparison'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -17,11 +16,9 @@ import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as PoliciesRouteImport } from './routes/policies'
 import { Route as PartnerRiskRouteImport } from './routes/partner-risk'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as LicensePlatesRouteImport } from './routes/license-plates'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as ClaimsRouteImport } from './routes/claims'
-import { Route as BillingRouteImport } from './routes/billing'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -33,11 +30,6 @@ import { Route as OneDocumentsRouteImport } from './routes/one/documents'
 import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
 import { Route as OneClaimsRouteImport } from './routes/one/claims'
 
-const WeatherAlertsRoute = WeatherAlertsRouteImport.update({
-  id: '/weather-alerts',
-  path: '/weather-alerts',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TermsAndConditionsRoute = TermsAndConditionsRouteImport.update({
   id: '/terms-and-conditions',
   path: '/terms-and-conditions',
@@ -73,11 +65,6 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LicensePlatesRoute = LicensePlatesRouteImport.update({
-  id: '/license-plates',
-  path: '/license-plates',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -91,11 +78,6 @@ const ContactRoute = ContactRouteImport.update({
 const ClaimsRoute = ClaimsRouteImport.update({
   id: '/claims',
   path: '/claims',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const BillingRoute = BillingRouteImport.update({
-  id: '/billing',
-  path: '/billing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AlertsRoute = AlertsRouteImport.update({
@@ -153,11 +135,9 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
-  '/billing': typeof BillingRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
-  '/license-plates': typeof LicensePlatesRoute
   '/login': typeof LoginRoute
   '/partner-risk': typeof PartnerRiskRoute
   '/policies': typeof PoliciesRoute
@@ -165,7 +145,6 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
-  '/weather-alerts': typeof WeatherAlertsRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -178,11 +157,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
-  '/billing': typeof BillingRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
-  '/license-plates': typeof LicensePlatesRoute
   '/login': typeof LoginRoute
   '/partner-risk': typeof PartnerRiskRoute
   '/policies': typeof PoliciesRoute
@@ -190,7 +167,6 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
-  '/weather-alerts': typeof WeatherAlertsRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -204,11 +180,9 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
   '/alerts': typeof AlertsRoute
-  '/billing': typeof BillingRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
   '/dashboard': typeof DashboardRoute
-  '/license-plates': typeof LicensePlatesRoute
   '/login': typeof LoginRoute
   '/partner-risk': typeof PartnerRiskRoute
   '/policies': typeof PoliciesRoute
@@ -216,7 +190,6 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
-  '/weather-alerts': typeof WeatherAlertsRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -231,11 +204,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/alerts'
-    | '/billing'
     | '/claims'
     | '/contact'
     | '/dashboard'
-    | '/license-plates'
     | '/login'
     | '/partner-risk'
     | '/policies'
@@ -243,7 +214,6 @@ export interface FileRouteTypes {
     | '/profile'
     | '/quotes-comparison'
     | '/terms-and-conditions'
-    | '/weather-alerts'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -256,11 +226,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/alerts'
-    | '/billing'
     | '/claims'
     | '/contact'
     | '/dashboard'
-    | '/license-plates'
     | '/login'
     | '/partner-risk'
     | '/policies'
@@ -268,7 +236,6 @@ export interface FileRouteTypes {
     | '/profile'
     | '/quotes-comparison'
     | '/terms-and-conditions'
-    | '/weather-alerts'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -281,11 +248,9 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/alerts'
-    | '/billing'
     | '/claims'
     | '/contact'
     | '/dashboard'
-    | '/license-plates'
     | '/login'
     | '/partner-risk'
     | '/policies'
@@ -293,7 +258,6 @@ export interface FileRouteTypes {
     | '/profile'
     | '/quotes-comparison'
     | '/terms-and-conditions'
-    | '/weather-alerts'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -307,11 +271,9 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   AlertsRoute: typeof AlertsRoute
-  BillingRoute: typeof BillingRoute
   ClaimsRoute: typeof ClaimsRoute
   ContactRoute: typeof ContactRoute
   DashboardRoute: typeof DashboardRoute
-  LicensePlatesRoute: typeof LicensePlatesRoute
   LoginRoute: typeof LoginRoute
   PartnerRiskRoute: typeof PartnerRiskRoute
   PoliciesRoute: typeof PoliciesRoute
@@ -319,7 +281,6 @@ export interface RootRouteChildren {
   ProfileRoute: typeof ProfileRoute
   QuotesComparisonRoute: typeof QuotesComparisonRoute
   TermsAndConditionsRoute: typeof TermsAndConditionsRoute
-  WeatherAlertsRoute: typeof WeatherAlertsRoute
   OneClaimsRoute: typeof OneClaimsRoute
   OneDashboardRoute: typeof OneDashboardRoute
   OneDocumentsRoute: typeof OneDocumentsRoute
@@ -331,13 +292,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/weather-alerts': {
-      id: '/weather-alerts'
-      path: '/weather-alerts'
-      fullPath: '/weather-alerts'
-      preLoaderRoute: typeof WeatherAlertsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/terms-and-conditions': {
       id: '/terms-and-conditions'
       path: '/terms-and-conditions'
@@ -387,13 +341,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/license-plates': {
-      id: '/license-plates'
-      path: '/license-plates'
-      fullPath: '/license-plates'
-      preLoaderRoute: typeof LicensePlatesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -413,13 +360,6 @@ declare module '@tanstack/react-router' {
       path: '/claims'
       fullPath: '/claims'
       preLoaderRoute: typeof ClaimsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/billing': {
-      id: '/billing'
-      path: '/billing'
-      fullPath: '/billing'
-      preLoaderRoute: typeof BillingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/alerts': {
@@ -499,11 +439,9 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   AlertsRoute: AlertsRoute,
-  BillingRoute: BillingRoute,
   ClaimsRoute: ClaimsRoute,
   ContactRoute: ContactRoute,
   DashboardRoute: DashboardRoute,
-  LicensePlatesRoute: LicensePlatesRoute,
   LoginRoute: LoginRoute,
   PartnerRiskRoute: PartnerRiskRoute,
   PoliciesRoute: PoliciesRoute,
@@ -511,7 +449,6 @@ const rootRouteChildren: RootRouteChildren = {
   ProfileRoute: ProfileRoute,
   QuotesComparisonRoute: QuotesComparisonRoute,
   TermsAndConditionsRoute: TermsAndConditionsRoute,
-  WeatherAlertsRoute: WeatherAlertsRoute,
   OneClaimsRoute: OneClaimsRoute,
   OneDashboardRoute: OneDashboardRoute,
   OneDocumentsRoute: OneDocumentsRoute,

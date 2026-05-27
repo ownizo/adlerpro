@@ -12,7 +12,6 @@ function AlertsSettingsPage() {
   const { t } = useTranslation()
   const [settings, setSettings] = useState({
     renewalAlerts: true,
-    weatherAlerts: true,
     channels: {
       platform: true,
       email: true,
@@ -70,15 +69,6 @@ function AlertsSettingsPage() {
                   onChange={(e) => setSettings({...settings, renewalAlerts: e.target.checked})}
                 />
                 <span className="text-navy-700">{t('alerts.renewalAlerts')}</span>
-              </label>
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 text-gold-500 rounded border-navy-300 focus:ring-gold-500"
-                  checked={settings.weatherAlerts}
-                  onChange={(e) => setSettings({...settings, weatherAlerts: e.target.checked})}
-                />
-                <span className="text-navy-700">{t('alerts.weatherAlerts')}</span>
               </label>
             </div>
           </div>
