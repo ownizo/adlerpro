@@ -893,8 +893,7 @@ function toDeltaPct(current: number, previous: number | null): number | null {
   return ((current - previous) / previous) * 100
 }
 
-const RENEWAL_ALERT_DAYS = [30, 60, 90] as const
-const DEFAULT_RENEWAL_ALERT_STATUS: RenewalAlertStatus = 'pendente'
+const DEFAULT_RENEWAL_ALERT_STATUS: RenewalAlertStatus = 'pending'
 
 interface RenewalAlertStateRecord {
   key: string
@@ -928,7 +927,7 @@ async function readRenewalAlertStateMap() {
 
     const status = row.status as RenewalAlertStatus
     const normalizedStatus: RenewalAlertStatus =
-      status === 'pendente' || status === 'tratado' || status === 'em_negociacao' || status === 'renovado'
+      status === 'pending' || status === 'negotiating' || status === 'renewed'
         ? status
         : DEFAULT_RENEWAL_ALERT_STATUS
     stateMap[alertKey] = {
@@ -949,7 +948,7 @@ async function readRenewalAlertHistoryMap(alertKeys: string[]) {
 
   const { data, error } = await supabaseAdmin
     .from('renewal_alerts_history')
-    .select('id, alert_key, policy_id, previous_status, new_status, previous_assigned_to, new_assigned_to, previous_next_action, new_next_action, changed_at')
+    .select('id, alert_key, policy_id, old_status, new_status, old_assigned_to, new_assigned_to, old_next_action, new_next_action, changed_at')
     .in('alert_key', alertKeys)
     .order('changed_at', { ascending: false })
 
@@ -965,13 +964,13 @@ async function readRenewalAlertHistoryMap(alertKeys: string[]) {
 
     const newStatusCandidate = row.new_status as RenewalAlertStatus
     const newStatus: RenewalAlertStatus =
-      newStatusCandidate === 'pendente' || newStatusCandidate === 'tratado' || newStatusCandidate === 'em_negociacao' || newStatusCandidate === 'renovado'
+      newStatusCandidate === 'pending' || newStatusCandidate === 'negotiating' || newStatusCandidate === 'renewed'
         ? newStatusCandidate
         : DEFAULT_RENEWAL_ALERT_STATUS
 
-    const prevStatusCandidate = row.previous_status as RenewalAlertStatus | null
+    const prevStatusCandidate = row.old_status as RenewalAlertStatus | null
     const previousStatus: RenewalAlertStatus | null =
-      prevStatusCandidate === 'pendente' || prevStatusCandidate === 'tratado' || prevStatusCandidate === 'em_negociacao' || prevStatusCandidate === 'renovado'
+      prevStatusCandidate === 'pending' || prevStatusCandidate === 'negotiating' || prevStatusCandidate === 'renewed'
         ? prevStatusCandidate
         : null
 
@@ -982,9 +981,9 @@ async function readRenewalAlertHistoryMap(alertKeys: string[]) {
       policyId: normalizeOptionalText(row.policy_id),
       previousStatus,
       newStatus,
-      previousAssignedTo: normalizeOptionalText(row.previous_assigned_to),
+      previousAssignedTo: normalizeOptionalText(row.old_assigned_to),
       newAssignedTo: normalizeOptionalText(row.new_assigned_to),
-      previousNextAction: normalizeOptionalText(row.previous_next_action),
+      previousNextAction: normalizeOptionalText(row.old_next_action),
       newNextAction: normalizeOptionalText(row.new_next_action),
       changedAt: typeof row.changed_at === 'string' ? row.changed_at : new Date().toISOString(),
     })
@@ -1041,10 +1040,10 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
 
       const renewalDate = computeUpcomingRenewalDate(startDate, todayUtc)
       const daysUntilRenewal = getUtcDayDiff(renewalDate, todayUtc)
-      if (!RENEWAL_ALERT_DAYS.includes(daysUntilRenewal as (typeof RENEWAL_ALERT_DAYS)[number])) continue
+      if (daysUntilRenewal < 0 || daysUntilRenewal > 90) continue
 
-      const urgency = daysUntilRenewal as 30 | 60 | 90
-      const key = `${policy.id}:${urgency}:${renewalDate.toISOString().slice(0, 10)}`
+      const urgency: 30 | 60 | 90 = daysUntilRenewal <= 30 ? 30 : daysUntilRenewal <= 60 ? 60 : 90
+      const key = `${policy.id}_${renewalDate.getUTCFullYear()}`
       if (dedupe.has(key)) continue
       dedupe.add(key)
 
@@ -1090,16 +1089,15 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
 
     const byUrgency: RenewalAlertsResponse['byUrgency'] = { 30: [], 60: [], 90: [] }
     const countsByStatus: RenewalAlertsResponse['summary']['countsByStatus'] = {
-      pendente: 0,
-      tratado: 0,
-      em_negociacao: 0,
-      renovado: 0,
+      pending: 0,
+      negotiating: 0,
+      renewed: 0,
     }
     let totalValueAtRisk = 0
     for (const alert of alerts) {
       byUrgency[alert.urgency].push(alert)
       countsByStatus[alert.status] += 1
-      if (alert.status !== 'renovado') totalValueAtRisk += alert.value
+      if (alert.status !== 'renewed') totalValueAtRisk += alert.value
     }
 
     return {
@@ -1121,9 +1119,9 @@ export const adminUpdateRenewalAlertStatus = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const key = data.key?.trim()
     if (!key) throw new Error('Chave de alerta inválida')
-    const fallbackPolicyId = key.split(':')[0]?.trim() || null
+    const fallbackPolicyId = key.split('_')[0]?.trim() || null
 
-    const validStatuses: RenewalAlertStatus[] = ['pendente', 'tratado', 'em_negociacao', 'renovado']
+    const validStatuses: RenewalAlertStatus[] = ['pending', 'negotiating', 'renewed']
     if (data.status && !validStatuses.includes(data.status)) throw new Error('Estado de alerta inválido')
 
     const { data: existing, error: findError } = await supabaseAdmin
@@ -1182,11 +1180,11 @@ export const adminUpdateRenewalAlertStatus = createServerFn({ method: 'POST' })
         .insert({
           alert_key: key,
           policy_id: policyId,
-          previous_status: previousStatus,
+          old_status: previousStatus,
           new_status: status,
-          previous_assigned_to: previousAssignedTo,
+          old_assigned_to: previousAssignedTo,
           new_assigned_to: assignedTo,
-          previous_next_action: previousNextAction,
+          old_next_action: previousNextAction,
           new_next_action: nextAction,
           changed_at: new Date().toISOString(),
         })

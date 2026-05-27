@@ -344,7 +344,7 @@ export interface AdminFinancialDashboardData {
 }
 
 export type RenewalAlertUrgency = 30 | 60 | 90
-export type RenewalAlertStatus = 'pendente' | 'tratado' | 'em_negociacao' | 'renovado'
+export type RenewalAlertStatus = 'pending' | 'negotiating' | 'renewed'
 
 export interface RenewalAlertHistoryItem {
   id: string

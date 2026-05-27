@@ -72,10 +72,9 @@ async function exportToExcel(data: Record<string, unknown>[], filename: string) 
 const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'social', 'api', 'profiles', 'alerts'] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
 const RENEWAL_ALERT_STATUS_LABELS: Record<RenewalAlertStatus, string> = {
-  pendente: 'Pendente',
-  tratado: 'Tratado',
-  em_negociacao: 'Em negociação',
-  renovado: 'Renovado',
+  pending: 'Pendente',
+  negotiating: 'Em negociação',
+  renewed: 'Renovado',
 }
 
 type RenewalKanbanColumnId = 'pending' | 'negotiating' | 'renewed'
@@ -91,31 +90,30 @@ const RENEWAL_KANBAN_COLUMNS: RenewalKanbanColumn[] = [
 ]
 
 const RENEWAL_KANBAN_TARGET_STATUS: Record<RenewalKanbanColumnId, RenewalAlertStatus> = {
-  pending: 'pendente',
-  negotiating: 'em_negociacao',
-  renewed: 'renovado',
+  pending: 'pending',
+  negotiating: 'negotiating',
+  renewed: 'renewed',
 }
 
 function renewalColumnByStatus(status: RenewalAlertStatus): RenewalKanbanColumnId {
-  if (status === 'em_negociacao') return 'negotiating'
-  if (status === 'renovado') return 'renewed'
+  if (status === 'negotiating') return 'negotiating'
+  if (status === 'renewed') return 'renewed'
   return 'pending'
 }
 
 function buildRenewalAlertsView(alerts: RenewalAlertItem[]) {
   const byUrgency: RenewalAlertsResponse['byUrgency'] = { 30: [], 60: [], 90: [] }
   const countsByStatus: RenewalAlertsResponse['summary']['countsByStatus'] = {
-    pendente: 0,
-    tratado: 0,
-    em_negociacao: 0,
-    renovado: 0,
+    pending: 0,
+    negotiating: 0,
+    renewed: 0,
   }
   let totalValueAtRisk = 0
 
   for (const alert of alerts) {
     byUrgency[alert.urgency].push(alert)
     countsByStatus[alert.status] += 1
-    if (alert.status !== 'renovado') totalValueAtRisk += alert.value
+    if (alert.status !== 'renewed') totalValueAtRisk += alert.value
   }
 
   return {
@@ -171,14 +169,14 @@ function calculatePendingToRenewedDurationDays(alert: RenewalAlertItem): number 
   for (const entry of sortedHistory) {
     const changedAt = new Date(entry.changedAt).getTime()
     if (!Number.isFinite(changedAt)) continue
-    if (entry.newStatus === 'pendente' && pendingAt === null) pendingAt = changedAt
-    if (entry.previousStatus === 'pendente' && pendingAt === null) pendingAt = changedAt
+    if (entry.newStatus === 'pending' && pendingAt === null) pendingAt = changedAt
+    if (entry.previousStatus === 'pending' && pendingAt === null) pendingAt = changedAt
   }
 
   if (pendingAt === null) return null
 
   for (const entry of sortedHistory) {
-    if (entry.newStatus !== 'renovado') continue
+    if (entry.newStatus !== 'renewed') continue
     const renewedAt = new Date(entry.changedAt).getTime()
     if (!Number.isFinite(renewedAt) || renewedAt < pendingAt) continue
     return (renewedAt - pendingAt) / (1000 * 60 * 60 * 24)
@@ -189,8 +187,8 @@ function calculatePendingToRenewedDurationDays(alert: RenewalAlertItem): number 
 
 function buildRenewalPipelineIntelligence(alerts: RenewalAlertItem[]): RenewalPipelineIntelligence {
   const totalAlerts = alerts.length
-  const renewedCount = alerts.filter((alert) => alert.status === 'renovado').length
-  const pendingOrNegotiatingCount = alerts.filter((alert) => alert.status !== 'renovado').length
+  const renewedCount = alerts.filter((alert) => alert.status === 'renewed').length
+  const pendingOrNegotiatingCount = alerts.filter((alert) => alert.status !== 'renewed').length
   const renewalRatePct = totalAlerts > 0 ? (renewedCount / totalAlerts) * 100 : 0
 
   const durations = alerts
@@ -201,7 +199,7 @@ function buildRenewalPipelineIntelligence(alerts: RenewalAlertItem[]): RenewalPi
     : null
 
   const valueAtRiskByPeriod: RenewalRiskByPeriod[] = ([30, 60, 90] as const).map((urgency) => {
-    const periodAlerts = alerts.filter((alert) => alert.urgency === urgency && alert.status !== 'renovado')
+    const periodAlerts = alerts.filter((alert) => alert.urgency === urgency && alert.status !== 'renewed')
     return {
       urgency,
       alertsCount: periodAlerts.length,
@@ -211,7 +209,7 @@ function buildRenewalPipelineIntelligence(alerts: RenewalAlertItem[]): RenewalPi
 
   const riskByClient = new Map<string, RenewalTopRiskClient>()
   for (const alert of alerts) {
-    if (alert.status === 'renovado') continue
+    if (alert.status === 'renewed') continue
     const key = `${alert.client}::${alert.company}`
     const current = riskByClient.get(key)
     if (current) {
@@ -232,8 +230,8 @@ function buildRenewalPipelineIntelligence(alerts: RenewalAlertItem[]): RenewalPi
     .slice(0, 3)
 
   const highestRiskPeriod = [...valueAtRiskByPeriod].sort((a, b) => b.valueAtRisk - a.valueAtRisk)[0]
-  const overduePending = alerts.filter((alert) => alert.status !== 'renovado' && alert.daysUntilRenewal <= 30)
-  const unassignedCount = alerts.filter((alert) => alert.status !== 'renovado' && !alert.assignedTo?.trim()).length
+  const overduePending = alerts.filter((alert) => alert.status !== 'renewed' && alert.daysUntilRenewal <= 30)
+  const unassignedCount = alerts.filter((alert) => alert.status !== 'renewed' && !alert.assignedTo?.trim()).length
 
   const insights: string[] = []
   if (totalAlerts === 0) {
@@ -2110,21 +2108,21 @@ function AdminDashboardTab({
                             if (renewalColumnByStatus(alert.status) !== 'pending') {
                               nextStatusActions.push({
                                 label: 'Mover para pending',
-                                status: 'pendente',
+                                status: 'pending',
                                 className: 'border-navy-200 text-navy-700 bg-white hover:bg-navy-50',
                               })
                             }
                             if (renewalColumnByStatus(alert.status) !== 'negotiating') {
                               nextStatusActions.push({
                                 label: 'Mover para negotiating',
-                                status: 'em_negociacao',
+                                status: 'negotiating',
                                 className: 'border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100',
                               })
                             }
                             if (renewalColumnByStatus(alert.status) !== 'renewed') {
                               nextStatusActions.push({
                                 label: 'Mover para renewed',
-                                status: 'renovado',
+                                status: 'renewed',
                                 className: 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100',
                               })
                             }
