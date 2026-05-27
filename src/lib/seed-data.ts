@@ -79,24 +79,6 @@ export function getSeedCompanyUsers(): CompanyUser[] {
 export function getSeedApiConnections(): ApiConnection[] {
   return [
     {
-      id: 'api_001',
-      service: 'Bizapis',
-      status: 'connected',
-      latency: '120ms',
-      endpoint: '/api/verify-seguro',
-      lastSync: new Date().toISOString(),
-      notes: 'Consulta de seguros por matrícula',
-    },
-    {
-      id: 'api_002',
-      service: 'RegCheck',
-      status: 'connected',
-      latency: '90ms',
-      endpoint: '/api/verify-plate',
-      lastSync: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-      notes: 'Validação de matrículas',
-    },
-    {
       id: 'api_003',
       service: 'OpenAI',
       status: 'connected',
