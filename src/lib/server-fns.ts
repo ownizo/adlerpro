@@ -2646,18 +2646,6 @@ export const createIXInvoice = createServerFn({ method: 'POST' })
     }
   })
 
-export const updateIXInvoice = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware])
-  .inputValidator((d: { id: number; invoice: Partial<ix.IXInvoice> }) => d)
-  .handler(async ({ data }) => {
-    try {
-      const result = await ix.updateInvoice(data.id, data.invoice)
-      return { ok: true as const, invoice: result.invoice }
-    } catch (e: any) {
-      return { ok: false as const, error: e.message }
-    }
-  })
-
 export const changeIXInvoiceState = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: { id: number; state: ix.IXDocState }) => d)
@@ -2942,18 +2930,6 @@ export const fetchIXClients = createServerFn({ method: 'GET' })
     }
   })
 
-export const getIXClient = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
-  .inputValidator((d: { id: number }) => d)
-  .handler(async ({ data }) => {
-    try {
-      const result = await ix.getClient(data.id)
-      return { ok: true as const, client: result.client }
-    } catch (e: any) {
-      return { ok: false as const, error: e.message }
-    }
-  })
-
 export const createIXClient = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: { client: Partial<ix.IXClient> }) => d)
@@ -3010,19 +2986,6 @@ export const updateIXItem = createServerFn({ method: 'POST' })
     try {
       const result = await ix.updateItem(data.id, data.item)
       return { ok: true as const, item: result.item }
-    } catch (e: any) {
-      return { ok: false as const, error: e.message }
-    }
-  })
-
-// --- Sequences ---
-
-export const fetchIXSequences = createServerFn({ method: 'GET' })
-  .middleware([requireAuthMiddleware])
-  .handler(async () => {
-    try {
-      const result = await ix.listSequences()
-      return { ok: true as const, sequences: result.sequences ?? [] }
     } catch (e: any) {
       return { ok: false as const, error: e.message }
     }
