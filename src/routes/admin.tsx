@@ -61,9 +61,8 @@ import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
-import * as XLSX from 'xlsx'
-
-function exportToExcel(data: Record<string, unknown>[], filename: string) {
+async function exportToExcel(data: Record<string, unknown>[], filename: string) {
+  const XLSX = await import('xlsx')
   const ws = XLSX.utils.json_to_sheet(data)
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, 'Dados')
@@ -441,8 +440,8 @@ function AdminPage() {
                   <h2 className="text-lg font-semibold text-navy-700">Empresas ({companies.length})</h2>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        exportToExcel(companies.map((c) => ({
+                      onClick={async () => {
+                        await exportToExcel(companies.map((c) => ({
                           Nome: c.name,
                           NIF: c.nif,
                           Setor: c.sector,
@@ -820,8 +819,8 @@ function AdminPage() {
                   <h2 className="text-lg font-semibold text-navy-700">Clientes Individuais ({individualClients.length})</h2>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
-                        exportToExcel(individualClients.map((c) => ({
+                      onClick={async () => {
+                        await exportToExcel(individualClients.map((c) => ({
                           Nome: c.fullName,
                           NIF: c.nif || '',
                           Email: c.email || '',
@@ -1086,13 +1085,13 @@ function AdminPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const filtered = policies.filter((p) => {
                           if (!selectedCompanyId) return true
                           if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
                           return p.companyId === selectedCompanyId
                         })
-                        exportToExcel(filtered.map((p) => ({
+                        await exportToExcel(filtered.map((p) => ({
                           'N.º Apólice': p.policyNumber,
                           Tipo: POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type,
                           Seguradora: p.insurer,
