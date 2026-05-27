@@ -1,7 +1,6 @@
 import { createFileRoute, Navigate, Link } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { OnboardingBanner } from '@/components/OnboardingBanner'
-import { WeatherWidget } from '@/components/WeatherWidget'
 import { fetchDashboardAll } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { DashboardStats, Alert, Policy } from '@/lib/types'
@@ -435,12 +434,6 @@ function DashboardPage() {
                   )}
                 </div>
               </div>
-              <WeatherWidget
-                lat={38.7167}
-                lon={-9.1333}
-                distrito="lisboa"
-                cityName="Lisboa"
-              />
             </div>
           </div>
           </>
