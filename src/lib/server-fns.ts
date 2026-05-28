@@ -1596,6 +1596,22 @@ export const getDocumentUrl = createServerFn({ method: 'POST' })
     return { url: urlData.signedUrl }
   })
 
+export const getStorageUploadUrl = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { storagePath: string }) => d)
+  .handler(async ({ data }) => {
+    // Prevent path traversal — only allow known bucket prefixes
+    const allowed = ['claims/', 'policies/']
+    if (!allowed.some((p) => data.storagePath.startsWith(p)) || data.storagePath.includes('..')) {
+      throw new Error('Invalid storage path')
+    }
+    const { data: urlData, error } = await supabaseAdmin.storage
+      .from('documents')
+      .createSignedUploadUrl(data.storagePath)
+    if (error) throw new Error(error.message)
+    return { token: urlData.token, path: urlData.path }
+  })
+
 // Keep alias for backwards compatibility
 export const adminGetDocumentUrl = getDocumentUrl
 

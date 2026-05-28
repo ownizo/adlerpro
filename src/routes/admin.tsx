@@ -22,6 +22,7 @@ import {
   adminUpdatePolicy,
   adminUploadPolicyDocument,
   adminGetDocumentUrl,
+  getStorageUploadUrl,
   fetchPolicyDocuments,
   adminDeletePolicyDocument,
   adminCreateClaim,
@@ -3206,7 +3207,8 @@ function AdminClaimWorkspace({
     setUploading(true)
     try {
       const storagePath = `claims/${claim.id}/${Date.now()}-${file.name}`
-      const { error } = await supabase.storage.from('documents').upload(storagePath, file)
+      const { token, path } = await getStorageUploadUrl({ data: { storagePath } })
+      const { error } = await supabase.storage.from('documents').uploadToSignedUrl(path, token, file)
       if (error) throw new Error(error.message)
       await registerClaimDocument({
         data: {
@@ -4279,7 +4281,8 @@ function PolicyDocumentUpload({ policyId, companyId, individualClientId, onUploa
     setUploading(true); setError('')
     try {
       const storagePath = `policies/${policyId}/${Date.now()}-${file.name}`
-      const { error: upErr } = await supabase.storage.from('documents').upload(storagePath, file)
+      const { token, path } = await getStorageUploadUrl({ data: { storagePath } })
+      const { error: upErr } = await supabase.storage.from('documents').uploadToSignedUrl(path, token, file)
       if (upErr) throw new Error(upErr.message)
       await adminUploadPolicyDocument({
         data: {

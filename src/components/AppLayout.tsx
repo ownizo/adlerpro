@@ -53,9 +53,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [adminSectionOpen, setAdminSectionOpen] = useState(true)
   const [lang, setLangState] = useState<LangCode>((i18n.language as LangCode) ?? 'pt')
   const isAdmin = user?.roles?.includes('admin')
-  const isAdminRoute = location.pathname === '/admin'
-
-  const primaryItems = NAV_ITEMS
+  const isAdminRoute = location.pathname.startsWith('/admin')
 
   const handleLogout = async () => {
     try { await logout() } catch { /* proceed */ }
@@ -95,7 +93,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {primaryItems.map((item) => (
+          {!isAdminRoute && NAV_ITEMS.map((item) => (
             <Link
               key={item.to}
               to={item.to}
