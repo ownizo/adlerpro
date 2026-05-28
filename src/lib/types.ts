@@ -17,7 +17,7 @@ export interface CompanyUser {
   name: string
   email: string
   role: 'owner' | 'manager' | 'employee'
-  accessPassword: string
+  accessPassword?: string
   identityStatus?: 'pending_confirmation' | 'confirmed' | 'already_registered' | 'not_found'
   invitationSentAt?: string
   lastLoginAt?: string
