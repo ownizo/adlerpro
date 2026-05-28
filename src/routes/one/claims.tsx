@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { OneLayout } from './__root'
-import { fetchClaimWorkspace, addClaimMessage, registerClaimDocument, getClaimDocumentUrl, fetchIndividualClaims, submitIndividualClaim } from '@/lib/server-fns'
+import { fetchClaimWorkspace, addClaimMessage, registerClaimDocument, getClaimDocumentUrl, fetchIndividualClaims, submitIndividualClaim, getStorageUploadUrl } from '@/lib/server-fns'
 import type { ClaimOperationalData } from '@/lib/types'
 
 export const Route = createFileRoute('/one/claims')({
@@ -317,7 +317,8 @@ function ClaimCard({ claim }: { claim: Claim }) {
                       setUploading(true)
                       try {
                         const storagePath = `claims/${claim.id}/${Date.now()}-${file.name}`
-                        const { error } = await supabase.storage.from('documents').upload(storagePath, file)
+                        const { token, path } = await getStorageUploadUrl({ data: { storagePath } })
+                        const { error } = await supabase.storage.from('documents').uploadToSignedUrl(path, token, file)
                         if (error) throw error
                         await registerClaimDocument({
                           data: {
