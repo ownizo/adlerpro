@@ -562,6 +562,7 @@ export const updateClaimDetails = createServerFn({ method: 'POST' })
   .inputValidator((d: { claimId: string; description: string; estimatedValue: number }) => d)
   .handler(async ({ data }) => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) throw new Error('Sem permissões para editar sinistros')
     const claim = await db.getClaim(data.claimId)
     if (!claim) throw new Error('Sinistro não encontrado')
     if (scope.companyId && claim.companyId !== scope.companyId) throw new Error('Sem permissões para editar este sinistro')
@@ -697,7 +698,7 @@ export const clearAlerts = createServerFn({ method: 'POST' })
     const scope = await getViewerScope()
     if (scope.companyId) {
       await db.clearAlertsForCompany(scope.companyId)
-    } else {
+    } else if (scope.isAdmin) {
       await db.clearAlerts()
     }
     return { success: true }
@@ -742,6 +743,7 @@ export const fetchCompanyUsers = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) return []
     return db.getCompanyUsers(scope.companyId ?? undefined)
   })
 
