@@ -353,6 +353,9 @@ export const fetchDashboardAll = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) {
+      return { stats: { activePolicies: 0, annualPremiums: 0, renewalsIn90Days: 0, openClaims: 0 }, alerts: [], policies: [] }
+    }
     const companyId = scope.companyId ?? undefined
 
     const [policies, claims, alerts] = await Promise.all([
@@ -387,6 +390,9 @@ export const fetchDashboardStats = createServerFn({ method: 'GET' })
   .handler(
   async (): Promise<DashboardStats> => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) {
+      return { activePolicies: 0, annualPremiums: 0, renewalsIn90Days: 0, openClaims: 0 }
+    }
     const [policies, claims] = await Promise.all([
       db.getPolicies(scope.companyId ?? undefined),
       db.getClaims(scope.companyId ?? undefined),
@@ -416,6 +422,7 @@ export const fetchPolicies = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) return []
     return db.getPolicies(scope.companyId ?? undefined)
   })
 
@@ -426,6 +433,7 @@ export const fetchPolicy = createServerFn({ method: 'GET' })
     const scope = await getViewerScope()
     const policy = await db.getPolicy(id)
     if (!policy) return undefined
+    if (!scope.isAdmin && !scope.companyId) return undefined
     if (scope.companyId && policy.companyId !== scope.companyId) return undefined
     return policy
   })
@@ -434,6 +442,7 @@ export const fetchClaims = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) return []
     const claims = await db.getClaims(scope.companyId ?? undefined)
     return normalizeClaimsByPolicy(claims)
   })
@@ -445,6 +454,7 @@ export const fetchClaim = createServerFn({ method: 'GET' })
     const scope = await getViewerScope()
     const claim = await db.getClaim(id)
     if (!claim) return undefined
+    if (!scope.isAdmin && !scope.companyId) return undefined
     if (scope.companyId && claim.companyId !== scope.companyId) return undefined
     return claim
   })
@@ -562,6 +572,7 @@ export const updateClaimDetails = createServerFn({ method: 'POST' })
   .inputValidator((d: { claimId: string; description: string; estimatedValue: number }) => d)
   .handler(async ({ data }) => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) throw new Error('Sem permissões para editar sinistros')
     const claim = await db.getClaim(data.claimId)
     if (!claim) throw new Error('Sinistro não encontrado')
     if (scope.companyId && claim.companyId !== scope.companyId) throw new Error('Sem permissões para editar este sinistro')
@@ -578,6 +589,7 @@ export const fetchClaimDocuments = createServerFn({ method: 'GET' })
   .inputValidator((d: string) => d)
   .handler(async ({ data: claimId }) => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) return []
     const claim = await db.getClaim(claimId)
     if (!claim) return []
     if (scope.companyId && claim.companyId !== scope.companyId) return []
@@ -681,6 +693,7 @@ export const fetchDocuments = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) return []
     return db.getDocuments(scope.companyId ?? undefined)
   })
 
@@ -688,6 +701,7 @@ export const fetchAlerts = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) return []
     return db.getAlerts(scope.companyId ?? undefined)
   })
 
@@ -697,7 +711,7 @@ export const clearAlerts = createServerFn({ method: 'POST' })
     const scope = await getViewerScope()
     if (scope.companyId) {
       await db.clearAlertsForCompany(scope.companyId)
-    } else {
+    } else if (scope.isAdmin) {
       await db.clearAlerts()
     }
     return { success: true }
@@ -719,6 +733,7 @@ export const fetchCompanies = createServerFn({ method: 'GET' })
       const company = await db.getCompany(scope.companyId)
       return company ? [company] : []
     }
+    if (!scope.isAdmin) return []
     return db.getCompanies()
   })
 
@@ -727,6 +742,7 @@ export const fetchCompany = createServerFn({ method: 'GET' })
   .inputValidator((d: string) => d)
   .handler(async ({ data: id }) => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) return undefined
     if (scope.companyId && scope.companyId !== id) return undefined
     return db.getCompany(id)
   })
@@ -735,6 +751,7 @@ export const fetchRiskReports = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) return []
     return db.getRiskReports(scope.companyId ?? undefined)
   })
 
@@ -742,6 +759,7 @@ export const fetchCompanyUsers = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) return []
     return db.getCompanyUsers(scope.companyId ?? undefined)
   })
 
@@ -749,6 +767,7 @@ export const fetchUserMetricEvents = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) return []
     return db.getUserMetricEvents(scope.companyId ?? undefined)
   })
 
@@ -1017,6 +1036,15 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async (): Promise<RenewalAlertsResponse> => {
     const scope = await getViewerScope()
+    if (!scope.isAdmin && !scope.companyId) {
+      return {
+        generatedAt: new Date().toISOString(),
+        total: 0,
+        alerts: [],
+        byUrgency: { 30: [], 60: [], 90: [] },
+        summary: { totalRenewals: 0, totalValueAtRisk: 0, countsByStatus: { pending: 0, negotiating: 0, renewed: 0 } },
+      }
+    }
     const todayUtc = startOfUtcDay(new Date())
 
     const [policies, companies, individualClients] = await Promise.all([
@@ -1024,7 +1052,7 @@ export const getRenewalAlerts = createServerFn({ method: 'GET' })
       scope.companyId
         ? db.getCompany(scope.companyId).then((company) => (company ? [company] : []))
         : db.getCompanies(),
-      db.getIndividualClients(),
+      scope.isAdmin ? db.getIndividualClients() : [],
     ])
     const alertStateMap = await readRenewalAlertStateMap()
 
