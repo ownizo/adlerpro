@@ -1202,7 +1202,6 @@ function AdminPage() {
                     if (selectedCompanyId.startsWith('ic:')) return p.individualClientId === selectedCompanyId.slice(3)
                     return p.companyId === selectedCompanyId
                   })}
-                  documents={documents}
                   companies={companies}
                   individualClients={individualClients}
                   onReload={reload}
@@ -4058,9 +4057,8 @@ const POLICY_STATUS_CLASS: Record<string, string> = {
 
 // ─── Admin Policy List ────────────────────────────────────────────────────────
 
-function AdminPolicyList({ policies, documents, companies, individualClients, onReload, selectedPolicyIds, setSelectedPolicyIds }: {
+function AdminPolicyList({ policies, companies, individualClients, onReload, selectedPolicyIds, setSelectedPolicyIds }: {
   policies: Policy[]
-  documents: DocType[]
   companies: Company[]
   individualClients: IndividualClient[]
   onReload: () => Promise<void>
@@ -4078,18 +4076,6 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
         const clientName = companies.find(c => c.id === policy.companyId)?.name
           ?? individualClients.find(c => c.id === policy.individualClientId)?.fullName
           ?? '—'
-        const policyDocs = documents.filter(d => d.policyId === policy.id)
-        const availableDocs = documents
-          .filter(d => !d.policyId && (
-            (policy.companyId && d.companyId === policy.companyId) ||
-            (policy.individualClientId && !d.companyId)
-          ))
-          .map(d => ({
-            ...d,
-            clientLabel: companies.find(c => c.id === d.companyId)?.name
-              ?? individualClients.find(c => c.id === (d as any).individualClientId)?.fullName
-              ?? 'Sem cliente',
-          }))
         const isEditing = editingId === policy.id
         const isExpanded = expandedId === policy.id
 
@@ -4149,35 +4135,7 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
 
             {/* Expanded: documents */}
             {isExpanded && !isEditing && (
-              <div className="border-t border-navy-100 bg-navy-50/30 p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide">Documentos associados</p>
-                  <PolicyDocumentUpload
-                    policyId={policy.id}
-                    companyId={policy.companyId}
-                    individualClientId={policy.individualClientId}
-                    onUploaded={onReload}
-                  />
-                </div>
-                {policyDocs.length === 0
-                  ? <p className="text-xs text-navy-400 mb-3">Nenhum documento associado.</p>
-                  : <ul className="mb-3 space-y-1.5">
-                      {policyDocs.map(d => (
-                        <li key={d.id} className="text-xs text-navy-600 flex items-center gap-2 flex-wrap">
-                          <span>📄</span>
-                          <span className="font-medium">{d.name}</span>
-                          <span className="text-navy-400">· {d.category}</span>
-                          <PolicyDocumentButtons storagePath={d.storagePath} name={d.name} />
-                        </li>
-                      ))}
-                    </ul>
-                }
-                <AssociateDocumentDropdown
-                  policyId={policy.id}
-                  availableDocs={availableDocs}
-                  onAssociated={onReload}
-                />
-              </div>
+              <AdminPolicyStorageDocs policy={policy} onReload={onReload} />
             )}
           </div>
         )
@@ -4186,45 +4144,6 @@ function AdminPolicyList({ policies, documents, companies, individualClients, on
   )
 }
 
-function AssociateDocumentDropdown({ policyId, availableDocs, onAssociated }: {
-  policyId: string
-  availableDocs: (DocType & { clientLabel: string })[]
-  onAssociated: () => Promise<void>
-}) {
-  const [selected, setSelected] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  if (availableDocs.length === 0) return null
-
-  return (
-    <div className="flex items-center gap-2 mt-1">
-      <select
-        value={selected}
-        onChange={e => setSelected(e.target.value)}
-        className="text-xs border border-navy-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-gold-400"
-      >
-        <option value="">Associar documento...</option>
-        {availableDocs.map(d => (
-          <option key={d.id} value={d.id}>{d.name} — {d.clientLabel} ({d.category})</option>
-        ))}
-      </select>
-      <button
-        disabled={!selected || saving}
-        onClick={async () => {
-          setSaving(true)
-          // adminAssociateDocument removed — association now done via storage path
-          console.log('Associate document:', selected, 'to policy:', policyId)
-          setSelected('')
-          setSaving(false)
-          await onAssociated()
-        }}
-        className="px-3 py-1 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50"
-      >
-        {saving ? '...' : 'Associar'}
-      </button>
-    </div>
-  )
-}
 
 function PolicyDocumentButtons({ storagePath, name }: { storagePath: string; name: string }) {
   const [loading, setLoading] = useState(false)
@@ -4280,14 +4199,15 @@ function PolicyDocumentUpload({ policyId, companyId, individualClientId, onUploa
     if (!file) return
     setUploading(true); setError('')
     try {
-      const storagePath = `policies/${policyId}/${Date.now()}-${file.name}`
+      const effectiveCompanyId = companyId || 'general'
+      const storagePath = `${effectiveCompanyId}/policies/${policyId}/${Date.now()}_${file.name}`
       const { token, path } = await getStorageUploadUrl({ data: { storagePath } })
       const { error: upErr } = await supabase.storage.from('documents').uploadToSignedUrl(path, token, file)
       if (upErr) throw new Error(upErr.message)
       await adminUploadPolicyDocument({
         data: {
           policyId,
-          companyId: companyId || undefined,
+          companyId: effectiveCompanyId !== 'general' ? effectiveCompanyId : undefined,
           individualClientId: individualClientId || undefined,
           name: file.name,
           storagePath,
@@ -4315,6 +4235,64 @@ function PolicyDocumentUpload({ policyId, companyId, individualClientId, onUploa
         {uploading ? 'A carregar...' : '↑ Fazer Upload'}
       </button>
       <input ref={ref} type="file" accept="application/pdf,image/*" className="hidden" onChange={handleFile} />
+    </div>
+  )
+}
+
+function AdminPolicyStorageDocs({ policy, onReload }: { policy: Policy; onReload: () => Promise<void> }) {
+  const [docs, setDocs] = useState<PolicyDocFile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const data = await fetchPolicyDocuments({
+        data: { policyId: policy.id, companyId: policy.companyId || undefined },
+      })
+      setDocs(data as PolicyDocFile[])
+    } catch (e: any) {
+      setError(e?.message ?? 'Erro ao carregar documentos')
+    } finally {
+      setLoading(false)
+    }
+  }, [policy.id, policy.companyId])
+
+  useEffect(() => { load() }, [load])
+
+  const handleUploaded = useCallback(async () => {
+    await load()
+    await onReload()
+  }, [load, onReload])
+
+  return (
+    <div className="border-t border-navy-100 bg-navy-50/30 p-4">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide">Documentos associados</p>
+        <PolicyDocumentUpload
+          policyId={policy.id}
+          companyId={policy.companyId}
+          individualClientId={policy.individualClientId}
+          onUploaded={handleUploaded}
+        />
+      </div>
+      {loading && <p className="text-xs text-navy-400">A carregar...</p>}
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      {!loading && !error && docs.length === 0 && (
+        <p className="text-xs text-navy-400 mb-3">Nenhum documento associado.</p>
+      )}
+      {!loading && docs.length > 0 && (
+        <ul className="mb-3 space-y-1.5">
+          {docs.map(d => (
+            <li key={d.id} className="text-xs text-navy-600 flex items-center gap-2 flex-wrap">
+              <span>📄</span>
+              <span className="font-medium">{d.name}</span>
+              <PolicyDocumentButtons storagePath={d.storagePath} name={d.name} />
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
