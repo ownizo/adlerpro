@@ -1600,10 +1600,25 @@ export const getStorageUploadUrl = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: { storagePath: string }) => d)
   .handler(async ({ data }) => {
-    // Prevent path traversal — only allow known bucket prefixes
-    const allowed = ['claims/', 'policies/']
-    if (!allowed.some((p) => data.storagePath.startsWith(p)) || data.storagePath.includes('..')) {
+    const parts = data.storagePath.split('/')
+    const allowedTypes = ['claims', 'policies']
+    // Reject empty first segment (leading slash), path traversal, and paths where neither
+    // parts[0] nor parts[1] is a known type (covers both old format and companyId-prefix format)
+    if (
+      data.storagePath.includes('..') ||
+      parts[0] === '' ||
+      (!allowedTypes.includes(parts[0]) && !allowedTypes.includes(parts[1]))
+    ) {
       throw new Error('Invalid storage path')
+    }
+    // For companyId-prefixed paths ({companyId}/policies/... or {companyId}/claims/...),
+    // validate the companyId against the user's scope — admins may write to any company prefix
+    if (!allowedTypes.includes(parts[0])) {
+      const scope = await getViewerScope()
+      if (!scope.isAdmin) {
+        const expectedCompanyId = scope.companyId ?? 'general'
+        if (parts[0] !== expectedCompanyId) throw new Error('Invalid storage path')
+      }
     }
     const { data: urlData, error } = await supabaseAdmin.storage
       .from('documents')
