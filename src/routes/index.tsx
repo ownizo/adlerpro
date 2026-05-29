@@ -1,10 +1,24 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, redirect, Link } from '@tanstack/react-router'
+import { getServerUser, getServerHostname } from '@/lib/auth'
 import { useIdentity } from '@/lib/identity-context'
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/lib/i18n'
 
 export const Route = createFileRoute('/')({
+  beforeLoad: async () => {
+    const hostname = typeof window !== 'undefined'
+      ? window.location.hostname
+      : await getServerHostname()
+
+    if (hostname === 'admin.adlerrochefort.com') {
+      throw redirect({ to: '/login' })
+    }
+    if (hostname === 'one.adlerrochefort.com') {
+      const user = await getServerUser()
+      throw redirect({ to: user ? '/one/dashboard' : '/one/' })
+    }
+  },
   component: LandingPage,
 })
 
@@ -47,19 +61,6 @@ function LandingPage() {
   const portalLink = ready && user ? '/dashboard' : '/login'
   const [lang, setLang] = useState(i18n.language)
   const handleLang = (l: string) => { i18n.changeLanguage(l); setLang(l) }
-
-  // Redirecionar admin.adlerrochefort.com → /admin (ou /login se não autenticado)
-  // Redirecionar one.adlerrochefort.com   → /one/dashboard (ou /one/login se não autenticado)
-  useEffect(() => {
-    if (!ready) return
-    if (typeof window === 'undefined') return
-    const host = window.location.hostname
-    if (host === 'admin.adlerrochefort.com') {
-      window.location.replace(user ? '/admin' : '/login')
-    } else if (host === 'one.adlerrochefort.com') {
-      window.location.replace(user ? '/one/dashboard' : '/one/')
-    }
-  }, [ready, user])
 
   return (
     <div className="min-h-screen bg-white text-primary" style={{ overflowX: 'hidden' as const }}>
