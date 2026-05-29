@@ -3,6 +3,12 @@ import { supabaseAdmin } from './supabase-admin'
 import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
 import type { User } from './identity-context'
 
+export const getServerHostname = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<string | null> => {
+    return getRequestHeader('x-forwarded-host') ?? getRequestHeader('host') ?? null
+  }
+)
+
 export type { User as IdentityUser }
 
 function parseCookieValue(value: string): string | null {
