@@ -10,7 +10,7 @@ export const Route = createFileRoute('/one/policies')({
 })
 
 const navy = '#0A1628'
-const gold  = '#C9A84C'
+const gold  = 'var(--color-accent)'
 
 interface Policy {
   id: string
@@ -60,11 +60,11 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  ativa:     { bg: '#EAF3DE', color: '#3B6D11', label: 'Ativa'     },
-  active:    { bg: '#EAF3DE', color: '#3B6D11', label: 'Ativa'     },
-  expiring:  { bg: '#FAEEDA', color: '#854F0B', label: 'A Renovar' },
-  expired:   { bg: '#FEE2E2', color: '#991B1B', label: 'Expirada'  },
-  cancelled: { bg: '#F3F4F6', color: '#6B7280', label: 'Cancelada' },
+  ativa:     { bg: 'var(--status-success-bg)', color: 'var(--status-success-text)', label: 'Ativa'     },
+  active:    { bg: 'var(--status-success-bg)', color: 'var(--status-success-text)', label: 'Ativa'     },
+  expiring:  { bg: 'var(--status-warning-bg)', color: 'var(--status-warning-text)', label: 'A Renovar' },
+  expired:   { bg: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', label: 'Expirada'  },
+  cancelled: { bg: 'var(--status-neutral-bg)', color: 'var(--status-neutral-text)', label: 'Cancelada' },
 }
 
 function daysUntil(dateStr: string): number {
@@ -138,7 +138,7 @@ function OnePolicies() {
         <>
           <div style={{ marginBottom: '1.75rem' }}>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>As Suas Apólices</h1>
-            <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', marginTop: '0.3rem' }}>
               {policies.length} apólice{policies.length !== 1 ? 's' : ''} registada{policies.length !== 1 ? 's' : ''}
             </p>
           </div>
@@ -167,7 +167,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
   const [previewName, setPreviewName] = useState('')
   const docFileRef = useRef<HTMLInputElement>(null)
 
-  const st = STATUS_STYLE[policy.status] ?? { bg: '#F3F4F6', color: '#6B7280', label: policy.status }
+  const st = STATUS_STYLE[policy.status] ?? { bg: 'var(--status-neutral-bg)', color: 'var(--status-neutral-text)', label: policy.status }
   const typeLabel = TYPE_LABELS[policy.type] ?? policy.type
   const days = policy.end_date ? daysUntil(policy.end_date) : null
   const urgency = days !== null && days <= 14 ? '#EF4444' : days !== null && days <= 30 ? '#F59E0B' : gold
@@ -251,7 +251,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
 
   return (
     <>
-      <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ background: 'var(--color-base)', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
         <button
           onClick={handleExpand}
           style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '1rem 1.25rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}
@@ -261,7 +261,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
               <span style={{ fontSize: '0.88rem', fontWeight: 700, color: navy }}>{typeLabel}</span>
               <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.55rem', borderRadius: 20, background: st.bg, color: st.color }}>{st.label}</span>
             </div>
-            <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '0.2rem 0 0' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', margin: '0.2rem 0 0' }}>
               {policy.insurer}{policy.policy_number ? ` · ${policy.policy_number}` : ''}
             </p>
           </div>
@@ -269,7 +269,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
             {policy.annual_premium > 0 && (
               <p style={{ fontSize: '0.9rem', fontWeight: 700, color: navy, margin: 0 }}>
                 {formatCurrency(policy.annual_premium)}
-                <span style={{ fontSize: '0.65rem', fontWeight: 400, color: '#94A3B8' }}>/ano</span>
+                <span style={{ fontSize: '0.65rem', fontWeight: 400, color: 'var(--color-muted)' }}>/ano</span>
               </p>
             )}
             {days !== null && (
@@ -281,13 +281,13 @@ function PolicyCard({ policy }: { policy: Policy }) {
         </button>
 
         {expanded && (
-          <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC' }}>
+          <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: 'var(--color-surface)' }}>
             {policy.emergency_contacts && (
-              <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.85rem', background: '#FEF9EC', border: '1px solid #F3D978', borderRadius: 6, display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
+              <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.85rem', background: 'var(--status-warning-bg)', border: '1px solid #F3D978', borderRadius: 6, display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
                 <span style={{ fontSize: '1rem' }}>📞</span>
                 <div>
-                  <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#92690A', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>Assistência</p>
-                  <p style={{ fontSize: '0.82rem', color: '#7A5500', fontWeight: 500, margin: '0.1rem 0 0' }}>{policy.emergency_contacts}</p>
+                  <p style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--status-warning-text)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>Assistência</p>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--status-warning-text)', fontWeight: 500, margin: '0.1rem 0 0' }}>{policy.emergency_contacts}</p>
                 </div>
               </div>
             )}
@@ -302,36 +302,36 @@ function PolicyCard({ policy }: { policy: Policy }) {
             {/* Documentos da apólice */}
             <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '0.85rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
-                <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
+                <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
                   Documentos {docs.length > 0 ? `(${docs.length})` : ''}
                 </p>
-                <label style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.28rem 0.65rem', background: uploading ? '#94A3B8' : navy, color: '#fff', borderRadius: 6, cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: "'Montserrat', sans-serif", display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                <label style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.28rem 0.65rem', background: uploading ? 'var(--color-muted)' : navy, color: '#fff', borderRadius: 6, cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: "'Montserrat', sans-serif", display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
                   {uploading ? <><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'one-spin 0.75s linear infinite' }} /> A carregar…</> : '+ Adicionar'}
                   <input ref={docFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style={{ display: 'none' }} disabled={uploading} onChange={e => handleDocUpload(e.target.files)} />
                 </label>
               </div>
-              {uploadMsg && <p style={{ fontSize: '0.75rem', color: '#16A34A', fontWeight: 600, margin: '0 0 0.5rem' }}>✓ {uploadMsg}</p>}
+              {uploadMsg && <p style={{ fontSize: '0.75rem', color: 'var(--status-success-text)', fontWeight: 600, margin: '0 0 0.5rem' }}>✓ {uploadMsg}</p>}
               {docsLoading ? (
                 <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
                   <div style={{ width: 18, height: 18, border: `2px solid ${gold}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'one-spin 0.75s linear infinite' }} />
                 </div>
               ) : docs.length === 0 ? (
-                <p style={{ fontSize: '0.78rem', color: '#94A3B8', textAlign: 'center', padding: '0.75rem 0', margin: 0 }}>Sem documentos para esta apólice.</p>
+                <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', textAlign: 'center', padding: '0.75rem 0', margin: 0 }}>Sem documentos para esta apólice.</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                   {docs.map(doc => {
                     const isPdf = doc.name.toLowerCase().endsWith('.pdf')
                     const isImg = /\.(jpg|jpeg|png|webp)$/i.test(doc.name)
                     return (
-                      <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.45rem 0.7rem', background: '#fff', border: '1px solid #E2E8F0', borderRadius: 6 }}>
+                      <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', padding: '0.45rem 0.7rem', background: 'var(--color-base)', border: '1px solid #E2E8F0', borderRadius: 6 }}>
                         <span style={{ fontSize: '1rem', flexShrink: 0 }}>{isPdf ? '📄' : isImg ? '🖼️' : '📎'}</span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p style={{ fontSize: '0.78rem', fontWeight: 600, color: navy, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</p>
-                          <p style={{ fontSize: '0.65rem', color: '#94A3B8', margin: 0 }}>{formatDocSize(doc.size)}</p>
+                          <p style={{ fontSize: '0.65rem', color: 'var(--color-muted)', margin: 0 }}>{formatDocSize(doc.size)}</p>
                         </div>
                         <button
                           onClick={() => handleDocPreview(doc)}
-                          style={{ padding: '0.25rem 0.6rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, flexShrink: 0, fontFamily: "'Montserrat', sans-serif" }}
+                          style={{ padding: '0.25rem 0.6rem', background: 'var(--status-info-bg)', color: 'var(--status-info-text)', border: '1px solid #BFDBFE', borderRadius: 6, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, flexShrink: 0, fontFamily: "'Montserrat', sans-serif" }}
                         >Ver</button>
                       </div>
                     )
@@ -350,14 +350,14 @@ function PolicyCard({ policy }: { policy: Policy }) {
           onClick={() => setPreviewUrl(null)}
         >
           <div
-            style={{ background: '#fff', borderRadius: 8, width: '100%', maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            style={{ background: 'var(--color-base)', borderRadius: 8, width: '100%', maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ fontWeight: 600, fontSize: '0.85rem', color: navy, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{previewName}</p>
               <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                <a href={previewUrl} target="_blank" rel="noreferrer" style={{ padding: '0.3rem 0.75rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, textDecoration: 'none', fontSize: '0.78rem', fontWeight: 600 }}>Abrir</a>
-                <button onClick={() => setPreviewUrl(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: '1.25rem' }}>×</button>
+                <a href={previewUrl} target="_blank" rel="noreferrer" style={{ padding: '0.3rem 0.75rem', background: 'var(--status-info-bg)', color: 'var(--status-info-text)', border: '1px solid #BFDBFE', borderRadius: 6, textDecoration: 'none', fontSize: '0.78rem', fontWeight: 600 }}>Abrir</a>
+                <button onClick={() => setPreviewUrl(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '1.25rem' }}>×</button>
               </div>
             </div>
             <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -377,7 +377,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
 function DetailItem({ label, value, span }: { label: string; value: string; span?: boolean }) {
   return (
     <div style={{ gridColumn: span ? '1 / -1' : undefined }}>
-      <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>{label}</p>
+      <p style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>{label}</p>
       <p style={{ fontSize: '0.8rem', color: navy, fontWeight: 500, margin: '0.1rem 0 0' }}>{value}</p>
     </div>
   )
@@ -393,12 +393,12 @@ function Spinner() {
 }
 
 function ErrorMsg({ msg }: { msg: string }) {
-  return <div style={{ padding: '2rem', textAlign: 'center', color: '#B91C1C', fontSize: '0.9rem' }}>{msg}</div>
+  return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--status-danger-text)', fontSize: '0.9rem' }}>{msg}</div>
 }
 
 function EmptyState({ msg }: { msg: string }) {
   return (
-    <div style={{ padding: '2.5rem', textAlign: 'center', background: '#fff', borderRadius: 8, border: '1px solid #E2E8F0', color: '#94A3B8', fontSize: '0.85rem' }}>
+    <div style={{ padding: '2.5rem', textAlign: 'center', background: 'var(--color-base)', borderRadius: 8, border: '1px solid #E2E8F0', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
       {msg}
     </div>
   )

@@ -42,37 +42,37 @@ const font = "'Montserrat', sans-serif"
 
 function ExtractedDataCard({ data, name, t }: { data: Record<string, any>; name: string; t: (k: string, opts?: any) => string }) {
   return (
-    <div style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '4px', padding: '1rem', marginTop: '0.75rem' }}>
-      <p style={{ fontFamily: font, fontSize: '0.65rem', fontWeight: 700, color: '#166534', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.6rem' }}>
+    <div style={{ background: 'var(--status-success-bg)', border: '1px solid #BBF7D0', borderRadius: '4px', padding: '1rem', marginTop: '0.75rem' }}>
+      <p style={{ fontFamily: font, fontSize: '0.65rem', fontWeight: 700, color: 'var(--status-success-text)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 0.6rem' }}>
         {t('comparison.extracted', { name })}
       </p>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem 1rem', marginBottom: '0.6rem' }}>
-        {data.insurer && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.insurer')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{data.insurer}</p></div>}
-        {data.policyNumber && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.policyNumber')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{data.policyNumber}</p></div>}
-        {data.annualPremium > 0 && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.annualPremium')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 700, color: '#111', margin: 0 }}>{formatCurrency(data.annualPremium)}</p></div>}
-        {data.insuredValue > 0 && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.insuredValue')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{formatCurrency(data.insuredValue)}</p></div>}
-        {data.startDate && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.startDate')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{formatDate(data.startDate)}</p></div>}
-        {data.endDate && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: '#aaa', margin: 0 }}>{t('comparison.endDate')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: '#111', margin: 0 }}>{formatDate(data.endDate)}</p></div>}
+        {data.insurer && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: 'var(--color-label-light)', margin: 0 }}>{t('comparison.insurer')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-primary)', margin: 0 }}>{data.insurer}</p></div>}
+        {data.policyNumber && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: 'var(--color-label-light)', margin: 0 }}>{t('comparison.policyNumber')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-primary)', margin: 0 }}>{data.policyNumber}</p></div>}
+        {data.annualPremium > 0 && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: 'var(--color-label-light)', margin: 0 }}>{t('comparison.annualPremium')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 700, color: 'var(--color-primary)', margin: 0 }}>{formatCurrency(data.annualPremium)}</p></div>}
+        {data.insuredValue > 0 && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: 'var(--color-label-light)', margin: 0 }}>{t('comparison.insuredValue')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-primary)', margin: 0 }}>{formatCurrency(data.insuredValue)}</p></div>}
+        {data.startDate && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: 'var(--color-label-light)', margin: 0 }}>{t('comparison.startDate')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-primary)', margin: 0 }}>{formatDate(data.startDate)}</p></div>}
+        {data.endDate && <div><p style={{ fontFamily: font, fontSize: '0.6rem', color: 'var(--color-label-light)', margin: 0 }}>{t('comparison.endDate')}</p><p style={{ fontFamily: font, fontSize: '0.78rem', fontWeight: 600, color: 'var(--color-primary)', margin: 0 }}>{formatDate(data.endDate)}</p></div>}
       </div>
       {data.coverages?.length > 0 && (
         <div style={{ marginBottom: '0.4rem' }}>
-          <p style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 700, color: '#166534', margin: '0 0 0.25rem' }}>{t('comparison.coverages')}</p>
+          <p style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 700, color: 'var(--status-success-text)', margin: '0 0 0.25rem' }}>{t('comparison.coverages')}</p>
           <ul style={{ margin: 0, paddingLeft: '1rem' }}>
             {data.coverages.slice(0, 4).map((c: string, i: number) => (
-              <li key={i} style={{ fontFamily: font, fontSize: '0.72rem', color: '#333', marginBottom: '0.15rem' }}>{c}</li>
+              <li key={i} style={{ fontFamily: font, fontSize: '0.72rem', color: 'var(--color-secondary)', marginBottom: '0.15rem' }}>{c}</li>
             ))}
-            {data.coverages.length > 4 && <li style={{ fontFamily: font, fontSize: '0.72rem', color: '#999' }}>{t('comparison.moreItems', { count: data.coverages.length - 4 })}</li>}
+            {data.coverages.length > 4 && <li style={{ fontFamily: font, fontSize: '0.72rem', color: 'var(--color-subtle)' }}>{t('comparison.moreItems', { count: data.coverages.length - 4 })}</li>}
           </ul>
         </div>
       )}
       {data.exclusions?.length > 0 && (
         <div>
-          <p style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 700, color: '#991B1B', margin: '0 0 0.25rem' }}>{t('comparison.exclusions')}</p>
+          <p style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 700, color: 'var(--status-danger-text)', margin: '0 0 0.25rem' }}>{t('comparison.exclusions')}</p>
           <ul style={{ margin: 0, paddingLeft: '1rem' }}>
             {data.exclusions.slice(0, 3).map((e: string, i: number) => (
-              <li key={i} style={{ fontFamily: font, fontSize: '0.72rem', color: '#555', marginBottom: '0.15rem' }}>{e}</li>
+              <li key={i} style={{ fontFamily: font, fontSize: '0.72rem', color: 'var(--color-body)', marginBottom: '0.15rem' }}>{e}</li>
             ))}
-            {data.exclusions.length > 3 && <li style={{ fontFamily: font, fontSize: '0.72rem', color: '#999' }}>{t('comparison.moreItems', { count: data.exclusions.length - 3 })}</li>}
+            {data.exclusions.length > 3 && <li style={{ fontFamily: font, fontSize: '0.72rem', color: 'var(--color-subtle)' }}>{t('comparison.moreItems', { count: data.exclusions.length - 3 })}</li>}
           </ul>
         </div>
       )}
@@ -99,22 +99,22 @@ function ComparisonTable({ quotes, recommendedIndex, t }: { quotes: QuoteEntry[]
     <div style={{ overflowX: 'auto', marginBottom: '1.5rem' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: font }}>
         <thead>
-          <tr style={{ background: '#f8f8f8' }}>
-            <th style={{ padding: '0.6rem 0.85rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #eee', width: colWidth }}>
+          <tr style={{ background: 'var(--color-surface)' }}>
+            <th style={{ padding: '0.6rem 0.85rem', textAlign: 'left', fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-label)', textTransform: 'uppercase', letterSpacing: '0.06em', borderBottom: '1px solid #eee', width: colWidth }}>
               {t('comparison.metric')}
             </th>
             {done.map((q, i) => {
               const isRec = i === recommendedIndex
               return (
-                <th key={i} style={{ padding: '0.6rem 0.85rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 700, color: isRec ? '#166534' : '#333', borderBottom: `2px solid ${isRec ? '#22C55E' : '#eee'}`, background: isRec ? '#F0FDF4' : '#f8f8f8', width: colWidth }}>
+                <th key={i} style={{ padding: '0.6rem 0.85rem', textAlign: 'center', fontSize: '0.72rem', fontWeight: 700, color: isRec ? 'var(--status-success-text)' : '#333', borderBottom: `2px solid ${isRec ? 'var(--status-success-text)' : 'var(--color-border)'}`, background: isRec ? 'var(--status-success-bg)' : '#f8f8f8', width: colWidth }}>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
                     {isRec && (
-                      <span style={{ background: '#16A34A', color: '#fff', fontSize: '0.55rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '20px', letterSpacing: '0.06em' }}>
+                      <span style={{ background: 'var(--status-success-text)', color: '#fff', fontSize: '0.55rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '20px', letterSpacing: '0.06em' }}>
                         {t('comparison.recommended')}
                       </span>
                     )}
                     <span>{q.data?.insurer || `${t('comparison.quote')} ${i + 1}`}</span>
-                    <span style={{ fontWeight: 300, fontSize: '0.65rem', color: '#999' }}>{q.file.name}</span>
+                    <span style={{ fontWeight: 300, fontSize: '0.65rem', color: 'var(--color-subtle)' }}>{q.file.name}</span>
                   </div>
                 </th>
               )
@@ -152,8 +152,8 @@ function ComparisonTable({ quotes, recommendedIndex, t }: { quotes: QuoteEntry[]
               bestLabel: t('comparison.bestMoreCov'),
             },
           ].map((row, ri) => (
-            <tr key={ri} style={{ borderBottom: '1px solid #f5f5f5' }}>
-              <td style={{ padding: '0.6rem 0.85rem', fontSize: '0.72rem', fontWeight: 600, color: '#555' }}>
+            <tr key={ri} style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <td style={{ padding: '0.6rem 0.85rem', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-body)' }}>
                 {row.label}
               </td>
               {row.values.map((v, ci) => {
@@ -161,11 +161,11 @@ function ComparisonTable({ quotes, recommendedIndex, t }: { quotes: QuoteEntry[]
                 const isRec = ci === recommendedIndex
                 return (
                   <td key={ci} style={{ padding: '0.6rem 0.85rem', textAlign: 'center', background: isRec ? '#FAFFF7' : 'transparent' }}>
-                    <span style={{ fontSize: '0.82rem', fontWeight: isBest ? 700 : 400, color: isBest ? '#166534' : '#333' }}>
+                    <span style={{ fontSize: '0.82rem', fontWeight: isBest ? 700 : 400, color: isBest ? 'var(--status-success-text)' : '#333' }}>
                       {row.format(v)}
                     </span>
                     {isBest && (
-                      <span style={{ display: 'block', fontSize: '0.55rem', color: '#16A34A', fontWeight: 600, marginTop: '0.1rem' }}>
+                      <span style={{ display: 'block', fontSize: '0.55rem', color: 'var(--status-success-text)', fontWeight: 600, marginTop: '0.1rem' }}>
                         ↑ {row.bestLabel}
                       </span>
                     )}
@@ -187,7 +187,7 @@ function RecommendationCard({ result, quotes, t }: { result: CompareResult; quot
 
   return (
     <div style={{ border: '2px solid #16A34A', borderRadius: '4px', overflow: 'hidden', marginBottom: '1.5rem' }}>
-      <div style={{ background: '#16A34A', padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div style={{ background: 'var(--status-success-text)', padding: '0.85rem 1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         <span style={{ fontSize: '1.25rem' }}>✦</span>
         <div>
           <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.9rem', color: '#fff', margin: 0 }}>
@@ -199,15 +199,15 @@ function RecommendationCard({ result, quotes, t }: { result: CompareResult; quot
         </div>
       </div>
 
-      <div style={{ padding: '1rem 1.25rem', background: '#F0FDF4' }}>
-        <p style={{ fontFamily: font, fontSize: '0.82rem', color: '#166534', fontWeight: 500, margin: '0 0 0.75rem', lineHeight: 1.5 }}>
+      <div style={{ padding: '1rem 1.25rem', background: 'var(--status-success-bg)' }}>
+        <p style={{ fontFamily: font, fontSize: '0.82rem', color: 'var(--status-success-text)', fontWeight: 500, margin: '0 0 0.75rem', lineHeight: 1.5 }}>
           {result.reason}
         </p>
 
         {result.highlights?.length > 0 && (
           <ul style={{ margin: '0 0 0.75rem', paddingLeft: 0, listStyle: 'none' }}>
             {result.highlights.map((h, i) => (
-              <li key={i} style={{ fontFamily: font, fontSize: '0.78rem', color: '#166534', marginBottom: '0.3rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
+              <li key={i} style={{ fontFamily: font, fontSize: '0.78rem', color: 'var(--status-success-text)', marginBottom: '0.3rem', display: 'flex', alignItems: 'flex-start', gap: '0.4rem' }}>
                 <span style={{ flexShrink: 0, marginTop: '0.1rem' }}>✓</span>
                 {h}
               </li>
@@ -217,13 +217,13 @@ function RecommendationCard({ result, quotes, t }: { result: CompareResult; quot
 
         {result.warnings && Object.keys(result.warnings).length > 0 && (
           <div style={{ borderTop: '1px solid #BBF7D0', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
-            <p style={{ fontFamily: font, fontSize: '0.65rem', fontWeight: 700, color: '#999', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.4rem' }}>
+            <p style={{ fontFamily: font, fontSize: '0.65rem', fontWeight: 700, color: 'var(--color-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.4rem' }}>
               {t('comparison.otherOptions')}
             </p>
             {Object.entries(result.warnings).map(([idx, warning]) => {
               const q = done[Number(idx)]
               return (
-                <p key={idx} style={{ fontFamily: font, fontSize: '0.75rem', color: '#666', margin: '0 0 0.2rem' }}>
+                <p key={idx} style={{ fontFamily: font, fontSize: '0.75rem', color: 'var(--color-muted)', margin: '0 0 0.2rem' }}>
                   <strong>{q?.data?.insurer || `${t('comparison.quote')} ${Number(idx) + 1}`}:</strong> {warning}
                 </p>
               )
@@ -362,7 +362,7 @@ Respond with this exact JSON (no markdown, no extra text):
 
       const DARK = '#111111'
       const GOLD = '#C8961A'
-      const GREEN = '#166534'
+      const GREEN = 'var(--status-success-text)'
       const LIGHT = '#888888'
       const FOOTER_COLOR: [number, number, number] = [136, 136, 136]
 
@@ -596,8 +596,8 @@ Respond with this exact JSON (no markdown, no extra text):
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '1.75rem', gap: '1rem' }}>
           <div>
-            <h1 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: '#111', margin: 0 }}>{t('comparison.title')}</h1>
-            <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.85rem', color: '#666', marginTop: '0.35rem' }}>
+            <h1 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: 'var(--color-primary)', margin: 0 }}>{t('comparison.title')}</h1>
+            <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.85rem', color: 'var(--color-muted)', marginTop: '0.35rem' }}>
               {t('comparison.subtitle')}
             </p>
           </div>
@@ -612,7 +612,7 @@ Respond with this exact JSON (no markdown, no extra text):
                   {exporting ? t('comparison.exportingPdf') : t('comparison.exportPdf')}
                 </button>
               )}
-              <button onClick={handleReset} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.78rem', padding: '0.45rem 0.85rem', background: 'none', color: '#666', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              <button onClick={handleReset} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.78rem', padding: '0.45rem 0.85rem', background: 'none', color: 'var(--color-muted)', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                 {t('comparison.reset')}
               </button>
             </div>
@@ -621,33 +621,33 @@ Respond with this exact JSON (no markdown, no extra text):
 
         {/* Cotações já adicionadas */}
         {quotes.map((q, idx) => (
-          <div key={idx} style={{ background: '#fff', border: '1px solid #eee', borderRadius: '4px', padding: '1rem 1.25rem', marginBottom: '0.75rem' }}>
+          <div key={idx} style={{ background: 'var(--color-base)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '1rem 1.25rem', marginBottom: '0.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
                 <div style={{
                   width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '0.7rem', fontWeight: 700, fontFamily: font,
-                  background: q.status === 'done' ? '#EAF3DE' : q.status === 'error' ? '#FEE2E2' : '#f0f0f0',
-                  color: q.status === 'done' ? '#166534' : q.status === 'error' ? '#991B1B' : '#888',
+                  background: q.status === 'done' ? 'var(--status-success-bg)' : q.status === 'error' ? 'var(--status-danger-bg)' : '#f0f0f0',
+                  color: q.status === 'done' ? 'var(--status-success-text)' : q.status === 'error' ? 'var(--status-danger-text)' : '#888',
                 }}>
                   {q.status === 'done' ? '✓' : q.status === 'error' ? '✕' : idx + 1}
                 </div>
                 <div>
-                  <p style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', color: '#111', margin: 0 }}>{q.file.name}</p>
-                  <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.72rem', color: '#999', margin: 0 }}>{formatFileSize(q.file.size)}</p>
+                  <p style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', color: 'var(--color-primary)', margin: 0 }}>{q.file.name}</p>
+                  <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.72rem', color: 'var(--color-subtle)', margin: 0 }}>{formatFileSize(q.file.size)}</p>
                 </div>
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 {q.status === 'analyzing' && (
-                  <span style={{ fontFamily: font, fontSize: '0.72rem', color: '#C8961A', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <span style={{ fontFamily: font, fontSize: '0.72rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                     <span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #C8961A', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                     {t('comparison.analyzing')}
                   </span>
                 )}
                 {q.status === 'done' && (
-                  <span style={{ fontFamily: font, fontSize: '0.72rem', fontWeight: 600, color: '#166534' }}>{t('comparison.analyzed')}</span>
+                  <span style={{ fontFamily: font, fontSize: '0.72rem', fontWeight: 600, color: 'var(--status-success-text)' }}>{t('comparison.analyzed')}</span>
                 )}
                 {q.status === 'error' && (
-                  <span style={{ fontFamily: font, fontSize: '0.72rem', color: '#dc2626' }}>{q.error}</span>
+                  <span style={{ fontFamily: font, fontSize: '0.72rem', color: 'var(--status-danger-text)' }}>{q.error}</span>
                 )}
                 {(q.status === 'done' || q.status === 'error') && !isAnalyzing && !compareResult && (
                   <button onClick={() => handleRemoveQuote(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: '1.1rem', lineHeight: 1, padding: '0.1rem' }} title="Remover">×</button>
@@ -662,27 +662,27 @@ Respond with this exact JSON (no markdown, no extra text):
 
         {/* Adicionar próxima cotação */}
         {canAddMore && (
-          <div style={{ background: '#fff', border: '1.5px dashed #ddd', borderRadius: '4px', padding: '1.25rem', marginBottom: '0.75rem' }}>
-            <p style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', color: '#555', margin: '0 0 0.75rem' }}>
+          <div style={{ background: 'var(--color-base)', border: '1.5px dashed var(--color-border)', borderRadius: '4px', padding: '1.25rem', marginBottom: '0.75rem' }}>
+            <p style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', color: 'var(--color-body)', margin: '0 0 0.75rem' }}>
               {t('comparison.quote')} {quotes.length + 1}
-              <span style={{ fontWeight: 300, color: '#999' }}> {t('comparison.quoteMandatory')}</span>
+              <span style={{ fontWeight: 300, color: 'var(--color-subtle)' }}> {t('comparison.quoteMandatory')}</span>
             </p>
             {!pendingFile ? (
-              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontFamily: font, fontWeight: 600, fontSize: '0.82rem', padding: '0.55rem 1rem', background: '#f5f5f5', color: '#333', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontFamily: font, fontWeight: 600, fontSize: '0.82rem', padding: '0.55rem 1rem', background: 'var(--color-elevated)', color: 'var(--color-secondary)', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer' }}>
                 {t('comparison.selectFile')}
                 <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleFileSelect} style={{ display: 'none' }} />
               </label>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: '#f8f8f8', border: '1px solid #eee', borderRadius: '4px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 0.75rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px' }}>
                   <span>📄</span>
                   <div>
-                    <p style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', color: '#333', margin: 0 }}>{pendingFile.name}</p>
-                    <p style={{ fontFamily: font, fontSize: '0.72rem', color: '#999', margin: 0 }}>{formatFileSize(pendingFile.size)}</p>
+                    <p style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', color: 'var(--color-secondary)', margin: 0 }}>{pendingFile.name}</p>
+                    <p style={{ fontFamily: font, fontSize: '0.72rem', color: 'var(--color-subtle)', margin: 0 }}>{formatFileSize(pendingFile.size)}</p>
                   </div>
                   <button onClick={() => setPendingFile(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#bbb', fontSize: '1.1rem', lineHeight: 1, marginLeft: '0.25rem' }}>×</button>
                 </div>
-                <button onClick={handleAnalyze} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', padding: '0.55rem 1.1rem', background: '#111', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <button onClick={handleAnalyze} style={{ fontFamily: font, fontWeight: 600, fontSize: '0.82rem', padding: '0.55rem 1.1rem', background: 'var(--color-inverse)', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   {t('comparison.analyze')}
                 </button>
               </div>
@@ -692,7 +692,7 @@ Respond with this exact JSON (no markdown, no extra text):
 
         {/* Indicação de progresso */}
         {!canCompare && doneQuotes.length < 2 && quotes.length > 0 && !isAnalyzing && !compareResult && (
-          <p style={{ fontFamily: font, fontSize: '0.78rem', color: '#999', margin: '0.25rem 0 0.75rem' }}>
+          <p style={{ fontFamily: font, fontSize: '0.78rem', color: 'var(--color-subtle)', margin: '0.25rem 0 0.75rem' }}>
             {t('comparison.canCompareHint', { count: 2 - doneQuotes.length })}
           </p>
         )}
@@ -709,13 +709,13 @@ Respond with this exact JSON (no markdown, no extra text):
                 ? <><span style={{ display: 'inline-block', width: '14px', height: '14px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />{t('comparison.comparing')}</>
                 : <>{t('comparison.compare', { count: doneQuotes.length })}</>}
             </button>
-            {comparing && <span style={{ fontFamily: font, fontSize: '0.78rem', color: '#999' }}>{t('comparison.comparingHint')}</span>}
+            {comparing && <span style={{ fontFamily: font, fontSize: '0.78rem', color: 'var(--color-subtle)' }}>{t('comparison.comparingHint')}</span>}
           </div>
         )}
 
         {/* Erro de comparação */}
         {compareError && (
-          <div style={{ padding: '0.75rem 1rem', background: '#fff5f5', border: '1px solid #fecaca', borderRadius: '4px', fontFamily: font, fontSize: '0.82rem', color: '#dc2626', marginBottom: '1rem' }}>
+          <div style={{ padding: '0.75rem 1rem', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger-border)', borderRadius: '4px', fontFamily: font, fontSize: '0.82rem', color: 'var(--status-danger-text)', marginBottom: '1rem' }}>
             ⚠️ {compareError}
           </div>
         )}
@@ -724,11 +724,11 @@ Respond with this exact JSON (no markdown, no extra text):
         {compareResult && (
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.5rem 0 1.25rem' }}>
-              <div style={{ flex: 1, height: '1px', background: '#eee' }} />
-              <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.72rem', color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0, whiteSpace: 'nowrap' }}>
+              <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
+              <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.72rem', color: 'var(--color-label-light)', textTransform: 'uppercase', letterSpacing: '0.1em', margin: 0, whiteSpace: 'nowrap' }}>
                 {t('comparison.summaryTitle')}
               </p>
-              <div style={{ flex: 1, height: '1px', background: '#eee' }} />
+              <div style={{ flex: 1, height: '1px', background: 'var(--color-border)' }} />
               <button
                 onClick={exportPdf}
                 disabled={exporting}
@@ -739,8 +739,8 @@ Respond with this exact JSON (no markdown, no extra text):
             </div>
 
             {/* Tabela comparativa */}
-            <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '4px', padding: '1.25rem', marginBottom: '1rem' }}>
-              <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.72rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 1rem' }}>
+            <div style={{ background: 'var(--color-base)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '1.25rem', marginBottom: '1rem' }}>
+              <p style={{ fontFamily: font, fontWeight: 700, fontSize: '0.72rem', color: 'var(--color-label)', textTransform: 'uppercase', letterSpacing: '0.08em', margin: '0 0 1rem' }}>
                 {t('comparison.comparisonTable')}
               </p>
               <ComparisonTable quotes={quotes} recommendedIndex={compareResult.recommendedIndex} t={t} />
@@ -750,7 +750,7 @@ Respond with this exact JSON (no markdown, no extra text):
             <RecommendationCard result={compareResult} quotes={quotes} t={t} />
 
             {/* Disclaimer */}
-            <p style={{ fontFamily: font, fontSize: '0.68rem', fontWeight: 300, color: '#aaaaaa', lineHeight: 1.6, marginTop: '1rem', padding: '0 0.25rem' }}>
+            <p style={{ fontFamily: font, fontSize: '0.68rem', fontWeight: 300, color: 'var(--color-label-light)', lineHeight: 1.6, marginTop: '1rem', padding: '0 0.25rem' }}>
               {t('comparison.disclaimer')}
             </p>
           </div>

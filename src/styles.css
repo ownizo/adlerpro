@@ -19,16 +19,16 @@
   --color-badge-review-text: #854F0B;
 
   /* Semantic tokens */
-  --color-base:         #FFFFFF;
-  --color-surface:      #F8F8F8;
-  --color-elevated:     #EEEEEE;
+  --color-base:          #FFFFFF;
+  --color-surface:       #F8F8F8;
+  --color-elevated:      #EEEEEE;
   --color-inverse:       #111111;
   --color-inverse-hover: #333333;
   --color-accent:        #C8961A;
-  --color-accent-hover: #D4A83A;
-  --color-accent-muted: #FAEEDA;
-  --color-secondary:    #333333;
-  --color-subtle:       #999999;
+  --color-accent-hover:  #D4A83A;
+  --color-accent-muted:  #FAEEDA;
+  --color-secondary:     #333333;
+  --color-subtle:        #999999;
 
   /* Legacy color mappings for components that still reference navy/gold */
   --color-navy-50: #f8f8f8;
@@ -56,7 +56,26 @@
   --color-gold-950: #321f0f;
 }
 
-/* ─── DARK MODE ───────────────────────────────────────────── */
+/* ─── STATUS TOKENS (light defaults) ─────────────────────────── */
+:root {
+  --status-success-bg:     #EAF3DE;
+  --status-success-text:   #3B6D11;
+  --status-success-border: #A8D5A2;
+  --status-warning-bg:     #FAEEDA;
+  --status-warning-text:   #854F0B;
+  --status-warning-border: #E8C080;
+  --status-danger-bg:      #FEE2E2;
+  --status-danger-text:    #991B1B;
+  --status-danger-border:  #FECACA;
+  --status-info-bg:        #DBEAFE;
+  --status-info-text:      #1D4ED8;
+  --status-info-border:    #BFDBFE;
+  --status-neutral-bg:     #F3F4F6;
+  --status-neutral-text:   #4B5563;
+  --status-neutral-border: #D1D5DB;
+}
+
+/* ─── DARK MODE ───────────────────────────────────────────────── */
 /* Referência: GitHub dark, Linear, Notion — luminância elevada, hue neutro frio */
 [data-theme="dark"] {
   /* Semantic tokens */
@@ -81,11 +100,28 @@
   --color-border-strong: #54565E;
   --color-body:          #B8BAC1;
 
-  /* Badge status */
+  /* Badge status (legacy) */
   --color-badge-active-bg:    #142408;
   --color-badge-active-text:  #7AC142;
   --color-badge-review-bg:    #261A06;
   --color-badge-review-text:  #D4943A;
+
+  /* Status tokens — dark equivalents */
+  --status-success-bg:     #142408;
+  --status-success-text:   #7AC142;
+  --status-success-border: #1E4A10;
+  --status-warning-bg:     #261A06;
+  --status-warning-text:   #D4943A;
+  --status-warning-border: #3D2A08;
+  --status-danger-bg:      #280C0C;
+  --status-danger-text:    #F87171;
+  --status-danger-border:  #3A1010;
+  --status-info-bg:        #0C1A2E;
+  --status-info-text:      #60A5FA;
+  --status-info-border:    #0E2040;
+  --status-neutral-bg:     #2C2D32;
+  --status-neutral-text:   #8A8C94;
+  --status-neutral-border: #34353B;
 
   /* Navy scale — inversão neutra fria */
   --color-navy-50:  #232428;
@@ -112,6 +148,31 @@
   --color-gold-800: #DCB554;
   --color-gold-900: #DCB554;
   --color-gold-950: #DCB554;
+}
+
+/* ─── STATUS UTILITY CLASSES ─────────────────────────────────── */
+@layer utilities {
+  .bg-success     { background-color: var(--status-success-bg); }
+  .text-success   { color: var(--status-success-text); }
+  .border-success { border-color: var(--status-success-border); }
+  .bg-warning     { background-color: var(--status-warning-bg); }
+  .text-warning   { color: var(--status-warning-text); }
+  .border-warning { border-color: var(--status-warning-border); }
+  .bg-danger      { background-color: var(--status-danger-bg); }
+  .text-danger    { color: var(--status-danger-text); }
+  .border-danger  { border-color: var(--status-danger-border); }
+  .bg-info        { background-color: var(--status-info-bg); }
+  .text-info      { color: var(--status-info-text); }
+  .border-info    { border-color: var(--status-info-border); }
+  .bg-neutral     { background-color: var(--status-neutral-bg); }
+  .text-neutral   { color: var(--status-neutral-text); }
+  .border-neutral { border-color: var(--status-neutral-border); }
+
+  .hover\:bg-success:hover  { background-color: color-mix(in srgb, var(--status-success-bg) 80%, var(--status-success-text) 20%); }
+  .hover\:bg-warning:hover  { background-color: color-mix(in srgb, var(--status-warning-bg) 80%, var(--status-warning-text) 20%); }
+  .hover\:bg-danger:hover   { background-color: color-mix(in srgb, var(--status-danger-bg)  80%, var(--status-danger-text)  20%); }
+  .hover\:bg-info:hover     { background-color: color-mix(in srgb, var(--status-info-bg)    80%, var(--status-info-text)    20%); }
+  .hover\:bg-neutral:hover  { background-color: color-mix(in srgb, var(--status-neutral-bg) 80%, var(--status-neutral-text) 20%); }
 }
 
 body {

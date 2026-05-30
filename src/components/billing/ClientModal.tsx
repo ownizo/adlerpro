@@ -45,11 +45,11 @@ export function ClientModal({
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={onClose} />
-      <div style={{ position: 'relative', background: '#fff', borderRadius: '8px', width: '95%', maxWidth: '600px', maxHeight: '90vh', overflow: 'auto', padding: '2rem', fontFamily: font }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 1.5rem', color: '#111' }}>
+      <div style={{ position: 'relative', background: 'var(--color-base)', borderRadius: '8px', width: '95%', maxWidth: '600px', maxHeight: '90vh', overflow: 'auto', padding: '2rem', fontFamily: font }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 1.5rem', color: 'var(--color-primary)' }}>
           {existing?.id ? t('billing.form.editClient') : t('billing.form.newClient')}
         </h3>
-        {error && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1rem' }}>{error}</div>}
+        {error && <div style={{ background: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1rem' }}>{error}</div>}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
           <div><label style={labelStyle}>{t('billing.columns.name')} *</label><input value={form.name ?? ''} onChange={(e) => set('name', e.target.value)} style={inputStyle} /></div>

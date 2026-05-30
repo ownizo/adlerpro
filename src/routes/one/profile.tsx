@@ -10,7 +10,7 @@ export const Route = createFileRoute('/one/profile')({
 })
 
 const navy = '#0A1628'
-const gold  = '#C9A84C'
+const gold  = 'var(--color-accent)'
 
 interface IndividualClient {
   id: string
@@ -98,23 +98,23 @@ function OneProfile() {
       ) : error ? (
         <ErrorMsg msg={error} />
       ) : !client ? (
-        <div style={{ padding: '1.5rem', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 6, fontSize: '0.85rem', color: '#92400E' }}>
+        <div style={{ padding: '1.5rem', background: 'var(--status-warning-bg)', border: '1px solid #FDE68A', borderRadius: 6, fontSize: '0.85rem', color: 'var(--status-warning-text)' }}>
           <strong>Perfil não encontrado.</strong> Contacte a Adler Rochefort para associar a sua conta ao seu perfil.
         </div>
       ) : (
         <>
           <div style={{ marginBottom: '1.75rem' }}>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>Perfil</h1>
-            <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>Os seus dados pessoais</p>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', marginTop: '0.3rem' }}>Os seus dados pessoais</p>
           </div>
 
           {saveOk && (
-            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 4, color: '#166534', fontSize: '0.82rem' }}>
+            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', background: 'var(--status-success-bg)', border: '1px solid #BBF7D0', borderRadius: 4, color: 'var(--status-success-text)', fontSize: '0.82rem' }}>
               Dados actualizados com sucesso.
             </div>
           )}
 
-          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', marginBottom: '1.5rem' }}>
+          <div style={{ background: 'var(--color-base)', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', marginBottom: '1.5rem' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, margin: 0 }}>Dados Pessoais</h2>
             </div>
@@ -128,7 +128,7 @@ function OneProfile() {
           </div>
 
           {/* Editable fields */}
-          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ background: 'var(--color-base)', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, margin: 0 }}>Actualizar Contacto</h2>
               {!editing && (
@@ -162,7 +162,7 @@ function OneProfile() {
                     />
                   </div>
                   {saveError && (
-                    <div style={{ gridColumn: '1 / -1', padding: '0.65rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 4, color: '#B91C1C', fontSize: '0.78rem' }}>
+                    <div style={{ gridColumn: '1 / -1', padding: '0.65rem', background: 'var(--status-danger-bg)', border: '1px solid #FECACA', borderRadius: 4, color: 'var(--status-danger-text)', fontSize: '0.78rem' }}>
                       {saveError}
                     </div>
                   )}
@@ -170,14 +170,14 @@ function OneProfile() {
                     <button
                       type="submit"
                       disabled={saving}
-                      style={{ padding: '0.6rem 1.4rem', background: saving ? '#e5c97a' : gold, color: navy, fontWeight: 700, fontSize: '0.82rem', border: 'none', borderRadius: 4, cursor: saving ? 'not-allowed' : 'pointer' }}
+                      style={{ padding: '0.6rem 1.4rem', background: saving ? 'var(--color-accent)' : gold, color: navy, fontWeight: 700, fontSize: '0.82rem', border: 'none', borderRadius: 4, cursor: saving ? 'not-allowed' : 'pointer' }}
                     >
                       {saving ? 'A guardar...' : 'Guardar'}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setEditing(false); setSaveError(''); setForm({ phone: client.phone ?? '', address: client.address ?? '' }) }}
-                      style={{ padding: '0.6rem 1.2rem', background: 'none', border: '1px solid #E2E8F0', color: '#64748B', fontWeight: 600, fontSize: '0.82rem', borderRadius: 4, cursor: 'pointer' }}
+                      style={{ padding: '0.6rem 1.2rem', background: 'none', border: '1px solid #E2E8F0', color: 'var(--color-muted)', fontWeight: 600, fontSize: '0.82rem', borderRadius: 4, cursor: 'pointer' }}
                     >
                       Cancelar
                     </button>
@@ -200,8 +200,8 @@ function OneProfile() {
 function ProfileField({ label, value, wide }: { label: string; value?: string | null; wide?: boolean }) {
   return (
     <div style={{ gridColumn: wide ? '1 / -1' : undefined }}>
-      <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>{label}</p>
-      <p style={{ fontSize: '0.88rem', color: value ? navy : '#CBD5E1', fontWeight: value ? 500 : 400, margin: '0.2rem 0 0' }}>
+      <p style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>{label}</p>
+      <p style={{ fontSize: '0.88rem', color: value ? navy : 'var(--color-border)', fontWeight: value ? 500 : 400, margin: '0.2rem 0 0' }}>
         {value || '—'}
       </p>
     </div>
@@ -209,13 +209,13 @@ function ProfileField({ label, value, wide }: { label: string; value?: string | 
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: '#64748B', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.3rem' }}>{children}</label>
+  return <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.3rem' }}>{children}</label>
 }
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.85rem',
   border: '1px solid #E2E8F0', borderRadius: 4, outline: 'none',
-  color: '#111', boxSizing: 'border-box', fontFamily: "'Montserrat', sans-serif",
+  color: 'var(--color-primary)', boxSizing: 'border-box', fontFamily: "'Montserrat', sans-serif",
 }
 
 function Spinner() {
@@ -228,5 +228,5 @@ function Spinner() {
 }
 
 function ErrorMsg({ msg }: { msg: string }) {
-  return <div style={{ padding: '2rem', textAlign: 'center', color: '#B91C1C', fontSize: '0.9rem' }}>{msg}</div>
+  return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--status-danger-text)', fontSize: '0.9rem' }}>{msg}</div>
 }

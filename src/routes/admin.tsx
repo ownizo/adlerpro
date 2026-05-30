@@ -530,7 +530,7 @@ function AdminPage() {
                             setBulkDeletingCompanies(false)
                           }
                         }}
-                        className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-1.5 text-xs bg-danger text-danger border border-danger rounded hover:bg-danger disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {bulkDeletingCompanies ? 'A eliminar...' : 'Eliminar selecionadas'}
                       </button>
@@ -609,7 +609,7 @@ function AdminPage() {
                                   alert(`Erro ao eliminar empresa: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
                                 }
                               }}
-                              className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+                              className="px-3 py-1.5 text-xs bg-danger text-danger border border-danger rounded hover:bg-danger"
                             >
                               Eliminar
                             </button>
@@ -658,7 +658,7 @@ function AdminPage() {
                                   setEditingCompanyId(company.id)
                                   setShowNewCompany(true)
                                 }}
-                                className="px-3 py-1.5 text-xs bg-base border border-gray-300 rounded hover:bg-gray-50"
+                                className="px-3 py-1.5 text-xs bg-base border border-gray-300 rounded hover:bg-surface"
                               >
                                 Editar Empresa
                               </button>
@@ -673,7 +673,7 @@ function AdminPage() {
                                     alert(`Erro ao eliminar empresa: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
                                   }
                                 }}
-                                className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+                                className="px-3 py-1.5 text-xs bg-danger text-danger border border-danger rounded hover:bg-danger"
                               >
                                 Eliminar Empresa
                               </button>
@@ -741,7 +741,7 @@ function AdminPage() {
                                                     alert(`Erro ao eliminar utilizador: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
                                                   }
                                                 }}
-                                                className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                                className="px-2 py-1 text-xs border border-danger text-danger rounded hover:bg-danger"
                                               >
                                                 Eliminar
                                               </button>
@@ -891,7 +891,7 @@ function AdminPage() {
                           setBulkDeletingClients(false)
                         }
                       }}
-                      className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1.5 text-xs bg-danger text-danger border border-danger rounded hover:bg-danger disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {bulkDeletingClients ? 'A eliminar...' : 'Eliminar selecionados'}
                     </button>
@@ -962,7 +962,7 @@ function AdminPage() {
                               <td className="px-4 py-3 text-sm text-navy-500">{client.phone || '—'}</td>
                               <td className="px-4 py-3">
                                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  client.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                                  client.status === 'active' ? 'bg-green-100 text-success' : 'bg-elevated text-muted'
                                 }`}>
                                   {client.status === 'active' ? 'Ativo' : client.status}
                                 </span>
@@ -1001,7 +1001,7 @@ function AdminPage() {
                                         alert(`Erro ao eliminar cliente: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
                                       }
                                     }}
-                                    className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                    className="px-2 py-1 text-xs border border-danger text-danger rounded hover:bg-danger"
                                   >
                                     Eliminar
                                   </button>
@@ -1188,7 +1188,7 @@ function AdminPage() {
                             setBulkDeletingPolicies(false)
                           }
                         }}
-                        className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-1.5 text-xs bg-danger text-danger border border-danger rounded hover:bg-danger disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {bulkDeletingPolicies ? 'A eliminar...' : 'Eliminar selecionadas'}
                       </button>
@@ -1342,7 +1342,7 @@ function AdminPage() {
                           <p className="text-xs text-navy-500">Modelo: claude-3-5-haiku-20241022 · api.anthropic.com/v1</p>
                         </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success text-success border border-success">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
                       </span>
                     </div>
@@ -1364,7 +1364,7 @@ function AdminPage() {
                           <p className="text-xs text-navy-500">API pública gratuita · api.ipma.pt/open-data</p>
                         </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success text-success border border-success">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
                       </span>
                     </div>
@@ -1386,7 +1386,7 @@ function AdminPage() {
                           <p className="text-xs text-navy-500">nifName (AT) + CPRC (Registo Comercial) + Matrículas · apigwws.bizapis.com</p>
                         </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success text-success border border-success">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
                       </span>
                     </div>
@@ -1408,7 +1408,7 @@ function AdminPage() {
                           <p className="text-xs text-navy-500">Remetente: noreply@adlerrochefort.com · api.resend.com/v1</p>
                         </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success text-success border border-success">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
                       </span>
                     </div>
@@ -1430,7 +1430,7 @@ function AdminPage() {
                           <p className="text-xs text-navy-500">PostgreSQL + Auth + Storage · VITE_SUPABASE_URL</p>
                         </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-success text-success border border-success">
                         <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
                       </span>
                     </div>
@@ -1506,8 +1506,8 @@ function AdminPage() {
                       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
                       return (
-                        <div key={p.id} className="bg-surface rounded-[4px] border border-red-200 p-6 flex items-start gap-4">
-                          <div className="w-10 h-10 rounded-full bg-red-100 flex flex-shrink-0 items-center justify-center text-red-600">!</div>
+                        <div key={p.id} className="bg-surface rounded-[4px] border border-danger p-6 flex items-start gap-4">
+                          <div className="w-10 h-10 rounded-full bg-red-100 flex flex-shrink-0 items-center justify-center text-danger">!</div>
                           <div>
                             <h3 className="text-md font-bold text-navy-700">
                               {company?.name || 'Cliente Desconhecido'} - {POLICY_TYPE_LABELS[p.type]}
@@ -1876,9 +1876,9 @@ function AdminDashboardTab({
                 type="button"
                 key={monthItem.monthKey}
                 onClick={() => setDrillDownMonth(monthItem.month)}
-                className="text-left bg-amber-50 border border-amber-200 rounded px-3 py-2 hover:bg-amber-100 transition-colors"
+                className="text-left bg-warning border border-warning rounded px-3 py-2 hover:bg-warning transition-colors"
               >
-                <p className="text-xs text-amber-700 uppercase tracking-wide">Top {index + 1}</p>
+                <p className="text-xs text-warning uppercase tracking-wide">Top {index + 1}</p>
                 <p className="text-sm font-semibold text-navy-700 mt-1">{monthItem.label} {selectedYear}</p>
                 <p className="text-xs text-navy-600 mt-1">Comissões: {formatCurrency(monthItem.commissions)}</p>
                 <p className="text-xs text-navy-500">Prémios: {formatCurrency(monthItem.premiums)}</p>
@@ -1973,27 +1973,27 @@ function AdminDashboardTab({
                   <p className="text-[11px] uppercase tracking-wide text-navy-500">Número de renovações</p>
                   <p className="text-base font-semibold text-navy-700">{renewalAlertsView.summary.totalRenewals}</p>
                 </div>
-                <div className="rounded border border-red-200 bg-red-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-red-500">Valor total em risco</p>
-                  <p className="text-base font-semibold text-red-700">{formatCurrency(renewalAlertsView.summary.totalValueAtRisk)}</p>
+                <div className="rounded border border-danger bg-danger px-3 py-2">
+                  <p className="text-[11px] uppercase tracking-wide text-danger">Valor total em risco</p>
+                  <p className="text-base font-semibold text-danger">{formatCurrency(renewalAlertsView.summary.totalValueAtRisk)}</p>
                 </div>
               </div>
               <div className="grid xl:grid-cols-3 gap-2">
                 <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2">
                   <p className="text-[11px] uppercase tracking-wide text-emerald-600">Taxa de renovação</p>
-                  <p className="text-base font-semibold text-emerald-700">{formatPctValue(renewalIntelligence.renewalRatePct)}</p>
-                  <p className="text-[11px] text-emerald-700/80">
+                  <p className="text-base font-semibold text-success">{formatPctValue(renewalIntelligence.renewalRatePct)}</p>
+                  <p className="text-[11px] text-success/80">
                     {renewalIntelligence.renewedCount} renovadas de {renewalIntelligence.totalAlerts}
                   </p>
                 </div>
-                <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
+                <div className="rounded border border-warning bg-warning px-3 py-2">
                   <p className="text-[11px] uppercase tracking-wide text-amber-600">Tempo médio pending → renewed</p>
-                  <p className="text-base font-semibold text-amber-700">
+                  <p className="text-base font-semibold text-warning">
                     {renewalIntelligence.avgDaysPendingToRenewed === null
                       ? 'n/d'
                       : `${renewalIntelligence.avgDaysPendingToRenewed.toFixed(1)} dias`}
                   </p>
-                  <p className="text-[11px] text-amber-700/80">
+                  <p className="text-[11px] text-warning/80">
                     Base: {renewalIntelligence.avgDaysSampleSize} transições completas
                   </p>
                 </div>
@@ -2005,10 +2005,10 @@ function AdminDashboardTab({
               </div>
               <div className="grid xl:grid-cols-3 gap-2">
                 {renewalIntelligence.valueAtRiskByPeriod.map((period) => (
-                  <div key={period.urgency} className="rounded border border-red-200 bg-red-50 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-red-500">Risco D-{period.urgency}</p>
-                    <p className="text-base font-semibold text-red-700">{formatCurrency(period.valueAtRisk)}</p>
-                    <p className="text-[11px] text-red-600/90">{period.alertsCount} apólices em risco</p>
+                  <div key={period.urgency} className="rounded border border-danger bg-danger px-3 py-2">
+                    <p className="text-[11px] uppercase tracking-wide text-danger">Risco D-{period.urgency}</p>
+                    <p className="text-base font-semibold text-danger">{formatCurrency(period.valueAtRisk)}</p>
+                    <p className="text-[11px] text-danger/90">{period.alertsCount} apólices em risco</p>
                   </div>
                 ))}
               </div>
@@ -2025,7 +2025,7 @@ function AdminDashboardTab({
                         <p>
                           <strong className="text-navy-700">#{index + 1}</strong> {client.client} <span className="text-navy-400">({client.company})</span>
                         </p>
-                        <p className="font-semibold text-red-700">
+                        <p className="font-semibold text-danger">
                           {formatCurrency(client.valueAtRisk)} · {client.policiesCount} apólices
                         </p>
                       </div>
@@ -2094,17 +2094,17 @@ function AdminDashboardTab({
                             const urgencyPalette =
                               alert.urgency === 30
                                 ? {
-                                    border: 'border-red-300',
-                                    badge: 'bg-red-100 text-red-700',
+                                    border: 'border-danger',
+                                    badge: 'bg-red-100 text-danger',
                                   }
                                 : alert.urgency === 60
                                   ? {
-                                      border: 'border-amber-300',
-                                      badge: 'bg-amber-100 text-amber-700',
+                                      border: 'border-warning',
+                                      badge: 'bg-amber-100 text-warning',
                                     }
                                   : {
                                       border: 'border-blue-300',
-                                      badge: 'bg-blue-100 text-blue-700',
+                                      badge: 'bg-blue-100 text-info',
                                     }
 
                             const nextStatusActions: Array<{ label: string; status: RenewalAlertStatus; className: string }> = []
@@ -2119,14 +2119,14 @@ function AdminDashboardTab({
                               nextStatusActions.push({
                                 label: 'Mover para negotiating',
                                 status: 'negotiating',
-                                className: 'border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100',
+                                className: 'border-warning text-warning bg-warning hover:bg-warning',
                               })
                             }
                             if (renewalColumnByStatus(alert.status) !== 'renewed') {
                               nextStatusActions.push({
                                 label: 'Mover para renewed',
                                 status: 'renewed',
-                                className: 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100',
+                                className: 'border-emerald-300 text-success bg-emerald-50 hover:bg-emerald-100',
                               })
                             }
 
@@ -2240,7 +2240,7 @@ function AdminDashboardTab({
                                   <Link
                                     to="/admin"
                                     search={{ tab: 'policies' }}
-                                    className="px-2 py-1 text-[11px] rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
+                                    className="px-2 py-1 text-[11px] rounded border border-info text-info bg-info hover:bg-info"
                                   >
                                     Ver apólice
                                   </Link>
@@ -2259,7 +2259,7 @@ function AdminDashboardTab({
                                       Contactar cliente
                                     </a>
                                   ) : (
-                                    <span className="px-2 py-1 text-[11px] rounded border border-gray-200 text-gray-400 bg-gray-50">
+                                    <span className="px-2 py-1 text-[11px] rounded border border-gray-200 text-subtle bg-surface">
                                       Sem contacto
                                     </span>
                                   )}
@@ -2337,8 +2337,8 @@ function formatPct(value: number | null): string {
 }
 
 function deltaChipClass(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return 'bg-gray-100 text-gray-500 border border-gray-200'
-  if (value >= 0) return 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+  if (value === null || !Number.isFinite(value)) return 'bg-elevated text-muted border border-gray-200'
+  if (value >= 0) return 'bg-emerald-50 text-success border border-emerald-200'
   return 'bg-rose-50 text-rose-700 border border-rose-200'
 }
 
@@ -2461,7 +2461,7 @@ function FinancialTimelineChart({
             type="button"
             key={`${point.monthKey}_kpi`}
             onClick={() => onSelectMonth(point.month)}
-            className={`text-left rounded px-3 py-2 text-xs border ${selectedMonth === point.month ? 'bg-amber-50 border-amber-200' : 'bg-navy-50 border-transparent'} text-navy-600`}
+            className={`text-left rounded px-3 py-2 text-xs border ${selectedMonth === point.month ? 'bg-warning border-warning' : 'bg-navy-50 border-transparent'} text-navy-600`}
           >
             <p className="font-semibold text-navy-700">{point.label}</p>
             <p>Prémios: {formatCurrency(point.premiums)}</p>
@@ -2482,7 +2482,7 @@ function InvoiceExpressStatus({ apiConnections }: { apiConnections: ApiConnectio
   if (invoiceExpressConnections.length > 0) {
     return (
       <div className="bg-surface rounded-[4px] border border-emerald-200 p-5">
-        <h3 className="text-sm font-semibold text-emerald-700 mb-2">Invoice Express</h3>
+        <h3 className="text-sm font-semibold text-success mb-2">Invoice Express</h3>
         <p className="text-sm text-navy-600 mb-3">Foram encontradas ligações de faturação no estado dinâmico de `api_connections`.</p>
         <div className="space-y-2 text-sm">
           {invoiceExpressConnections.map((api) => (
@@ -2496,8 +2496,8 @@ function InvoiceExpressStatus({ apiConnections }: { apiConnections: ApiConnectio
   }
 
   return (
-    <div className="bg-surface rounded-[4px] border border-amber-200 p-5">
-      <h3 className="text-sm font-semibold text-amber-700 mb-2">Invoice Express</h3>
+    <div className="bg-surface rounded-[4px] border border-warning p-5">
+      <h3 className="text-sm font-semibold text-warning mb-2">Invoice Express</h3>
       <p className="text-sm text-navy-600">
         Não foi encontrado código de integração Invoice Express neste repositório nem entradas dedicadas em `api_connections`.
         O módulo foi deixado em modo stub para reintegração futura sem simular integrações inexistentes.
@@ -2546,12 +2546,12 @@ function SendRenewalAlertsButton() {
           : <>✉️ Enviar Alertas por Email</>}
       </button>
       {result && (
-        <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#166534', background: '#EAF3DE', padding: '0.25rem 0.6rem', borderRadius: '4px' }}>
+        <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: 'var(--status-success-text)', background: 'var(--status-success-bg)', padding: '0.25rem 0.6rem', borderRadius: '4px' }}>
           ✓ {result.sent} email{result.sent !== 1 ? 's' : ''} enviado{result.sent !== 1 ? 's' : ''} para {result.companies} empresa{result.companies !== 1 ? 's' : ''}
         </span>
       )}
       {error && (
-        <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#dc2626', background: '#FEE2E2', padding: '0.25rem 0.6rem', borderRadius: '4px' }}>
+        <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#dc2626', background: 'var(--status-danger-bg)', padding: '0.25rem 0.6rem', borderRadius: '4px' }}>
           ⚠️ {error}
         </span>
       )}
@@ -2691,9 +2691,9 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
       </div>
       {uploadStatus && <p className="text-xs text-navy-500 mb-2">{uploadStatus}</p>}
       {error && (
-        <div className="mb-2 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-600 flex items-start gap-2">
+        <div className="mb-2 px-2 py-1 bg-danger border border-danger rounded text-xs text-danger flex items-start gap-2">
           <span>⚠ {error}</span>
-          <button onClick={() => setError(null)} className="ml-auto text-red-500">×</button>
+          <button onClick={() => setError(null)} className="ml-auto text-danger">×</button>
         </div>
       )}
       {loading ? (
@@ -2715,7 +2715,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
                 <button
                   onClick={() => handlePreview(doc)}
                   title="Pré-visualizar"
-                  className="px-2 py-1 text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
+                  className="px-2 py-1 text-[11px] font-semibold bg-info text-info border border-info rounded hover:bg-info"
                 >
                   Ver
                 </button>
@@ -2729,7 +2729,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
                 <button
                   onClick={() => handleDelete(doc)}
                   title="Eliminar"
-                  className="px-2 py-1 text-[11px] font-semibold bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+                  className="px-2 py-1 text-[11px] font-semibold bg-danger text-danger border border-danger rounded hover:bg-danger"
                 >
                   ✕
                 </button>
@@ -2754,7 +2754,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
                   href={previewUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-2 py-1 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded"
+                  className="px-2 py-1 text-xs font-semibold bg-info text-info border border-info rounded"
                 >
                   Abrir em nova janela
                 </a>
@@ -2798,9 +2798,9 @@ function PolicyExpandableCard({ policy, defaultOpen = false }: { policy: Policy;
         <div className="text-right">
           <p className="text-sm font-semibold text-navy-700">{formatCurrency(policy.annualPremium)}/ano</p>
           <span className={`text-xs px-2 py-0.5 rounded-full ${
-            policy.status === 'active' ? 'bg-green-100 text-green-700' :
-            policy.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
-            'bg-red-100 text-red-700'
+            policy.status === 'active' ? 'bg-green-100 text-success' :
+            policy.status === 'expiring' ? 'bg-yellow-100 text-warning' :
+            'bg-red-100 text-danger'
           }`}>{policy.status}</span>
         </div>
       </button>
@@ -3349,7 +3349,7 @@ function AdminClaimWorkspace({
                     await removeClaimDocument({ data: { claimId: claim.id, documentId: doc.id } })
                     await onUpdated()
                   }}
-                  className="px-2 py-1 border border-red-200 text-red-600 rounded text-xs"
+                  className="px-2 py-1 border border-danger text-danger rounded text-xs"
                 >
                   Remover
                 </button>
@@ -3390,15 +3390,15 @@ function AdminClaimWorkspace({
 
 function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
-    submitted: 'bg-blue-100 text-blue-700',
-    under_review: 'bg-purple-100 text-purple-700',
-    documentation: 'bg-yellow-100 text-yellow-700',
-    assessment: 'bg-orange-100 text-orange-700',
-    approved: 'bg-green-100 text-green-700',
-    denied: 'bg-red-100 text-red-700',
-    paid: 'bg-emerald-100 text-emerald-700',
+    submitted: 'bg-blue-100 text-info',
+    under_review: 'bg-purple-100 text-info',
+    documentation: 'bg-yellow-100 text-warning',
+    assessment: 'bg-orange-100 text-warning',
+    approved: 'bg-green-100 text-success',
+    denied: 'bg-red-100 text-danger',
+    paid: 'bg-emerald-100 text-success',
   }
-  return colors[status] || 'bg-gray-100 text-gray-600'
+  return colors[status] || 'bg-elevated text-muted'
 }
 
 function formatDateTime(value?: string) {
@@ -3544,7 +3544,7 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
         <FormField label="Comissão (%)" value={form.commissionPercentage} onChange={(v) => updateCommissionPercentage(v)} type="number" />
         <FormField label="Comissão (€)" value={form.commissionValue} onChange={(v) => updateCommissionValue(v)} type="number" />
         <div className="sm:col-span-2">
-          {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
+          {error && <p className="text-sm text-danger mb-2">{error}</p>}
           <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 text-sm">
             {submitting ? 'A criar...' : 'Criar Apólice'}
           </button>
@@ -3595,7 +3595,7 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
 
   if (client.authUserId) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-success">
         Adler One ✓
       </span>
     )
@@ -3610,7 +3610,7 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
   }
 
   if (message) {
-    return <span className="text-xs text-green-700">{message}</span>
+    return <span className="text-xs text-success">{message}</span>
   }
 
   return (
@@ -3712,9 +3712,9 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  scheduled: 'bg-blue-100 text-blue-700',
-  published: 'bg-green-100 text-green-700',
+  draft: 'bg-elevated text-muted',
+  scheduled: 'bg-blue-100 text-info',
+  published: 'bg-green-100 text-success',
 }
 
 function SocialHubTab({ posts, onRefresh }: { posts: SocialPost[]; onRefresh: () => Promise<void> }) {
@@ -3763,7 +3763,7 @@ function SocialHubTab({ posts, onRefresh }: { posts: SocialPost[]; onRefresh: ()
                 <tr key={p.id} className="hover:bg-navy-50 transition-colors">
                   <td className="px-4 py-3 text-navy-700 font-medium max-w-xs truncate">{p.topic}</td>
                   <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[p.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[p.status] ?? 'bg-elevated text-muted'}`}>
                       {STATUS_LABELS[p.status] ?? p.status}
                     </span>
                   </td>
@@ -3814,7 +3814,7 @@ function DeletePostButton({ postId, onDeleted }: { postId: string; onDeleted: ()
     <button
       onClick={handleDelete}
       disabled={deleting}
-      className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
+      className="text-xs text-danger hover:text-danger disabled:opacity-50"
     >
       {deleting ? '...' : 'Apagar'}
     </button>
@@ -3912,7 +3912,7 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
             {generating ? 'A gerar...' : '✦ Gerar com IA'}
           </button>
         </div>
-        {genError && <p className="text-red-500 text-xs mt-1">{genError}</p>}
+        {genError && <p className="text-danger text-xs mt-1">{genError}</p>}
       </div>
 
       {/* Network selector */}
@@ -4049,10 +4049,10 @@ const POLICY_STATUS_LABEL: Record<string, string> = {
   cancelled: 'Cancelada', cancelada: 'Cancelada',
 }
 const POLICY_STATUS_CLASS: Record<string, string> = {
-  active: 'bg-green-100 text-green-700', ativa: 'bg-green-100 text-green-700',
-  expiring: 'bg-yellow-100 text-yellow-700',
-  expired: 'bg-red-100 text-red-700', expirada: 'bg-red-100 text-red-700',
-  cancelled: 'bg-gray-100 text-gray-600', cancelada: 'bg-gray-100 text-gray-600',
+  active: 'bg-green-100 text-success', ativa: 'bg-green-100 text-success',
+  expiring: 'bg-yellow-100 text-warning',
+  expired: 'bg-red-100 text-danger', expirada: 'bg-red-100 text-danger',
+  cancelled: 'bg-elevated text-muted', cancelada: 'bg-elevated text-muted',
 }
 
 // ─── Admin Policy List ────────────────────────────────────────────────────────
@@ -4103,7 +4103,7 @@ function AdminPolicyList({ policies, companies, individualClients, onReload, sel
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-semibold text-navy-700">{POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type}</span>
-                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${POLICY_STATUS_CLASS[policy.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${POLICY_STATUS_CLASS[policy.status] ?? 'bg-elevated text-muted'}`}>
                     {POLICY_STATUS_LABEL[policy.status] ?? policy.status}
                   </span>
                   <span className="text-xs text-navy-500">{clientName}</span>
@@ -4226,7 +4226,7 @@ function PolicyDocumentUpload({ policyId, companyId, individualClientId, onUploa
 
   return (
     <div className="flex items-center gap-2">
-      {error && <span className="text-xs text-red-500">{error}</span>}
+      {error && <span className="text-xs text-danger">{error}</span>}
       <button
         onClick={() => ref.current?.click()}
         disabled={uploading}
@@ -4278,7 +4278,7 @@ function AdminPolicyStorageDocs({ policy, onReload }: { policy: Policy; onReload
         />
       </div>
       {loading && <p className="text-xs text-navy-400">A carregar...</p>}
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
       {!loading && !error && docs.length === 0 && (
         <p className="text-xs text-navy-400 mb-3">Nenhum documento associado.</p>
       )}

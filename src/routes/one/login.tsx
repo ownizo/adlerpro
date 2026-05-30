@@ -9,7 +9,7 @@ export const Route = createFileRoute('/one/login')({
 })
 
 const navy = '#0A1628'
-const gold  = '#C9A84C'
+const gold  = 'var(--color-accent)'
 
 function OnLoginPage() {
   const [tab,          setTab]        = useState<'login' | 'register'>('login')
@@ -63,7 +63,7 @@ function OnLoginPage() {
 
   if (checking) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F4F6FA' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-surface)' }}>
         <div style={{ width: 28, height: 28, borderRadius: '50%', border: `3px solid ${gold}`, borderTopColor: 'transparent', animation: 'one-spin 0.75s linear infinite' }} />
         <style>{`@keyframes one-spin { to { transform: rotate(360deg); } }`}</style>
       </div>
@@ -95,7 +95,7 @@ function OnLoginPage() {
 
       {/* Card */}
       <div style={{
-        background: '#fff',
+        background: 'var(--color-base)',
         borderRadius: 8,
         width: '100%',
         maxWidth: 400,
@@ -157,13 +157,13 @@ function OnLoginPage() {
           </div>
 
           {error && (
-            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 4, color: '#B91C1C', fontSize: '0.78rem' }}>
+            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', background: 'var(--status-danger-bg)', border: '1px solid #FECACA', borderRadius: 4, color: 'var(--status-danger-text)', fontSize: '0.78rem' }}>
               {error}
             </div>
           )}
 
           {info && (
-            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 4, color: '#166534', fontSize: '0.78rem' }}>
+            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', background: 'var(--status-success-bg)', border: '1px solid #BBF7D0', borderRadius: 4, color: 'var(--status-success-text)', fontSize: '0.78rem' }}>
               {info}
             </div>
           )}
@@ -178,7 +178,7 @@ function OnLoginPage() {
                 onChange={e => setTermsAccepted(e.target.checked)}
                 style={{ marginTop: 3, flexShrink: 0, accentColor: navy, width: 14, height: 14, cursor: 'pointer' }}
               />
-              <label htmlFor="terms" style={{ fontSize: '0.68rem', color: '#555', lineHeight: 1.55, cursor: 'pointer' }}>
+              <label htmlFor="terms" style={{ fontSize: '0.68rem', color: 'var(--color-body)', lineHeight: 1.55, cursor: 'pointer' }}>
                 Li e aceito os{' '}
                 <a href="https://adlerrochefort.com/termos-e-condicoes" target="_blank" rel="noopener noreferrer" style={{ color: navy, fontWeight: 600, textDecoration: 'underline' }}>
                   Termos de Serviço
@@ -194,7 +194,7 @@ function OnLoginPage() {
             style={{
               width: '100%',
               padding: '0.75rem',
-              background: loading || (tab === 'register' && !termsAccepted) ? '#e5c97a' : gold,
+              background: loading || (tab === 'register' && !termsAccepted) ? 'var(--color-accent)' : gold,
               color: navy,
               fontFamily: "'Montserrat', sans-serif",
               fontWeight: 700,
@@ -218,7 +218,7 @@ function OnLoginPage() {
           </button>
 
           {tab === 'login' && (
-            <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.72rem', color: '#aaa' }}>
+            <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.72rem', color: 'var(--color-label-light)' }}>
               Não tem conta?{' '}
               <button
                 type="button"
@@ -245,7 +245,7 @@ const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: '0.68rem',
   fontWeight: 600,
-  color: '#555',
+  color: 'var(--color-body)',
   marginBottom: '0.35rem',
   letterSpacing: '0.06em',
   textTransform: 'uppercase',
@@ -256,10 +256,10 @@ const inputStyle: React.CSSProperties = {
   padding: '0.6rem 0.75rem',
   fontSize: '0.85rem',
   fontFamily: "'Montserrat', sans-serif",
-  border: '1px solid #ddd',
+  border: '1px solid var(--color-border)',
   borderRadius: 4,
   outline: 'none',
-  color: '#111',
+  color: 'var(--color-primary)',
   boxSizing: 'border-box',
   transition: 'border-color 0.15s',
 }

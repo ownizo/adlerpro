@@ -50,12 +50,12 @@ function AlertsSettingsPage() {
         <p className="text-navy-500 mb-8">{t('alerts.subtitle')}</p>
 
         {saved && (
-          <div className="mb-6 p-4 rounded bg-green-50 text-green-800 border border-green-200">
+          <div className="mb-6 p-4 rounded bg-success text-success border border-success">
             {t('alerts.savedSuccess')}
           </div>
         )}
 
-        <form onSubmit={handleSave} className="bg-white p-6 rounded-lg border border-navy-200 shadow-sm space-y-8 mb-8">
+        <form onSubmit={handleSave} className="bg-base p-6 rounded-lg border border-navy-200 shadow-sm space-y-8 mb-8">
 
           {/* Tipos de Alertas */}
           <div>
@@ -147,14 +147,14 @@ function AlertsSettingsPage() {
           </div>
         </form>
 
-        <div className="bg-white p-6 rounded-lg border border-red-200 shadow-sm mt-8">
-          <h2 className="text-lg font-semibold text-red-700 mb-2">{t('alerts.manageHistory')}</h2>
+        <div className="bg-base p-6 rounded-lg border border-danger shadow-sm mt-8">
+          <h2 className="text-lg font-semibold text-danger mb-2">{t('alerts.manageHistory')}</h2>
           <p className="text-sm text-navy-500 mb-4">{t('alerts.manageHistoryDesc')}</p>
           <button
             type="button"
             onClick={handleClearAlerts}
             disabled={clearing}
-            className="bg-white text-red-600 border border-red-200 px-4 py-2 rounded font-medium hover:bg-red-50 transition-colors disabled:opacity-50 text-sm"
+            className="bg-base text-danger border border-danger px-4 py-2 rounded font-medium hover:bg-danger transition-colors disabled:opacity-50 text-sm"
           >
             {clearing ? t('alerts.clearing') : t('alerts.clearHistory')}
           </button>

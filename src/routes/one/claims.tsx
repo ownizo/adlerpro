@@ -12,7 +12,7 @@ export const Route = createFileRoute('/one/claims')({
 })
 
 const navy = '#0A1628'
-const gold  = '#C9A84C'
+const gold  = 'var(--color-accent)'
 
 interface Policy {
   id: string
@@ -47,13 +47,13 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const CLAIM_STATUS: Record<string, { bg: string; color: string; label: string }> = {
-  submitted:    { bg: '#EFF6FF', color: '#1D4ED8', label: 'Submetido'     },
-  under_review: { bg: '#FEF3C7', color: '#92400E', label: 'Em Análise'    },
-  documentation:{ bg: '#F3E8FF', color: '#6D28D9', label: 'Documentação'  },
-  assessment:   { bg: '#FEF3C7', color: '#92400E', label: 'Avaliação'     },
-  approved:     { bg: '#EAF3DE', color: '#3B6D11', label: 'Aprovado'      },
-  denied:       { bg: '#FEE2E2', color: '#991B1B', label: 'Recusado'      },
-  paid:         { bg: '#D1FAE5', color: '#065F46', label: 'Pago'          },
+  submitted:    { bg: 'var(--status-info-bg)', color: 'var(--status-info-text)', label: 'Submetido'     },
+  under_review: { bg: 'var(--status-warning-bg)', color: 'var(--status-warning-text)', label: 'Em Análise'    },
+  documentation:{ bg: 'var(--status-info-bg)', color: 'var(--status-info-text)', label: 'Documentação'  },
+  assessment:   { bg: 'var(--status-warning-bg)', color: 'var(--status-warning-text)', label: 'Avaliação'     },
+  approved:     { bg: 'var(--status-success-bg)', color: 'var(--status-success-text)', label: 'Aprovado'      },
+  denied:       { bg: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', label: 'Recusado'      },
+  paid:         { bg: 'var(--status-success-bg)', color: 'var(--status-success-text)', label: 'Pago'          },
 }
 
 function formatCurrency(n: number) {
@@ -166,14 +166,14 @@ function OneClaims() {
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
             <div>
               <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>Sinistros</h1>
-              <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', marginTop: '0.3rem' }}>
                 {claims.length} sinistro{claims.length !== 1 ? 's' : ''} registado{claims.length !== 1 ? 's' : ''}
               </p>
             </div>
             {clientId && (
               <button
                 onClick={() => setShowForm(s => !s)}
-                style={{ padding: '0.6rem 1.2rem', background: showForm ? '#E2E8F0' : gold, color: showForm ? '#475569' : navy, fontWeight: 700, fontSize: '0.82rem', border: 'none', borderRadius: 6, cursor: 'pointer', letterSpacing: '0.02em' }}
+                style={{ padding: '0.6rem 1.2rem', background: showForm ? 'var(--color-border)' : gold, color: showForm ? 'var(--color-muted)' : navy, fontWeight: 700, fontSize: '0.82rem', border: 'none', borderRadius: 6, cursor: 'pointer', letterSpacing: '0.02em' }}
               >
                 {showForm ? 'Cancelar' : 'Novo Sinistro'}
               </button>
@@ -181,7 +181,7 @@ function OneClaims() {
           </div>
 
           {showForm && (
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, padding: '1.5rem', marginBottom: '1.5rem' }}>
+            <div style={{ background: 'var(--color-base)', border: '1px solid #E2E8F0', borderRadius: 8, padding: '1.5rem', marginBottom: '1.5rem' }}>
               <h2 style={{ fontSize: '1rem', fontWeight: 700, color: navy, marginTop: 0, marginBottom: '1.25rem' }}>Novo Sinistro</h2>
               <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
@@ -212,12 +212,12 @@ function OneClaims() {
                   <input type="number" min="0" step="0.01" value={form.estimatedValue} onChange={e => update('estimatedValue', e.target.value)} placeholder="0.00" style={inputStyle} />
                 </div>
                 {formError && (
-                  <div style={{ gridColumn: '1 / -1', padding: '0.65rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 4, color: '#B91C1C', fontSize: '0.78rem' }}>
+                  <div style={{ gridColumn: '1 / -1', padding: '0.65rem', background: 'var(--status-danger-bg)', border: '1px solid #FECACA', borderRadius: 4, color: 'var(--status-danger-text)', fontSize: '0.78rem' }}>
                     {formError}
                   </div>
                 )}
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <button type="submit" disabled={submitting} style={{ padding: '0.65rem 1.5rem', background: submitting ? '#e5c97a' : gold, color: navy, fontWeight: 700, fontSize: '0.83rem', border: 'none', borderRadius: 4, cursor: submitting ? 'not-allowed' : 'pointer' }}>
+                  <button type="submit" disabled={submitting} style={{ padding: '0.65rem 1.5rem', background: submitting ? 'var(--color-accent)' : gold, color: navy, fontWeight: 700, fontSize: '0.83rem', border: 'none', borderRadius: 4, cursor: submitting ? 'not-allowed' : 'pointer' }}>
                     {submitting ? 'A submeter...' : 'Submeter Sinistro'}
                   </button>
                 </div>
@@ -245,7 +245,7 @@ function ClaimCard({ claim }: { claim: Claim }) {
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const st = CLAIM_STATUS[claim.status] ?? { bg: '#F3F4F6', color: '#6B7280', label: claim.status }
+  const st = CLAIM_STATUS[claim.status] ?? { bg: 'var(--status-neutral-bg)', color: 'var(--status-neutral-text)', label: claim.status }
 
   async function loadOps() {
     setLoadingOps(true)
@@ -265,7 +265,7 @@ function ClaimCard({ claim }: { claim: Claim }) {
   }, [expanded])
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
+    <div style={{ background: 'var(--color-base)', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
       <button
         onClick={() => setExpanded(e => !e)}
         style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '1rem 1.25rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}
@@ -275,7 +275,7 @@ function ClaimCard({ claim }: { claim: Claim }) {
             <span style={{ fontSize: '0.88rem', fontWeight: 700, color: navy }}>{claim.title}</span>
             <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.55rem', borderRadius: 20, background: st.bg, color: st.color }}>{st.label}</span>
           </div>
-          <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '0.2rem 0 0' }}>
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', margin: '0.2rem 0 0' }}>
             Incidente: {formatDate(claim.incident_date)}
           </p>
         </div>
@@ -285,25 +285,25 @@ function ClaimCard({ claim }: { claim: Claim }) {
               {formatCurrency(claim.estimated_value)}
             </p>
           )}
-          <p style={{ fontSize: '0.7rem', color: '#94A3B8', margin: '0.1rem 0 0' }}>
+          <p style={{ fontSize: '0.7rem', color: 'var(--color-muted)', margin: '0.1rem 0 0' }}>
             Submetido: {formatDate(claim.claim_date)}
           </p>
         </div>
       </button>
 
       {expanded && (
-        <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC', display: 'grid', gap: '0.9rem' }}>
+        <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: 'var(--color-surface)', display: 'grid', gap: '0.9rem' }}>
           {claim.description && (
             <div>
-              <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.25rem' }}>Descrição</p>
+              <p style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.25rem' }}>Descrição</p>
               <p style={{ fontSize: '0.82rem', color: navy, margin: 0, lineHeight: 1.5 }}>{claim.description}</p>
             </div>
           )}
 
           <div>
-            <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>Documentos</p>
+            <p style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>Documentos</p>
             {loadingOps ? (
-              <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: 0 }}>A carregar...</p>
+              <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: 0 }}>A carregar...</p>
             ) : (
               <>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 0.75rem', background: navy, color: '#fff', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', marginBottom: '0.6rem' }}>
@@ -345,7 +345,7 @@ function ClaimCard({ claim }: { claim: Claim }) {
                       <div key={doc.id} style={{ padding: '0.55rem 0.65rem', border: '1px solid #E2E8F0', borderRadius: 6, display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'center' }}>
                         <div>
                           <p style={{ fontSize: '0.78rem', color: navy, margin: 0, fontWeight: 600 }}>{doc.name}</p>
-                          <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '0.1rem 0 0' }}>{formatDateTime(doc.uploadedAt)} · {doc.uploadedByName}</p>
+                          <p style={{ fontSize: '0.68rem', color: 'var(--color-muted)', margin: '0.1rem 0 0' }}>{formatDateTime(doc.uploadedAt)} · {doc.uploadedByName}</p>
                         </div>
                         <button
                           onClick={async () => {
@@ -355,7 +355,7 @@ function ClaimCard({ claim }: { claim: Claim }) {
                             a.download = name
                             a.click()
                           }}
-                          style={{ border: '1px solid #CBD5E1', background: '#fff', color: '#334155', borderRadius: 4, padding: '0.3rem 0.6rem', fontSize: '0.72rem', cursor: 'pointer' }}
+                          style={{ border: '1px solid #CBD5E1', background: 'var(--color-base)', color: '#334155', borderRadius: 4, padding: '0.3rem 0.6rem', fontSize: '0.72rem', cursor: 'pointer' }}
                         >
                           Download
                         </button>
@@ -363,14 +363,14 @@ function ClaimCard({ claim }: { claim: Claim }) {
                     ))}
                   </div>
                 ) : (
-                  <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: 0 }}>Sem documentos neste sinistro.</p>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: 0 }}>Sem documentos neste sinistro.</p>
                 )}
               </>
             )}
           </div>
 
           <div>
-            <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>Mensagens</p>
+            <p style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>Mensagens</p>
             {ops?.messages?.length ? (
               <div style={{ display: 'grid', gap: '0.45rem', marginBottom: '0.65rem', maxHeight: 220, overflowY: 'auto' }}>
                 {ops.messages.map((item) => (
@@ -379,17 +379,17 @@ function ClaimCard({ claim }: { claim: Claim }) {
                     style={{
                       padding: '0.55rem 0.65rem',
                       border: item.senderRole === 'client' ? '1px solid #BFDBFE' : '1px solid #FDE68A',
-                      background: item.senderRole === 'client' ? '#EFF6FF' : '#FFFBEB',
+                      background: item.senderRole === 'client' ? 'var(--status-info-bg)' : 'var(--status-warning-bg)',
                       borderRadius: 6,
                     }}
                   >
                     <p style={{ fontSize: '0.78rem', color: navy, margin: 0 }}>{item.body}</p>
-                    <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '0.18rem 0 0' }}>{item.senderName} · {formatDateTime(item.createdAt)}</p>
+                    <p style={{ fontSize: '0.68rem', color: 'var(--color-muted)', margin: '0.18rem 0 0' }}>{item.senderName} · {formatDateTime(item.createdAt)}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '0 0 0.65rem' }}>Ainda sem mensagens.</p>
+              <p style={{ fontSize: '0.78rem', color: 'var(--color-muted)', margin: '0 0 0.65rem' }}>Ainda sem mensagens.</p>
             )}
             <div style={{ display: 'flex', gap: '0.45rem' }}>
               <input
@@ -424,16 +424,16 @@ function ClaimCard({ claim }: { claim: Claim }) {
 }
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: '#64748B', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.3rem' }}>{children}</label>
+  return <label style={{ display: 'block', fontSize: '0.68rem', fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: '0.3rem' }}>{children}</label>
 }
 
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '0.6rem 0.75rem', fontSize: '0.85rem',
   border: '1px solid #E2E8F0', borderRadius: 4, outline: 'none',
-  color: '#111', boxSizing: 'border-box', fontFamily: "'Montserrat', sans-serif",
+  color: 'var(--color-primary)', boxSizing: 'border-box', fontFamily: "'Montserrat', sans-serif",
 }
 
-const selectStyle: React.CSSProperties = { ...inputStyle, background: '#fff' }
+const selectStyle: React.CSSProperties = { ...inputStyle, background: 'var(--color-base)' }
 
 function Spinner() {
   return (
@@ -445,12 +445,12 @@ function Spinner() {
 }
 
 function ErrorMsg({ msg }: { msg: string }) {
-  return <div style={{ padding: '2rem', textAlign: 'center', color: '#B91C1C', fontSize: '0.9rem' }}>{msg}</div>
+  return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--status-danger-text)', fontSize: '0.9rem' }}>{msg}</div>
 }
 
 function EmptyState({ msg }: { msg: string }) {
   return (
-    <div style={{ padding: '2.5rem', textAlign: 'center', background: '#fff', borderRadius: 8, border: '1px solid #E2E8F0', color: '#94A3B8', fontSize: '0.85rem' }}>
+    <div style={{ padding: '2.5rem', textAlign: 'center', background: 'var(--color-base)', borderRadius: 8, border: '1px solid #E2E8F0', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
       {msg}
     </div>
   )

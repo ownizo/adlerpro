@@ -10,7 +10,7 @@ export const Route = createFileRoute('/one/dashboard')({
 })
 
 const navy = '#0A1628'
-const gold  = '#C9A84C'
+const gold  = 'var(--color-accent)'
 
 interface IndividualClient {
   id: string
@@ -68,11 +68,11 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  ativa:      { bg: '#EAF3DE', color: '#3B6D11', label: 'Ativa'      },
-  active:     { bg: '#EAF3DE', color: '#3B6D11', label: 'Ativa'      },
-  expiring:   { bg: '#FAEEDA', color: '#854F0B', label: 'A Renovar'  },
-  expired:    { bg: '#FEE2E2', color: '#991B1B', label: 'Expirada'   },
-  cancelled:  { bg: '#F3F4F6', color: '#6B7280', label: 'Cancelada'  },
+  ativa:      { bg: 'var(--status-success-bg)', color: 'var(--status-success-text)', label: 'Ativa'      },
+  active:     { bg: 'var(--status-success-bg)', color: 'var(--status-success-text)', label: 'Ativa'      },
+  expiring:   { bg: 'var(--status-warning-bg)', color: 'var(--status-warning-text)', label: 'A Renovar'  },
+  expired:    { bg: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', label: 'Expirada'   },
+  cancelled:  { bg: 'var(--status-neutral-bg)', color: 'var(--status-neutral-text)', label: 'Cancelada'  },
 }
 
 function OneDashboard() {
@@ -159,7 +159,7 @@ function OneDashboard() {
           <style>{`@keyframes one-spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       ) : error ? (
-        <div style={{ padding: '2rem', textAlign: 'center', color: '#B91C1C', fontSize: '0.9rem' }}>{error}</div>
+        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--status-danger-text)', fontSize: '0.9rem' }}>{error}</div>
       ) : (
         <>
           {/* Welcome header */}
@@ -167,7 +167,7 @@ function OneDashboard() {
             <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>
               Olá{client?.full_name ? `, ${client.full_name.split(' ')[0]}` : ''}
             </h1>
-            <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem', fontWeight: 400 }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', marginTop: '0.3rem', fontWeight: 400 }}>
               Aqui está um resumo das suas apólices de seguro.
             </p>
           </div>
@@ -198,7 +198,7 @@ function OneDashboard() {
 
           {/* No client record warning */}
           {!client && (
-            <div style={{ padding: '1.5rem', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 6, marginBottom: '1.5rem', fontSize: '0.85rem', color: '#92400E' }}>
+            <div style={{ padding: '1.5rem', background: 'var(--status-warning-bg)', border: '1px solid #FDE68A', borderRadius: 6, marginBottom: '1.5rem', fontSize: '0.85rem', color: 'var(--status-warning-text)' }}>
               <strong>Conta sem apólices associadas.</strong> Se já tem apólices geridas pela Adler Rochefort, contacte-nos para ligar a sua conta ao seu perfil.
             </div>
           )}
@@ -207,11 +207,11 @@ function OneDashboard() {
           {client && (
             <div>
               <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, marginBottom: '0.85rem', letterSpacing: '0.02em' }}>
-                As Suas Apólices {activePolicies.length > 0 && <span style={{ color: '#94A3B8', fontWeight: 400 }}>({policies.length})</span>}
+                As Suas Apólices {activePolicies.length > 0 && <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>({policies.length})</span>}
               </h2>
 
               {policies.length === 0 ? (
-                <div style={{ padding: '2.5rem', textAlign: 'center', background: '#fff', borderRadius: 8, border: '1px solid #E2E8F0', color: '#94A3B8', fontSize: '0.85rem' }}>
+                <div style={{ padding: '2.5rem', textAlign: 'center', background: 'var(--color-base)', borderRadius: 8, border: '1px solid #E2E8F0', color: 'var(--color-muted)', fontSize: '0.85rem' }}>
                   Sem apólices registadas.
                 </div>
               ) : (
@@ -234,7 +234,7 @@ function KPICard({ label, value, sublabel, icon, accent, highlight }: {
 }) {
   return (
     <div style={{
-      background: '#fff',
+      background: 'var(--color-base)',
       border: highlight ? `1.5px solid ${accent}` : '1px solid #E2E8F0',
       borderRadius: 8,
       padding: '1rem 1.1rem',
@@ -244,9 +244,9 @@ function KPICard({ label, value, sublabel, icon, accent, highlight }: {
     }}>
       <span style={{ fontSize: '1.4rem', flexShrink: 0, marginTop: 2 }}>{icon}</span>
       <div>
-        <p style={{ fontSize: '0.68rem', color: '#94A3B8', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>{label}</p>
+        <p style={{ fontSize: '0.68rem', color: 'var(--color-muted)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', margin: 0 }}>{label}</p>
         <p style={{ fontSize: '1.3rem', fontWeight: 700, color: highlight ? accent : navy, margin: '0.1rem 0 0', lineHeight: 1.2 }}>{value}</p>
-        {sublabel && <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '0.1rem 0 0' }}>{sublabel}</p>}
+        {sublabel && <p style={{ fontSize: '0.68rem', color: 'var(--color-muted)', margin: '0.1rem 0 0' }}>{sublabel}</p>}
       </div>
     </div>
   )
@@ -254,13 +254,13 @@ function KPICard({ label, value, sublabel, icon, accent, highlight }: {
 
 function PolicyCard({ policy }: { policy: Policy }) {
   const [expanded, setExpanded] = useState(false)
-  const st = STATUS_STYLE[policy.status] ?? { bg: '#F3F4F6', color: '#6B7280', label: policy.status }
+  const st = STATUS_STYLE[policy.status] ?? { bg: 'var(--status-neutral-bg)', color: 'var(--status-neutral-text)', label: policy.status }
   const typeLabel = TYPE_LABELS[policy.type] ?? policy.type
   const days = policy.end_date ? daysUntil(policy.end_date) : null
   const urgency = days !== null && days <= 14 ? '#EF4444' : days !== null && days <= 30 ? '#F59E0B' : gold
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
+    <div style={{ background: 'var(--color-base)', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
       <button
         onClick={() => setExpanded(e => !e)}
         style={{ width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: '1rem 1.25rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}
@@ -274,7 +274,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
               {st.label}
             </span>
           </div>
-          <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '0.2rem 0 0', fontFamily: "'Montserrat', sans-serif" }}>
+          <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', margin: '0.2rem 0 0', fontFamily: "'Montserrat', sans-serif" }}>
             {policy.insurer}{policy.policy_number ? ` · ${policy.policy_number}` : ''}
           </p>
         </div>
@@ -282,7 +282,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
           {policy.annual_premium > 0 && (
             <p style={{ fontSize: '0.9rem', fontWeight: 700, color: navy, margin: 0, fontFamily: "'Montserrat', sans-serif" }}>
               {formatCurrency(policy.annual_premium)}
-              <span style={{ fontSize: '0.65rem', fontWeight: 400, color: '#94A3B8' }}>/ano</span>
+              <span style={{ fontSize: '0.65rem', fontWeight: 400, color: 'var(--color-muted)' }}>/ano</span>
             </p>
           )}
           {days !== null && (
@@ -294,7 +294,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
       </button>
 
       {expanded && (
-        <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
+        <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: 'var(--color-surface)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
           {policy.start_date     && <DetailItem label="Início"       value={formatDate(policy.start_date)} />}
           {policy.end_date       && <DetailItem label="Fim"          value={formatDate(policy.end_date)} />}
           {policy.renewal_date   && <DetailItem label="Renovação"    value={formatDate(policy.renewal_date)} />}
@@ -309,7 +309,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
 function DetailItem({ label, value, span }: { label: string; value: string; span?: boolean }) {
   return (
     <div style={{ gridColumn: span ? '1 / -1' : undefined }}>
-      <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0, fontFamily: "'Montserrat', sans-serif" }}>
+      <p style={{ fontSize: '0.62rem', fontWeight: 600, color: 'var(--color-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0, fontFamily: "'Montserrat', sans-serif" }}>
         {label}
       </p>
       <p style={{ fontSize: '0.8rem', color: navy, fontWeight: 500, margin: '0.1rem 0 0', fontFamily: "'Montserrat', sans-serif" }}>

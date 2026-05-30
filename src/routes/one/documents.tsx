@@ -10,7 +10,7 @@ export const Route = createFileRoute('/one/documents')({
 })
 
 const navy = '#0A1628'
-const gold  = '#C9A84C'
+const gold  = 'var(--color-accent)'
 
 interface Document {
   id: string
@@ -31,12 +31,12 @@ const CATEGORY_LABELS: Record<string, string> = {
 }
 
 const CATEGORY_COLOR: Record<string, { bg: string; color: string }> = {
-  policy:      { bg: '#EFF6FF', color: '#1D4ED8' },
-  claim:       { bg: '#FEF3C7', color: '#92400E' },
-  invoice:     { bg: '#F3E8FF', color: '#6D28D9' },
-  report:      { bg: '#EAF3DE', color: '#3B6D11' },
-  certificate: { bg: '#D1FAE5', color: '#065F46' },
-  other:       { bg: '#F3F4F6', color: '#6B7280' },
+  policy:      { bg: 'var(--status-info-bg)', color: 'var(--status-info-text)' },
+  claim:       { bg: 'var(--status-warning-bg)', color: 'var(--status-warning-text)' },
+  invoice:     { bg: 'var(--status-info-bg)', color: 'var(--status-info-text)' },
+  report:      { bg: 'var(--status-success-bg)', color: 'var(--status-success-text)' },
+  certificate: { bg: 'var(--status-success-bg)', color: 'var(--status-success-text)' },
+  other:       { bg: 'var(--status-neutral-bg)', color: 'var(--status-neutral-text)' },
 }
 
 function formatSize(bytes: number) {
@@ -177,14 +177,14 @@ function OneDocuments() {
         <>
           <div style={{ marginBottom: '1.75rem' }}>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>Documentos</h1>
-            <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>
+            <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', marginTop: '0.3rem' }}>
               {documents.length} documento{documents.length !== 1 ? 's' : ''}
             </p>
           </div>
 
           {/* Upload area */}
-          <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, padding: '1.25rem', marginBottom: '1.5rem' }}>
-            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.85rem' }}>
+          <div style={{ background: 'var(--color-base)', border: '1px solid #E2E8F0', borderRadius: 8, padding: '1.25rem', marginBottom: '1.5rem' }}>
+            <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.85rem' }}>
               Adicionar Documento
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -192,7 +192,7 @@ function OneDocuments() {
                 type="button"
                 disabled={uploading}
                 onClick={() => cameraRef.current?.click()}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.1rem', background: uploading ? '#94A3B8' : navy, color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.82rem', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: "'Montserrat', sans-serif" }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.1rem', background: uploading ? 'var(--color-muted)' : navy, color: '#fff', border: 'none', borderRadius: 6, fontSize: '0.82rem', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: "'Montserrat', sans-serif" }}
               >
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -204,7 +204,7 @@ function OneDocuments() {
                 type="button"
                 disabled={uploading}
                 onClick={() => fileRef.current?.click()}
-                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.1rem', background: '#F8FAFC', color: navy, border: '1px solid #E2E8F0', borderRadius: 6, fontSize: '0.82rem', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: "'Montserrat', sans-serif" }}
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.6rem 1.1rem', background: 'var(--color-surface)', color: navy, border: '1px solid #E2E8F0', borderRadius: 6, fontSize: '0.82rem', fontWeight: 600, cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: "'Montserrat', sans-serif" }}
               >
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
@@ -217,31 +217,31 @@ function OneDocuments() {
             <input ref={fileRef} type="file" accept="image/*,application/pdf" multiple style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
 
             {uploading && (
-              <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: '#F0F9FF', border: '1px solid #BAE6FD', borderRadius: 6 }}>
+              <div style={{ marginTop: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.65rem 0.85rem', background: 'var(--status-info-bg)', border: '1px solid #BAE6FD', borderRadius: 6 }}>
                 <div style={{ width: 14, height: 14, border: '2px solid #0EA5E9', borderTopColor: 'transparent', borderRadius: '50%', animation: 'one-spin 0.75s linear infinite', flexShrink: 0 }} />
-                <p style={{ fontSize: '0.82rem', color: '#0369A1', margin: 0 }}>{uploadMsg}</p>
+                <p style={{ fontSize: '0.82rem', color: 'var(--status-info-text)', margin: 0 }}>{uploadMsg}</p>
               </div>
             )}
             {!uploading && uploadMsg && (
-              <p style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: '#16A34A', fontWeight: 600 }}>✓ {uploadMsg}</p>
+              <p style={{ marginTop: '0.75rem', fontSize: '0.82rem', color: 'var(--status-success-text)', fontWeight: 600 }}>✓ {uploadMsg}</p>
             )}
             {uploadError && (
-              <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: '#FFF5F5', border: '1px solid #FECACA', borderRadius: 6 }}>
-                <p style={{ fontSize: '0.78rem', color: '#DC2626', margin: 0 }}>⚠ {uploadError}</p>
+              <div style={{ marginTop: '0.75rem', padding: '0.5rem 0.75rem', background: 'var(--status-danger-bg)', border: '1px solid #FECACA', borderRadius: 6 }}>
+                <p style={{ fontSize: '0.78rem', color: 'var(--status-danger-text)', margin: 0 }}>⚠ {uploadError}</p>
               </div>
             )}
           </div>
 
           {documents.length === 0 ? (
-            <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#fff', borderRadius: 8, border: '1px solid #E2E8F0' }}>
+            <div style={{ padding: '3rem 2rem', textAlign: 'center', background: 'var(--color-base)', borderRadius: 8, border: '1px solid #E2E8F0' }}>
               <p style={{ fontSize: '2rem', margin: '0 0 0.75rem' }}>📄</p>
               <p style={{ fontSize: '0.9rem', fontWeight: 600, color: navy, margin: '0 0 0.4rem' }}>Sem documentos disponíveis</p>
-              <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0 }}>
+              <p style={{ fontSize: '0.82rem', color: 'var(--color-muted)', margin: 0 }}>
                 Os seus documentos serão disponibilizados aqui pela Adler Rochefort.
               </p>
             </div>
           ) : (
-            <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
+            <div style={{ background: 'var(--color-base)', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
               {documents.map((doc, i) => {
                 const cat = CATEGORY_COLOR[doc.category] ?? CATEGORY_COLOR.other
                 const catLabel = CATEGORY_LABELS[doc.category] ?? doc.category
@@ -261,7 +261,7 @@ function OneDocuments() {
                       <p style={{ fontSize: '0.85rem', fontWeight: 600, color: navy, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {doc.name}
                       </p>
-                      <p style={{ fontSize: '0.72rem', color: '#94A3B8', margin: '0.15rem 0 0' }}>
+                      <p style={{ fontSize: '0.72rem', color: 'var(--color-muted)', margin: '0.15rem 0 0' }}>
                         {formatSize(doc.size)} · {formatDate(doc.uploaded_at)}
                       </p>
                     </div>
@@ -271,7 +271,7 @@ function OneDocuments() {
                     {doc.storage_path && (
                       <button
                         onClick={() => handlePreview(doc)}
-                        style={{ padding: '0.3rem 0.7rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600, flexShrink: 0, fontFamily: "'Montserrat', sans-serif" }}
+                        style={{ padding: '0.3rem 0.7rem', background: 'var(--status-info-bg)', color: 'var(--status-info-text)', border: '1px solid #BFDBFE', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600, flexShrink: 0, fontFamily: "'Montserrat', sans-serif" }}
                       >
                         Ver
                       </button>
@@ -291,14 +291,14 @@ function OneDocuments() {
           onClick={() => setPreviewUrl(null)}
         >
           <div
-            style={{ background: '#fff', borderRadius: 8, width: '100%', maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            style={{ background: 'var(--color-base)', borderRadius: 8, width: '100%', maxWidth: '900px', maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ fontWeight: 600, fontSize: '0.85rem', color: navy, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{previewName}</p>
               <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                <a href={previewUrl} target="_blank" rel="noreferrer" style={{ padding: '0.3rem 0.75rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, textDecoration: 'none', fontSize: '0.78rem', fontWeight: 600 }}>Abrir</a>
-                <button onClick={() => setPreviewUrl(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: '1.25rem' }}>×</button>
+                <a href={previewUrl} target="_blank" rel="noreferrer" style={{ padding: '0.3rem 0.75rem', background: 'var(--status-info-bg)', color: 'var(--status-info-text)', border: '1px solid #BFDBFE', borderRadius: 6, textDecoration: 'none', fontSize: '0.78rem', fontWeight: 600 }}>Abrir</a>
+                <button onClick={() => setPreviewUrl(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: '1.25rem' }}>×</button>
               </div>
             </div>
             <div style={{ flex: 1, overflow: 'hidden' }}>
@@ -327,5 +327,5 @@ function Spinner() {
 }
 
 function ErrorMsg({ msg }: { msg: string }) {
-  return <div style={{ padding: '2rem', textAlign: 'center', color: '#B91C1C', fontSize: '0.9rem' }}>{msg}</div>
+  return <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--status-danger-text)', fontSize: '0.9rem' }}>{msg}</div>
 }

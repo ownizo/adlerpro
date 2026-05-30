@@ -41,7 +41,7 @@ function LoginPage() {
           key={l}
           onClick={() => handleLang(l)}
           style={{
-            background: lang === l ? '#111111' : 'transparent',
+            background: lang === l ? 'var(--color-inverse)' : 'transparent',
             border: 'none',
             cursor: 'pointer',
             padding: '0.25rem 0.6rem',
@@ -49,7 +49,7 @@ function LoginPage() {
             fontSize: '0.7rem',
             fontWeight: 700,
             letterSpacing: '0.08em',
-            color: lang === l ? '#ffffff' : '#888888',
+            color: lang === l ? '#ffffff' : 'var(--color-label)',
             transition: 'background 0.15s, color 0.15s',
           }}
         >
@@ -84,9 +84,9 @@ function LoginPage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-base flex items-center justify-center">
         {langPill}
-        <div style={{ color: '#666666', fontFamily: "'Montserrat', sans-serif" }}>{t('common.loading')}</div>
+        <div style={{ color: 'var(--color-muted)', fontFamily: "'Montserrat', sans-serif" }}>{t('common.loading')}</div>
       </div>
     )
   }
@@ -231,23 +231,23 @@ function LoginPage() {
 
   if (signupSuccess) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center px-4">
+      <div className="min-h-screen bg-base flex items-center justify-center px-4">
         {langPill}
-        <div className="w-full max-w-md p-8 text-center" style={{ border: '1px solid #eeeeee', borderRadius: '4px' }}>
-          <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4" style={{ background: '#EAF3DE', borderRadius: '50%' }}>
-            <svg className="w-8 h-8" style={{ color: '#3B6D11' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="w-full max-w-md p-8 text-center" style={{ border: '1px solid var(--color-border)', borderRadius: '4px' }}>
+          <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4" style={{ background: 'var(--status-success-bg)', borderRadius: '50%' }}>
+            <svg className="w-8 h-8" style={{ color: 'var(--status-success-text)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1.75rem', color: '#111111', marginBottom: '0.5rem' }}>
+          <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1.75rem', color: 'var(--color-primary)', marginBottom: '0.5rem' }}>
             {t('auth.accountCreated')}
           </h2>
-          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, color: '#555555', marginBottom: '1.5rem' }}>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, color: 'var(--color-body)', marginBottom: '1.5rem' }}>
             {t('auth.confirmationSent', { email })}
           </p>
           <button
             onClick={() => { setSignupSuccess(false); setMode('login') }}
-            style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: '#C8961A', background: 'none', border: 'none', cursor: 'pointer' }}
+            style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: 'var(--color-accent)', background: 'none', border: 'none', cursor: 'pointer' }}
           >
             {t('auth.backToSignIn')}
           </button>
@@ -257,7 +257,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-4">
+    <div className="min-h-screen bg-base flex items-center justify-center px-4">
       {langPill}
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
@@ -268,18 +268,18 @@ function LoginPage() {
             fontSize: '1.1rem',
             letterSpacing: '0.04em',
             textTransform: 'uppercase' as const,
-            color: '#111111',
+            color: 'var(--color-primary)',
           }}>
-            Adler<span style={{ color: '#C8961A' }}>.</span>Pro
+            Adler<span style={{ color: 'var(--color-accent)' }}>.</span>Pro
           </h1>
-          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.85rem', color: '#999999', marginTop: '0.5rem' }}>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.85rem', color: 'var(--color-subtle)', marginTop: '0.5rem' }}>
             {t('common.portal')}
           </p>
         </div>
 
-        <div style={{ border: '1px solid #eeeeee', borderRadius: '4px', padding: '2rem' }}>
+        <div style={{ border: '1px solid var(--color-border)', borderRadius: '4px', padding: '2rem' }}>
           {!isPasswordSetupMode && mode !== 'forgot' && (
-            <div className="flex mb-6" style={{ background: '#f8f8f8', borderRadius: '2px', padding: '3px' }}>
+            <div className="flex mb-6" style={{ background: 'var(--color-surface)', borderRadius: '2px', padding: '3px' }}>
               <button
                 onClick={() => { setMode('login'); setError('') }}
                 className="flex-1 py-2 text-sm transition-colors"
@@ -288,8 +288,8 @@ function LoginPage() {
                   fontWeight: 600,
                   borderRadius: '2px',
                   ...(mode === 'login'
-                    ? { background: '#111111', color: '#ffffff' }
-                    : { background: 'transparent', color: '#666666' }),
+                    ? { background: 'var(--color-inverse)', color: '#ffffff' }
+                    : { background: 'transparent', color: 'var(--color-muted)' }),
                 }}
               >
                 {t('auth.signIn')}
@@ -302,8 +302,8 @@ function LoginPage() {
                   fontWeight: 600,
                   borderRadius: '2px',
                   ...(mode === 'signup'
-                    ? { background: '#111111', color: '#ffffff' }
-                    : { background: 'transparent', color: '#666666' }),
+                    ? { background: 'var(--color-inverse)', color: '#ffffff' }
+                    : { background: 'transparent', color: 'var(--color-muted)' }),
                 }}
               >
                 {t('auth.createAccount')}
@@ -315,7 +315,7 @@ function LoginPage() {
             <form onSubmit={mode === 'login' ? handleLogin : handleSignup} className="space-y-4">
               {mode === 'signup' && (
                 <div>
-                  <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                  <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: 'var(--color-subtle)', display: 'block', marginBottom: '0.25rem' }}>
                     {t('auth.fullName')}
                   </label>
                   <input
@@ -323,14 +323,14 @@ function LoginPage() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="w-full px-4 py-2.5 text-sm"
-                    style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
+                    style={{ border: '1px solid var(--color-border)', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
                     placeholder={t('auth.namePlaceholder')}
                     required
                   />
                 </div>
               )}
               <div>
-                <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: 'var(--color-subtle)', display: 'block', marginBottom: '0.25rem' }}>
                   {t('auth.email')}
                 </label>
                 <input
@@ -338,13 +338,13 @@ function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
-                  style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
+                  style={{ border: '1px solid var(--color-border)', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
                   placeholder={t('auth.emailPlaceholder')}
                   required
                 />
               </div>
               <div>
-                <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: 'var(--color-subtle)', display: 'block', marginBottom: '0.25rem' }}>
                   {t('auth.password')}
                 </label>
                 <input
@@ -352,7 +352,7 @@ function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
-                  style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
+                  style={{ border: '1px solid var(--color-border)', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
                   placeholder={t('auth.passwordPlaceholder')}
                   required
                   minLength={6}
@@ -360,17 +360,17 @@ function LoginPage() {
               </div>
 
               {error && (
-                <div className="text-sm p-3" style={{ background: '#FAEEDA', color: '#854F0B', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: 'var(--status-warning-bg)', color: 'var(--status-warning-text)', borderRadius: '2px' }}>
                   {error}
                 </div>
               )}
               {recoveryMessage && (
-                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: 'var(--status-success-bg)', color: 'var(--status-success-text)', borderRadius: '2px' }}>
                   {recoveryMessage}
                 </div>
               )}
               {confirmationMessage && (
-                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: 'var(--status-success-bg)', color: 'var(--status-success-text)', borderRadius: '2px' }}>
                   {confirmationMessage}
                 </div>
               )}
@@ -384,13 +384,13 @@ function LoginPage() {
                       setError('')
                       setRecoveryMessage('')
                     }}
-                    style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: '#C8961A', background: 'none', border: 'none', cursor: 'pointer' }}
+                    style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: 'var(--color-accent)', background: 'none', border: 'none', cursor: 'pointer' }}
                   >
                     {t('auth.forgotPassword')}
                   </button>
                   <Link
                     to="/"
-                    style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: '#666666', textDecoration: 'none' }}
+                    style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: 'var(--color-muted)', textDecoration: 'none' }}
                   >
                     {t('auth.backToHome')}
                   </Link>
@@ -407,12 +407,12 @@ function LoginPage() {
                       onChange={(e) => setTermsAccepted(e.target.checked)}
                       style={{ marginTop: '3px', accentColor: '#C8961A', cursor: 'pointer', minWidth: '16px' }}
                     />
-                    <label htmlFor="terms-checkbox" style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#666666', cursor: 'pointer', lineHeight: '1.4' }}>
+                    <label htmlFor="terms-checkbox" style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: 'var(--color-muted)', cursor: 'pointer', lineHeight: '1.4' }}>
                       {t('auth.termsAccept')}{' '}
                       <button
                         type="button"
                         onClick={(e) => { e.preventDefault(); setTermsExpanded(!termsExpanded) }}
-                        style={{ fontWeight: 600, color: '#C8961A', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', textDecoration: 'underline' }}
+                        style={{ fontWeight: 600, color: 'var(--color-accent)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', textDecoration: 'underline' }}
                       >
                         {t('auth.termsLink')}
                       </button>
@@ -420,7 +420,7 @@ function LoginPage() {
                       <Link
                         to="/privacy-policy"
                         target="_blank"
-                        style={{ fontWeight: 600, color: '#C8961A', textDecoration: 'underline', fontSize: '0.75rem' }}
+                        style={{ fontWeight: 600, color: 'var(--color-accent)', textDecoration: 'underline', fontSize: '0.75rem' }}
                       >
                         {t('auth.privacyLink')}
                       </Link>
@@ -431,17 +431,17 @@ function LoginPage() {
                     <div style={{
                       marginTop: '0.75rem',
                       padding: '1rem',
-                      background: '#f9f9f9',
-                      border: '1px solid #eeeeee',
+                      background: 'var(--color-surface)',
+                      border: '1px solid var(--color-border)',
                       borderRadius: '4px',
                       maxHeight: '200px',
                       overflowY: 'auto' as const,
                       fontSize: '0.7rem',
                       fontFamily: "'Montserrat', sans-serif",
-                      color: '#555555',
+                      color: 'var(--color-body)',
                       lineHeight: '1.6',
                     }}>
-                      <p style={{ fontWeight: 700, marginBottom: '0.5rem', color: '#111111', fontSize: '0.75rem' }}>Termos e Condições de Utilização — Adler Pro</p>
+                      <p style={{ fontWeight: 700, marginBottom: '0.5rem', color: 'var(--color-primary)', fontSize: '0.75rem' }}>Termos e Condições de Utilização — Adler Pro</p>
                       <p style={{ marginBottom: '0.5rem' }}><strong>1. Objecto.</strong> O Adler Pro é uma plataforma digital de gestão de seguros empresariais desenvolvida pela Ownizo Unipessoal, Lda., e operada sob a marca comercial Adler & Rochefort, dedicada à mediação de seguros e registada na ASF. A utilização da plataforma está sujeita à aceitação integral destes termos.</p>
                       <p style={{ marginBottom: '0.5rem' }}><strong>2. Registo e Acesso.</strong> O utilizador compromete-se a fornecer informações verdadeiras e actualizadas. As credenciais de acesso são pessoais e intransmissíveis. O utilizador é responsável por toda a actividade realizada com as suas credenciais.</p>
                       <p style={{ marginBottom: '0.5rem' }}><strong>3. Serviços Disponibilizados.</strong> A plataforma disponibiliza funcionalidades de gestão de apólices, análise comparativa por IA, gestão de sinistros, alertas de renovação e análise de risco. Os resultados gerados por IA têm carácter informativo e não substituem aconselhamento profissional.</p>
@@ -458,7 +458,7 @@ function LoginPage() {
                     <button
                       type="button"
                       onClick={() => setTermsExpanded(false)}
-                      style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.7rem', color: '#999999', background: 'none', border: 'none', cursor: 'pointer', marginTop: '0.25rem' }}
+                      style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.7rem', color: 'var(--color-subtle)', background: 'none', border: 'none', cursor: 'pointer', marginTop: '0.25rem' }}
                     >
                       {t('auth.closeTerms')}
                     </button>
@@ -475,7 +475,7 @@ function LoginPage() {
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   padding: '0.7rem 1.75rem',
-                  background: (mode === 'signup' && !termsAccepted) ? '#cccccc' : '#111111',
+                  background: (mode === 'signup' && !termsAccepted) ? 'var(--color-subtle)' : 'var(--color-inverse)',
                   color: '#ffffff',
                   borderRadius: '2px',
                   border: 'none',
@@ -493,11 +493,11 @@ function LoginPage() {
 
           {mode === 'forgot' && (
             <form onSubmit={handlePasswordRecovery} className="space-y-4">
-              <p className="text-sm" style={{ color: '#666666', fontFamily: "'Montserrat', sans-serif" }}>
+              <p className="text-sm" style={{ color: 'var(--color-muted)', fontFamily: "'Montserrat', sans-serif" }}>
                 {t('auth.forgotTitle')}
               </p>
               <div>
-                <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: 'var(--color-subtle)', display: 'block', marginBottom: '0.25rem' }}>
                   {t('auth.email')}
                 </label>
                 <input
@@ -505,19 +505,19 @@ function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
-                  style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
+                  style={{ border: '1px solid var(--color-border)', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
                   placeholder={t('auth.emailPlaceholder')}
                   required
                 />
               </div>
 
               {error && (
-                <div className="text-sm p-3" style={{ background: '#FAEEDA', color: '#854F0B', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: 'var(--status-warning-bg)', color: 'var(--status-warning-text)', borderRadius: '2px' }}>
                   {error}
                 </div>
               )}
               {recoveryMessage && (
-                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: 'var(--status-success-bg)', color: 'var(--status-success-text)', borderRadius: '2px' }}>
                   {recoveryMessage}
                 </div>
               )}
@@ -530,7 +530,7 @@ function LoginPage() {
                     setError('')
                     setRecoveryMessage('')
                   }}
-                  style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: '#666666', background: 'none', border: 'none', cursor: 'pointer' }}
+                  style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   {t('auth.backToLogin')}
                 </button>
@@ -543,7 +543,7 @@ function LoginPage() {
                     fontWeight: 600,
                     fontSize: '0.85rem',
                     padding: '0.7rem 1.75rem',
-                    background: '#111111',
+                    background: 'var(--color-inverse)',
                     color: '#ffffff',
                     borderRadius: '2px',
                     border: 'none',
@@ -558,12 +558,12 @@ function LoginPage() {
 
           {isPasswordSetupMode && (
             <form onSubmit={handlePasswordSetup} className="space-y-4">
-              <p className="text-sm" style={{ color: '#666666', fontFamily: "'Montserrat', sans-serif" }}>
+              <p className="text-sm" style={{ color: 'var(--color-muted)', fontFamily: "'Montserrat', sans-serif" }}>
                 {t('auth.recoveryTitle')}
               </p>
 
               <div>
-                <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: 'var(--color-subtle)', display: 'block', marginBottom: '0.25rem' }}>
                   {t('auth.newPassword')}
                 </label>
                 <input
@@ -571,14 +571,14 @@ function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
-                  style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
+                  style={{ border: '1px solid var(--color-border)', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
                   placeholder={t('auth.passwordPlaceholder')}
                   required
                   minLength={6}
                 />
               </div>
               <div>
-                <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                <label style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.75rem', color: 'var(--color-subtle)', display: 'block', marginBottom: '0.25rem' }}>
                   {t('auth.confirmPassword')}
                 </label>
                 <input
@@ -586,7 +586,7 @@ function LoginPage() {
                   value={passwordConfirmation}
                   onChange={(e) => setPasswordConfirmation(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
-                  style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
+                  style={{ border: '1px solid var(--color-border)', borderRadius: '2px', fontFamily: "'Montserrat', sans-serif", outline: 'none' }}
                   placeholder={t('auth.passwordPlaceholder')}
                   required
                   minLength={6}
@@ -594,12 +594,12 @@ function LoginPage() {
               </div>
 
               {error && (
-                <div className="text-sm p-3" style={{ background: '#FAEEDA', color: '#854F0B', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: 'var(--status-warning-bg)', color: 'var(--status-warning-text)', borderRadius: '2px' }}>
                   {error}
                 </div>
               )}
               {recoveryMessage && (
-                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: 'var(--status-success-bg)', color: 'var(--status-success-text)', borderRadius: '2px' }}>
                   {recoveryMessage}
                 </div>
               )}
@@ -613,7 +613,7 @@ function LoginPage() {
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   padding: '0.7rem 1.75rem',
-                  background: '#111111',
+                  background: 'var(--color-inverse)',
                   color: '#ffffff',
                   borderRadius: '2px',
                   border: 'none',

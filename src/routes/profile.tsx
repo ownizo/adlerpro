@@ -101,25 +101,25 @@ function ProfilePage() {
       <h1 className="text-2xl font-bold mb-8" style={{ fontFamily: "'Montserrat', sans-serif" }}>{t('profile.title')}</h1>
 
       {message && (
-        <div className="mb-6 p-4 rounded bg-blue-50 text-blue-800">
+        <div className="mb-6 p-4 rounded bg-info text-info">
           {message}
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm mb-8">
+      <div className="bg-surface p-6 rounded-lg border border-navy-200 shadow-sm mb-8">
         <h2 className="text-lg font-semibold mb-4">{t('profile.accountInfo')}</h2>
         <div className="flex items-center gap-6 mb-6">
           <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden border">
             {avatarUrl ? (
               <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
             ) : (
-              <span className="text-2xl text-gray-500">{user.name?.charAt(0) || user.email?.charAt(0)}</span>
+              <span className="text-2xl text-muted">{user.name?.charAt(0) || user.email?.charAt(0)}</span>
             )}
           </div>
           <div>
             <p className="font-medium text-lg">{user.name || t('profile.noName')}</p>
-            <p className="text-gray-500 mb-3">{user.email}</p>
-            <p className="text-sm text-gray-500 mb-3">{t('profile.company')} <strong>{companyName}</strong></p>
+            <p className="text-muted mb-3">{user.email}</p>
+            <p className="text-sm text-muted mb-3">{t('profile.company')} <strong>{companyName}</strong></p>
             <div>
               <label className="cursor-pointer bg-[#111111] text-white px-4 py-2 rounded text-sm hover:bg-black transition-colors">
                 {uploading ? t('profile.uploading') : t('profile.changeImage')}
@@ -131,13 +131,13 @@ function ProfilePage() {
                   disabled={uploading}
                 />
               </label>
-              <p className="text-xs text-gray-400 mt-2">{t('profile.supportedFormats')}</p>
+              <p className="text-xs text-subtle mt-2">{t('profile.supportedFormats')}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm mb-8">
+      <div className="bg-surface p-6 rounded-lg border border-navy-200 shadow-sm mb-8">
         <h2 className="text-lg font-semibold mb-4">{t('profile.changePassword')}</h2>
         <form onSubmit={handlePasswordChange} className="space-y-4">
           <div>
@@ -160,12 +160,12 @@ function ProfilePage() {
         </form>
       </div>
 
-      <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-        <h2 className="text-lg font-semibold text-red-600 mb-4">{t('profile.session')}</h2>
-        <p className="text-sm text-gray-500 mb-4">{t('profile.sessionDesc')}</p>
+      <div className="bg-surface p-6 rounded-lg border border-navy-200 shadow-sm">
+        <h2 className="text-lg font-semibold text-danger mb-4">{t('profile.session')}</h2>
+        <p className="text-sm text-muted mb-4">{t('profile.sessionDesc')}</p>
         <button
           onClick={handleLogout}
-          className="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded text-sm hover:bg-red-100 transition-colors"
+          className="bg-danger text-danger border border-danger px-4 py-2 rounded text-sm hover:bg-danger transition-colors"
         >
           {t('profile.logout')}
         </button>

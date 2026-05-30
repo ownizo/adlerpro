@@ -68,15 +68,15 @@ function PartnerRiskPage() {
     <AppLayout>
       <div style={{ maxWidth: '900px', margin: '0 auto', padding: '1.5rem 1rem' }}>
         <div style={{ marginBottom: '2rem' }}>
-          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '1.75rem', fontWeight: 700, color: '#111111', margin: '0 0 0.5rem' }}>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '1.75rem', fontWeight: 700, color: 'var(--color-primary)', margin: '0 0 0.5rem' }}>
             {t('partnerRisk.title')}
           </h1>
-          <p style={{ color: '#666666', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}
+          <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', lineHeight: 1.6, margin: 0 }}
             dangerouslySetInnerHTML={{ __html: t('partnerRisk.subtitle') }}
           />
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', padding: '1rem 1.25rem', background: '#f8f8f8', border: '1px solid #eeeeee', borderRadius: '4px', marginBottom: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', padding: '1rem 1.25rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', marginBottom: '1.5rem' }}>
           <Info style={{ width: '18px', height: '18px', color: '#C8961A', flexShrink: 0, marginTop: '2px' }} />
           <div>
             <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.85rem', fontWeight: 600, color: '#111', margin: '0 0 0.25rem' }}>{t('partnerRisk.howItWorks')}</p>
@@ -86,7 +86,7 @@ function PartnerRiskPage() {
           </div>
         </div>
 
-        <div style={{ background: '#ffffff', border: '1.5px solid #111111', borderRadius: '4px', padding: '1.5rem', marginBottom: '2rem' }}>
+        <div style={{ background: 'var(--color-base)', border: '1.5px solid var(--color-border-strong)', borderRadius: '4px', padding: '1.5rem', marginBottom: '2rem' }}>
           <form onSubmit={analyzeRisk}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
               <div>
@@ -130,7 +130,7 @@ function PartnerRiskPage() {
             <button
               type="submit"
               disabled={loading || (!nif && !cprc)}
-              style={{ background: '#111', color: '#fff', padding: '0.75rem 2rem', borderRadius: '4px', border: 'none', fontFamily: "'Montserrat', sans-serif", fontSize: '0.875rem', fontWeight: 700, cursor: loading || (!nif && !cprc) ? 'not-allowed' : 'pointer', opacity: loading || (!nif && !cprc) ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ background: 'var(--color-inverse)', color: '#fff', padding: '0.75rem 2rem', borderRadius: '4px', border: 'none', fontFamily: "'Montserrat', sans-serif", fontSize: '0.875rem', fontWeight: 700, cursor: loading || (!nif && !cprc) ? 'not-allowed' : 'pointer', opacity: loading || (!nif && !cprc) ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '0.5rem' }}
             >
               {loading ? (
                 <><svg style={{ width: '16px', height: '16px', animation: 'spin 1s linear infinite' }} viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" /></svg>{t('partnerRisk.analyzing')}</>
@@ -139,37 +139,37 @@ function PartnerRiskPage() {
               )}
             </button>
             {error && (
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginTop: '0.75rem', padding: '0.625rem 0.75rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px' }}>
-                <AlertTriangle style={{ width: '16px', height: '16px', color: '#dc2626', flexShrink: 0, marginTop: '1px' }} />
-                <p style={{ color: '#dc2626', fontSize: '0.85rem', margin: 0 }}>{error}</p>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginTop: '0.75rem', padding: '0.625rem 0.75rem', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger-border)', borderRadius: '4px' }}>
+                <AlertTriangle style={{ width: '16px', height: '16px', color: 'var(--status-danger-text)', flexShrink: 0, marginTop: '1px' }} />
+                <p style={{ color: 'var(--status-danger-text)', fontSize: '0.85rem', margin: 0 }}>{error}</p>
               </div>
             )}
           </form>
         </div>
 
         {companyProfile && (
-          <div style={{ background: '#111', color: '#fff', borderRadius: '4px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem' }}>
+          <div style={{ background: 'var(--color-inverse)', color: '#fff', borderRadius: '4px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem' }}>
               <div>
                 <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', color: '#C8961A', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 0.25rem' }}>{t('partnerRisk.identified')}</p>
                 <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '1.1rem', fontWeight: 700, color: '#fff', margin: '0 0 0.25rem' }}>{companyProfile.identificacao.nome}</h2>
-                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', color: '#aaa', margin: 0 }}>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.8rem', color: 'var(--color-label-light)', margin: 0 }}>
                   NIF {companyProfile.identificacao.nif} · {companyProfile.identificacao.naturezaJuridica} · Capital: {companyProfile.identificacao.capitalSocial}
                 </p>
               </div>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 {companyProfile.fonteDados.bizapisNifName === 'Disponível' && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: '#1a1a1a', border: '1px solid #333', borderRadius: '4px', padding: '0.25rem 0.625rem', fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', color: '#aaa' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '0.25rem 0.625rem', fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', color: 'var(--color-label-light)' }}>
                     <CheckCircle style={{ width: '12px', height: '12px', color: '#16a34a' }} /> {t('partnerRisk.at')}
                   </span>
                 )}
                 {companyProfile.fonteDados.bizapisCPRC === 'Disponível' && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: '#1a1a1a', border: '1px solid #333', borderRadius: '4px', padding: '0.25rem 0.625rem', fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', color: '#aaa' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '0.25rem 0.625rem', fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', color: 'var(--color-label-light)' }}>
                     <CheckCircle style={{ width: '12px', height: '12px', color: '#16a34a' }} /> {t('partnerRisk.comercialRegistry')}
                   </span>
                 )}
                 {companyProfile.alertas?.factosPendentes === 'Sim' && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', padding: '0.25rem 0.625rem', fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', color: '#dc2626' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger-border)', borderRadius: '4px', padding: '0.25rem 0.625rem', fontFamily: "'Montserrat', sans-serif", fontSize: '0.7rem', color: 'var(--status-danger-text)' }}>
                     <AlertTriangle style={{ width: '12px', height: '12px' }} /> {t('partnerRisk.pendingFacts')}
                   </span>
                 )}
@@ -190,7 +190,7 @@ function PartnerRiskPage() {
                 <FileText style={{ width: '14px', height: '14px' }} />{t('partnerRisk.printPdf')}
               </button>
             </div>
-            <div style={{ background: '#fff', border: '1px solid #eee', borderRadius: '4px', padding: '2rem' }} dangerouslySetInnerHTML={{ __html: report }} />
+            <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: '4px', padding: '2rem' }} dangerouslySetInnerHTML={{ __html: report }} />
             <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#888', margin: '0.75rem 0 0', lineHeight: 1.5 }}>
               {t('partnerRisk.disclaimer', { date: new Date().toLocaleDateString('pt-PT') })}
             </p>

@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 
 const navy = '#0A1628'
-const gold  = '#C9A84C'
+const gold  = 'var(--color-accent)'
 
 const NAV_LINKS = [
   { to: '/one/dashboard',  label: 'Dashboard'    },
@@ -49,7 +49,7 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F4F6FA', fontFamily: "'Montserrat', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: 'var(--color-base)', fontFamily: "'Montserrat', sans-serif" }}>
 
       {/* ── Top nav ── */}
       <nav style={styles.nav}>
@@ -124,7 +124,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#F4F6FA',
+    background: 'var(--color-base)',
   },
   spinner: {
     width: 32,
@@ -135,7 +135,7 @@ const styles: Record<string, React.CSSProperties> = {
     animation: 'one-spin 0.75s linear infinite',
   },
   nav: {
-    background: navy,
+    background: '#0A1628',
     height: 56,
     padding: '0 1.5rem',
     display: 'flex',
@@ -203,7 +203,7 @@ const styles: Record<string, React.CSSProperties> = {
     top: 56,
     left: 0,
     right: 0,
-    background: navy,
+    background: '#0A1628',
     display: 'flex',
     flexDirection: 'column' as const,
     padding: '0.75rem 1.5rem 1.25rem',

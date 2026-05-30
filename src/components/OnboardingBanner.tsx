@@ -48,7 +48,7 @@ export function OnboardingBanner({ hasPolicies, hasProfile, onDismiss }: Onboard
   return (
     <div
       style={{
-        background: '#111111',
+        background: 'var(--color-inverse)',
         borderRadius: '4px',
         padding: '1.25rem 1.5rem',
         marginBottom: '1.5rem',
@@ -63,7 +63,7 @@ export function OnboardingBanner({ hasPolicies, hasProfile, onDismiss }: Onboard
           right: '0.75rem',
           background: 'none',
           border: 'none',
-          color: '#666666',
+          color: 'var(--color-muted)',
           cursor: 'pointer',
           fontSize: '1.1rem',
           lineHeight: 1,
@@ -84,12 +84,12 @@ export function OnboardingBanner({ hasPolicies, hasProfile, onDismiss }: Onboard
           </span>
         </div>
         {/* Progress bar */}
-        <div style={{ height: '4px', background: '#333333', borderRadius: '2px', overflow: 'hidden' }}>
+        <div style={{ height: '4px', background: 'var(--color-border-strong)', borderRadius: '2px', overflow: 'hidden' }}>
           <div
             style={{
               height: '100%',
               width: `${progressPct}%`,
-              background: '#C8961A',
+              background: 'var(--color-accent)',
               borderRadius: '2px',
               transition: 'width 0.4s ease',
             }}
@@ -129,7 +129,7 @@ export function OnboardingBanner({ hasPolicies, hasProfile, onDismiss }: Onboard
                     <path d="M2 5l2.5 2.5L8 3" stroke="#111111" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 ) : (
-                  <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.6rem', color: '#888888', fontWeight: 700 }}>
+                  <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.6rem', color: 'var(--color-label)', fontWeight: 700 }}>
                     {step.id}
                   </span>
                 )}
@@ -138,7 +138,7 @@ export function OnboardingBanner({ hasPolicies, hasProfile, onDismiss }: Onboard
                 {step.label}
               </span>
             </div>
-            <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', color: '#666666', margin: 0, lineHeight: 1.4 }}>
+            <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.65rem', color: 'var(--color-muted)', margin: 0, lineHeight: 1.4 }}>
               {step.description}
             </p>
             {!step.done && step.link && (

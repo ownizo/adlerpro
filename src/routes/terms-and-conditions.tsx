@@ -6,7 +6,7 @@ export const Route = createFileRoute('/terms-and-conditions')({
 
 function TermsAndConditionsPage() {
   return (
-    <div className="min-h-screen bg-white px-4 py-12">
+    <div className="min-h-screen bg-base px-4 py-12">
       <article className="max-w-4xl mx-auto prose prose-slate max-w-none">
         <h1>Termos e Condições</h1>
         <p><strong>Última atualização:</strong> 2 de abril de 2026</p>

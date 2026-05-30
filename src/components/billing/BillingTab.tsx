@@ -34,18 +34,18 @@ function StatusBadge({ status }: { status?: string }) {
   const { t } = useTranslation()
   const key = status?.toLowerCase() ?? 'draft'
   const colors: Record<string, { bg: string; text: string }> = {
-    draft: { bg: '#F3F4F6', text: '#6B7280' },
-    final: { bg: '#DBEAFE', text: '#1D4ED8' },
-    finalized: { bg: '#DBEAFE', text: '#1D4ED8' },
+    draft: { bg: 'var(--status-neutral-bg)', text: 'var(--status-neutral-text)' },
+    final: { bg: 'var(--status-info-bg)', text: 'var(--status-info-text)' },
+    finalized: { bg: 'var(--status-info-bg)', text: 'var(--status-info-text)' },
     sent: { bg: '#E0E7FF', text: '#4338CA' },
-    settled: { bg: '#D1FAE5', text: '#065F46' },
-    unsettled: { bg: '#FEF3C7', text: '#92400E' },
-    canceled: { bg: '#FEE2E2', text: '#991B1B' },
-    cancelled: { bg: '#FEE2E2', text: '#991B1B' },
-    deleted: { bg: '#F3F4F6', text: '#9CA3AF' },
-    accepted: { bg: '#D1FAE5', text: '#065F46' },
-    refused: { bg: '#FEE2E2', text: '#991B1B' },
-    second_copy: { bg: '#EDE9FE', text: '#6D28D9' },
+    settled: { bg: 'var(--status-success-bg)', text: 'var(--status-success-text)' },
+    unsettled: { bg: 'var(--status-warning-bg)', text: 'var(--status-warning-text)' },
+    canceled: { bg: 'var(--status-danger-bg)', text: 'var(--status-danger-text)' },
+    cancelled: { bg: 'var(--status-danger-bg)', text: 'var(--status-danger-text)' },
+    deleted: { bg: 'var(--status-neutral-bg)', text: '#9CA3AF' },
+    accepted: { bg: 'var(--status-success-bg)', text: 'var(--status-success-text)' },
+    refused: { bg: 'var(--status-danger-bg)', text: 'var(--status-danger-text)' },
+    second_copy: { bg: '#EDE9FE', text: 'var(--status-info-text)' },
   }
   const c = colors[key] ?? colors.draft
   return (
@@ -180,28 +180,28 @@ export function BillingTab() {
     <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
       {/* Toast */}
       {toast && (
-        <div style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 200, background: '#065F46', color: '#fff', padding: '0.6rem 1.2rem', borderRadius: '8px', fontSize: '0.8rem', fontFamily: font, fontWeight: 600, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
+        <div style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 200, background: 'var(--status-success-text)', color: '#fff', padding: '0.6rem 1.2rem', borderRadius: '8px', fontSize: '0.8rem', fontFamily: font, fontWeight: 600, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}>
           {toast}
         </div>
       )}
 
       {/* Header */}
       <div style={{ marginBottom: '2rem' }}>
-        <h2 style={{ fontFamily: font, fontSize: '1.5rem', fontWeight: 700, color: '#111111', margin: '0 0 0.25rem' }}>{t('billing.title')}</h2>
-        <p style={{ fontFamily: font, fontSize: '0.85rem', color: '#888888', margin: 0 }}>{t('billing.subtitle')}</p>
+        <h2 style={{ fontFamily: font, fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-primary)', margin: '0 0 0.25rem' }}>{t('billing.title')}</h2>
+        <p style={{ fontFamily: font, fontSize: '0.85rem', color: 'var(--color-label)', margin: 0 }}>{t('billing.subtitle')}</p>
       </div>
 
       {/* Summary KPIs */}
       {summary && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
           {[
-            { label: t('billing.summary.totalDocuments'), value: String(summary.total), color: '#111' },
-            { label: t('billing.summary.totalValue'), value: formatCurrency(summary.totalValue), color: '#C8961A' },
-            { label: t('billing.summary.pending'), value: String(summary.pending), color: '#92400E' },
-            { label: t('billing.summary.finalized'), value: String(summary.finalized), color: '#065F46' },
+            { label: t('billing.summary.totalDocuments'), value: String(summary.total), color: 'var(--color-primary)' },
+            { label: t('billing.summary.totalValue'), value: formatCurrency(summary.totalValue), color: 'var(--color-accent)' },
+            { label: t('billing.summary.pending'), value: String(summary.pending), color: 'var(--status-warning-text)' },
+            { label: t('billing.summary.finalized'), value: String(summary.finalized), color: 'var(--status-success-text)' },
           ].map((kpi) => (
-            <div key={kpi.label} style={{ background: '#fff', border: '1px solid #eee', borderRadius: '8px', padding: '1rem 1.25rem' }}>
-              <p style={{ fontFamily: font, fontSize: '0.7rem', fontWeight: 600, color: '#888', margin: '0 0 0.25rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{kpi.label}</p>
+            <div key={kpi.label} style={{ background: 'var(--color-base)', border: '1px solid var(--color-border)', borderRadius: '8px', padding: '1rem 1.25rem' }}>
+              <p style={{ fontFamily: font, fontSize: '0.7rem', fontWeight: 600, color: 'var(--color-label)', margin: '0 0 0.25rem', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{kpi.label}</p>
               <p style={{ fontFamily: font, fontSize: '1.3rem', fontWeight: 700, color: kpi.color, margin: 0 }}>{kpi.value}</p>
             </div>
           ))}
@@ -254,14 +254,14 @@ export function BillingTab() {
 
       {/* Content */}
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#999', fontFamily: font }}>{t('billing.loading')}</div>
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-subtle)', fontFamily: font }}>{t('billing.loading')}</div>
       ) : error ? (
         <div style={{ textAlign: 'center', padding: '3rem', fontFamily: font }}>
-          <p style={{ color: '#991B1B', fontSize: '0.85rem' }}>{error}</p>
+          <p style={{ color: 'var(--status-danger-text)', fontSize: '0.85rem' }}>{error}</p>
           <button onClick={loadData} style={{ ...btnSecondary, marginTop: '1rem' }}>{t('billing.retry')}</button>
         </div>
       ) : data.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#999', fontFamily: font, fontSize: '0.85rem' }}>
+        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-subtle)', fontFamily: font, fontSize: '0.85rem' }}>
           {t(`billing.empty.${tab}`)}
         </div>
       ) : (

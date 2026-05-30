@@ -37,13 +37,13 @@ const CLAIM_TYPES = [
 ]
 
 const STATUS_COLORS: Record<string, string> = {
-  submitted: 'bg-blue-50 text-blue-700 border-blue-200',
-  under_review: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-  documentation: 'bg-orange-50 text-orange-700 border-orange-200',
-  assessment: 'bg-purple-50 text-purple-700 border-purple-200',
-  approved: 'bg-green-50 text-green-700 border-green-200',
-  denied: 'bg-red-50 text-red-700 border-red-200',
-  paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  submitted: 'bg-info text-info border-info',
+  under_review: 'bg-yellow-50 text-warning border-yellow-200',
+  documentation: 'bg-warning text-warning border-orange-200',
+  assessment: 'bg-info text-info border-purple-200',
+  approved: 'bg-success text-success border-success',
+  denied: 'bg-danger text-danger border-danger',
+  paid: 'bg-emerald-50 text-success border-emerald-200',
 }
 
 const STATUS_STEPS = ['submitted', 'under_review', 'documentation', 'assessment', 'approved', 'paid']
@@ -361,18 +361,18 @@ function ClaimsPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
             { label: t('claims.total'), value: stats.total, color: 'text-navy-700' },
-            { label: t('claims.open'), value: stats.open, color: 'text-orange-600' },
-            { label: t('claims.approved'), value: stats.approved, color: 'text-green-600' },
+            { label: t('claims.open'), value: stats.open, color: 'text-warning' },
+            { label: t('claims.approved'), value: stats.approved, color: 'text-success' },
             { label: t('claims.totalValue'), value: formatCurrency(stats.totalValue), color: 'text-navy-700' },
           ].map((kpi) => (
-            <div key={kpi.label} className="bg-white rounded-[4px] border border-navy-200 p-4">
+            <div key={kpi.label} className="bg-base rounded-[4px] border border-navy-200 p-4">
               <p className="text-xs text-navy-500 mb-1">{kpi.label}</p>
               <p className={`text-2xl font-bold ${kpi.color}`}>{kpi.value}</p>
             </div>
           ))}
         </div>
 
-        <div className="bg-white rounded-[4px] border border-navy-200 p-4 mb-6">
+        <div className="bg-base rounded-[4px] border border-navy-200 p-4 mb-6">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <input
               type="text"
@@ -430,7 +430,7 @@ function ClaimsPage() {
         )}
 
         {filteredClaims.length === 0 ? (
-          <div className="bg-white rounded-[4px] border border-navy-200 p-12 text-center">
+          <div className="bg-base rounded-[4px] border border-navy-200 p-12 text-center">
             <svg className="w-12 h-12 text-navy-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
@@ -449,7 +449,7 @@ function ClaimsPage() {
               const draft = editDraftByClaim[claim.id] || { description: claim.description, estimatedValue: String(claim.estimatedValue || 0) }
 
               return (
-                <div key={claim.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
+                <div key={claim.id} className="bg-base rounded-[4px] border border-navy-200 overflow-hidden">
                   <button
                     onClick={() => openClaimDetail(claim, isSelected)}
                     className="w-full p-5 text-left hover:bg-navy-50/50 transition-colors"
@@ -458,11 +458,11 @@ function ClaimsPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-navy-700">{claim.title}</h3>
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_COLORS[claim.status] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${STATUS_COLORS[claim.status] || 'bg-surface text-muted border-gray-200'}`}>
                             {CLAIM_STATUS_LABELS[claim.status] || claim.status}
                           </span>
                           {unreadAdminMessages > 0 && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-amber-50 text-amber-700 border-amber-200">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border bg-warning text-warning border-warning">
                               {unreadAdminMessages} nova{unreadAdminMessages > 1 ? 's' : ''}
                             </span>
                           )}
@@ -505,7 +505,7 @@ function ClaimsPage() {
                                         isDenied && isCurrent ? 'bg-red-500 border-red-500 text-white' :
                                         isCurrent ? 'bg-gold-400 border-gold-400 text-navy-700' :
                                         isActive ? 'bg-navy-700 border-navy-700 text-white' :
-                                        'bg-white border-navy-200 text-navy-300'
+                                        'bg-base border-navy-200 text-navy-300'
                                       }`}>
                                         {isActive && !isCurrent ? '✓' : idx + 1}
                                       </div>
@@ -521,7 +521,7 @@ function ClaimsPage() {
                               })}
                               {claim.status === 'denied' && (
                                 <div className="ml-4 flex-shrink-0">
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-danger text-danger border border-danger">
                                     {t('claims.denied')}
                                   </span>
                                 </div>
@@ -547,7 +547,7 @@ function ClaimsPage() {
                             </div>
                           )}
 
-                          <div className="bg-white border border-navy-200 rounded-[4px] p-4">
+                          <div className="bg-base border border-navy-200 rounded-[4px] p-4">
                             <div className="flex items-center justify-between mb-3">
                               <h4 className="text-sm font-semibold text-navy-700">Dados do sinistro</h4>
                               <span className="text-xs text-navy-400">Edição contínua ativa</span>
@@ -591,7 +591,7 @@ function ClaimsPage() {
                             </div>
                           </div>
 
-                          <div className="bg-white border border-navy-200 rounded-[4px] p-4">
+                          <div className="bg-base border border-navy-200 rounded-[4px] p-4">
                             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                               <h4 className="text-sm font-semibold text-navy-700">Ficheiros e provas</h4>
                               <label className="px-3 py-1.5 text-xs bg-navy-700 text-white rounded cursor-pointer hover:bg-navy-600">
@@ -643,7 +643,7 @@ function ClaimsPage() {
                             )}
                           </div>
 
-                          <div className="bg-white border border-navy-200 rounded-[4px] p-4">
+                          <div className="bg-base border border-navy-200 rounded-[4px] p-4">
                             <h4 className="text-sm font-semibold text-navy-700 mb-3">Mensagens do processo</h4>
                             {messages.length === 0 ? (
                               <p className="text-sm text-navy-400 mb-4">Sem mensagens neste sinistro.</p>
@@ -653,7 +653,7 @@ function ClaimsPage() {
                                   <div
                                     key={msg.id}
                                     className={`rounded p-3 text-sm border ${msg.senderType === 'admin'
-                                      ? 'bg-amber-50 border-amber-200 text-amber-900'
+                                      ? 'bg-warning border-warning text-warning'
                                       : 'bg-navy-50 border-navy-200 text-navy-700'}`}
                                   >
                                     <p className="whitespace-pre-wrap">{msg.message}</p>
@@ -683,7 +683,7 @@ function ClaimsPage() {
                           </div>
 
                           {errorByClaim[claim.id] && (
-                            <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+                            <div className="p-3 bg-danger border border-danger rounded text-sm text-danger">
                               {errorByClaim[claim.id]}
                             </div>
                           )}
@@ -748,7 +748,7 @@ function NewClaimForm({
   }
 
   return (
-    <div className="bg-white rounded-[4px] border border-gold-400 shadow-lg p-6 mb-6">
+    <div className="bg-base rounded-[4px] border border-gold-400 shadow-lg p-6 mb-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-bold text-navy-700">{t('claims.registerTitle')}</h2>
@@ -854,7 +854,7 @@ function NewClaimForm({
         </div>
 
         {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+          <div className="p-3 bg-danger border border-danger rounded text-sm text-danger">
             {error}
           </div>
         )}

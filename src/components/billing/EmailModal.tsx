@@ -40,17 +40,17 @@ export function EmailModal({
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={onClose} />
-      <div style={{ position: 'relative', background: '#fff', borderRadius: '8px', width: '95%', maxWidth: '480px', padding: '2rem', fontFamily: font }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 1.5rem', color: '#111' }}>{t('billing.actions.sendEmail')}</h3>
+      <div style={{ position: 'relative', background: 'var(--color-base)', borderRadius: '8px', width: '95%', maxWidth: '480px', padding: '2rem', fontFamily: font }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 1.5rem', color: 'var(--color-primary)' }}>{t('billing.actions.sendEmail')}</h3>
         {sent ? (
-          <p style={{ color: '#065F46', fontWeight: 600, fontSize: '0.85rem' }}>{t('billing.success.emailSent')}</p>
+          <p style={{ color: 'var(--status-success-text)', fontWeight: 600, fontSize: '0.85rem' }}>{t('billing.success.emailSent')}</p>
         ) : (
           <>
-            {error && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1rem' }}>{error}</div>}
+            {error && <div style={{ background: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1rem' }}>{error}</div>}
             <div style={{ display: 'grid', gap: '0.75rem', marginBottom: '1.5rem' }}>
-              <div><label style={{ fontFamily: font, fontSize: '0.7rem', fontWeight: 600, color: '#555', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{t('billing.form.emailTo')} *</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} /></div>
-              <div><label style={{ fontFamily: font, fontSize: '0.7rem', fontWeight: 600, color: '#555', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{t('billing.form.emailSubject')}</label><input value={subject} onChange={(e) => setSubject(e.target.value)} style={inputStyle} /></div>
-              <div><label style={{ fontFamily: font, fontSize: '0.7rem', fontWeight: 600, color: '#555', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{t('billing.form.emailBody')}</label><textarea value={body} onChange={(e) => setBody(e.target.value)} style={{ ...inputStyle, minHeight: '60px' }} /></div>
+              <div><label style={{ fontFamily: font, fontSize: '0.7rem', fontWeight: 600, color: 'var(--color-body)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{t('billing.form.emailTo')} *</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} /></div>
+              <div><label style={{ fontFamily: font, fontSize: '0.7rem', fontWeight: 600, color: 'var(--color-body)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{t('billing.form.emailSubject')}</label><input value={subject} onChange={(e) => setSubject(e.target.value)} style={inputStyle} /></div>
+              <div><label style={{ fontFamily: font, fontSize: '0.7rem', fontWeight: 600, color: 'var(--color-body)', display: 'block', marginBottom: '0.25rem', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>{t('billing.form.emailBody')}</label><textarea value={body} onChange={(e) => setBody(e.target.value)} style={{ ...inputStyle, minHeight: '60px' }} /></div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
               <button onClick={onClose} style={btnSecondary}>{t('billing.form.cancel')}</button>

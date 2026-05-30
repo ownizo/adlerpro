@@ -168,10 +168,10 @@ export function CreateDocumentModal({
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)' }} onClick={onClose} />
-      <div style={{ position: 'relative', background: '#fff', borderRadius: '8px', width: '95%', maxWidth: '720px', maxHeight: '90vh', overflow: 'auto', padding: '2rem', fontFamily: font }}>
-        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 1.5rem', color: '#111' }}>{formTitle}</h3>
+      <div style={{ position: 'relative', background: 'var(--color-base)', borderRadius: '8px', width: '95%', maxWidth: '720px', maxHeight: '90vh', overflow: 'auto', padding: '2rem', fontFamily: font }}>
+        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 1.5rem', color: 'var(--color-primary)' }}>{formTitle}</h3>
 
-        {error && <div style={{ background: '#FEE2E2', color: '#991B1B', padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1rem' }}>{error}</div>}
+        {error && <div style={{ background: 'var(--status-danger-bg)', color: 'var(--status-danger-text)', padding: '0.5rem 1rem', borderRadius: '6px', fontSize: '0.8rem', marginBottom: '1rem' }}>{error}</div>}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
           <div>
@@ -268,7 +268,7 @@ export function CreateDocumentModal({
               )}
             </div>
           ))}
-          <button type="button" onClick={addItem} style={{ background: 'none', border: '1px dashed #ccc', borderRadius: '4px', padding: '0.4rem 1rem', fontSize: '0.75rem', color: '#666', cursor: 'pointer', fontFamily: font }}>
+          <button type="button" onClick={addItem} style={{ background: 'none', border: '1px dashed #ccc', borderRadius: '4px', padding: '0.4rem 1rem', fontSize: '0.75rem', color: 'var(--color-muted)', cursor: 'pointer', fontFamily: font }}>
             {t('billing.form.addLine')}
           </button>
         </div>

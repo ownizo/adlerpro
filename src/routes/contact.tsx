@@ -38,7 +38,7 @@ function ContactPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-primary px-4 py-12">
+    <div className="min-h-screen bg-base text-primary px-4 py-12">
       <div className="max-w-2xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-navy-700 mb-2">Entrar em Contacto</h1>
@@ -51,7 +51,7 @@ function ContactPage() {
           data-netlify="true"
           netlify-honeypot="bot-field"
           onSubmit={handleSubmit}
-          className="bg-white border border-navy-200 rounded p-6 space-y-4"
+          className="bg-surface border border-navy-200 rounded p-6 space-y-4"
         >
           <input type="hidden" name="form-name" value="contact-adler-rochefort" />
           <p className="hidden">
@@ -66,13 +66,13 @@ function ContactPage() {
           <Field label="Telefone" name="phone" required />
 
           {status === 'success' && (
-            <div className="text-sm p-3 rounded" style={{ background: '#EAF3DE', color: '#3B6D11' }}>
+            <div className="text-sm p-3 rounded" style={{ background: 'var(--status-success-bg)', color: 'var(--status-success-text)' }}>
               Contacto enviado com sucesso. A equipa irá responder brevemente.
             </div>
           )}
 
           {status === 'error' && (
-            <div className="text-sm p-3 rounded" style={{ background: '#FAEEDA', color: '#854F0B' }}>
+            <div className="text-sm p-3 rounded" style={{ background: 'var(--status-warning-bg)', color: 'var(--status-warning-text)' }}>
               Ocorreu um erro ao enviar. Tente novamente dentro de instantes.
             </div>
           )}
