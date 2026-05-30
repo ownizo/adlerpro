@@ -1,5 +1,6 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useIdentity } from '@/lib/identity-context'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -66,25 +67,25 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex bg-white">
+    <div className="min-h-screen flex bg-base">
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       <aside
         className={cn(
-          'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white flex flex-col transition-transform duration-200 lg:translate-x-0',
+          'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-base flex flex-col transition-transform duration-200 lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
-        style={{ borderRight: '1.5px solid #111111' }}
+        style={{ borderRight: '1.5px solid var(--color-border-strong)' }}
       >
-        <div style={{ padding: '1.25rem 1rem 1rem', borderBottom: '1px solid #eeeeee' }}>
+        <div style={{ padding: '1.25rem 1rem 1rem', borderBottom: '1px solid var(--color-border)' }}>
           <Link to="/dashboard" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
             <div style={{ width: '100%', display: 'flex', alignItems: 'baseline', gap: '0.2rem' }}>
-              <span style={{ fontFamily: font, fontSize: '1rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#111111' }}>
-                Adler<span style={{ color: '#C8961A' }}>.</span>Pro
+              <span style={{ fontFamily: font, fontSize: '1rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--color-primary)' }}>
+                Adler<span style={{ color: 'var(--color-accent)' }}>.</span>Pro
               </span>
-              <span style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 300, color: '#aaaaaa', letterSpacing: '0.1em', textTransform: 'uppercase', marginLeft: '0.3rem' }}>
+              <span style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 300, color: 'var(--color-label-light)', letterSpacing: '0.1em', textTransform: 'uppercase', marginLeft: '0.3rem' }}>
                 {t('common.portal')}
               </span>
             </div>
@@ -97,8 +98,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <Link
               key={item.to}
               to={item.to}
-              className={cn('flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors', '[&.active]:text-primary [&.active]:bg-[#f8f8f8]')}
-              style={{ fontFamily: font, color: '#666666', borderRadius: '2px' }}
+              className={cn('flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors', '[&.active]:text-primary [&.active]:bg-surface')}
+              style={{ fontFamily: font, color: 'var(--color-muted)', borderRadius: '2px' }}
               activeProps={{ className: 'active' }}
               onClick={() => setSidebarOpen(false)}
             >
@@ -112,7 +113,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {isAdmin && (
             <>
               <div className="pt-4 pb-2">
-                <p style={{ fontFamily: font, fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#C8961A', padding: '0 0.75rem' }}>
+                <p style={{ fontFamily: font, fontSize: '0.65rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'var(--color-accent)', padding: '0 0.75rem' }}>
                   {t('nav.admin')}
                 </p>
               </div>
@@ -121,7 +122,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 onClick={() => setAdminSectionOpen((prev) => !prev)}
                 className={cn(
                   'w-full flex items-center justify-between gap-3 px-3 py-2.5 text-sm font-medium transition-colors',
-                  isAdminRoute ? 'bg-[#f8f8f8] text-primary' : 'text-[#666666] hover:bg-[#f8f8f8]'
+                  isAdminRoute ? 'bg-surface text-primary' : 'text-muted hover:bg-surface'
                 )}
                 style={{ fontFamily: font, borderRadius: '2px' }}
               >
@@ -149,8 +150,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       key={item.tab}
                       to="/admin"
                       search={{ tab: item.tab }}
-                      className={cn('flex items-center px-3 py-2 text-sm font-medium transition-colors', '[&.active]:text-primary [&.active]:bg-[#f8f8f8]')}
-                      style={{ fontFamily: font, color: '#666666', borderRadius: '2px' }}
+                      className={cn('flex items-center px-3 py-2 text-sm font-medium transition-colors', '[&.active]:text-primary [&.active]:bg-surface')}
+                      style={{ fontFamily: font, color: 'var(--color-muted)', borderRadius: '2px' }}
                       activeProps={{ className: 'active' }}
                       activeOptions={{ includeSearch: true }}
                       onClick={() => setSidebarOpen(false)}
@@ -165,21 +166,21 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         {ready && user && (
-          <div className="p-4 mt-auto" style={{ borderTop: '1px solid #eeeeee' }}>
+          <div className="p-4 mt-auto" style={{ borderTop: '1px solid var(--color-border)' }}>
             <div style={{ marginBottom: '0.5rem', padding: '0 0.25rem' }}>
-              <p style={{ fontFamily: font, fontSize: '0.75rem', fontWeight: 600, color: '#333333', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <p style={{ fontFamily: font, fontSize: '0.75rem', fontWeight: 600, color: 'var(--color-secondary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user.name || user.email}
               </p>
-              <p style={{ fontFamily: font, fontSize: '0.65rem', color: '#999999', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <p style={{ fontFamily: font, fontSize: '0.65rem', color: 'var(--color-subtle)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {user.email}
               </p>
             </div>
             <button
               onClick={handleLogout}
               className="w-full flex justify-center items-center py-2.5 text-sm font-semibold rounded transition-colors"
-              style={{ background: '#f8f8f8', color: '#666666', border: '1px solid #eeeeee', fontFamily: font }}
+              style={{ background: 'var(--color-surface)', color: 'var(--color-muted)', border: '1px solid var(--color-border)', fontFamily: font }}
               onMouseEnter={(e) => { e.currentTarget.style.background = '#fee2e2'; e.currentTarget.style.color = '#dc2626' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = '#f8f8f8'; e.currentTarget.style.color = '#666666' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--color-surface)'; e.currentTarget.style.color = 'var(--color-muted)' }}
             >
               {t('common.logout')}
             </button>
@@ -188,11 +189,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="px-4 lg:px-8 h-14 flex items-center justify-between shrink-0" style={{ background: '#ffffff', borderBottom: '1px solid #eeeeee' }}>
+        <header className="px-4 lg:px-8 h-14 flex items-center justify-between shrink-0" style={{ background: 'var(--color-base)', borderBottom: '1px solid var(--color-border)' }}>
           <button
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 -ml-2"
-            style={{ color: '#111111' }}
+            style={{ color: 'var(--color-primary)' }}
             aria-label={t('nav.openMenu')}
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -204,13 +205,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3">
             {/* Language switcher */}
-            <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #dddddd', borderRadius: '4px', overflow: 'hidden', fontFamily: font }}>
+            <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: '4px', overflow: 'hidden', fontFamily: font }}>
               {(['pt', 'en'] as LangCode[]).map((l) => (
                 <button
                   key={l}
                   onClick={() => handleLang(l)}
                   style={{
-                    background: lang === l ? '#111111' : 'transparent',
+                    background: lang === l ? 'var(--color-inverse)' : 'transparent',
                     border: 'none',
                     cursor: 'pointer',
                     padding: '0.25rem 0.6rem',
@@ -218,7 +219,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     fontSize: '0.7rem',
                     fontWeight: 700,
                     letterSpacing: '0.08em',
-                    color: lang === l ? '#ffffff' : '#888888',
+                    color: lang === l ? '#ffffff' : 'var(--color-label)',
                     transition: 'background 0.15s, color 0.15s',
                   }}
                 >
@@ -227,12 +228,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               ))}
             </div>
 
+            <ThemeToggle />
+
             {ready && user && (
               <>
-                <span className="hidden sm:inline text-sm" style={{ color: '#666666', fontFamily: font, fontWeight: 300 }}>
+                <span className="hidden sm:inline text-sm" style={{ color: 'var(--color-muted)', fontFamily: font, fontWeight: 300 }}>
                   {user.name || user.email}
                 </span>
-                <Link to="/alerts" style={{ color: '#666666', display: 'flex', alignItems: 'center' }} title={t('nav.alerts')}>
+                <Link to="/alerts" style={{ color: 'var(--color-muted)', display: 'flex', alignItems: 'center' }} title={t('nav.alerts')}>
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
@@ -242,19 +245,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 pb-20 lg:pb-8" style={{ background: '#fafafa' }}>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8 pb-20 lg:pb-8" style={{ background: 'var(--color-surface)' }}>
           {children}
         </main>
       </div>
 
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex" style={{ background: '#ffffff', borderTop: '1.5px solid #111111', height: '60px' }}>
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex" style={{ background: 'var(--color-base)', borderTop: '1.5px solid var(--color-border-strong)', height: '60px' }}>
         {BOTTOM_NAV_ITEMS.map((item) => (
           <Link
             key={item.to}
             to={item.to}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 [&.active]:text-[#C8961A]"
-            style={{ color: '#888888', textDecoration: 'none' }}
-            activeProps={{ style: { color: '#C8961A' } }}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 [&.active]:text-accent"
+            style={{ color: 'var(--color-label)', textDecoration: 'none' }}
+            activeProps={{ style: { color: 'var(--color-accent)' } }}
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />

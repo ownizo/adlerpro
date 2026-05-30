@@ -373,7 +373,7 @@ function AdminPage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-base flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
       </div>
     )
@@ -547,7 +547,7 @@ function AdminPage() {
                     const isSelected = selectedCompanyIds.has(company.id)
 
                     return (
-                      <div key={company.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
+                      <div key={company.id} className="bg-surface rounded-[4px] border border-navy-200 overflow-hidden">
                         <div className="flex items-stretch">
                           <div className="flex items-start pl-4 pt-6">
                             <input
@@ -620,7 +620,7 @@ function AdminPage() {
                           <div className="border-t border-navy-100 bg-navy-50/50 p-6 space-y-6">
                             <div>
                               <h4 className="text-sm font-semibold text-navy-700 mb-3">Dados de Contacto</h4>
-                              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white rounded border border-navy-200 p-4">
+                              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-surface rounded border border-navy-200 p-4">
                                 <div>
                                   <p className="text-[11px] uppercase tracking-wide text-navy-400">Pessoa de Contacto</p>
                                   <p className="text-sm text-navy-700">{company.contactName || '—'}</p>
@@ -658,7 +658,7 @@ function AdminPage() {
                                   setEditingCompanyId(company.id)
                                   setShowNewCompany(true)
                                 }}
-                                className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                className="px-3 py-1.5 text-xs bg-base border border-gray-300 rounded hover:bg-gray-50"
                               >
                                 Editar Empresa
                               </button>
@@ -700,7 +700,7 @@ function AdminPage() {
                             <div className="grid lg:grid-cols-2 gap-6">
                               <div>
                                 <h4 className="text-sm font-semibold text-navy-700 mb-3">Utilizadores da Empresa</h4>
-                                <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
+                                <div className="bg-surface rounded-[4px] border border-navy-200 overflow-hidden">
                                   <table className="w-full">
                                     <thead>
                                       <tr className="bg-navy-50 border-b border-navy-200">
@@ -774,7 +774,7 @@ function AdminPage() {
                                     }).length
 
                                     return (
-                                      <div key={user.id} className="bg-white rounded-[4px] border border-navy-200 p-4">
+                                      <div key={user.id} className="bg-surface rounded-[4px] border border-navy-200 p-4">
                                         <p className="text-sm font-semibold text-navy-700">{user.name}</p>
                                         <p className="text-xs text-navy-500">Último login: {user.lastLoginAt ? formatDate(user.lastLoginAt) : '-'}</p>
                                         <p className="text-xs text-navy-500">Acessos no mês: {loginsThisMonth}</p>
@@ -898,7 +898,7 @@ function AdminPage() {
                   </div>
                 )}
 
-                <div className="bg-white rounded-[4px] border border-navy-200 overflow-x-auto">
+                <div className="bg-surface rounded-[4px] border border-navy-200 overflow-x-auto">
                   <table className="w-full min-w-[1100px]">
                     <thead>
                       <tr className="bg-navy-50 border-b border-navy-200">
@@ -1252,7 +1252,7 @@ function AdminPage() {
                 />
 
                 {loadingClaimWorkspace ? (
-                  <div className="mt-4 bg-white border border-navy-200 rounded-[4px] p-6 text-sm text-navy-500">
+                  <div className="mt-4 bg-surface border border-navy-200 rounded-[4px] p-6 text-sm text-navy-500">
                     A carregar detalhe do sinistro...
                   </div>
                 ) : claimWorkspace ? (
@@ -1269,7 +1269,7 @@ function AdminPage() {
                     }}
                   />
                 ) : (
-                  <div className="mt-4 bg-white border border-navy-200 rounded-[4px] p-6 text-sm text-navy-500">
+                  <div className="mt-4 bg-surface border border-navy-200 rounded-[4px] p-6 text-sm text-navy-500">
                     Selecionar um sinistro para abrir o detalhe operacional.
                   </div>
                 )}
@@ -1282,7 +1282,7 @@ function AdminPage() {
                 <p className="text-sm text-navy-500 mb-6">Serviços externos integrados na plataforma Adler Pro. Todas as chaves são configuradas como variáveis de ambiente no Netlify.</p>
                 <div className="grid gap-4 mb-6">
                   {apiConnections.map((api) => (
-                    <div key={api.id} className="bg-white rounded-[4px] border border-navy-200 p-5">
+                    <div key={api.id} className="bg-surface rounded-[4px] border border-navy-200 p-5">
                       <div className="flex flex-wrap items-center justify-between gap-4">
                         <div>
                           <h3 className="font-bold text-navy-700">{api.service}</h3>
@@ -1320,7 +1320,7 @@ function AdminPage() {
                     </div>
                   ))}
                   {apiConnections.length === 0 && (
-                    <div className="bg-white rounded-[4px] border border-navy-200 p-5 text-sm text-navy-500">
+                    <div className="bg-surface rounded-[4px] border border-navy-200 p-5 text-sm text-navy-500">
                       Nenhuma ligação dinâmica encontrada em `api_connections`.
                     </div>
                   )}
@@ -1331,7 +1331,7 @@ function AdminPage() {
                 <div className="grid gap-4 mt-6">
 
                   {/* Anthropic Claude */}
-                  <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+                  <div className="bg-surface rounded-[4px] border border-navy-200 p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <div style={{width:36,height:36,borderRadius:4,background:'#111',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -1353,7 +1353,7 @@ function AdminPage() {
                   </div>
 
                   {/* IPMA */}
-                  <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+                  <div className="bg-surface rounded-[4px] border border-navy-200 p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <div style={{width:36,height:36,borderRadius:4,background:'#2563eb',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -1375,7 +1375,7 @@ function AdminPage() {
                   </div>
 
                   {/* BizAPIs */}
-                  <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+                  <div className="bg-surface rounded-[4px] border border-navy-200 p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <div style={{width:36,height:36,borderRadius:4,background:'#C8961A',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -1397,7 +1397,7 @@ function AdminPage() {
                   </div>
 
                   {/* Resend */}
-                  <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+                  <div className="bg-surface rounded-[4px] border border-navy-200 p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <div style={{width:36,height:36,borderRadius:4,background:'#111',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -1419,7 +1419,7 @@ function AdminPage() {
                   </div>
 
                   {/* Supabase */}
-                  <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+                  <div className="bg-surface rounded-[4px] border border-navy-200 p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <div style={{width:36,height:36,borderRadius:4,background:'#059669',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
@@ -1447,7 +1447,7 @@ function AdminPage() {
             {tab === 'profiles' && (
               <div>
                 <h2 className="text-lg font-semibold text-navy-700 mb-4">Perfis e Métricas de Acesso</h2>
-                <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
+                <div className="bg-surface rounded-[4px] border border-navy-200 overflow-hidden">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-navy-50 border-b border-navy-200">
@@ -1506,7 +1506,7 @@ function AdminPage() {
                       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
                       return (
-                        <div key={p.id} className="bg-white rounded-[4px] border border-red-200 p-6 flex items-start gap-4">
+                        <div key={p.id} className="bg-surface rounded-[4px] border border-red-200 p-6 flex items-start gap-4">
                           <div className="w-10 h-10 rounded-full bg-red-100 flex flex-shrink-0 items-center justify-center text-red-600">!</div>
                           <div>
                             <h3 className="text-md font-bold text-navy-700">
@@ -1742,7 +1742,7 @@ function AdminDashboardTab({
   return (
     <div>
       <h2 className="text-lg font-semibold text-navy-700 mb-4">Dashboard Administração</h2>
-      <div className="bg-white rounded-[4px] border border-navy-200 p-4 mb-6">
+      <div className="bg-surface rounded-[4px] border border-navy-200 p-4 mb-6">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <label className="text-sm text-navy-600">
             <span className="block text-xs uppercase tracking-wide text-navy-500 mb-1">Ano</span>
@@ -1828,21 +1828,21 @@ function AdminDashboardTab({
         />
       </div>
 
-      <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
+      <div className="bg-surface rounded-[4px] border border-navy-200 p-5 mb-6">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <h3 className="text-sm font-semibold text-navy-700">Prémios vs Comissões (linha temporal mensal)</h3>
           <div className="inline-flex rounded border border-navy-200 overflow-hidden text-xs">
             <button
               type="button"
               onClick={() => setTimelineMode('historical')}
-              className={`px-3 py-1.5 ${timelineMode === 'historical' ? 'bg-navy-700 text-white' : 'bg-white text-navy-600 hover:bg-navy-50'}`}
+              className={`px-3 py-1.5 ${timelineMode === 'historical' ? 'bg-inverse text-white' : 'bg-base text-navy-600 hover:bg-navy-50'}`}
             >
               Histórico
             </button>
             <button
               type="button"
               onClick={() => setTimelineMode('projection')}
-              className={`px-3 py-1.5 border-l border-navy-200 ${timelineMode === 'projection' ? 'bg-gold-400 text-navy-700 font-semibold' : 'bg-white text-navy-600 hover:bg-navy-50'}`}
+              className={`px-3 py-1.5 border-l border-navy-200 ${timelineMode === 'projection' ? 'bg-gold-400 text-navy-700 font-semibold' : 'bg-base text-navy-600 hover:bg-navy-50'}`}
             >
               Projeção
             </button>
@@ -1867,7 +1867,7 @@ function AdminDashboardTab({
         )}
       </div>
 
-      <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
+      <div className="bg-surface rounded-[4px] border border-navy-200 p-5 mb-6">
         <h3 className="text-sm font-semibold text-navy-700 mb-3">Meses com Maior Receita Prevista</h3>
         {financialData?.projectionHighlights.length ? (
           <div className="grid sm:grid-cols-3 gap-3">
@@ -1890,7 +1890,7 @@ function AdminDashboardTab({
         )}
       </div>
 
-      <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
+      <div className="bg-surface rounded-[4px] border border-navy-200 p-5 mb-6">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-sm font-semibold text-navy-700">Drill-down por Mês (Apólices)</h3>
           <select
@@ -1948,7 +1948,7 @@ function AdminDashboardTab({
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+        <div className="bg-surface rounded-[4px] border border-navy-200 p-5">
           <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
             <h3 className="text-sm font-semibold text-navy-700">Pipeline de Renovações</h3>
             <label className="text-xs text-navy-600">
@@ -2012,7 +2012,7 @@ function AdminDashboardTab({
                   </div>
                 ))}
               </div>
-              <div className="rounded border border-navy-200 bg-white px-3 py-3">
+              <div className="rounded border border-navy-200 bg-surface px-3 py-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-navy-700 mb-2">
                   Clientes com maior risco financeiro
                 </h4>
@@ -2077,7 +2077,7 @@ function AdminDashboardTab({
                       <div className="mb-2">
                         <div className="flex items-center justify-between gap-2">
                           <h4 className="text-xs font-semibold uppercase tracking-wide text-navy-700">{column.title}</h4>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-white border border-navy-200 text-navy-700 font-semibold">
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-base border border-navy-200 text-navy-700 font-semibold">
                             {items.length}
                           </span>
                         </div>
@@ -2085,7 +2085,7 @@ function AdminDashboardTab({
                       </div>
 
                       {items.length === 0 ? (
-                        <p className="text-[11px] text-navy-400 rounded border border-dashed border-navy-200 bg-white px-2 py-2">
+                        <p className="text-[11px] text-navy-400 rounded border border-dashed border-navy-200 bg-base px-2 py-2">
                           Sem apólices nesta coluna.
                         </p>
                       ) : (
@@ -2112,7 +2112,7 @@ function AdminDashboardTab({
                               nextStatusActions.push({
                                 label: 'Mover para pending',
                                 status: 'pending',
-                                className: 'border-navy-200 text-navy-700 bg-white hover:bg-navy-50',
+                                className: 'border-navy-200 text-navy-700 bg-base hover:bg-navy-50',
                               })
                             }
                             if (renewalColumnByStatus(alert.status) !== 'negotiating') {
@@ -2143,7 +2143,7 @@ function AdminDashboardTab({
                                   setDraggingAlertKey(null)
                                   setActiveDropColumn(null)
                                 }}
-                                className={`text-xs text-navy-700 rounded border bg-white p-2 ${urgencyPalette.border} ${
+                                className={`text-xs text-navy-700 rounded border bg-base p-2 ${urgencyPalette.border} ${
                                   updatingRenewalAlertKey === alert.key ? 'opacity-70' : ''
                                 }`}
                               >
@@ -2187,7 +2187,7 @@ function AdminDashboardTab({
                                           setAssigneeDraftByKey((current) => ({ ...current, [alert.key]: value }))
                                         }}
                                         placeholder="Email do responsável"
-                                        className="flex-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-gold-400"
+                                        className="flex-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-base focus:outline-none focus:ring-2 focus:ring-gold-400"
                                       />
                                       <datalist id={`responsible_${alert.key}`}>
                                         {responsibleOptions.map((option) => (
@@ -2200,7 +2200,7 @@ function AdminDashboardTab({
                                         type="button"
                                         disabled={updatingRenewalAlertKey === alert.key}
                                         onClick={() => handleRenewalAlertStatusUpdate(alert.key, { assignedTo: assigneeDraftByKey[alert.key] ?? alert.assignedTo ?? null })}
-                                        className="px-2 py-1 text-[11px] rounded border border-navy-200 bg-white text-navy-700 hover:bg-navy-100 disabled:opacity-50"
+                                        className="px-2 py-1 text-[11px] rounded border border-navy-200 bg-base text-navy-700 hover:bg-navy-100 disabled:opacity-50"
                                       >
                                         Guardar
                                       </button>
@@ -2219,7 +2219,7 @@ function AdminDashboardTab({
                                       }}
                                       placeholder="Definir próxima ação para a apólice"
                                       rows={2}
-                                      className="w-full mt-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-gold-400 resize-y"
+                                      className="w-full mt-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-base focus:outline-none focus:ring-2 focus:ring-gold-400 resize-y"
                                     />
                                     <div className="flex items-center justify-between mt-1">
                                       <p className="text-[11px] text-navy-500">
@@ -2229,7 +2229,7 @@ function AdminDashboardTab({
                                         type="button"
                                         disabled={updatingRenewalAlertKey === alert.key}
                                         onClick={() => handleRenewalAlertStatusUpdate(alert.key, { nextAction: nextActionDraftByKey[alert.key] ?? alert.nextAction ?? null })}
-                                        className="px-2 py-1 text-[11px] rounded border border-navy-200 bg-white text-navy-700 hover:bg-navy-100 disabled:opacity-50"
+                                        className="px-2 py-1 text-[11px] rounded border border-navy-200 bg-base text-navy-700 hover:bg-navy-100 disabled:opacity-50"
                                       >
                                         Guardar ação
                                       </button>
@@ -2311,7 +2311,7 @@ function AdminDashboardTab({
           )}
         </div>
 
-        <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+        <div className="bg-surface rounded-[4px] border border-navy-200 p-5">
           <h3 className="text-sm font-semibold text-navy-700 mb-3">Resumo Operacional</h3>
           <div className="space-y-2 text-sm text-navy-600">
             <p>Empresas registadas: <strong>{companies.length}</strong></p>
@@ -2356,7 +2356,7 @@ function MetricCard({
   yoyDeltaPct: number | null
 }) {
   return (
-    <div className="bg-white rounded-[4px] border border-navy-200 p-5">
+    <div className="bg-surface rounded-[4px] border border-navy-200 p-5">
       <p className="text-xs uppercase tracking-wide text-navy-500">{label}</p>
       <p className="text-3xl font-bold text-navy-700 mt-2">{value}</p>
       <p className="text-xs text-navy-500 mt-2">{help}</p>
@@ -2411,7 +2411,7 @@ function FinancialTimelineChart({
   return (
     <div>
       <div className="flex flex-wrap items-center gap-5 text-xs text-navy-500 mb-3">
-        <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-navy-700 inline-block" /> Prémios</span>
+        <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-inverse inline-block" /> Prémios</span>
         <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-gold-400 inline-block" /> Comissões</span>
       </div>
       <div className="overflow-x-auto">
@@ -2481,7 +2481,7 @@ function InvoiceExpressStatus({ apiConnections }: { apiConnections: ApiConnectio
 
   if (invoiceExpressConnections.length > 0) {
     return (
-      <div className="bg-white rounded-[4px] border border-emerald-200 p-5">
+      <div className="bg-surface rounded-[4px] border border-emerald-200 p-5">
         <h3 className="text-sm font-semibold text-emerald-700 mb-2">Invoice Express</h3>
         <p className="text-sm text-navy-600 mb-3">Foram encontradas ligações de faturação no estado dinâmico de `api_connections`.</p>
         <div className="space-y-2 text-sm">
@@ -2496,7 +2496,7 @@ function InvoiceExpressStatus({ apiConnections }: { apiConnections: ApiConnectio
   }
 
   return (
-    <div className="bg-white rounded-[4px] border border-amber-200 p-5">
+    <div className="bg-surface rounded-[4px] border border-amber-200 p-5">
       <h3 className="text-sm font-semibold text-amber-700 mb-2">Invoice Express</h3>
       <p className="text-sm text-navy-600">
         Não foi encontrado código de integração Invoice Express neste repositório nem entradas dedicadas em `api_connections`.
@@ -2671,7 +2671,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
   }
 
   return (
-    <div className="bg-white rounded border border-navy-100 p-3">
+    <div className="bg-surface rounded border border-navy-100 p-3">
       <div className="flex items-center justify-between mb-2 gap-2">
         <p className="text-xs font-semibold text-navy-500 uppercase tracking-wide">
           Documentos {docs.length > 0 ? `(${docs.length})` : ''}
@@ -2744,7 +2744,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
           onClick={() => setPreviewUrl(null)}
         >
           <div
-            className="bg-white rounded w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
+            className="bg-surface rounded w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 py-2 border-b border-navy-100 flex items-center justify-between gap-2">
@@ -2779,7 +2779,7 @@ function PolicyExpandableCard({ policy, defaultOpen = false }: { policy: Policy;
   const [open, setOpen] = useState(defaultOpen)
   const typeLabel = POLICY_TYPE_LABELS[policy.type as keyof typeof POLICY_TYPE_LABELS] ?? policy.type
   return (
-    <div className="bg-white rounded border border-navy-200 overflow-hidden">
+    <div className="bg-surface rounded border border-navy-200 overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -2844,7 +2844,7 @@ function CompanyForm({
   }
 
   return (
-    <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
+    <div className="bg-surface rounded-[4px] border border-navy-200 p-6 mb-6">
       <h3 className="text-lg font-semibold text-navy-700 mb-4">{title}</h3>
       <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-4">
         <FormField label="Nome" value={form.name} onChange={(v) => update('name', v)} required />
@@ -2899,7 +2899,7 @@ function CompanyUserForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid md:grid-cols-5 gap-3 bg-white border border-navy-200 rounded-[4px] p-4">
+    <form onSubmit={handleSubmit} className="grid md:grid-cols-5 gap-3 bg-surface border border-navy-200 rounded-[4px] p-4">
       <input
         value={companyName}
         readOnly
@@ -2940,7 +2940,7 @@ function CompanyUserForm({
         minLength={6}
       />
       <div className="md:col-span-5">
-        <button type="submit" disabled={submitting} className="px-4 py-2 bg-navy-700 text-white rounded text-sm disabled:opacity-50">
+        <button type="submit" disabled={submitting} className="px-4 py-2 bg-inverse text-white rounded text-sm disabled:opacity-50">
           {submitting ? 'A criar...' : 'Criar Utilizador de Empresa'}
         </button>
       </div>
@@ -3011,7 +3011,7 @@ function NewAdminClaimForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white border border-navy-200 rounded-[4px] p-5 mb-4 grid md:grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit} className="bg-surface border border-navy-200 rounded-[4px] p-5 mb-4 grid md:grid-cols-2 gap-4">
       <div>
         <label className="block text-sm text-navy-600 mb-1">Tipo de cliente</label>
         <select value={targetType} onChange={(e) => setTargetType(e.target.value as 'company' | 'individual')} className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
@@ -3083,7 +3083,7 @@ function NewAdminClaimForm({
       </div>
 
       <div className="md:col-span-2">
-        <button disabled={submitting} className="px-4 py-2 bg-navy-700 text-white rounded text-sm disabled:opacity-50">
+        <button disabled={submitting} className="px-4 py-2 bg-inverse text-white rounded text-sm disabled:opacity-50">
           {submitting ? 'A criar...' : 'Criar sinistro'}
         </button>
       </div>
@@ -3113,11 +3113,11 @@ function AdminClaimsBoard({
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   if (claims.length === 0) {
-    return <div className="bg-white border border-navy-200 rounded-[4px] p-5 text-sm text-navy-500">Sem sinistros registados.</div>
+    return <div className="bg-surface border border-navy-200 rounded-[4px] p-5 text-sm text-navy-500">Sem sinistros registados.</div>
   }
 
   return (
-    <div className="bg-white border border-navy-200 rounded-[4px] overflow-auto">
+    <div className="bg-surface border border-navy-200 rounded-[4px] overflow-auto">
       <table className="min-w-full text-sm">
         <thead className="bg-navy-50 text-navy-600">
           <tr>
@@ -3226,7 +3226,7 @@ function AdminClaimWorkspace({
   }
 
   return (
-    <div className="mt-4 bg-white border border-navy-200 rounded-[4px] p-5 space-y-5">
+    <div className="mt-4 bg-surface border border-navy-200 rounded-[4px] p-5 space-y-5">
       <div className="flex flex-wrap justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-navy-700">{claim.title}</h3>
@@ -3262,7 +3262,7 @@ function AdminClaimWorkspace({
                 await onUpdated()
                 setSaving(false)
               }}
-              className="px-3 py-2 bg-navy-700 text-white rounded text-sm disabled:opacity-50"
+              className="px-3 py-2 bg-inverse text-white rounded text-sm disabled:opacity-50"
             >
               Guardar
             </button>
@@ -3308,7 +3308,7 @@ function AdminClaimWorkspace({
                 setNewNote('')
                 await onUpdated()
               }}
-              className="px-3 py-2 bg-navy-700 text-white rounded text-sm"
+              className="px-3 py-2 bg-inverse text-white rounded text-sm"
             >
               Adicionar
             </button>
@@ -3319,7 +3319,7 @@ function AdminClaimWorkspace({
       <div className="border border-navy-100 rounded p-3">
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs uppercase tracking-wide text-navy-500">Documentos</p>
-          <label className="px-3 py-1.5 bg-navy-700 text-white rounded text-xs cursor-pointer">
+          <label className="px-3 py-1.5 bg-inverse text-white rounded text-xs cursor-pointer">
             {uploading ? 'A carregar...' : 'Upload'}
             <input type="file" className="hidden" onChange={handleUploadDocument} />
           </label>
@@ -3476,7 +3476,7 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
   }
 
   return (
-    <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
+    <div className="bg-surface rounded-[4px] border border-navy-200 p-6 mb-6">
       <h3 className="text-lg font-semibold text-navy-700 mb-4">Nova Apólice</h3>
       <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2">
@@ -3485,14 +3485,14 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
             <button
               type="button"
               onClick={() => setClientType('company')}
-              className={`px-4 py-2 rounded-[2px] text-sm font-medium border transition-colors ${clientType === 'company' ? 'bg-navy-700 text-white border-navy-700' : 'bg-white text-navy-600 border-navy-200 hover:border-navy-400'}`}
+              className={`px-4 py-2 rounded-[2px] text-sm font-medium border transition-colors ${clientType === 'company' ? 'bg-inverse text-white border-inverse' : 'bg-base text-navy-600 border-navy-200 hover:border-navy-400'}`}
             >
               Empresa
             </button>
             <button
               type="button"
               onClick={() => setClientType('individual')}
-              className={`px-4 py-2 rounded-[2px] text-sm font-medium border transition-colors ${clientType === 'individual' ? 'bg-navy-700 text-white border-navy-700' : 'bg-white text-navy-600 border-navy-200 hover:border-navy-400'}`}
+              className={`px-4 py-2 rounded-[2px] text-sm font-medium border transition-colors ${clientType === 'individual' ? 'bg-inverse text-white border-inverse' : 'bg-base text-navy-600 border-navy-200 hover:border-navy-400'}`}
             >
               Cliente Individual
             </button>
@@ -3581,7 +3581,7 @@ function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClien
       value="individual"
       onChange={handleChange}
       disabled={promoting}
-      className="text-xs border border-navy-200 rounded px-1.5 py-1 bg-white text-navy-700 focus:outline-none focus:ring-1 focus:ring-gold-400 disabled:opacity-50"
+      className="text-xs border border-navy-200 rounded px-1.5 py-1 bg-base text-navy-700 focus:outline-none focus:ring-1 focus:ring-gold-400 disabled:opacity-50"
     >
       <option value="individual">Individual</option>
       <option value="company">→ Empresa</option>
@@ -3665,7 +3665,7 @@ function IndividualClientForm({
   }
 
   return (
-    <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
+    <div className="bg-surface rounded-[4px] border border-navy-200 p-6 mb-6">
       <h3 className="text-lg font-semibold text-navy-700 mb-4">{title}</h3>
       <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-4">
         <FormField label="Nome Completo" value={form.fullName} onChange={(v) => update('fullName', v)} required />
@@ -3747,7 +3747,7 @@ function SocialHubTab({ posts, onRefresh }: { posts: SocialPost[]; onRefresh: ()
       {posts.length === 0 ? (
         <p className="text-navy-500">Ainda não existem posts. Cria o primeiro!</p>
       ) : (
-        <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
+        <div className="bg-surface rounded-[4px] border border-navy-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-navy-50 border-b border-navy-200">
               <tr>
@@ -3887,7 +3887,7 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
   }
 
   return (
-    <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
+    <div className="bg-surface rounded-[4px] border border-navy-200 p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold text-navy-700">{initial ? 'Editar Post' : 'Novo Post'}</h3>
         <button onClick={onClose} className="text-navy-400 hover:text-navy-600 text-sm">✕ Fechar</button>
@@ -3907,7 +3907,7 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
           <button
             onClick={handleGenerate}
             disabled={generating}
-            className="px-4 py-2 bg-navy-700 text-white text-sm font-medium rounded-[2px] hover:bg-navy-600 disabled:opacity-50 whitespace-nowrap"
+            className="px-4 py-2 bg-inverse text-white text-sm font-medium rounded-[2px] hover:bg-inverse-hover disabled:opacity-50 whitespace-nowrap"
           >
             {generating ? 'A gerar...' : '✦ Gerar com IA'}
           </button>
@@ -3926,8 +3926,8 @@ function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; on
               onClick={() => toggleNetwork(n)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                 networks.includes(n)
-                  ? 'bg-navy-700 text-white border-navy-700'
-                  : 'bg-white text-navy-500 border-navy-200 hover:border-navy-400'
+                  ? 'bg-inverse text-white border-inverse'
+                  : 'bg-base text-navy-500 border-navy-200 hover:border-navy-400'
               }`}
             >
               {NETWORK_ICONS[n]} {n.charAt(0).toUpperCase() + n.slice(1)}
@@ -4080,7 +4080,7 @@ function AdminPolicyList({ policies, companies, individualClients, onReload, sel
         const isExpanded = expandedId === policy.id
 
         return (
-          <div key={policy.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
+          <div key={policy.id} className="bg-surface rounded-[4px] border border-navy-200 overflow-hidden">
             {/* Summary row */}
             <div className="flex items-center gap-3 px-4 py-3">
               <input
@@ -4230,7 +4230,7 @@ function PolicyDocumentUpload({ policyId, companyId, individualClientId, onUploa
       <button
         onClick={() => ref.current?.click()}
         disabled={uploading}
-        className="px-2.5 py-1 text-xs bg-navy-700 text-white rounded hover:bg-navy-600 disabled:opacity-50 whitespace-nowrap"
+        className="px-2.5 py-1 text-xs bg-inverse text-white rounded hover:bg-inverse-hover disabled:opacity-50 whitespace-nowrap"
       >
         {uploading ? 'A carregar...' : '↑ Fazer Upload'}
       </button>

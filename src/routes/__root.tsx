@@ -1,9 +1,12 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
 import { IdentityProvider } from '../lib/identity-context'
+import { ThemeProvider } from '../lib/theme-context'
 import { CallbackHandler } from '../components/CallbackHandler'
 import '../styles.css'
 // Initialise i18n before any component renders
 import '../lib/i18n'
+
+const FOUC_SCRIPT = `(function(){var t=localStorage.getItem('adler-theme');if(t)document.documentElement.setAttribute('data-theme',t);})();`
 
 export const Route = createRootRoute({
   head: () => ({
@@ -48,6 +51,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     <html lang="pt-PT">
       <head>
         <HeadContent />
+        {/* Prevent flash of unstyled content — applies saved theme before React mounts */}
+        <script dangerouslySetInnerHTML={{ __html: FOUC_SCRIPT }} />
       </head>
       <body>
         {children}
@@ -59,10 +64,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   return (
-    <IdentityProvider>
-      <CallbackHandler>
-        <Outlet />
-      </CallbackHandler>
-    </IdentityProvider>
+    <ThemeProvider>
+      <IdentityProvider>
+        <CallbackHandler>
+          <Outlet />
+        </CallbackHandler>
+      </IdentityProvider>
+    </ThemeProvider>
   )
 }

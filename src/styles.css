@@ -18,6 +18,18 @@
   --color-badge-review-bg: #FAEEDA;
   --color-badge-review-text: #854F0B;
 
+  /* Semantic tokens */
+  --color-base:         #FFFFFF;
+  --color-surface:      #F8F8F8;
+  --color-elevated:     #EEEEEE;
+  --color-inverse:       #111111;
+  --color-inverse-hover: #333333;
+  --color-accent:        #C8961A;
+  --color-accent-hover: #D4A83A;
+  --color-accent-muted: #FAEEDA;
+  --color-secondary:    #333333;
+  --color-subtle:       #999999;
+
   /* Legacy color mappings for components that still reference navy/gold */
   --color-navy-50: #f8f8f8;
   --color-navy-100: #eeeeee;
@@ -44,8 +56,65 @@
   --color-gold-950: #321f0f;
 }
 
+/* ─── DARK MODE ───────────────────────────────────────────── */
+[data-theme="dark"] {
+  /* Semantic tokens */
+  --color-base:         #161614;
+  --color-surface:      #1E1E1B;
+  --color-elevated:     #272723;
+  --color-inverse:       #272723;
+  --color-inverse-hover: #32302C;
+  --color-accent:        #B8890F;
+  --color-accent-hover: #C8961A;
+  --color-accent-muted: #28210F;
+  --color-secondary:    #C5C1B9;
+  --color-subtle:       #5C5954;
+
+  /* Existing tokens */
+  --color-primary:       #F0EDE8;
+  --color-gold:          #B8890F;
+  --color-muted:         #8A8680;
+  --color-label:         #8A8680;
+  --color-label-light:   #5C5954;
+  --color-border:        #2E2C28;
+  --color-border-strong: #5C5954;
+  --color-body:          #C5C1B9;
+
+  /* Badge status */
+  --color-badge-active-bg:    #142408;
+  --color-badge-active-text:  #7AC142;
+  --color-badge-review-bg:    #261A06;
+  --color-badge-review-text:  #D4943A;
+
+  /* Navy scale — semantic inversion (light surface ↔ dark surface) */
+  --color-navy-50:  #1E1E1B;
+  --color-navy-100: #272723;
+  --color-navy-200: #2E2C28;
+  --color-navy-300: #5C5954;
+  --color-navy-400: #5C5954;
+  --color-navy-500: #8A8680;
+  --color-navy-600: #C5C1B9;
+  --color-navy-700: #F0EDE8;
+  --color-navy-800: #F0EDE8;
+  --color-navy-900: #F0EDE8;
+  --color-navy-950: #F0EDE8;
+
+  /* Gold scale — dessaturate slightly for dark bg */
+  --color-gold-50:  #28210F;
+  --color-gold-100: #2E2516;
+  --color-gold-200: #6B5110;
+  --color-gold-300: #C8961A;
+  --color-gold-400: #B8890F;
+  --color-gold-500: #B8890F;
+  --color-gold-600: #C8961A;
+  --color-gold-700: #D4A83A;
+  --color-gold-800: #D4A83A;
+  --color-gold-900: #D4A83A;
+  --color-gold-950: #D4A83A;
+}
+
 body {
-  @apply m-0 bg-white text-primary;
+  @apply m-0 bg-base text-primary;
   font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -63,12 +132,12 @@ code {
   width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #f8f8f8;
+  background: var(--color-surface);
 }
 ::-webkit-scrollbar-thumb {
-  background: #cccccc;
+  background: var(--color-elevated);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #999999;
+  background: var(--color-navy-300);
 }
