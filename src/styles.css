@@ -57,28 +57,29 @@
 }
 
 /* ─── DARK MODE ───────────────────────────────────────────── */
+/* Referência: GitHub dark, Linear, Notion — luminância elevada, hue neutro frio */
 [data-theme="dark"] {
   /* Semantic tokens */
-  --color-base:         #161614;
-  --color-surface:      #1E1E1B;
-  --color-elevated:     #272723;
-  --color-inverse:       #272723;
-  --color-inverse-hover: #32302C;
-  --color-accent:        #B8890F;
-  --color-accent-hover: #C8961A;
-  --color-accent-muted: #28210F;
-  --color-secondary:    #C5C1B9;
-  --color-subtle:       #5C5954;
+  --color-base:          #1B1C1F;
+  --color-surface:       #232428;
+  --color-elevated:      #2C2D32;
+  --color-inverse:       #2C2D32;
+  --color-inverse-hover: #383941;
+  --color-accent:        #C49A3A;
+  --color-accent-hover:  #D4A83A;
+  --color-accent-muted:  #2A2317;
+  --color-secondary:     #B8BAC1;
+  --color-subtle:        #6A6C73;
 
   /* Existing tokens */
-  --color-primary:       #F0EDE8;
-  --color-gold:          #B8890F;
-  --color-muted:         #8A8680;
-  --color-label:         #8A8680;
-  --color-label-light:   #5C5954;
-  --color-border:        #2E2C28;
-  --color-border-strong: #5C5954;
-  --color-body:          #C5C1B9;
+  --color-primary:       #E8E9EC;
+  --color-gold:          #C49A3A;
+  --color-muted:         #8A8C94;
+  --color-label:         #8A8C94;
+  --color-label-light:   #6A6C73;
+  --color-border:        #34353B;
+  --color-border-strong: #54565E;
+  --color-body:          #B8BAC1;
 
   /* Badge status */
   --color-badge-active-bg:    #142408;
@@ -86,31 +87,31 @@
   --color-badge-review-bg:    #261A06;
   --color-badge-review-text:  #D4943A;
 
-  /* Navy scale — semantic inversion (light surface ↔ dark surface) */
-  --color-navy-50:  #1E1E1B;
-  --color-navy-100: #272723;
-  --color-navy-200: #2E2C28;
-  --color-navy-300: #5C5954;
-  --color-navy-400: #5C5954;
-  --color-navy-500: #8A8680;
-  --color-navy-600: #C5C1B9;
-  --color-navy-700: #F0EDE8;
-  --color-navy-800: #F0EDE8;
-  --color-navy-900: #F0EDE8;
-  --color-navy-950: #F0EDE8;
+  /* Navy scale — inversão neutra fria */
+  --color-navy-50:  #232428;
+  --color-navy-100: #2C2D32;
+  --color-navy-200: #34353B;
+  --color-navy-300: #54565E;
+  --color-navy-400: #6A6C73;
+  --color-navy-500: #8A8C94;
+  --color-navy-600: #B8BAC1;
+  --color-navy-700: #E8E9EC;
+  --color-navy-800: #E8E9EC;
+  --color-navy-900: #E8E9EC;
+  --color-navy-950: #E8E9EC;
 
-  /* Gold scale — dessaturate slightly for dark bg */
-  --color-gold-50:  #28210F;
-  --color-gold-100: #2E2516;
+  /* Gold scale */
+  --color-gold-50:  #2A2317;
+  --color-gold-100: #322A1B;
   --color-gold-200: #6B5110;
   --color-gold-300: #C8961A;
-  --color-gold-400: #B8890F;
-  --color-gold-500: #B8890F;
-  --color-gold-600: #C8961A;
-  --color-gold-700: #D4A83A;
-  --color-gold-800: #D4A83A;
-  --color-gold-900: #D4A83A;
-  --color-gold-950: #D4A83A;
+  --color-gold-400: #C49A3A;
+  --color-gold-500: #C49A3A;
+  --color-gold-600: #D4A83A;
+  --color-gold-700: #DCB554;
+  --color-gold-800: #DCB554;
+  --color-gold-900: #DCB554;
+  --color-gold-950: #DCB554;
 }
 
 body {
