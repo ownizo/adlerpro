@@ -44,15 +44,36 @@
   --color-gold-950: #321f0f;
 }
 
+/*
+ * Runtime UI personalisation tokens.
+ * Defaults mirror the production look. The customiser (src/lib/theme.ts)
+ * overrides these on <html> at runtime so the whole chrome re-themes live.
+ */
+:root {
+  --ui-font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+  --ui-page-bg: #fafafa;
+  --ui-surface-bg: #ffffff;
+  --ui-text-primary: #111111;
+  --ui-text-secondary: #666666;
+  --ui-text-muted: #888888;
+  --ui-accent: #C8961A;
+  --ui-border: #eeeeee;
+  --ui-menu-text: #666666;
+  --ui-menu-active-bg: #f8f8f8;
+  --ui-menu-active-text: #111111;
+}
+
 body {
-  @apply m-0 bg-white text-primary;
-  font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", sans-serif;
+  @apply m-0;
+  background: var(--ui-surface-bg);
+  color: var(--ui-text-primary);
+  font-family: var(--ui-font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Montserrat', sans-serif;
+  font-family: var(--ui-font-family);
 }
 
 code {

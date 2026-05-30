@@ -1,4 +1,26 @@
 {
+  "customizer": {
+    "title": "Customise interface",
+    "subtitle": "Colours, typography and menus",
+    "typography": "Typography",
+    "font": "Font",
+    "fontSize": "Base font size",
+    "colors": "Colours",
+    "pageBg": "Page background",
+    "surfaceBg": "Surface background",
+    "textPrimary": "Primary text",
+    "textSecondary": "Secondary text",
+    "textMuted": "Muted text",
+    "accent": "Accent colour",
+    "border": "Lines and borders",
+    "menuText": "Menu text",
+    "menuActiveBg": "Active menu background",
+    "menuActiveText": "Active menu text",
+    "apply": "Apply",
+    "undo": "Undo",
+    "reset": "Reset to default",
+    "clearHistory": "Clear history"
+  },
   "nav": {
     "dashboard": "Dashboard",
     "policies": "Policies",

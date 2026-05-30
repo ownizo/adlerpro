@@ -5,6 +5,11 @@ import '../styles.css'
 // Initialise i18n before any component renders
 import '../lib/i18n'
 
+// Inline, render-blocking script: reads the persisted UI theme from
+// localStorage and sets the matching CSS variables on <html> before the page
+// paints, so a personalised theme never flashes the default first.
+const THEME_BOOTSTRAP = `(function(){try{var r=document.documentElement;var s=function(k,v){r.style.setProperty(k,v)};var raw=localStorage.getItem('adlerpro-ui-theme');if(!raw)return;var t=JSON.parse(raw);if(t.baseFontSize)r.style.fontSize=t.baseFontSize+'px';var m={fontFamily:'--ui-font-family',pageBg:'--ui-page-bg',surfaceBg:'--ui-surface-bg',textPrimary:'--ui-text-primary',textSecondary:'--ui-text-secondary',textMuted:'--ui-text-muted',accent:'--ui-accent',border:'--ui-border',menuText:'--ui-menu-text',menuActiveBg:'--ui-menu-active-bg',menuActiveText:'--ui-menu-active-text'};for(var k in m){if(t[k]!=null)s(m[k],t[k])}if(t.textPrimary){s('--color-primary',t.textPrimary)}if(t.textSecondary){s('--color-body',t.textSecondary);s('--color-muted',t.textSecondary)}if(t.textMuted){s('--color-label',t.textMuted);s('--color-label-light',t.textMuted)}if(t.border)s('--color-border',t.border);if(t.accent){s('--color-gold',t.accent);s('--color-gold-400',t.accent)}}catch(e){}})();`
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -47,6 +52,8 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-PT">
       <head>
+        {/* Apply the saved UI theme before first paint to avoid a flash. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
         <HeadContent />
       </head>
       <body>

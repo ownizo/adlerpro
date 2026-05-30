@@ -1,4 +1,26 @@
 {
+  "customizer": {
+    "title": "Personalizar interface",
+    "subtitle": "Cores, tipografia e menus",
+    "typography": "Tipografia",
+    "font": "Tipo de letra",
+    "fontSize": "Tamanho de letra base",
+    "colors": "Cores",
+    "pageBg": "Fundo da página",
+    "surfaceBg": "Fundo das superfícies",
+    "textPrimary": "Texto principal",
+    "textSecondary": "Texto secundário",
+    "textMuted": "Texto subtil",
+    "accent": "Cor de destaque",
+    "border": "Linhas e contornos",
+    "menuText": "Texto do menu",
+    "menuActiveBg": "Fundo do menu ativo",
+    "menuActiveText": "Texto do menu ativo",
+    "apply": "Aplicar",
+    "undo": "Retroceder",
+    "reset": "Repor origem",
+    "clearHistory": "Limpar histórico"
+  },
   "nav": {
     "dashboard": "Painel",
     "policies": "Apólices",
