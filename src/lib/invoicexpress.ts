@@ -3,9 +3,13 @@
  * Server-side only — uses process.env for secrets
  */
 
+// Account subdomain (e.g. <account>.app.invoicexpress.com). Not a secret — it is
+// the public subdomain of the account. Overridable via env; falls back to the
+// production account so the integration works without extra configuration.
+const DEFAULT_ACCOUNT = 'ownizounipessoall-1'
+
 const BASE = () => {
-  const account = process.env['INVOICEXPRESS_ACCOUNT']
-  if (!account) throw new Error('INVOICEXPRESS_ACCOUNT not set')
+  const account = process.env['INVOICEXPRESS_ACCOUNT'] || DEFAULT_ACCOUNT
   return `https://${account}.app.invoicexpress.com`
 }
 

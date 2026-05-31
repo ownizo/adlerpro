@@ -411,21 +411,3 @@ export interface IndividualClient {
   authUserId?: string
   createdAt?: string
 }
-
-export type SocialPostStatus = 'draft' | 'scheduled' | 'published'
-export type SocialNetwork = 'instagram' | 'linkedin' | 'facebook'
-
-export interface SocialPost {
-  id: string
-  topic: string
-  status: SocialPostStatus
-  networks: SocialNetwork[]
-  contentInstagram?: string
-  contentLinkedin?: string
-  contentFacebook?: string
-  imageUrl?: string
-  scheduledAt?: string
-  publishedAt?: string
-  createdAt: string
-  updatedAt: string
-}
