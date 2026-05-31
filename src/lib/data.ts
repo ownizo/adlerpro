@@ -15,7 +15,6 @@ import type {
   ApiConnection,
   UserMetricEvent,
   IndividualClient,
-  SocialPost,
   ClaimMessage,
 } from './types'
 
@@ -537,34 +536,6 @@ export async function deleteIndividualClientRelations(clientId: string): Promise
   ])
   const errors = results.filter((r) => r.error).map((r) => r.error!.message)
   if (errors.length > 0) throw new Error(`deleteIndividualClientRelations: ${errors.join('; ')}`)
-}
-
-// ============================================================
-// Social Posts
-// ============================================================
-export async function getSocialPosts(): Promise<SocialPost[]> {
-  const sb = getSupabaseAdmin()
-  const { data, error } = await sb.from('social_posts').select('*').order('created_at', { ascending: false })
-  if (error) throw error
-  return rowsToCamel<SocialPost>(data ?? [])
-}
-
-export async function createSocialPost(post: SocialPost): Promise<void> {
-  const sb = getSupabaseAdmin()
-  const { error } = await sb.from('social_posts').insert(objectToSnake(post as unknown as Record<string, unknown>))
-  if (error) console.error('createSocialPost error:', error)
-}
-
-export async function updateSocialPost(id: string, updates: Partial<SocialPost>): Promise<void> {
-  const sb = getSupabaseAdmin()
-  const { error } = await sb.from('social_posts').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
-  if (error) console.error('updateSocialPost error:', error)
-}
-
-export async function deleteSocialPost(id: string): Promise<void> {
-  const sb = getSupabaseAdmin()
-  const { error } = await sb.from('social_posts').delete().eq('id', id)
-  if (error) throw new Error(`deleteSocialPost: ${error.message}`)
 }
 
 // ============================================================

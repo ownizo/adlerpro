@@ -33,11 +33,6 @@ import {
   registerClaimDocument,
   removeClaimDocument,
   getClaimDocumentUrl,
-  fetchSocialPosts,
-  adminCreateSocialPost,
-  adminUpdateSocialPost,
-  adminDeleteSocialPost,
-  adminGenerateSocialContent,
   fetchAdminFinancialDashboard,
   getRenewalAlerts,
   adminUpdateRenewalAlertStatus,
@@ -52,7 +47,6 @@ import type {
   UserMetricEvent,
   ApiConnection,
   IndividualClient,
-  SocialPost,
   AdminFinancialDashboardData,
   RenewalAlertItem,
   RenewalAlertsResponse,
@@ -71,7 +65,7 @@ async function exportToExcel(data: Record<string, unknown>[], filename: string) 
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
 
-const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'social', 'api', 'profiles', 'alerts'] as const
+const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'api', 'profiles', 'alerts'] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
 const RENEWAL_ALERT_STATUS_LABELS: Record<RenewalAlertStatus, string> = {
   pending: 'Pendente',
@@ -296,7 +290,6 @@ function AdminPage() {
   const [claimOperationalSummary, setClaimOperationalSummary] = useState<Record<string, { responsibleName?: string; messagesCount: number; documentsCount: number; lastMessageAt?: string; updatedAt?: string }>>({})
   const [documents, setDocuments] = useState<DocType[]>([])
   const [individualClients, setIndividualClients] = useState<IndividualClient[]>([])
-  const [socialPosts, setSocialPosts] = useState<SocialPost[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewCompany, setShowNewCompany] = useState(false)
   const [showNewPolicy, setShowNewPolicy] = useState(false)
@@ -335,13 +328,6 @@ function AdminPage() {
     setClaimOperationalSummary(cos ?? {})
     setDocuments(d)
     setIndividualClients(ic ?? [])
-    try {
-      const sp = await fetchSocialPosts()
-      setSocialPosts(sp ?? [])
-    } catch (err) {
-      console.error('[reload] fetchSocialPosts error:', err)
-      setSocialPosts([])
-    }
   }
 
   useEffect(() => {
@@ -429,7 +415,6 @@ function AdminPage() {
                 claims={claims}
                 documents={documents}
                 individualClients={individualClients}
-                socialPosts={socialPosts}
                 apiConnections={apiConnections}
               />
             )}
@@ -1481,13 +1466,6 @@ function AdminPage() {
 
             {tab === 'billing' && <BillingTab />}
 
-            {tab === 'social' && (
-              <SocialHubTab
-                posts={socialPosts}
-                onRefresh={async () => { const sp = await fetchSocialPosts(); setSocialPosts(sp ?? []) }}
-              />
-            )}
-
             {tab === 'alerts' && (
               <div>
                 <div className="flex items-center justify-between mb-4">
@@ -1537,7 +1515,6 @@ function AdminDashboardTab({
   claims,
   documents,
   individualClients,
-  socialPosts,
   apiConnections,
 }: {
   companies: Company[]
@@ -1546,12 +1523,10 @@ function AdminDashboardTab({
   claims: Claim[]
   documents: DocType[]
   individualClients: IndividualClient[]
-  socialPosts: SocialPost[]
   apiConnections: ApiConnection[]
 }) {
   const openClaims = claims.filter((c) => c.status !== 'paid' && c.status !== 'denied')
   const connectedApis = apiConnections.filter((a) => a.status === 'connected').length
-  const scheduledPosts = socialPosts.filter((p) => p.status === 'scheduled').length
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getUTCFullYear())
   const [selectedMonth, setSelectedMonth] = useState<string>('')
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
@@ -2321,8 +2296,6 @@ function AdminDashboardTab({
             <p>Sinistros em aberto: <strong>{openClaims.length}</strong></p>
             <p>Ligações API ativas: <strong>{connectedApis}</strong> / {apiConnections.length}</p>
             <p>Documentos registados: <strong>{documents.length}</strong></p>
-            <p>Posts sociais agendados: <strong>{scheduledPosts}</strong></p>
-            <p>Posts sociais totais: <strong>{socialPosts.length}</strong></p>
           </div>
         </div>
       </div>
@@ -3692,350 +3665,6 @@ function IndividualClientForm({
           </button>
         </div>
       </form>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────
-// Social Hub Tab
-// ─────────────────────────────────────────────────────────
-const NETWORK_ICONS: Record<string, string> = {
-  instagram: '📷',
-  linkedin: '💼',
-  facebook: '📘',
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Rascunho',
-  scheduled: 'Agendado',
-  published: 'Publicado',
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600',
-  scheduled: 'bg-blue-100 text-blue-700',
-  published: 'bg-green-100 text-green-700',
-}
-
-function SocialHubTab({ posts, onRefresh }: { posts: SocialPost[]; onRefresh: () => Promise<void> }) {
-  const [showEditor, setShowEditor] = useState(false)
-  const [editingPost, setEditingPost] = useState<SocialPost | null>(null)
-
-  const handleNew = () => { setEditingPost(null); setShowEditor(true) }
-  const handleEdit = (p: SocialPost) => { setEditingPost(p); setShowEditor(true) }
-  const handleClose = async () => { setShowEditor(false); setEditingPost(null); await onRefresh() }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-navy-700">Social Hub ({posts.length})</h2>
-        <button
-          onClick={handleNew}
-          className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm"
-        >
-          + Novo Post
-        </button>
-      </div>
-
-      {showEditor && (
-        <SocialPostEditor
-          initial={editingPost}
-          onClose={handleClose}
-        />
-      )}
-
-      {posts.length === 0 ? (
-        <p className="text-navy-500">Ainda não existem posts. Cria o primeiro!</p>
-      ) : (
-        <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-navy-50 border-b border-navy-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-navy-600 font-medium">Tópico</th>
-                <th className="text-left px-4 py-3 text-navy-600 font-medium">Estado</th>
-                <th className="text-left px-4 py-3 text-navy-600 font-medium">Redes</th>
-                <th className="text-left px-4 py-3 text-navy-600 font-medium">Data</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-navy-100">
-              {posts.map((p) => (
-                <tr key={p.id} className="hover:bg-navy-50 transition-colors">
-                  <td className="px-4 py-3 text-navy-700 font-medium max-w-xs truncate">{p.topic}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[p.status] ?? 'bg-gray-100 text-gray-600'}`}>
-                      {STATUS_LABELS[p.status] ?? p.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="flex gap-1">
-                      {p.networks.map((n) => (
-                        <span key={n} title={n}>{NETWORK_ICONS[n] ?? n}</span>
-                      ))}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-navy-500">
-                    {p.scheduledAt ? formatDate(p.scheduledAt) : formatDate(p.createdAt)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleEdit(p)}
-                      className="text-xs text-navy-500 hover:text-navy-700 underline mr-3"
-                    >
-                      Editar
-                    </button>
-                    <DeletePostButton postId={p.id} onDeleted={onRefresh} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
-function DeletePostButton({ postId, onDeleted }: { postId: string; onDeleted: () => Promise<void> }) {
-  const [deleting, setDeleting] = useState(false)
-  const handleDelete = async () => {
-    if (!confirm('Apagar este post?')) return
-    setDeleting(true)
-    try {
-      await adminDeleteSocialPost({ data: { id: postId } })
-      await onDeleted()
-    } catch (err) {
-      alert(`Erro ao apagar post: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
-    } finally {
-      setDeleting(false)
-    }
-  }
-  return (
-    <button
-      onClick={handleDelete}
-      disabled={deleting}
-      className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
-    >
-      {deleting ? '...' : 'Apagar'}
-    </button>
-  )
-}
-
-function SocialPostEditor({ initial, onClose }: { initial: SocialPost | null; onClose: () => Promise<void> }) {
-  const [topic, setTopic] = useState(initial?.topic ?? '')
-  const [networks, setNetworks] = useState<string[]>(initial?.networks ?? ['instagram', 'linkedin', 'facebook'])
-  const [contentInstagram, setContentInstagram] = useState(initial?.contentInstagram ?? '')
-  const [contentLinkedin, setContentLinkedin] = useState(initial?.contentLinkedin ?? '')
-  const [contentFacebook, setContentFacebook] = useState(initial?.contentFacebook ?? '')
-  const [scheduledAt, setScheduledAt] = useState(initial?.scheduledAt ? initial.scheduledAt.slice(0, 16) : '')
-  const [previewTab, setPreviewTab] = useState<'instagram' | 'linkedin' | 'facebook'>('instagram')
-  const [generating, setGenerating] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [genError, setGenError] = useState('')
-  const [carouselSlides, setCarouselSlides] = useState<string[]>([])
-
-  const toggleNetwork = (n: string) => {
-    setNetworks((prev) => prev.includes(n) ? prev.filter((x) => x !== n) : [...prev, n])
-  }
-
-  const handleGenerate = async () => {
-    if (!topic.trim()) { setGenError('Introduz um tópico primeiro.'); return }
-    setGenError(''); setGenerating(true); setCarouselSlides([])
-    try {
-      const res = await adminGenerateSocialContent({ data: { topic } })
-      if (res.instagram) setContentInstagram(res.instagram)
-      if (res.linkedin) setContentLinkedin(res.linkedin)
-      if (res.facebook) setContentFacebook(res.facebook)
-      if (res.carouselSlides?.length) setCarouselSlides(res.carouselSlides)
-    } catch (e: any) {
-      setGenError(e?.message ?? 'Erro ao gerar conteúdo.')
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  const downloadSvg = (svg: string, index: number) => {
-    const blob = new Blob([svg], { type: 'image/svg+xml' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `adler-carousel-${index + 1}.svg`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  const handleSave = async (status: 'draft' | 'scheduled') => {
-    setSaving(true)
-    const now = new Date().toISOString()
-    const payload: any = {
-      topic,
-      status,
-      networks,
-      contentInstagram,
-      contentLinkedin,
-      contentFacebook,
-      scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
-      updatedAt: now,
-    }
-    if (initial) {
-      await adminUpdateSocialPost({ data: { id: initial.id, updates: payload } })
-    } else {
-      await adminCreateSocialPost({ data: { ...payload, id: crypto.randomUUID(), createdAt: now } })
-    }
-    setSaving(false)
-    await onClose()
-  }
-
-  return (
-    <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-navy-700">{initial ? 'Editar Post' : 'Novo Post'}</h3>
-        <button onClick={onClose} className="text-navy-400 hover:text-navy-600 text-sm">✕ Fechar</button>
-      </div>
-
-      {/* Topic */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-navy-600 mb-1">Tópico / Ideia</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={topic}
-            onChange={(e) => setTopic(e.target.value)}
-            placeholder="Ex: Seguro automóvel — coberturas que não sabia que tinha"
-            className="flex-1 px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
-          />
-          <button
-            onClick={handleGenerate}
-            disabled={generating}
-            className="px-4 py-2 bg-navy-700 text-white text-sm font-medium rounded-[2px] hover:bg-navy-600 disabled:opacity-50 whitespace-nowrap"
-          >
-            {generating ? 'A gerar...' : '✦ Gerar com IA'}
-          </button>
-        </div>
-        {genError && <p className="text-red-500 text-xs mt-1">{genError}</p>}
-      </div>
-
-      {/* Network selector */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-navy-600 mb-2">Redes</label>
-        <div className="flex gap-3">
-          {(['instagram', 'linkedin', 'facebook'] as const).map((n) => (
-            <button
-              key={n}
-              type="button"
-              onClick={() => toggleNetwork(n)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                networks.includes(n)
-                  ? 'bg-navy-700 text-white border-navy-700'
-                  : 'bg-white text-navy-500 border-navy-200 hover:border-navy-400'
-              }`}
-            >
-              {NETWORK_ICONS[n]} {n.charAt(0).toUpperCase() + n.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Content tabs */}
-      <div className="mb-4">
-        <div className="flex gap-1 border-b border-navy-200 mb-3">
-          {(['instagram', 'linkedin', 'facebook'] as const).map((n) => (
-            <button
-              key={n}
-              onClick={() => setPreviewTab(n)}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                previewTab === n
-                  ? 'border-gold-400 text-navy-700'
-                  : 'border-transparent text-navy-400 hover:text-navy-600'
-              }`}
-            >
-              {NETWORK_ICONS[n]} {n.charAt(0).toUpperCase() + n.slice(1)}
-            </button>
-          ))}
-        </div>
-        {previewTab === 'instagram' && (
-          <textarea
-            value={contentInstagram}
-            onChange={(e) => setContentInstagram(e.target.value)}
-            rows={8}
-            placeholder="Conteúdo para Instagram..."
-            className="w-full px-4 py-3 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 resize-y font-mono"
-          />
-        )}
-        {previewTab === 'linkedin' && (
-          <textarea
-            value={contentLinkedin}
-            onChange={(e) => setContentLinkedin(e.target.value)}
-            rows={8}
-            placeholder="Conteúdo para LinkedIn..."
-            className="w-full px-4 py-3 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 resize-y font-mono"
-          />
-        )}
-        {previewTab === 'facebook' && (
-          <textarea
-            value={contentFacebook}
-            onChange={(e) => setContentFacebook(e.target.value)}
-            rows={8}
-            placeholder="Conteúdo para Facebook..."
-            className="w-full px-4 py-3 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 resize-y font-mono"
-          />
-        )}
-      </div>
-
-      {/* Carousel slides preview */}
-      {carouselSlides.length > 0 && (
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-navy-600 mb-2">Carrossel Instagram ({carouselSlides.length} slides)</label>
-          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
-            {carouselSlides.map((svg, i) => (
-              <div key={i} style={{ flexShrink: 0 }}>
-                <img
-                  src={'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)}
-                  width={270}
-                  height={270}
-                  style={{ borderRadius: 4, border: '1px solid #e2e8f0', display: 'block' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => downloadSvg(svg, i)}
-                  className="mt-1.5 w-full px-2 py-1 bg-gold-400 text-navy-700 text-xs font-semibold rounded-[2px] hover:bg-gold-300"
-                >
-                  ↓ Slide {i + 1}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Schedule */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-navy-600 mb-1">Data / Hora de Agendamento (opcional)</label>
-        <input
-          type="datetime-local"
-          value={scheduledAt}
-          onChange={(e) => setScheduledAt(e.target.value)}
-          className="px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
-        />
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => handleSave('draft')}
-          disabled={saving}
-          className="px-5 py-2 border border-navy-300 text-navy-700 text-sm font-medium rounded-[2px] hover:bg-navy-50 disabled:opacity-50"
-        >
-          {saving ? 'A guardar...' : 'Guardar Rascunho'}
-        </button>
-        <button
-          onClick={() => handleSave('scheduled')}
-          disabled={saving || !scheduledAt}
-          className="px-5 py-2 bg-gold-400 text-navy-700 text-sm font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50"
-        >
-          {saving ? 'A agendar...' : 'Agendar'}
-        </button>
-      </div>
     </div>
   )
 }
