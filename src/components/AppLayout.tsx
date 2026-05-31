@@ -88,7 +88,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 {t('common.portal')}
               </span>
             </div>
-            <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '72px', width: 'auto', display: 'block' }} />
+            <img src={isAdminRoute ? '/admin-logo.png' : '/logo.png'} alt="Adler & Rochefort" style={{ height: '72px', width: 'auto', display: 'block' }} />
           </Link>
         </div>
 
