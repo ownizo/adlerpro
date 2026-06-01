@@ -27,6 +27,7 @@
     "openai": "^6.33.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-email": "^6.5.0",
     "react-i18next": "^17.0.2",
     "resend": "^6.10.0",
     "tailwindcss": "^4.0.6",
