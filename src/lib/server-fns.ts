@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
-import { Resend } from 'resend'
+import { resendClient, FROM_EMAIL } from './email/client'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
 import { getClaimOperationalData, saveClaimOperationalData, updateClaimOperationalData } from './claim-ops'
@@ -201,26 +201,25 @@ async function sendClaimMessageEmail(params: {
   body: string
 }) {
   const to = params.to?.trim()
-  const apiKey = process.env['RESEND_API_KEY']
-  if (!to || !apiKey) return
+  const templateId = process.env['RESEND_TEMPLATE_CLAIMS']
+  if (!to || !process.env['RESEND_API_KEY'] || !templateId) return
 
-  const resend = new Resend(apiKey)
-  const from = process.env['RESEND_FROM_EMAIL'] || 'noreply@adlerrochefort.com'
-  const preview = params.body.length > 220 ? `${params.body.slice(0, 220)}...` : params.body
+  const roleLabel = params.senderRole === 'admin' ? 'Admin' : 'Cliente'
+  const message = params.body.length > 2000 ? `${params.body.slice(0, 1997)}...` : params.body
 
   try {
-    await resend.emails.send({
-      from,
+    await resendClient.emails.send({
+      from: FROM_EMAIL,
       to: [to],
       subject: `Atualização de sinistro ${params.claimId}`,
-      html: `
-        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#0f172a">
-          <h2 style="margin:0 0 12px">Nova mensagem no sinistro ${params.claimId}</h2>
-          <p style="margin:0 0 8px"><strong>Remetente:</strong> ${params.senderName} (${params.senderRole === 'admin' ? 'Admin' : 'Cliente'})</p>
-          <p style="margin:0 0 16px"><strong>Mensagem:</strong><br>${preview.replace(/\n/g, '<br>')}</p>
-          <p style="margin:0">Aceda ao portal para responder e acompanhar o processo.</p>
-        </div>
-      `,
+      template: {
+        id: templateId,
+        variables: {
+          TITLE: `Nova mensagem no sinistro ${params.claimId}`,
+          DETAIL: `Remetente: ${params.senderName} (${roleLabel})`,
+          MESSAGE: message,
+        },
+      },
     })
   } catch (error) {
     console.error('[sendClaimMessageEmail] error:', error)
