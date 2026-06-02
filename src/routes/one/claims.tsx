@@ -131,6 +131,7 @@ function OneClaims() {
     e.preventDefault()
     if (!clientId) return
     setFormError('')
+    if (!form.policyId) { setFormError('Selecione uma apólice associada.'); return }
     setSubmitting(true)
     try {
       await submitIndividualClaim({
@@ -185,9 +186,9 @@ function OneClaims() {
               <h2 style={{ fontSize: '1rem', fontWeight: 700, color: navy, marginTop: 0, marginBottom: '1.25rem' }}>Novo Sinistro</h2>
               <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <FieldLabel>Apólice Associada</FieldLabel>
-                  <select value={form.policyId} onChange={e => update('policyId', e.target.value)} style={selectStyle}>
-                    <option value="">Selecionar apólice (opcional)</option>
+                  <FieldLabel>Apólice Associada *</FieldLabel>
+                  <select value={form.policyId} onChange={e => update('policyId', e.target.value)} required style={selectStyle}>
+                    <option value="">Selecionar apólice</option>
                     {policies.map(p => (
                       <option key={p.id} value={p.id}>
                         {TYPE_LABELS[p.type] ?? p.type} · {p.insurer}{p.policy_number ? ` · ${p.policy_number}` : ''}

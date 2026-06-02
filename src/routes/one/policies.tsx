@@ -24,7 +24,9 @@ interface Policy {
   status: string
   description?: string
   payment_frequency?: string
-  emergency_contacts?: string
+  deductible?: number | null
+  coverages?: string[] | null
+  exclusions?: string[] | null
   company_id?: string
 }
 
@@ -114,7 +116,9 @@ function OnePolicies() {
       if (clientId) {
         const { data, error: pErr } = await supabase
           .from('policies')
-          .select('id, policy_number, type, insurer, annual_premium, start_date, end_date, renewal_date, status, description, payment_frequency, emergency_contacts, company_id')
+          // Apenas campos visíveis ao cliente. NUNCA inclui campos internos
+          // (commission_percentage, commission_value, notes_internal).
+          .select('id, policy_number, type, insurer, annual_premium, start_date, end_date, renewal_date, status, description, payment_frequency, deductible, coverages, exclusions, company_id')
           .eq('individual_client_id', clientId)
           .order('end_date', { ascending: true })
         if (pErr) throw pErr
@@ -282,22 +286,22 @@ function PolicyCard({ policy }: { policy: Policy }) {
 
         {expanded && (
           <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC' }}>
-            {policy.emergency_contacts && (
-              <div style={{ marginBottom: '0.75rem', padding: '0.6rem 0.85rem', background: '#FEF9EC', border: '1px solid #F3D978', borderRadius: 6, display: 'flex', alignItems: 'flex-start', gap: '0.5rem' }}>
-                <span style={{ fontSize: '1rem' }}>📞</span>
-                <div>
-                  <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#92690A', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>Assistência</p>
-                  <p style={{ fontSize: '0.82rem', color: '#7A5500', fontWeight: 500, margin: '0.1rem 0 0' }}>{policy.emergency_contacts}</p>
-                </div>
-              </div>
-            )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '1rem' }}>
               {policy.start_date        && <DetailItem label="Início"     value={formatDate(policy.start_date)} />}
               {policy.end_date          && <DetailItem label="Fim"        value={formatDate(policy.end_date)} />}
               {policy.renewal_date      && <DetailItem label="Renovação"  value={formatDate(policy.renewal_date)} />}
               {policy.payment_frequency && <DetailItem label="Pagamento"  value={policy.payment_frequency} />}
+              {policy.deductible != null && <DetailItem label="Franquia"   value={formatCurrency(policy.deductible)} />}
               {policy.description       && <DetailItem label="Descrição"  value={policy.description} span />}
             </div>
+
+            {/* Coberturas e exclusões (read-only) */}
+            {policy.coverages && policy.coverages.length > 0 && (
+              <PolicyClauseList title="Coberturas" items={policy.coverages} tone="cover" />
+            )}
+            {policy.exclusions && policy.exclusions.length > 0 && (
+              <PolicyClauseList title="Exclusões" items={policy.exclusions} tone="exclude" />
+            )}
 
             {/* Documentos da apólice */}
             <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '0.85rem' }}>
@@ -379,6 +383,30 @@ function DetailItem({ label, value, span }: { label: string; value: string; span
     <div style={{ gridColumn: span ? '1 / -1' : undefined }}>
       <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: 0 }}>{label}</p>
       <p style={{ fontSize: '0.8rem', color: navy, fontWeight: 500, margin: '0.1rem 0 0' }}>{value}</p>
+    </div>
+  )
+}
+
+// Lista read-only de coberturas / exclusões (arrays de texto da apólice).
+function PolicyClauseList({ title, items, tone }: { title: string; items: string[]; tone: 'cover' | 'exclude' }) {
+  const accent = tone === 'cover' ? '#3B6D11' : '#B91C1C'
+  const dotBg  = tone === 'cover' ? '#EAF3DE' : '#FEE2E2'
+  const mark   = tone === 'cover' ? '✓' : '✕'
+  return (
+    <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '0.85rem', marginBottom: '1rem' }}>
+      <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.65rem' }}>
+        {title} ({items.length})
+      </p>
+      <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        {items.map((item, i) => (
+          <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem' }}>
+            <span style={{ marginTop: 1, flexShrink: 0, width: 20, height: 20, borderRadius: '50%', background: dotBg, color: accent, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.72rem', fontWeight: 700 }}>
+              {mark}
+            </span>
+            <span style={{ fontSize: '0.9rem', color: '#1E293B', lineHeight: 1.5 }}>{item}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

@@ -260,13 +260,13 @@ export async function getClaim(id: string): Promise<Claim | undefined> {
 export async function createClaim(claim: Claim): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('claims').insert(objectToSnake(claim as unknown as Record<string, unknown>))
-  if (error) console.error('createClaim error:', error)
+  if (error) throw new Error(`Falha ao criar sinistro: ${error.message}`)
 }
 
 export async function updateClaim(id: string, updates: Partial<Claim>): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('claims').update(objectToSnake(updates as Record<string, unknown>)).eq('id', id)
-  if (error) console.error('updateClaim error:', error)
+  if (error) throw new Error(`Falha ao atualizar sinistro: ${error.message}`)
 }
 
 // ============================================================

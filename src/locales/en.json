@@ -66,7 +66,9 @@
     "nd": "N/A",
     "processing": "Processing...",
     "analyzing": "Analyzing...",
-    "searching": "Searching..."
+    "searching": "Searching...",
+    "redirecting": "Redirecting...",
+    "retry": "Try again"
   },
   "auth": {
     "signIn": "Sign In",
@@ -98,6 +100,10 @@
     "linkSent": "An email with instructions to reset your password has been sent.",
     "passwordReset": "Password reset successfully. Sign in with your new credentials.",
     "emailValidated": "Email validated successfully. Sign in to continue.",
+    "accountPendingTitle": "Account not yet set up",
+    "accountPendingBody": "Your account is authenticated but is not yet linked to a client profile. Your broker will link your policies shortly. If you have questions, contact insurance@adlerrochefort.com.",
+    "profileLoadErrorTitle": "Could not load your profile",
+    "profileLoadErrorBody": "There was a problem loading your account data. Please check your connection and try again.",
     "errors": {
       "invalidCredentials": "Invalid email or password.",
       "emailNotConfirmed": "Email not yet confirmed. Open the confirmation link sent to your email.",

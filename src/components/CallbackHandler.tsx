@@ -35,7 +35,11 @@ export function CallbackHandler({ children }: { children: React.ReactNode }) {
           return
         }
 
-        // Default: clean URL
+        // Default: limpa apenas o hash de auth e deixa o utilizador na página.
+        // A decisão de destino por portal NÃO é feita aqui: os fluxos de auth
+        // desembocam em /login, onde a decisão é centralizada (resolvePostLogin
+        // em post-login-destination.ts). Encaminhar para um portal a partir
+        // daqui arriscaria o loop de redirect que queremos evitar.
         if (!cancelled) {
           const cleanUrl = `${window.location.pathname}${window.location.search}`
           window.history.replaceState(null, '', cleanUrl)

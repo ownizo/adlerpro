@@ -1,9 +1,10 @@
-import { createFileRoute, useNavigate, Navigate, Link } from '@tanstack/react-router'
+import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useIdentity } from '@/lib/identity-context'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import i18n from '@/lib/i18n'
+import { resolvePostLogin } from '@/lib/post-login-destination'
 
 const TERMS_VERSION = '2025-01'
 
@@ -32,6 +33,15 @@ function LoginPage() {
   const [termsExpanded, setTermsExpanded] = useState(false)
   const [lang, setLang] = useState(i18n.language)
   const handleLang = (l: string) => { i18n.changeLanguage(l); setLang(l) }
+  // Estado "conta por configurar" (segmento 'unknown' e não-admin).
+  const [unconfigured, setUnconfigured] = useState(false)
+  // Estado "não foi possível carregar o perfil" (falha persistente a resolver
+  // o segmento) — distinto de unconfigured e de qualquer destino de portal.
+  const [loadError, setLoadError] = useState(false)
+  // Bump para re-correr a decisão de destino (botão "tentar novamente").
+  const [retryNonce, setRetryNonce] = useState(0)
+  // Garante que a decisão de destino corre uma só vez por sessão estabelecida.
+  const redirectStartedRef = useRef(false)
 
   const font = "'Montserrat', sans-serif"
   const langPill = (
@@ -82,6 +92,25 @@ function LoginPage() {
 
   const isPasswordSetupMode = mode === 'recovery'
 
+  // Decisão de destino pós-login centralizada (única fonte: resolvePostLogin).
+  // Corre uma só vez quando há sessão e não estamos a definir palavra-passe;
+  // não acontece em cada navegação — apenas nesta página de entrada.
+  useEffect(() => {
+    if (!ready || !user || isPasswordSetupMode) return
+    if (redirectStartedRef.current) return
+    redirectStartedRef.current = true
+    let cancelled = false
+    void (async () => {
+      const isAdmin = Boolean(user.roles?.includes('admin'))
+      const decision = await resolvePostLogin(isAdmin)
+      if (cancelled) return
+      if (decision.status === 'redirect') navigate({ to: decision.to })
+      else if (decision.status === 'unconfigured') setUnconfigured(true)
+      else setLoadError(true)
+    })()
+    return () => { cancelled = true }
+  }, [ready, user, isPasswordSetupMode, retryNonce])
+
   if (!ready) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -92,8 +121,77 @@ function LoginPage() {
   }
 
   if (user && !isPasswordSetupMode) {
-    const isAdmin = user.roles?.includes('admin')
-    return <Navigate to={isAdmin ? '/admin' : '/dashboard'} />
+    // Conta autenticada mas sem perfil de cliente associado: estado explícito,
+    // sem redirect (logo, sem loop) e sem ecrã em branco.
+    if (unconfigured) {
+      return (
+        <div className="min-h-screen bg-white flex items-center justify-center px-4">
+          {langPill}
+          <div className="w-full max-w-md p-8 text-center" style={{ border: '1px solid #eeeeee', borderRadius: '4px' }}>
+            <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4" style={{ background: '#FAEEDA', borderRadius: '50%' }}>
+              <svg className="w-8 h-8" style={{ color: '#854F0B' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+            </div>
+            <h2 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: '#111111', marginBottom: '0.75rem' }}>
+              {t('auth.accountPendingTitle')}
+            </h2>
+            <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.85rem', color: '#555555', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+              {t('auth.accountPendingBody')}
+            </p>
+            <button
+              onClick={async () => {
+                await logout().catch(() => undefined)
+                setUnconfigured(false)
+                redirectStartedRef.current = false
+              }}
+              style={{ fontFamily: font, fontWeight: 600, fontSize: '0.85rem', padding: '0.6rem 1.5rem', background: '#111111', color: '#ffffff', borderRadius: '2px', border: 'none', cursor: 'pointer' }}
+            >
+              {t('common.logout')}
+            </button>
+          </div>
+        </div>
+      )
+    }
+    // Falha persistente a resolver o segmento: estado explícito com retry.
+    // Não há redirect para portal (evita mandar um B2C para o portal B2B).
+    if (loadError) {
+      return (
+        <div className="min-h-screen bg-white flex items-center justify-center px-4">
+          {langPill}
+          <div className="w-full max-w-md p-8 text-center" style={{ border: '1px solid #eeeeee', borderRadius: '4px' }}>
+            <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4" style={{ background: '#FEE2E2', borderRadius: '50%' }}>
+              <svg className="w-8 h-8" style={{ color: '#991B1B' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: '#111111', marginBottom: '0.75rem' }}>
+              {t('auth.profileLoadErrorTitle')}
+            </h2>
+            <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.85rem', color: '#555555', lineHeight: 1.6, marginBottom: '1.5rem' }}>
+              {t('auth.profileLoadErrorBody')}
+            </p>
+            <button
+              onClick={() => {
+                setLoadError(false)
+                redirectStartedRef.current = false
+                setRetryNonce((n) => n + 1)
+              }}
+              style={{ fontFamily: font, fontWeight: 600, fontSize: '0.85rem', padding: '0.6rem 1.5rem', background: '#111111', color: '#ffffff', borderRadius: '2px', border: 'none', cursor: 'pointer' }}
+            >
+              {t('common.retry')}
+            </button>
+          </div>
+        </div>
+      )
+    }
+    // Destino a ser resolvido pelo segmento — ecrã de transição.
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        {langPill}
+        <div style={{ color: '#666666', fontFamily: font }}>{t('common.redirecting')}</div>
+      </div>
+    )
   }
 
   const resetLocalAuthForm = () => {
@@ -118,11 +216,10 @@ function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
-      const roles: string[] = (data.user?.app_metadata?.roles as string[]) ?? []
-      const isAdmin = roles.includes('admin')
-      navigate({ to: isAdmin ? '/admin' : '/dashboard' })
+      // Destino decidido centralmente pelo effect de routing assim que a sessão
+      // fica disponível (onAuthStateChange) — ver resolvePostLogin.
     } catch (err: any) {
       setError(formatLoginError(err))
     } finally {
