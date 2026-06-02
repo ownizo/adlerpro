@@ -1231,8 +1231,12 @@ function AdminPage() {
                   selectedClaimId={selectedClaimId}
                   onSelectClaim={setSelectedClaimId}
                   onQuickStatusUpdate={async (claimId, status, notes) => {
-                    await adminUpdateClaimStatus({ data: { claimId, status, notes } })
-                    await reload()
+                    try {
+                      await adminUpdateClaimStatus({ data: { claimId, status, notes } })
+                      await reload()
+                    } catch (err) {
+                      alert(`Erro ao atualizar estado do sinistro: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                    }
                   }}
                 />
 
@@ -2954,6 +2958,7 @@ function NewAdminClaimForm({
   const [incidentDate, setIncidentDate] = useState('')
   const [estimatedValue, setEstimatedValue] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   const availableUsers = companyUsers.filter((user) => user.companyId === companyId)
   const availablePolicies = policies.filter((policy) => {
@@ -2963,24 +2968,30 @@ function NewAdminClaimForm({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    setError('')
     setSubmitting(true)
-    await onSubmit({
-      targetType,
-      companyId: targetType === 'company' ? companyId : undefined,
-      individualClientId: targetType === 'individual' ? individualClientId : undefined,
-      clientUserId: targetType === 'company' ? (clientUserId || undefined) : undefined,
-      policyId,
-      type,
-      description,
-      incidentDate,
-      estimatedValue: estimatedValue ? Number(estimatedValue) : undefined,
-    })
-    setSubmitting(false)
-    setPolicyId('')
-    setType('')
-    setDescription('')
-    setIncidentDate('')
-    setEstimatedValue('')
+    try {
+      await onSubmit({
+        targetType,
+        companyId: targetType === 'company' ? companyId : undefined,
+        individualClientId: targetType === 'individual' ? individualClientId : undefined,
+        clientUserId: targetType === 'company' ? (clientUserId || undefined) : undefined,
+        policyId,
+        type,
+        description,
+        incidentDate,
+        estimatedValue: estimatedValue ? Number(estimatedValue) : undefined,
+      })
+      setPolicyId('')
+      setType('')
+      setDescription('')
+      setIncidentDate('')
+      setEstimatedValue('')
+    } catch (err) {
+      setError(`Erro ao criar sinistro: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -3054,6 +3065,12 @@ function NewAdminClaimForm({
         <label className="block text-sm text-navy-600 mb-1">Descrição inicial</label>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} className="w-full px-3 py-2 border border-navy-200 rounded text-sm" />
       </div>
+
+      {error && (
+        <div className="md:col-span-2 px-3 py-2 bg-red-50 border border-red-200 rounded text-sm text-red-600">
+          {error}
+        </div>
+      )}
 
       <div className="md:col-span-2">
         <button disabled={submitting} className="px-4 py-2 bg-navy-700 text-white rounded text-sm disabled:opacity-50">

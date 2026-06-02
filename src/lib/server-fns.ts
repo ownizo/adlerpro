@@ -148,6 +148,23 @@ async function resolveIndividualClientScope(user: { id: string; email?: string |
   return null
 }
 
+/**
+ * Segmento do viewer — valor DERIVADO (não persistido) a partir dos
+ * vínculos que getViewerAccessContext já resolve:
+ *   - 'b2b'     → existe companyId (cliente empresarial via company_users)
+ *   - 'b2c'     → existe individualClientId e NÃO existe companyId
+ *   - 'unknown' → nenhum vínculo resolvido (tratado explicitamente, não silenciado)
+ * Precedência 'b2b' no caso (improvável) de coexistirem ambos os vínculos.
+ * Não introduz nova fonte de dados nem mexe no role (app_metadata/profiles).
+ */
+export type ViewerSegment = 'b2b' | 'b2c' | 'unknown'
+
+function deriveSegment(scope: { companyId: string | null; individualClientId: string | null }): ViewerSegment {
+  if (scope.companyId) return 'b2b'
+  if (scope.individualClientId) return 'b2c'
+  return 'unknown'
+}
+
 async function getViewerAccessContext() {
   const token = extractAccessToken()
   if (!token) throw new Error('Authentication required')
@@ -168,15 +185,35 @@ async function getViewerAccessContext() {
   const companyUser = user.email ? await db.getCompanyUserByEmail(user.email) : undefined
   const individualClient = await resolveIndividualClientScope(user)
 
+  const companyId = companyUser?.companyId ?? null
+  const individualClientId = individualClient?.id ?? null
+
   return {
     user,
     isAdmin,
-    companyId: companyUser?.companyId ?? null,
-    individualClientId: individualClient?.id ?? null,
+    companyId,
+    individualClientId,
     individualClientName: individualClient?.full_name ?? null,
     individualClientEmail: individualClient?.email ?? null,
+    segment: deriveSegment({ companyId, individualClientId }),
   }
 }
+
+/**
+ * getMySegment — server function leve para a próxima fase (routing).
+ * Reutiliza getViewerAccessContext (mesma lógica e fonte de dados) e expõe
+ * apenas o segmento derivado e os dois vínculos. Regra: ver deriveSegment.
+ */
+export const getMySegment = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async (): Promise<{ segment: ViewerSegment; companyId: string | null; individualClientId: string | null }> => {
+    const ctx = await getViewerAccessContext()
+    return {
+      segment: ctx.segment,
+      companyId: ctx.companyId,
+      individualClientId: ctx.individualClientId,
+    }
+  })
 
 function canAccessClaimByContext(claim: Claim, ctx: Awaited<ReturnType<typeof getViewerAccessContext>>) {
   if (ctx.isAdmin) return true

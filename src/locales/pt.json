@@ -66,7 +66,9 @@
     "nd": "N/D",
     "processing": "A processar...",
     "analyzing": "A analisar...",
-    "searching": "A pesquisar..."
+    "searching": "A pesquisar...",
+    "redirecting": "A redirecionar...",
+    "retry": "Tentar novamente"
   },
   "auth": {
     "signIn": "Iniciar Sessão",
@@ -98,6 +100,10 @@
     "linkSent": "Foi enviado um email com instruções para redefinir a palavra-passe.",
     "passwordReset": "Palavra-passe redefinida com sucesso. Inicie sessão com a nova credencial.",
     "emailValidated": "Email validado com sucesso. Inicie sessão para continuar.",
+    "accountPendingTitle": "Conta por configurar",
+    "accountPendingBody": "A sua conta está autenticada, mas ainda não está associada a um perfil de cliente. O seu mediador irá associar as suas apólices em breve. Em caso de dúvida, contacte insurance@adlerrochefort.com.",
+    "profileLoadErrorTitle": "Não foi possível carregar o perfil",
+    "profileLoadErrorBody": "Ocorreu um problema a carregar os dados da sua conta. Verifique a ligação e tente novamente.",
     "errors": {
       "invalidCredentials": "Email ou palavra-passe inválidos.",
       "emailNotConfirmed": "O email ainda não foi confirmado. Abra o link de confirmação enviado para o seu email.",
