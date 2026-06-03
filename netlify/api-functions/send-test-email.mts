@@ -40,7 +40,7 @@ export default async function handler(req: Request, _context: Context) {
           'Este é um email de confirmação gerado automaticamente para validar a integração com o Resend. Se o recebeu, o envio de emails transacionais está operacional.',
         referenceCode: `TEST-${Date.now()}`,
         ctaLabel: 'Abrir Portal',
-        ctaUrl: 'https://pro.adlerrochefort.com',
+        ctaUrl: 'https://osmeusseguros.com',
       }),
     })
 
