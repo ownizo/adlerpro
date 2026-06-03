@@ -146,7 +146,7 @@ function buildEmailHTML(companyName: string, policies: any[]): string {
 
               <!-- CTA -->
               <div style="text-align: center; margin-bottom: 24px;">
-                <a href="https://pro.adlerrochefort.com/policies" style="display: inline-block; background: #C8961A; color: #ffffff; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 4px; text-decoration: none; letter-spacing: 0.03em;">
+                <a href="https://osmeusseguros.com/policies" style="display: inline-block; background: #C8961A; color: #ffffff; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 4px; text-decoration: none; letter-spacing: 0.03em;">
                   Ver Apólices no Portal →
                 </a>
               </div>
