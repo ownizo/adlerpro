@@ -385,7 +385,7 @@ Respond with this exact JSON (no markdown, no extra text):
 
       // Tentar carregar logo
       try {
-        const logoRes = await fetch('/adler-logo.png')
+        const logoRes = await fetch('/logo.png')
         if (logoRes.ok) {
           const blob = await logoRes.blob()
           const dataUrl = await new Promise<string>((resolve) => {
