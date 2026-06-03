@@ -56,7 +56,7 @@ function PartnerRiskPage() {
       'table{width:100%;border-collapse:collapse;margin:12px 0}td,th{padding:8px 12px;border:1px solid #ddd;font-size:13px}' +
       'th{background:#f5f5f5;font-weight:700}.header{background:#111;color:#fff;padding:20px;margin-bottom:24px;border-radius:4px}' +
       '.header h1{margin:0;font-size:18px;color:#fff}.header p{margin:4px 0 0;color:#C8961A;font-size:12px}</style></head><body>' +
-      '<div class="header"><h1>ADLER PRO — ' + t('partnerRisk.reportTitle') + '</h1>' +
+      '<div class="header"><h1>Os Meus Seguros — ' + t('partnerRisk.reportTitle') + '</h1>' +
       '<p>' + (companyName || '') + ' · ' + new Date().toLocaleDateString('pt-PT') + '</p></div>' +
       (report || '') + '</body></html>'
     )

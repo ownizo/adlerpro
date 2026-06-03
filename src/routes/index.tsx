@@ -79,8 +79,9 @@ function LandingPage() {
       }}>
         <div>
           <h1 style={{ ...font(700, '1.1rem'), letterSpacing: '0.04em', textTransform: 'uppercase' as const, color: dark, margin: 0 }}>
-            Adler<span style={{ color: gold }}>.</span>Pro
+            Os Meus Seguros
           </h1>
+          <p style={{ ...font(300, '0.6rem'), color: gold, letterSpacing: '0.08em', margin: '2px 0 0' }}>by Adler &amp; Rochefort</p>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
           <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '56px', width: 'auto' }} />
@@ -399,7 +400,7 @@ function LandingPage() {
       {/* ══════════ CTA FINAL ══════════ */}
       <section style={{ background: dark, padding: '5rem 2.5rem' }}>
         <div className="max-w-3xl mx-auto text-center">
-          <img src="/logo.png" alt="Adler Pro" style={{ height: '80px', width: 'auto', margin: '0 auto 2rem' }} />
+          <img src="/logo.png" alt="Os Meus Seguros" style={{ height: '80px', width: 'auto', margin: '0 auto 2rem' }} />
           <h2 style={{ ...font(700, '2.5rem'), color: '#fff', marginBottom: '1rem', letterSpacing: '-0.02em' }}>
             {t('landing.ctaTitle')}
           </h2>

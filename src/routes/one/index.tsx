@@ -3,7 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router'
 export const Route = createFileRoute('/one/')({
   component: OneLanding,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Adler One — Os seus seguros, num só lugar' }] }),
+  head: () => ({ meta: [{ title: 'Os Meus Seguros — Os seus seguros, num só lugar' }] }),
 })
 
 const navy = '#0A1628'
@@ -17,10 +17,10 @@ function OneLanding() {
 
       {/* ── Nav ── */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: navy, padding: '0 1.5rem', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 1px 8px rgba(0,0,0,0.3)' }}>
-        {/* Left: ADLER ONE wordmark */}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, minWidth: 100 }}>
-          <span style={{ ...f(700, '0.95rem'), color: gold, letterSpacing: '0.06em' }}>ADLER</span>
-          <span style={{ ...f(300, '0.95rem'), color: 'rgba(255,255,255,0.85)', letterSpacing: '0.14em', marginLeft: 3 }}>ONE</span>
+        {/* Left: Os Meus Seguros wordmark */}
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minWidth: 100 }}>
+          <span style={{ ...f(700, '0.95rem'), color: '#fff', letterSpacing: '0.04em' }}>Os Meus Seguros</span>
+          <span style={{ ...f(300, '0.6rem'), color: gold, letterSpacing: '0.08em' }}>by Adler &amp; Rochefort</span>
         </div>
         {/* Centre: logo */}
         <a href="https://adlerrochefort.com" target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>

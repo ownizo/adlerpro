@@ -274,7 +274,7 @@ export const Route = createFileRoute('/admin')({
     tab: isAdminTab(search.tab) ? search.tab : undefined,
   }),
   component: AdminPage,
-  head: () => ({ meta: [{ title: 'Adler Admin' }] }),
+  head: () => ({ meta: [{ title: 'Os Meus Seguros · Admin' }] }),
 })
 
 function AdminPage() {
@@ -1268,7 +1268,7 @@ function AdminPage() {
             {tab === 'api' && (
               <div>
                 <h2 className="text-lg font-semibold text-navy-700 mb-2">API & Ligações</h2>
-                <p className="text-sm text-navy-500 mb-6">Serviços externos integrados na plataforma Adler Pro. Todas as chaves são configuradas como variáveis de ambiente no Netlify.</p>
+                <p className="text-sm text-navy-500 mb-6">Serviços externos integrados na plataforma Os Meus Seguros. Todas as chaves são configuradas como variáveis de ambiente no Netlify.</p>
                 <div className="grid gap-4 mb-6">
                   {apiConnections.map((api) => (
                     <div key={api.id} className="bg-white rounded-[4px] border border-navy-200 p-5">
@@ -3552,7 +3552,7 @@ function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClien
     e.target.value = 'individual' // reset immediately
 
     const hasPolicies = true // we don't have the count here, warn generically
-    const authWarning = client.authUserId ? '\n⚠️ Este cliente tem acesso ao Adler One — o acesso será desligado.' : ''
+    const authWarning = client.authUserId ? '\n⚠️ Este cliente tem acesso ao Os Meus Seguros — o acesso será desligado.' : ''
     if (!confirm(`Converter "${client.fullName}" para Empresa?\n\nIsso irá:\n• Criar um registo de Empresa\n• Mover as apólices associadas\n• Apagar o registo de cliente individual${authWarning}`)) return
 
     setPromoting(true)
@@ -3586,7 +3586,7 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
   if (client.authUserId) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-        Adler One ✓
+        Os Meus Seguros ✓
       </span>
     )
   }
@@ -3607,7 +3607,7 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
     <button
       disabled={activating}
       onClick={async () => {
-        if (!confirm(`Enviar convite Adler One para ${client.email}?`)) return
+        if (!confirm(`Enviar convite Os Meus Seguros para ${client.email}?`)) return
         setActivating(true)
         try {
           await adminActivateAdlerOne({ data: { clientId: client.id, email: client.email!, fullName: client.fullName } })
@@ -3621,7 +3621,7 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
       }}
       className="px-2 py-1 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50 whitespace-nowrap"
     >
-      {activating ? '...' : 'Activar Adler One'}
+      {activating ? '...' : 'Activar Os Meus Seguros'}
     </button>
   )
 }
@@ -4076,7 +4076,7 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
         </div>
         <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
           <input type="checkbox" id={`vp-${policy.id}`} checked={form.visiblePortal} onChange={e => u('visiblePortal', e.target.checked)} className="accent-gold-400" />
-          <label htmlFor={`vp-${policy.id}`} className="text-sm text-navy-600 cursor-pointer">Visível no Adler One</label>
+          <label htmlFor={`vp-${policy.id}`} className="text-sm text-navy-600 cursor-pointer">Visível no Os Meus Seguros</label>
         </div>
       </div>
 

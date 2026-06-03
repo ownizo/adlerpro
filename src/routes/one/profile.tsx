@@ -6,7 +6,7 @@ import { OneLayout } from './__root'
 export const Route = createFileRoute('/one/profile')({
   component: OneProfile,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Adler One' }] }),
+  head: () => ({ meta: [{ title: 'Os Meus Seguros' }] }),
 })
 
 const navy = '#0A1628'

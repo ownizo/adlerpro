@@ -367,8 +367,11 @@ function LoginPage() {
             textTransform: 'uppercase' as const,
             color: '#111111',
           }}>
-            Adler<span style={{ color: '#C8961A' }}>.</span>Pro
+            Os Meus Seguros
           </h1>
+          <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.7rem', color: '#C8961A', marginTop: '0.4rem', letterSpacing: '0.08em' }}>
+            by Adler &amp; Rochefort
+          </p>
           <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.85rem', color: '#999999', marginTop: '0.5rem' }}>
             {t('common.portal')}
           </p>
@@ -538,7 +541,7 @@ function LoginPage() {
                       color: '#555555',
                       lineHeight: '1.6',
                     }}>
-                      <p style={{ fontWeight: 700, marginBottom: '0.5rem', color: '#111111', fontSize: '0.75rem' }}>Termos e Condições de Utilização — Adler Pro</p>
+                      <p style={{ fontWeight: 700, marginBottom: '0.5rem', color: '#111111', fontSize: '0.75rem' }}>Termos e Condições de Utilização — Os Meus Seguros</p>
                       <p style={{ marginBottom: '0.5rem' }}><strong>1. Objecto.</strong> O Adler Pro é uma plataforma digital de gestão de seguros empresariais desenvolvida pela Ownizo Unipessoal, Lda., e operada sob a marca comercial Adler & Rochefort, dedicada à mediação de seguros e registada na ASF. A utilização da plataforma está sujeita à aceitação integral destes termos.</p>
                       <p style={{ marginBottom: '0.5rem' }}><strong>2. Registo e Acesso.</strong> O utilizador compromete-se a fornecer informações verdadeiras e actualizadas. As credenciais de acesso são pessoais e intransmissíveis. O utilizador é responsável por toda a actividade realizada com as suas credenciais.</p>
                       <p style={{ marginBottom: '0.5rem' }}><strong>3. Serviços Disponibilizados.</strong> A plataforma disponibiliza funcionalidades de gestão de apólices, análise comparativa por IA, gestão de sinistros, alertas de renovação e análise de risco. Os resultados gerados por IA têm carácter informativo e não substituem aconselhamento profissional.</p>

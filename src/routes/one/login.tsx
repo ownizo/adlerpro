@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react'
 export const Route = createFileRoute('/one/login')({
   component: OnLoginPage,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Adler One' }] }),
+  head: () => ({ meta: [{ title: 'Os Meus Seguros' }] }),
 })
 
 const navy = '#0A1628'
@@ -85,9 +85,11 @@ function OnLoginPage() {
       {/* Logo */}
       <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 6 }}>
-          <span style={{ color: gold, fontWeight: 700, fontSize: '1.6rem', letterSpacing: '0.06em' }}>ADLER</span>
-          <span style={{ color: 'rgba(255,255,255,0.85)', fontWeight: 300, fontSize: '1.6rem', letterSpacing: '0.14em' }}>ONE</span>
+          <span style={{ color: '#fff', fontWeight: 700, fontSize: '1.6rem', letterSpacing: '0.04em' }}>Os Meus Seguros</span>
         </div>
+        <p style={{ color: gold, fontSize: '0.7rem', marginTop: '0.3rem', letterSpacing: '0.08em' }}>
+          by Adler &amp; Rochefort
+        </p>
         <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', marginTop: '0.4rem', letterSpacing: '0.08em' }}>
           Portal de Clientes Individuais
         </p>

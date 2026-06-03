@@ -8,7 +8,7 @@ import type { ClaimOperationalData } from '@/lib/types'
 export const Route = createFileRoute('/one/claims')({
   component: OneClaims,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Adler One' }] }),
+  head: () => ({ meta: [{ title: 'Os Meus Seguros' }] }),
 })
 
 const navy = '#0A1628'

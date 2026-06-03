@@ -15,7 +15,7 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Adler Pro' },
+      { title: 'Os Meus Seguros' },
       { name: 'description', content: 'Portal seguro para clientes de corretagem de seguros empresariais' },
       { name: 'theme-color', content: '#111111' },
     ],
