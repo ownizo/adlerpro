@@ -1,5 +1,5 @@
 /**
- * OneLayout — layout shell for all /one/* routes (Adler One portal).
+ * OneLayout — layout shell for all /one/* routes (Os Meus Seguros portal).
  * Not a TanStack Router route file; used as a wrapper component by each
  * /one/* route, similar to how AppLayout works for the main portal.
  *
@@ -54,8 +54,8 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
       {/* ── Top nav ── */}
       <nav style={styles.nav}>
         <a href="/one/dashboard" style={styles.logo}>
-          <span style={{ color: gold, fontWeight: 700, letterSpacing: '0.04em' }}>ADLER</span>
-          <span style={{ color: '#fff', fontWeight: 300, letterSpacing: '0.1em', marginLeft: 4 }}>ONE</span>
+          <span style={{ color: '#fff', fontWeight: 700, letterSpacing: '0.04em' }}>Os Meus Seguros</span>
+          <span style={{ color: gold, fontWeight: 300, fontSize: '0.6em', letterSpacing: '0.05em', marginLeft: 8 }}>by Adler &amp; Rochefort</span>
         </a>
 
         {/* Desktop links */}

@@ -82,12 +82,15 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Link to="/dashboard" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
             <div style={{ width: '100%', display: 'flex', alignItems: 'baseline', gap: '0.2rem' }}>
               <span style={{ fontFamily: font, fontSize: '1rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--ui-text-primary)' }}>
-                Adler<span style={{ color: 'var(--ui-accent)' }}>.</span>Pro
+                Os Meus Seguros
               </span>
               <span style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 300, color: 'var(--ui-text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginLeft: '0.3rem' }}>
                 {t('common.portal')}
               </span>
             </div>
+            <span style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 300, color: 'var(--ui-accent)', letterSpacing: '0.08em' }}>
+              by Adler &amp; Rochefort
+            </span>
             <img src={isAdminRoute ? '/admin-logo.png' : '/logo.png'} alt="Adler & Rochefort" style={{ height: '72px', width: 'auto', display: 'block' }} />
           </Link>
         </div>

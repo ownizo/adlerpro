@@ -84,7 +84,20 @@ export function BaseLayout({ preview, children }: BaseLayoutProps) {
                     fontFamily: FONT,
                   }}
                 >
-                  ADLER PRO
+                  Os Meus Seguros
+                </Text>
+                <Text
+                  style={{
+                    color: 'rgba(255,255,255,0.6)',
+                    fontSize: 9,
+                    fontWeight: 400,
+                    letterSpacing: '0.08em',
+                    margin: '1px 0 0',
+                    lineHeight: '1.4',
+                    fontFamily: FONT,
+                  }}
+                >
+                  by Adler &amp; Rochefort
                 </Text>
                 <Text
                   style={{
@@ -135,7 +148,7 @@ export function BaseLayout({ preview, children }: BaseLayoutProps) {
                 fontFamily: FONT,
               }}
             >
-              Este email foi enviado automaticamente pelo sistema Adler Pro. Para
+              Este email foi enviado automaticamente pelo sistema Os Meus Seguros. Para
               deixar de receber estas notificações, contacte o seu mediador.
             </Text>
           </Section>

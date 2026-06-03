@@ -23,7 +23,7 @@ export function ConfirmationEmail({
   ctaUrl,
 }: ConfirmationEmailProps) {
   return (
-    <BaseLayout preview={`${title} — Adler Pro`}>
+    <BaseLayout preview={`${title} — Os Meus Seguros`}>
       {/* Banner de confirmação */}
       <Section style={{ backgroundColor: NAVY, padding: '10px 32px' }}>
         <Text

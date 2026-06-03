@@ -6,7 +6,7 @@ import type { ReactElement } from 'react'
 export const resendClient = new Resend(process.env.RESEND_API_KEY)
 
 export const FROM_EMAIL =
-  process.env.EMAIL_FROM ?? 'Adler Pro <noreply@adlerrochefort.com>'
+  process.env.EMAIL_FROM ?? 'Os Meus Seguros <noreply@adlerrochefort.com>'
 
 export interface SendEmailOptions {
   to: string | string[]
