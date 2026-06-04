@@ -16,6 +16,7 @@ import type {
   UserMetricEvent,
   IndividualClient,
   ClaimMessage,
+  ClientNote,
 } from './types'
 
 // ============================================================
@@ -548,6 +549,40 @@ export async function deleteIndividualClientRelations(clientId: string): Promise
   ])
   const errors = results.filter((r) => r.error).map((r) => r.error!.message)
   if (errors.length > 0) throw new Error(`deleteIndividualClientRelations: ${errors.join('; ')}`)
+}
+
+// ============================================================
+// Client Notes
+// ============================================================
+export async function getClientNotes(
+  scope: { companyId?: string; individualClientId?: string },
+): Promise<ClientNote[]> {
+  const sb = getSupabaseAdmin()
+  let query = sb.from('client_notes').select('*').order('created_at', { ascending: false })
+  if (scope.companyId) query = query.eq('company_id', scope.companyId)
+  else if (scope.individualClientId) query = query.eq('individual_client_id', scope.individualClientId)
+  else return []
+  const { data, error } = await query
+  if (error) { console.error('getClientNotes error:', error); return [] }
+  return rowsToCamel<ClientNote>(data ?? [])
+}
+
+export async function createClientNote(note: ClientNote): Promise<void> {
+  // XOR: exatamente um de {companyId, individualClientId}; '' conta como ausente
+  const hasCompany = !!note.companyId && note.companyId.trim() !== ''
+  const hasIndividual = !!note.individualClientId && note.individualClientId.trim() !== ''
+  if (hasCompany === hasIndividual) {
+    throw new Error('createClientNote: a nota deve pertencer a exatamente um de {companyId, individualClientId}')
+  }
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('client_notes').insert(objectToSnake(note as unknown as Record<string, unknown>))
+  if (error) throw new Error(`createClientNote: ${error.message}`)
+}
+
+export async function deleteClientNote(id: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('client_notes').delete().eq('id', id)
+  if (error) throw new Error(`deleteClientNote: ${error.message}`)
 }
 
 // ============================================================
