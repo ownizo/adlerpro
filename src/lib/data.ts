@@ -124,9 +124,21 @@ export async function deleteCompanyRelations(companyId: string): Promise<void> {
     if (fkErrors.length > 0) throw new Error(`deleteCompanyRelations (renewal alerts): ${fkErrors.join('; ')}`)
   }
 
+  const { data: companyClaims } = await sb
+    .from('claims')
+    .select('id')
+    .eq('company_id', companyId)
+  const claimIds = (companyClaims ?? []).map((c: { id: string }) => c.id)
+
+  if (claimIds.length > 0) {
+    const msgResult = await sb.from('claim_messages').delete().in('claim_id', claimIds)
+    if (msgResult.error) throw new Error(`deleteCompanyRelations (claim_messages): ${msgResult.error.message}`)
+  }
+
+  const docResult = await sb.from('documents').delete().eq('company_id', companyId)
+  if (docResult.error) throw new Error(`deleteCompanyRelations (documents): ${docResult.error.message}`)
+
   const results = await Promise.all([
-    sb.from('claim_messages').delete().eq('company_id', companyId),
-    sb.from('documents').delete().eq('company_id', companyId),
     sb.from('claims').delete().eq('company_id', companyId),
     sb.from('policies').delete().eq('company_id', companyId),
     sb.from('alerts').delete().eq('company_id', companyId),
