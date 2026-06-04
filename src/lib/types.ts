@@ -411,3 +411,13 @@ export interface IndividualClient {
   authUserId?: string
   createdAt?: string
 }
+
+export interface ClientNote {
+  id: string
+  companyId?: string
+  individualClientId?: string
+  body: string
+  category?: string
+  authorName?: string
+  createdAt: string
+}

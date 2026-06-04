@@ -20,6 +20,7 @@ import type {
   ClaimParticipant,
   ClaimTicketMessage,
   ClaimFileRef,
+  ClientNote,
 } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
@@ -2371,6 +2372,39 @@ export const adminDeleteIndividualClient = createServerFn({ method: 'POST' })
   .handler(async ({ data: id }) => {
     await db.deleteIndividualClientRelations(id)
     await db.deleteIndividualClient(id)
+    return { success: true }
+  })
+
+export const fetchClientNotes = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { companyId?: string; individualClientId?: string }) => d)
+  .handler(async ({ data }) => db.getClientNotes(data))
+
+export const adminCreateClientNote = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { companyId?: string; individualClientId?: string; body: string; category?: string }) => d)
+  .handler(async ({ data }) => {
+    const body = data.body.trim()
+    if (!body) throw new Error('Nota vazia')
+    const scope = await getViewerScope()
+    const note: ClientNote = {
+      id: crypto.randomUUID(),
+      companyId: data.companyId,
+      individualClientId: data.individualClientId,
+      body,
+      category: data.category,
+      authorName: scope.user.name || scope.user.email || 'Admin',
+      createdAt: new Date().toISOString(),
+    }
+    await db.createClientNote(note)
+    return { success: true, note }
+  })
+
+export const adminDeleteClientNote = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    await db.deleteClientNote(id)
     return { success: true }
   })
 
