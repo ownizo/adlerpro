@@ -11,8 +11,15 @@
 -- Segue o padrão já auditado em claims (ver
 -- 20260602_claims_scope_nullable_company_xor.sql): ambas as
 -- colunas de dono são nullable e um CHECK XOR garante, ao nível
--- da BD, que EXATAMENTE uma está preenchida. NULLIF(...,'') trata
--- o sentinela '' (usado noutros pontos) como ausente.
+-- da BD, que EXATAMENTE uma está preenchida.
+--
+-- TIPOS DAS FKs (assimétricos, batem certo com as tabelas-alvo):
+--   company_id           text -> companies.id            (text)
+--   individual_client_id uuid -> individual_clients.id   (uuid)
+-- Por isso o XOR usa NULLIF(company_id,'') para tratar o
+-- sentinela '' (usado noutros pontos) em text como ausente, mas
+-- em individual_client_id (uuid) basta IS NOT NULL — uuid não
+-- tem o problema da string vazia.
 --
 -- ACESSO / RLS
 -- Todo o acesso da app passa por src/lib/data.ts com a
@@ -31,7 +38,7 @@
 CREATE TABLE IF NOT EXISTS public.client_notes (
   id                   uuid PRIMARY KEY,
   company_id           text REFERENCES public.companies(id) ON DELETE CASCADE,
-  individual_client_id text REFERENCES public.individual_clients(id) ON DELETE CASCADE,
+  individual_client_id uuid REFERENCES public.individual_clients(id) ON DELETE CASCADE,
   body                 text NOT NULL,
   category             text,
   author_name          text,
