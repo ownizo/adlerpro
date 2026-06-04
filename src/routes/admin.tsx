@@ -57,6 +57,7 @@ import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
+import { ClientProfilePanel } from '@/components/admin/ClientProfilePanel'
 async function exportToExcel(data: Record<string, unknown>[], filename: string) {
   const XLSX = await import('xlsx')
   const ws = XLSX.utils.json_to_sheet(data)
@@ -789,6 +790,12 @@ function AdminPage() {
                                 </div>
                               )}
                             </div>
+                            <ClientProfilePanel
+                              subject={{ kind: 'company', company }}
+                              policies={policies}
+                              claims={claims}
+                              documents={documents}
+                            />
                           </div>
                         )}
                       </div>
@@ -1026,6 +1033,12 @@ function AdminPage() {
                                       ))}
                                     </div>
                                   )}
+                                  <ClientProfilePanel
+                                    subject={{ kind: 'individual', client }}
+                                    policies={policies}
+                                    claims={claims}
+                                    documents={documents}
+                                  />
                                 </td>
                               </tr>
                             )}
