@@ -1,5 +1,5 @@
 import { createFileRoute, redirect, Link } from '@tanstack/react-router'
-import { getServerUser, getServerHostname } from '@/lib/auth'
+import { getServerHostname } from '@/lib/auth'
 import { useIdentity } from '@/lib/identity-context'
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -13,10 +13,6 @@ export const Route = createFileRoute('/')({
 
     if (hostname === 'admin.adlerrochefort.com') {
       throw redirect({ to: '/login' })
-    }
-    if (hostname === 'one.adlerrochefort.com') {
-      const user = await getServerUser()
-      throw redirect({ to: user ? '/one/dashboard' : '/one/' })
     }
   },
   component: LandingPage,
