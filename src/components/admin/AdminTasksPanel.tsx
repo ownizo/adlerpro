@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ClientTask, Company, IndividualClient } from '@/lib/types'
-import { fetchAllTasksByDueDate, adminUpdateClientTaskStatus } from '@/lib/server-fns'
+import { fetchAllTasksByDueDate, adminUpdateClientTaskStatus, adminGenerateRenewalTasks } from '@/lib/server-fns'
 import { formatDate } from '@/lib/utils'
 
 interface Props {
@@ -18,25 +18,38 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<'pending' | 'all'>('pending')
+  const [generating, setGenerating] = useState(false)
+  const [generateResult, setGenerateResult] = useState<{ created: number; skipped: number } | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
+  async function loadTasks() {
     setLoading(true)
     setError(null)
-    fetchAllTasksByDueDate({ data: {} })
-      .then((result) => {
-        if (!cancelled) setTasks(result)
-      })
-      .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Erro ao carregar tarefas')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
+    try {
+      const result = await fetchAllTasksByDueDate({ data: {} })
+      setTasks(result)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar tarefas')
+    } finally {
+      setLoading(false)
     }
-  }, [])
+  }
+
+  useEffect(() => { loadTasks() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleGenerate() {
+    setGenerating(true)
+    setGenerateResult(null)
+    setError(null)
+    try {
+      const result = await adminGenerateRenewalTasks()
+      setGenerateResult({ created: result.created, skipped: result.skipped })
+      await loadTasks()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Erro ao gerar tarefas de renovação')
+    } finally {
+      setGenerating(false)
+    }
+  }
 
   async function handleToggle(task: ClientTask) {
     const nextStatus: 'pending' | 'done' = task.status === 'pending' ? 'done' : 'pending'
@@ -162,6 +175,22 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="flex items-center justify-end mb-4 gap-3">
+        <button
+          className="px-3 py-1.5 rounded-[4px] text-sm font-medium border border-navy-300 text-navy-600 hover:bg-navy-50 disabled:opacity-40"
+          onClick={handleGenerate}
+          disabled={generating}
+        >
+          {generating ? 'A gerar…' : 'Gerar tarefas de renovação'}
+        </button>
+        {generateResult !== null && (
+          <p className="text-sm text-navy-500">
+            {generateResult.created} criada{generateResult.created !== 1 ? 's' : ''}
+            {generateResult.skipped > 0 ? `, ${generateResult.skipped} já existia${generateResult.skipped !== 1 ? 'm' : ''}` : ''}
+          </p>
+        )}
       </div>
 
       {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
