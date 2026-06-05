@@ -2,6 +2,7 @@ import type { Company, Policy, Claim, Document as DocType, IndividualClient } fr
 import { CLAIM_STATUS_LABELS, POLICY_TYPE_LABELS } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { ClientNotes } from './ClientNotes'
+import { ClientTasks } from './ClientTasks'
 
 type Subject =
   | { kind: 'company'; company: Company }
@@ -142,6 +143,12 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
           </div>
         )}
       </div>
+
+      {/* Tarefas */}
+      <ClientTasks
+        companyId={subject.kind === 'company' ? subject.company.id : undefined}
+        individualClientId={subject.kind === 'individual' ? subject.client.id : undefined}
+      />
 
       {/* Notas */}
       <ClientNotes
