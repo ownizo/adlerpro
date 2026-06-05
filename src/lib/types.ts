@@ -421,3 +421,17 @@ export interface ClientNote {
   authorName?: string
   createdAt: string
 }
+
+export interface ClientTask {
+  id: string
+  companyId?: string
+  individualClientId?: string
+  title: string
+  description?: string
+  dueDate: string              // 'YYYY-MM-DD'
+  status: 'pending' | 'done'
+  doneAt?: string              // ISO timestamp; undefined enquanto pending
+  createdAt: string
+  source: 'manual' | 'renewal'
+  policyId?: string            // FK policies.id; só preenchido na fatia 4
+}

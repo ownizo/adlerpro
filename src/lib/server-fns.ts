@@ -21,6 +21,7 @@ import type {
   ClaimTicketMessage,
   ClaimFileRef,
   ClientNote,
+  ClientTask,
 } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
@@ -2407,6 +2408,61 @@ export const adminDeleteClientNote = createServerFn({ method: 'POST' })
     await db.deleteClientNote(id)
     return { success: true }
   })
+
+// ── Client Tasks ─────────────────────────────────────────────
+
+export const fetchClientTasks = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { companyId?: string; individualClientId?: string; status?: 'pending' | 'done' }) => d)
+  .handler(async ({ data }) => db.getClientTasks(data, data.status ? { status: data.status } : undefined))
+
+export const adminCreateClientTask = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: {
+    companyId?: string
+    individualClientId?: string
+    title: string
+    description?: string
+    dueDate: string
+  }) => d)
+  .handler(async ({ data }) => {
+    const title = data.title.trim()
+    if (!title) throw new Error('Título vazio')
+    const task: ClientTask = {
+      id: crypto.randomUUID(),
+      companyId: data.companyId,
+      individualClientId: data.individualClientId,
+      title,
+      description: data.description,
+      dueDate: data.dueDate,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      source: 'manual',
+    }
+    await db.createClientTask(task)
+    return { success: true, task }
+  })
+
+export const adminUpdateClientTaskStatus = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { id: string; status: 'pending' | 'done' }) => d)
+  .handler(async ({ data }) => {
+    await db.updateClientTaskStatus(data.id, data.status)
+    return { success: true }
+  })
+
+export const adminDeleteClientTask = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    await db.deleteClientTask(id)
+    return { success: true }
+  })
+
+export const fetchAllTasksByDueDate = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { status?: 'pending' | 'done' }) => d)
+  .handler(async ({ data }) => db.getAllTasksByDueDate(data.status ? { status: data.status } : undefined))
 
 export const adminActivateAdlerOne = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
