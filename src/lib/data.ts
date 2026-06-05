@@ -17,6 +17,7 @@ import type {
   IndividualClient,
   ClaimMessage,
   ClientNote,
+  ClientTask,
 } from './types'
 
 // ============================================================
@@ -583,6 +584,65 @@ export async function deleteClientNote(id: string): Promise<void> {
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('client_notes').delete().eq('id', id)
   if (error) throw new Error(`deleteClientNote: ${error.message}`)
+}
+
+// ============================================================
+// Client Tasks
+// ============================================================
+export async function getClientTasks(
+  scope: { companyId?: string; individualClientId?: string },
+  filter?: { status?: 'pending' | 'done' },
+): Promise<ClientTask[]> {
+  const sb = getSupabaseAdmin()
+  let query = sb.from('client_tasks').select('*').order('due_date', { ascending: true })
+  if (scope.companyId) query = query.eq('company_id', scope.companyId)
+  else if (scope.individualClientId) query = query.eq('individual_client_id', scope.individualClientId)
+  else return []
+  if (filter?.status) query = query.eq('status', filter.status)
+  const { data, error } = await query
+  if (error) { console.error('getClientTasks error:', error); return [] }
+  return rowsToCamel<ClientTask>(data ?? [])
+}
+
+export async function createClientTask(task: ClientTask): Promise<void> {
+  // XOR: exatamente um de {companyId, individualClientId}; '' conta como ausente
+  const hasCompany = !!task.companyId && task.companyId.trim() !== ''
+  const hasIndividual = !!task.individualClientId && task.individualClientId.trim() !== ''
+  if (hasCompany === hasIndividual) {
+    throw new Error('createClientTask: a tarefa deve pertencer a exatamente um de {companyId, individualClientId}')
+  }
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('client_tasks').insert(objectToSnake(task as unknown as Record<string, unknown>))
+  if (error) throw new Error(`createClientTask: ${error.message}`)
+}
+
+export async function updateClientTaskStatus(
+  id: string,
+  status: 'pending' | 'done',
+): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const updates: Record<string, unknown> = { status }
+  if (status === 'done') updates.done_at = new Date().toISOString()
+  else updates.done_at = null
+  const { error } = await sb.from('client_tasks').update(updates).eq('id', id)
+  if (error) throw new Error(`updateClientTaskStatus: ${error.message}`)
+}
+
+export async function deleteClientTask(id: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('client_tasks').delete().eq('id', id)
+  if (error) throw new Error(`deleteClientTask: ${error.message}`)
+}
+
+export async function getAllTasksByDueDate(
+  filter?: { status?: 'pending' | 'done' },
+): Promise<ClientTask[]> {
+  const sb = getSupabaseAdmin()
+  let query = sb.from('client_tasks').select('*').order('due_date', { ascending: true })
+  if (filter?.status) query = query.eq('status', filter.status)
+  const { data, error } = await query
+  if (error) { console.error('getAllTasksByDueDate error:', error); return [] }
+  return rowsToCamel<ClientTask>(data ?? [])
 }
 
 // ============================================================
