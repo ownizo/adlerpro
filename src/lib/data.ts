@@ -4,10 +4,12 @@
  * Converte automaticamente entre camelCase (TypeScript) e snake_case (Supabase).
  */
 import { createClient } from '@supabase/supabase-js'
+import { POLICY_TYPE_LABELS } from './types'
 import type {
   Company,
   CompanyUser,
   Policy,
+  PolicyType,
   Claim,
   Document,
   Alert,
@@ -643,6 +645,92 @@ export async function getAllTasksByDueDate(
   const { data, error } = await query
   if (error) { console.error('getAllTasksByDueDate error:', error); return [] }
   return rowsToCamel<ClientTask>(data ?? [])
+}
+
+// ============================================================
+// Renewal Tasks — geração automática a partir de apólices a expirar
+// ============================================================
+
+// Subtrai N dias a uma data YYYY-MM-DD usando UTC para evitar desfasamentos de timezone
+function subtractDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d))
+  date.setUTCDate(date.getUTCDate() - days)
+  return date.toISOString().slice(0, 10)
+}
+
+export async function generateRenewalTasks(): Promise<{ created: number; skipped: number }> {
+  const sb = getSupabaseAdmin()
+
+  const today = new Date()
+  today.setUTCHours(0, 0, 0, 0)
+  const in60Days = new Date(today)
+  in60Days.setUTCDate(in60Days.getUTCDate() + 60)
+  const todayStr = today.toISOString().slice(0, 10)
+  const in60DaysStr = in60Days.toISOString().slice(0, 10)
+
+  type PolicyRow = {
+    id: string; type: string; insurer: string; policy_number: string
+    end_date: string; company_id: string; individual_client_id: string | null
+  }
+
+  const { data: rawPolicies, error: policiesError } = await sb
+    .from('policies')
+    .select('id, type, insurer, policy_number, end_date, company_id, individual_client_id')
+    .in('status', ['active', 'expiring'])
+    .not('end_date', 'is', null)
+    .gte('end_date', todayStr)
+    .lte('end_date', in60DaysStr)
+
+  if (policiesError) throw new Error(`generateRenewalTasks (fetch): ${policiesError.message}`)
+  const policies = (rawPolicies ?? []) as unknown as PolicyRow[]
+  if (policies.length === 0) return { created: 0, skipped: 0 }
+
+  let created = 0
+  let skipped = 0
+
+  for (const policy of policies) {
+    const dueDate = subtractDays(policy.end_date, 14)
+    const typeLabel = POLICY_TYPE_LABELS[policy.type as PolicyType] ?? policy.type
+    const title = `Renovar apólice — ${typeLabel} ${policy.insurer} · ${policy.policy_number}`
+
+    // Anti-duplicação: policy_id + source + due_date identifica univocamente o ciclo
+    // Não filtra por status — tarefa 'done' do mesmo ciclo não deve regenerar
+    const { count, error: countError } = await sb
+      .from('client_tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('policy_id', policy.id)
+      .eq('source', 'renewal')
+      .eq('due_date', dueDate)
+
+    if (countError) {
+      console.error(`generateRenewalTasks: erro ao verificar duplicado (policy ${policy.id}):`, countError)
+      continue
+    }
+    if ((count ?? 0) > 0) { skipped++; continue }
+
+    // Scope XOR: individual_client_id tem prioridade se preenchido
+    const row: Record<string, unknown> = {
+      id: crypto.randomUUID(),
+      title,
+      due_date: dueDate,
+      status: 'pending',
+      source: 'renewal',
+      policy_id: policy.id,
+      created_at: new Date().toISOString(),
+    }
+    if (policy.individual_client_id) row.individual_client_id = policy.individual_client_id
+    else row.company_id = policy.company_id
+
+    const { error: insertError } = await sb.from('client_tasks').insert(row)
+    if (insertError) {
+      console.error(`generateRenewalTasks: erro ao inserir (policy ${policy.id}):`, insertError)
+      continue
+    }
+    created++
+  }
+
+  return { created, skipped }
 }
 
 // ============================================================

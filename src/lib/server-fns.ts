@@ -2464,6 +2464,13 @@ export const fetchAllTasksByDueDate = createServerFn({ method: 'GET' })
   .inputValidator((d: { status?: 'pending' | 'done' }) => d)
   .handler(async ({ data }) => db.getAllTasksByDueDate(data.status ? { status: data.status } : undefined))
 
+export const adminGenerateRenewalTasks = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .handler(async () => {
+    const result = await db.generateRenewalTasks()
+    return { success: true, ...result }
+  })
+
 export const adminActivateAdlerOne = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { clientId: string; email: string; fullName: string }) => d)
