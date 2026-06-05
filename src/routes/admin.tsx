@@ -58,6 +58,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
 import { ClientProfilePanel } from '@/components/admin/ClientProfilePanel'
+import { AdminTasksPanel } from '@/components/admin/AdminTasksPanel'
 async function exportToExcel(data: Record<string, unknown>[], filename: string) {
   const XLSX = await import('xlsx')
   const ws = XLSX.utils.json_to_sheet(data)
@@ -66,7 +67,7 @@ async function exportToExcel(data: Record<string, unknown>[], filename: string) 
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
 
-const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'api', 'profiles', 'alerts'] as const
+const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'api', 'profiles', 'tasks', 'alerts'] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
 const RENEWAL_ALERT_STATUS_LABELS: Record<RenewalAlertStatus, string> = {
   pending: 'Pendente',
@@ -1482,6 +1483,10 @@ function AdminPage() {
             )}
 
             {tab === 'billing' && <BillingTab />}
+
+            {tab === 'tasks' && (
+              <AdminTasksPanel companies={companies} individualClients={individualClients} />
+            )}
 
             {tab === 'alerts' && (
               <div>
