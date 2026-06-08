@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { OneLayout } from './__root'
+import { clientClearMustChangePassword } from '@/lib/server-fns'
 
 export const Route = createFileRoute('/one/profile')({
   component: OneProfile,
@@ -31,6 +32,10 @@ function OneProfile() {
   const [saveError, setSaveError] = useState('')
   const [saveOk,    setSaveOk]    = useState(false)
   const [form, setForm] = useState({ phone: '', address: '' })
+
+  const [pwForm,   setPwForm]   = useState({ password: '', confirm: '' })
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwError,  setPwError]  = useState('')
 
   useEffect(() => { loadData() }, [])
 
@@ -64,6 +69,28 @@ function OneProfile() {
       console.error(e)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handlePasswordChange() {
+    setPwError('')
+    if (pwForm.password.length < 6) {
+      setPwError('A password deve ter pelo menos 6 caracteres.')
+      return
+    }
+    if (pwForm.password !== pwForm.confirm) {
+      setPwError('As passwords não coincidem.')
+      return
+    }
+    setPwSaving(true)
+    try {
+      const { error: pwErr } = await supabase.auth.updateUser({ password: pwForm.password })
+      if (pwErr) throw pwErr
+      await clientClearMustChangePassword()
+      window.location.replace('/one/profile')
+    } catch (e: any) {
+      setPwError(e?.message ?? 'Erro ao alterar password.')
+      setPwSaving(false)
     }
   }
 
@@ -127,7 +154,63 @@ function OneProfile() {
             </div>
           </div>
 
-          {/* Editable fields */}
+          {/* Alterar Password */}
+          <div id="alterar-password" style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', marginBottom: '1.5rem' }}>
+            <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #F1F5F9' }}>
+              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, margin: 0 }}>Alterar Password</h2>
+            </div>
+            <div style={{ padding: '1.25rem 1.5rem' }}>
+              {pwError && (
+                <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 4, color: '#B91C1C', fontSize: '0.82rem' }}>
+                  {pwError}
+                </div>
+              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', maxWidth: 520 }}>
+                <div>
+                  <FieldLabel>Nova password</FieldLabel>
+                  <input
+                    type="password"
+                    value={pwForm.password}
+                    onChange={e => setPwForm(f => ({ ...f, password: e.target.value }))}
+                    placeholder="Mínimo 6 caracteres"
+                    style={inputStyle}
+                  />
+                </div>
+                <div>
+                  <FieldLabel>Confirmar password</FieldLabel>
+                  <input
+                    type="password"
+                    value={pwForm.confirm}
+                    onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
+                    placeholder="Repetir password"
+                    style={inputStyle}
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  disabled={pwSaving}
+                  onClick={handlePasswordChange}
+                  style={{
+                    padding: '0.6rem 1.4rem',
+                    background: pwSaving ? '#e5c97a' : gold,
+                    color: navy,
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: pwSaving ? 'not-allowed' : 'pointer',
+                    fontFamily: "'Montserrat', sans-serif",
+                  }}
+                >
+                  {pwSaving ? 'A alterar...' : 'Alterar password'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Actualizar Contacto */}
           <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, margin: 0 }}>Actualizar Contacto</h2>
