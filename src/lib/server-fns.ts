@@ -24,7 +24,7 @@ import type {
   ClientTask,
 } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
-import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser } from './identity-admin'
+import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser, generateStrongPassword } from './identity-admin'
 
 function extractAccessToken(): string | null {
   try {
@@ -3083,11 +3083,8 @@ export const adminGrantIndividualClientAccess = createServerFn({ method: 'POST' 
     }
     const existingAuthUser = usersData.users.find((u) => u.email?.toLowerCase() === email)
 
-    // c) Gerar password forte (charset legível, sem O/I/l/0/1, 16 chars, ~92 bits de entropia)
-    const charset  = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
-    const rawBytes = new Uint8Array(16)
-    crypto.getRandomValues(rawBytes)
-    const password = Array.from(rawBytes, (b) => charset.charAt(b % charset.length)).join('')
+    // c) Gerar password forte (~92 bits de entropia, charset legível sem O/I/l/0/1)
+    const password = generateStrongPassword()
 
     let userId: string
     let userWasCreatedByUs = false
@@ -3127,5 +3124,44 @@ export const adminGrantIndividualClientAccess = createServerFn({ method: 'POST' 
     }
 
     // f) Devolver password — apenas nesta resposta, nunca persistida
+    return { success: true, password }
+  })
+
+export const adminResetIndividualClientPassword = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { clientId: string }) => d)
+  .handler(async ({ data }): Promise<{ success: true; password: string }> => {
+    // a) Validar cliente e confirmar que já tem acesso
+    const { data: client, error: clientErr } = await supabaseAdmin
+      .from('individual_clients')
+      .select('id, auth_user_id')
+      .eq('id', data.clientId)
+      .single()
+
+    if (clientErr || !client) {
+      throw new Error('Cliente não encontrado.')
+    }
+    if (!client.auth_user_id) {
+      throw new Error('Este cliente ainda não tem acesso ao portal.')
+    }
+
+    // b) Gerar nova password
+    const password = generateStrongPassword()
+
+    // c) Actualizar password directamente pelo UUID — seguro, não cria user novo
+    const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
+      client.auth_user_id as string,
+      { password },
+    )
+    if (updateErr) {
+      if (updateErr.message.toLowerCase().includes('not found') || updateErr.status === 404) {
+        throw new Error(
+          'Falha ao repor password: utilizador não encontrado no sistema de autenticação. Contacte suporte técnico para religar o acesso.',
+        )
+      }
+      throw new Error(`Falha ao repor password: ${updateErr.message}`)
+    }
+
+    // d) Devolver password — apenas nesta resposta, nunca persistida
     return { success: true, password }
   })
