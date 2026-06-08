@@ -109,3 +109,9 @@ export async function createIndividualIdentityUser(
   }
   return { userId: data.user.id }
 }
+
+export function generateStrongPassword(): string {
+  const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  return Array.from(bytes, (b) => charset[b % charset.length]).join('')
+}
