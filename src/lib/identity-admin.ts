@@ -81,3 +81,31 @@ export async function deleteIdentityUserByEmail(email: string): Promise<void> {
   const { error } = await supabaseAdmin.auth.admin.deleteUser(user.id)
   if (error) throw new Error('Falha ao eliminar utilizador do Auth: ' + error.message)
 }
+
+/**
+ * Cria um utilizador no Supabase Auth para um cliente individual.
+ * Diferenças face a createIdentityUserWithConfirmation:
+ *   - NÃO injeta metadata de empresa (company_id/company_user_id/company_role).
+ *   - Devolve { userId } para ligação imediata ao individual_clients.auth_user_id.
+ * Lança erro em qualquer falha (incluindo email já existente).
+ */
+export async function createIndividualIdentityUser(
+  email: string,
+  password: string,
+  fullName?: string,
+): Promise<{ userId: string }> {
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email: email.toLowerCase(),
+    password,
+    email_confirm: true,
+    user_metadata: fullName ? { full_name: fullName } : {},
+  })
+
+  if (error) {
+    throw new Error(`Falha ao criar utilizador no Auth: ${error.message}`)
+  }
+  if (!data?.user?.id) {
+    throw new Error('Auth criou o utilizador mas não devolveu o UUID.')
+  }
+  return { userId: data.user.id }
+}
