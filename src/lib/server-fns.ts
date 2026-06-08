@@ -3093,7 +3093,10 @@ export const adminGrantIndividualClientAccess = createServerFn({ method: 'POST' 
       // d-edge) Email já existe no Auth (orphaned de tentativa anterior):
       //   reutilizar o user existente, actualizar a password. NÃO criar duplicado.
       userId = existingAuthUser.id
-      const { error: updatePwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password })
+      const { error: updatePwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+        password,
+        app_metadata: { must_change_password: true },
+      })
       if (updatePwErr) {
         throw new Error(`Falha ao actualizar password do utilizador existente no Auth: ${updatePwErr.message}`)
       }
@@ -3151,7 +3154,7 @@ export const adminResetIndividualClientPassword = createServerFn({ method: 'POST
     // c) Actualizar password directamente pelo UUID — seguro, não cria user novo
     const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
       client.auth_user_id as string,
-      { password },
+      { password, app_metadata: { must_change_password: true } },
     )
     if (updateErr) {
       if (updateErr.message.toLowerCase().includes('not found') || updateErr.status === 404) {
@@ -3164,4 +3167,21 @@ export const adminResetIndividualClientPassword = createServerFn({ method: 'POST
 
     // d) Devolver password — apenas nesta resposta, nunca persistida
     return { success: true, password }
+  })
+
+export const clientClearMustChangePassword = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .handler(async (): Promise<{ success: true }> => {
+    // Padrão do codebase: extrair token + getUser para obter o UUID do caller sem
+    // depender do typing do context do TanStack Start (nenhum handler existente usa context).
+    const token = extractAccessToken()
+    if (!token) throw new Error('Authentication required')
+    const { data: { user }, error: userErr } = await supabaseAdmin.auth.getUser(token)
+    if (userErr || !user) throw new Error('Authentication required')
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+      app_metadata: { must_change_password: false },
+    })
+    if (error) throw new Error('Falha ao actualizar estado da conta.')
+    return { success: true }
   })

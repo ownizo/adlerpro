@@ -21,14 +21,16 @@ const NAV_LINKS = [
 ]
 
 export function OneLayout({ children }: { children: React.ReactNode }) {
-  const [checking,    setChecking]    = useState(true)
-  const [menuOpen,    setMenuOpen]    = useState(false)
+  const [checking,           setChecking]           = useState(true)
+  const [menuOpen,           setMenuOpen]           = useState(false)
+  const [mustChangePassword, setMustChangePassword] = useState(false)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
         window.location.replace('/one/login')
       } else {
+        setMustChangePassword(user.app_metadata?.must_change_password === true)
         setChecking(false)
       }
     })
@@ -103,6 +105,41 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
           <button onClick={handleSignOut} style={styles.drawerSignOut}>
             Sair
           </button>
+        </div>
+      )}
+
+      {/* Banner: trocar password definida pelo mediador */}
+      {mustChangePassword && (
+        <div style={{
+          background: '#FFFBEB',
+          borderBottom: `1px solid ${gold}`,
+          padding: '0.75rem 1.5rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap' as const,
+          gap: '0.5rem',
+          fontFamily: "'Montserrat', sans-serif",
+        }}>
+          <p style={{ fontSize: '0.82rem', color: '#92400E', margin: 0, fontWeight: 500 }}>
+            ⚠ A sua password foi definida pelo seu mediador. Por segurança, altere-a.
+          </p>
+          <a
+            href="/one/profile#alterar-password"
+            style={{
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: '#92400E',
+              background: '#FDE68A',
+              border: '1px solid #F59E0B',
+              borderRadius: 4,
+              padding: '0.35rem 0.85rem',
+              textDecoration: 'none',
+              whiteSpace: 'nowrap' as const,
+            }}
+          >
+            Alterar password agora →
+          </a>
         </div>
       )}
 

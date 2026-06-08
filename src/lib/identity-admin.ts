@@ -99,6 +99,7 @@ export async function createIndividualIdentityUser(
     password,
     email_confirm: true,
     user_metadata: fullName ? { full_name: fullName } : {},
+    app_metadata: { must_change_password: true },
   })
 
   if (error) {
