@@ -18,6 +18,7 @@ import {
   adminUpdateIndividualClient,
   adminDeleteIndividualClient,
   adminActivateAdlerOne,
+  adminGrantIndividualClientAccess,
   adminPromoteToCompany,
   adminUpdatePolicy,
   adminUploadPolicyDocument,
@@ -3598,9 +3599,16 @@ function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClien
 }
 
 function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClient; onSuccess: () => Promise<void> }) {
-  const [activating, setActivating] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
+  // Estado do fluxo de convite (existente, inalterado)
+  const [activating,        setActivating]        = useState(false)
+  const [message,           setMessage]           = useState<string | null>(null)
 
+  // Estado do novo fluxo de password gerada — isolado para não interferir com o convite
+  const [grantingAccess,    setGrantingAccess]    = useState(false)
+  const [generatedPassword, setGeneratedPassword] = useState<string | null>(null)
+  const [grantError,        setGrantError]        = useState<string | null>(null)
+
+  // Estado 1: cliente já tem acesso → badge verde
   if (client.authUserId) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
@@ -3609,6 +3617,7 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
     )
   }
 
+  // Estado 2: sem email → desativado
   if (!client.email) {
     return (
       <span title="Sem email — edite o cliente primeiro" className="inline-block px-2 py-1 text-xs text-navy-400 border border-navy-200 rounded cursor-default">
@@ -3617,30 +3626,114 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
     )
   }
 
-  if (message) {
-    return <span className="text-xs text-green-700">{message}</span>
+  const handleClosePassword = async () => {
+    setGeneratedPassword(null)
+    setGrantError(null)
+    await onSuccess() // recarrega lista → badge verde aparece automaticamente
   }
 
   return (
-    <button
-      disabled={activating}
-      onClick={async () => {
-        if (!confirm(`Enviar convite Os Meus Seguros para ${client.email}?`)) return
-        setActivating(true)
-        try {
-          await adminActivateAdlerOne({ data: { clientId: client.id, email: client.email!, fullName: client.fullName } })
-          setMessage(`Convite enviado para ${client.email}`)
-          await onSuccess()
-        } catch (e: any) {
-          setMessage(`Erro: ${e?.message ?? 'falha ao enviar convite'}`)
-        } finally {
-          setActivating(false)
-        }
-      }}
-      className="px-2 py-1 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50 whitespace-nowrap"
-    >
-      {activating ? '...' : 'Activar Os Meus Seguros'}
-    </button>
+    <>
+      {/* Overlay com a password — fixed para sair fora da célula da tabela */}
+      {generatedPassword && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={handleClosePassword}
+        >
+          <div
+            style={{ background: '#fff', borderRadius: 8, padding: '1.75rem', maxWidth: 440, width: '90vw', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', fontFamily: "'Montserrat', sans-serif" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ fontWeight: 700, fontSize: '1rem', color: '#0A1628', margin: '0 0 0.3rem' }}>
+              Acesso criado — {client.fullName}
+            </p>
+            <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '0 0 0.85rem' }}>
+              {client.email}
+            </p>
+            <p style={{ fontSize: '0.82rem', color: '#B91C1C', fontWeight: 600, margin: '0 0 0.85rem' }}>
+              ⚠ Guarde esta password agora — não será mostrada novamente.
+            </p>
+            <div style={{ background: '#F1F5F9', borderRadius: 6, padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+              <code style={{ flex: 1, fontFamily: 'monospace', fontSize: '1.05rem', letterSpacing: '0.08em', color: '#0A1628', wordBreak: 'break-all' }}>
+                {generatedPassword}
+              </code>
+              <button
+                onClick={() => navigator.clipboard.writeText(generatedPassword)}
+                style={{ flexShrink: 0, padding: '0.35rem 0.75rem', background: '#0A1628', color: '#fff', border: 'none', borderRadius: 4, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Montserrat', sans-serif" }}
+              >
+                Copiar
+              </button>
+            </div>
+            <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '0 0 1.25rem', lineHeight: 1.5 }}>
+              Entregar ao cliente por canal seguro (telefone ou mensagem direta).<br />
+              O cliente pode alterar a password em <strong>Os Meus Seguros → Perfil</strong> após o primeiro acesso.
+            </p>
+            <button
+              onClick={handleClosePassword}
+              style={{ width: '100%', padding: '0.6rem', background: '#F1F5F9', color: '#0A1628', border: '1px solid #E2E8F0', borderRadius: 6, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Montserrat', sans-serif" }}
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Mensagem de sucesso do convite */}
+      {message && (
+        <p className="text-xs text-green-700 mb-1">{message}</p>
+      )}
+
+      {/* Mensagem de erro do novo fluxo */}
+      {grantError && (
+        <p className="text-xs text-red-600 mb-1">{grantError}</p>
+      )}
+
+      {/* Dois botões: convite (existente) + password gerada (novo) */}
+      <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+        <button
+          disabled={activating || grantingAccess}
+          onClick={async () => {
+            if (!confirm(`Enviar convite Os Meus Seguros para ${client.email}?`)) return
+            setActivating(true)
+            setMessage(null)
+            setGrantError(null)
+            try {
+              await adminActivateAdlerOne({ data: { clientId: client.id, email: client.email!, fullName: client.fullName } })
+              setMessage(`Convite enviado para ${client.email}`)
+              await onSuccess()
+            } catch (e: any) {
+              setMessage(`Erro: ${e?.message ?? 'falha ao enviar convite'}`)
+            } finally {
+              setActivating(false)
+            }
+          }}
+          className="px-2 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 disabled:opacity-50 whitespace-nowrap"
+        >
+          {activating ? '...' : 'Activar por convite'}
+        </button>
+
+        <button
+          disabled={activating || grantingAccess}
+          onClick={async () => {
+            if (!confirm(`Criar acesso ao portal Os Meus Seguros para ${client.fullName} (${client.email})?\n\nSerá gerada uma password pelo sistema para entregar ao cliente.`)) return
+            setGrantingAccess(true)
+            setGrantError(null)
+            setMessage(null)
+            try {
+              const result = await adminGrantIndividualClientAccess({ data: { clientId: client.id } })
+              setGeneratedPassword(result.password)
+            } catch (e: any) {
+              setGrantError(`Erro: ${e?.message ?? 'falha ao criar acesso'}`)
+            } finally {
+              setGrantingAccess(false)
+            }
+          }}
+          className="px-2 py-1 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50 whitespace-nowrap"
+        >
+          {grantingAccess ? '...' : 'Criar acesso com password'}
+        </button>
+      </div>
+    </>
   )
 }
 

@@ -24,7 +24,7 @@ import type {
   ClientTask,
 } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
-import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail } from './identity-admin'
+import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser } from './identity-admin'
 
 function extractAccessToken(): string | null {
   try {
@@ -3035,4 +3035,90 @@ export const adminDeletePolicyDocument = createServerFn({ method: 'POST' })
       .remove([data.storagePath])
     if (error) throw new Error(error.message)
     return { success: true }
+  })
+
+/**
+ * Cria acesso ao portal "Os Meus Seguros" para um cliente individual com
+ * password gerada pelo sistema. Não envia email de convite.
+ *
+ * A password é devolvida UMA ÚNICA VEZ no retorno e nunca é persistida.
+ * Garante ligação atómica: auth_user_id é gravado imediatamente após criar
+ * o utilizador no Auth, com rollback explícito em caso de falha.
+ */
+export const adminGrantIndividualClientAccess = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { clientId: string }) => d)
+  .handler(async ({ data }): Promise<{ success: true; password: string }> => {
+    // a) Validar cliente
+    const { data: client, error: clientErr } = await supabaseAdmin
+      .from('individual_clients')
+      .select('id, email, full_name, auth_user_id')
+      .eq('id', data.clientId)
+      .single()
+
+    if (clientErr || !client) {
+      throw new Error('Cliente não encontrado.')
+    }
+    if (!client.email) {
+      throw new Error('O cliente não tem email registado. Edite o cliente e adicione um email primeiro.')
+    }
+    if (client.auth_user_id) {
+      throw new Error('Este cliente já tem acesso ao portal Os Meus Seguros. Para repor o acesso, utilize a função de reset de password.')
+    }
+
+    const email     = (client.email as string).toLowerCase()
+    const fullName  = client.full_name as string | undefined
+
+    // b) Verificar se o email já existe no Auth (ex: convite órfão de tentativa anterior)
+    const { data: usersData, error: listErr } = await supabaseAdmin.auth.admin.listUsers()
+    if (listErr) {
+      throw new Error(`Falha ao verificar utilizadores no Auth: ${listErr.message}`)
+    }
+    const existingAuthUser = usersData.users.find((u) => u.email?.toLowerCase() === email)
+
+    // c) Gerar password forte (charset legível, sem O/I/l/0/1, 16 chars, ~92 bits de entropia)
+    const charset  = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789'
+    const rawBytes = new Uint8Array(16)
+    crypto.getRandomValues(rawBytes)
+    const password = Array.from(rawBytes, (b) => charset.charAt(b % charset.length)).join('')
+
+    let userId: string
+    let userWasCreatedByUs = false
+
+    if (existingAuthUser) {
+      // d-edge) Email já existe no Auth (orphaned de tentativa anterior):
+      //   reutilizar o user existente, actualizar a password. NÃO criar duplicado.
+      userId = existingAuthUser.id
+      const { error: updatePwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password })
+      if (updatePwErr) {
+        throw new Error(`Falha ao actualizar password do utilizador existente no Auth: ${updatePwErr.message}`)
+      }
+    } else {
+      // d-normal) Criar novo utilizador no Auth, sem metadata de empresa
+      const created = await createIndividualIdentityUser(email, password, fullName)
+      userId            = created.userId
+      userWasCreatedByUs = true
+    }
+
+    // e) LIGAÇÃO ATÓMICA — verificar o erro (ao contrário do fluxo de convite antigo)
+    const { error: linkErr } = await supabaseAdmin
+      .from('individual_clients')
+      .update({ auth_user_id: userId })
+      .eq('id', data.clientId)
+
+    if (linkErr) {
+      if (userWasCreatedByUs) {
+        // Rollback: apagar o user que criámos para não deixar órfão
+        const { error: rollbackErr } = await supabaseAdmin.auth.admin.deleteUser(userId)
+        if (rollbackErr) {
+          throw new Error(
+            `Falha crítica: utilizador criado no Auth (${userId}) mas não foi possível ligar ao cliente nem fazer rollback. Eliminar manualmente em Auth > Users.`,
+          )
+        }
+      }
+      throw new Error(`Falha ao ligar o acesso ao cliente: ${linkErr.message}`)
+    }
+
+    // f) Devolver password — apenas nesta resposta, nunca persistida
+    return { success: true, password }
   })
