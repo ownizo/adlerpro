@@ -1,10 +1,11 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useIdentity } from '@/lib/identity-context'
 import { cn } from '@/lib/utils'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { setLang, type LangCode } from '@/lib/i18n'
 import { ThemeCustomizer } from './ThemeCustomizer'
+import { getAdminNavBadgeCounts, markAdminNavSeen } from '@/lib/server-fns'
 
 const NAV_ITEMS = [
   { to: '/dashboard' as const, key: 'nav.dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
@@ -55,6 +56,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<LangCode>((i18n.language as LangCode) ?? 'pt')
   const isAdmin = user?.roles?.includes('admin')
   const isAdminRoute = location.pathname.startsWith('/admin')
+  const [navBadges, setNavBadges] = useState({ tasks: 0, alerts: 0 })
+
+  useEffect(() => {
+    if (!isAdmin || !ready) return
+    getAdminNavBadgeCounts()
+      .then(({ tasksCount, alertsCount }) => setNavBadges({ tasks: tasksCount, alerts: alertsCount }))
+      .catch(console.error)
+  }, [isAdmin, ready])
+
+  useEffect(() => {
+    if (!isAdmin || !ready) return
+    const currentTab = new URLSearchParams(location.searchStr).get('tab')
+    if (currentTab === 'tasks' || currentTab === 'alerts') {
+      const tab = currentTab
+      setNavBadges((prev) => ({ ...prev, [tab]: 0 }))
+      markAdminNavSeen({ data: { tab } }).catch(console.error)
+    }
+  }, [location.searchStr, isAdmin, ready])
 
   const handleLogout = async () => {
     try { await logout() } catch { /* proceed */ }
@@ -150,20 +169,41 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
               {adminSectionOpen && (
                 <div className="pl-4 mt-1 space-y-1">
-                  {ADMIN_SUBNAV_ITEMS.map((item) => (
-                    <Link
-                      key={item.tab}
-                      to="/admin"
-                      search={{ tab: item.tab }}
-                      className="flex items-center px-3 py-2 text-sm font-medium transition-colors"
-                      style={{ fontFamily: font, color: 'var(--ui-menu-text)', borderRadius: '2px' }}
-                      activeProps={{ style: { fontFamily: font, color: 'var(--ui-menu-active-text)', background: 'var(--ui-menu-active-bg)', borderRadius: '2px' } }}
-                      activeOptions={{ includeSearch: true }}
-                      onClick={() => setSidebarOpen(false)}
-                    >
-                      {t(item.key)}
-                    </Link>
-                  ))}
+                  {ADMIN_SUBNAV_ITEMS.map((item) => {
+                    const badge = item.tab === 'tasks' ? navBadges.tasks : item.tab === 'alerts' ? navBadges.alerts : 0
+                    return (
+                      <Link
+                        key={item.tab}
+                        to="/admin"
+                        search={{ tab: item.tab }}
+                        className="flex items-center justify-between px-3 py-2 text-sm font-medium transition-colors"
+                        style={{ fontFamily: font, color: 'var(--ui-menu-text)', borderRadius: '2px' }}
+                        activeProps={{ style: { fontFamily: font, color: 'var(--ui-menu-active-text)', background: 'var(--ui-menu-active-bg)', borderRadius: '2px' } }}
+                        activeOptions={{ includeSearch: true }}
+                        onClick={() => setSidebarOpen(false)}
+                      >
+                        <span>{t(item.key)}</span>
+                        {badge > 0 && (
+                          <span style={{
+                            background: '#dc2626',
+                            color: '#fff',
+                            borderRadius: '9999px',
+                            fontSize: '0.6rem',
+                            fontWeight: 700,
+                            minWidth: '1.1rem',
+                            height: '1.1rem',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            padding: '0 0.3rem',
+                            lineHeight: 1,
+                          }}>
+                            {badge > 99 ? '99+' : badge}
+                          </span>
+                        )}
+                      </Link>
+                    )
+                  })}
                 </div>
               )}
             </>
