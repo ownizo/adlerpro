@@ -111,7 +111,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <span style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 300, color: 'var(--ui-accent)', letterSpacing: '0.08em' }}>
               by Adler &amp; Rochefort
             </span>
-            <img src={isAdminRoute ? '/admin-logo.png' : '/logo.png'} alt="Adler & Rochefort" style={{ height: '72px', width: 'auto', display: 'block' }} />
           </Link>
         </div>
 
@@ -234,21 +233,31 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="px-4 lg:px-8 h-14 flex items-center justify-between shrink-0" style={{ background: 'var(--ui-surface-bg)', borderBottom: '1px solid var(--ui-border)' }}>
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 -ml-2"
-            style={{ color: 'var(--ui-text-primary)' }}
-            aria-label={t('nav.openMenu')}
-          >
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-          </button>
+        <header className="px-4 lg:px-8 h-14 flex items-center shrink-0" style={{ background: 'var(--ui-surface-bg)', borderBottom: '1px solid var(--ui-border)' }}>
+          {/* Left zone — flex-1, só tem conteúdo em mobile */}
+          <div className="flex-1 flex items-center" style={{ minWidth: 0 }}>
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden p-2 -ml-2"
+              style={{ color: 'var(--ui-text-primary)' }}
+              aria-label={t('nav.openMenu')}
+            >
+              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+              </svg>
+            </button>
+          </div>
 
-          <div className="flex-1" />
+          {/* Centre zone — logo centrado */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+            <img src={isAdminRoute ? '/admin-logo.png' : '/logo.png'} alt="Adler & Rochefort" style={{ height: '32px', width: 'auto', display: 'block', flexShrink: 0 }} />
+            <span style={{ fontFamily: font, fontSize: '0.72rem', fontWeight: 300, color: 'var(--ui-accent)', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
+              Adler &amp; Rochefort
+            </span>
+          </div>
 
-          <div className="flex items-center gap-3">
+          {/* Right zone — PT/EN + utilizador + sino */}
+          <div className="flex-1 flex items-center justify-end gap-3" style={{ minWidth: 0 }}>
             {/* Language switcher */}
             <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--ui-border)', borderRadius: '4px', overflow: 'hidden', fontFamily: font }}>
               {(['pt', 'en'] as LangCode[]).map((l) => (
