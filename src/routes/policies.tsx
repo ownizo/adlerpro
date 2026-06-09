@@ -530,6 +530,9 @@ function PoliciesPage() {
                       <div>
                         <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '0.82rem', color: c.text, margin: 0 }}>{POLICY_TYPE_LABELS[policy.type] || policy.type}</p>
                         <p style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 300, fontSize: '0.72rem', color: c.text, opacity: 0.8, margin: 0 }}>{policy.insurer}</p>
+                        {policy.description && (
+                          <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.78rem', fontWeight: 500, color: '#475569', margin: '0.15rem 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{policy.description}</p>
+                        )}
                       </div>
                     </div>
                     <StatusBadge status={policy.status} />
