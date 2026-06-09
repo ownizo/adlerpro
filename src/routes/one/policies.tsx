@@ -268,6 +268,11 @@ function PolicyCard({ policy }: { policy: Policy }) {
             <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '0.2rem 0 0' }}>
               {policy.insurer}{policy.policy_number ? ` · ${policy.policy_number}` : ''}
             </p>
+            {policy.description && (
+              <p style={{ fontSize: '0.78rem', color: '#475569', fontWeight: 500, margin: '0.15rem 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {policy.description}
+              </p>
+            )}
           </div>
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
             {policy.annual_premium > 0 && (
