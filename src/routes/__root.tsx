@@ -10,6 +10,10 @@ import '../lib/i18n'
 // paints, so a personalised theme never flashes the default first.
 const THEME_BOOTSTRAP = `(function(){try{var r=document.documentElement;var s=function(k,v){r.style.setProperty(k,v)};var raw=localStorage.getItem('adlerpro-ui-theme');if(!raw)return;var t=JSON.parse(raw);if(t.baseFontSize)r.style.fontSize=t.baseFontSize+'px';var m={fontFamily:'--ui-font-family',pageBg:'--ui-page-bg',surfaceBg:'--ui-surface-bg',textPrimary:'--ui-text-primary',textSecondary:'--ui-text-secondary',textMuted:'--ui-text-muted',accent:'--ui-accent',border:'--ui-border',menuText:'--ui-menu-text',menuActiveBg:'--ui-menu-active-bg',menuActiveText:'--ui-menu-active-text'};for(var k in m){if(t[k]!=null)s(m[k],t[k])}if(t.textPrimary){s('--color-primary',t.textPrimary)}if(t.textSecondary){s('--color-body',t.textSecondary);s('--color-muted',t.textSecondary)}if(t.textMuted){s('--color-label',t.textMuted);s('--color-label-light',t.textMuted)}if(t.border)s('--color-border',t.border);if(t.accent){s('--color-gold',t.accent);s('--color-gold-400',t.accent)}}catch(e){}})();`
 
+// Register the PWA service worker once the page is loaded, so the portal can be
+// installed to a phone home screen and opened offline.
+const SW_REGISTER = `(function(){if('serviceWorker'in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}})();`
+
 export const Route = createRootRoute({
   head: () => ({
     meta: [
@@ -17,13 +21,18 @@ export const Route = createRootRoute({
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: 'Os Meus Seguros' },
       { name: 'description', content: 'Portal seguro para clientes de corretagem de seguros empresariais' },
-      { name: 'theme-color', content: '#111111' },
+      { name: 'theme-color', content: '#0A1628' },
+      { name: 'mobile-web-app-capable', content: 'yes' },
+      { name: 'apple-mobile-web-app-capable', content: 'yes' },
+      { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+      { name: 'apple-mobile-web-app-title', content: 'Os Meus Seguros' },
     ],
     links: [
       { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
       { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon.png' },
       { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/favicon-192.png' },
-      { rel: 'apple-touch-icon', sizes: '512x512', href: '/favicon-512.png' },
+      { rel: 'manifest', href: '/manifest.webmanifest' },
+      { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
       {
         rel: 'preconnect',
         href: 'https://fonts.googleapis.com',
@@ -59,6 +68,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <body>
         {children}
         <Scripts />
+        <script dangerouslySetInnerHTML={{ __html: SW_REGISTER }} />
       </body>
     </html>
   )

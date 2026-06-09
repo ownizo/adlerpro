@@ -63,70 +63,140 @@ function LandingPage() {
   const { user, ready } = useIdentity()
   const portalLink = ready && user ? '/dashboard' : '/login'
   const [lang, setLang] = useState(i18n.language)
+  const [menuOpen, setMenuOpen] = useState(false)
   const handleLang = (l: string) => { i18n.changeLanguage(l); setLang(l) }
 
   return (
     <div className="min-h-screen" style={{ background: cream, color: navy, overflowX: 'hidden' as const }}>
 
       {/* ══════════ HEADER ══════════ */}
-      <header style={{
-        padding: '1rem 2.5rem',
-        borderBottom: `1.5px solid ${navy}`,
-        display: 'grid',
-        gridTemplateColumns: '1fr auto 1fr',
-        alignItems: 'center',
-        position: 'sticky' as const,
-        top: 0,
-        background: white,
-        zIndex: 50,
-      }}>
-        <div>
-          <h1 style={{ ...font(700, '1.1rem'), letterSpacing: '0.04em', textTransform: 'uppercase' as const, color: navy, margin: 0 }}>
-            Os Meus Seguros
-          </h1>
-          <p style={{ ...font(300, '0.6rem'), color: goldDeep, letterSpacing: '0.08em', margin: '2px 0 0' }}>by Adler &amp; Rochefort</p>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '56px', width: 'auto' }} />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '0.75rem' }}>
-          {/* Language switcher */}
-          <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${border}`, borderRadius: '4px', overflow: 'hidden', fontFamily: "'Montserrat', sans-serif" }}>
-            {(['pt', 'en'] as const).map((l) => (
-              <button
-                key={l}
-                onClick={() => handleLang(l)}
-                style={{
-                  background: lang === l ? navy : 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '0.25rem 0.6rem',
-                  fontFamily: "'Montserrat', sans-serif",
-                  fontSize: '0.7rem',
-                  fontWeight: 700,
-                  letterSpacing: '0.08em',
-                  color: lang === l ? '#ffffff' : navyMuted,
-                  transition: 'background 0.15s, color 0.15s',
-                }}
-              >
-                {l.toUpperCase()}
-              </button>
-            ))}
+      <div style={{ position: 'sticky' as const, top: 0, zIndex: 50 }}>
+        <header
+          className="flex md:grid items-center justify-between gap-3 px-5 md:px-10 py-3 md:py-4"
+          style={{
+            borderBottom: `1.5px solid ${navy}`,
+            background: white,
+            gridTemplateColumns: '1fr auto 1fr',
+          }}
+        >
+          {/* Brand */}
+          <div className="min-w-0">
+            <h1 className="text-base md:text-lg" style={{ ...font(700, '1.1rem'), letterSpacing: '0.04em', textTransform: 'uppercase' as const, color: navy, margin: 0 }}>
+              Os Meus Seguros
+            </h1>
+            <p style={{ ...font(300, '0.6rem'), color: goldDeep, letterSpacing: '0.08em', margin: '2px 0 0' }}>by Adler &amp; Rochefort</p>
           </div>
-          <a href="#funcionalidades" style={{ ...font(600, '0.78rem'), color: navyMuted, textDecoration: 'none', padding: '0.5rem 0.75rem' }}>
-            {t('landing.navFeatures')}
-          </a>
-          <a href="#vantagens" style={{ ...font(600, '0.78rem'), color: navyMuted, textDecoration: 'none', padding: '0.5rem 0.75rem' }}>
-            {t('landing.navAdvantages')}
-          </a>
-          <Link to="/contact" style={{ ...font(600, '0.82rem'), padding: '0.6rem 1rem', background: gold, color: '#fff', borderRadius: '2px', textDecoration: 'none' }}>
-            {t('landing.navContact')}
-          </Link>
-          <Link to={portalLink} style={{ ...font(600, '0.82rem'), padding: '0.6rem 1rem', background: navy, color: '#fff', borderRadius: '2px', textDecoration: 'none' }}>
-            {ready && user ? t('landing.navPortal') : t('landing.navLogin')}
-          </Link>
-        </div>
-      </header>
+
+          {/* Centre logo (desktop only) */}
+          <div className="hidden md:flex" style={{ justifyContent: 'center' }}>
+            <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '56px', width: 'auto' }} />
+          </div>
+
+          {/* Right cluster */}
+          <div className="flex items-center justify-end gap-2 md:gap-3">
+            {/* Desktop navigation */}
+            <div className="hidden md:flex items-center gap-3">
+              <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${border}`, borderRadius: '4px', overflow: 'hidden', fontFamily: "'Montserrat', sans-serif" }}>
+                {(['pt', 'en'] as const).map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => handleLang(l)}
+                    style={{
+                      background: lang === l ? navy : 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      padding: '0.25rem 0.6rem',
+                      fontFamily: "'Montserrat', sans-serif",
+                      fontSize: '0.7rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.08em',
+                      color: lang === l ? '#ffffff' : navyMuted,
+                      transition: 'background 0.15s, color 0.15s',
+                    }}
+                  >
+                    {l.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <a href="#funcionalidades" style={{ ...font(600, '0.78rem'), color: navyMuted, textDecoration: 'none', padding: '0.5rem 0.75rem' }}>
+                {t('landing.navFeatures')}
+              </a>
+              <a href="#vantagens" style={{ ...font(600, '0.78rem'), color: navyMuted, textDecoration: 'none', padding: '0.5rem 0.75rem' }}>
+                {t('landing.navAdvantages')}
+              </a>
+              <Link to="/contact" style={{ ...font(600, '0.82rem'), padding: '0.6rem 1rem', background: gold, color: '#fff', borderRadius: '2px', textDecoration: 'none' }}>
+                {t('landing.navContact')}
+              </Link>
+              <Link to={portalLink} style={{ ...font(600, '0.82rem'), padding: '0.6rem 1rem', background: navy, color: '#fff', borderRadius: '2px', textDecoration: 'none' }}>
+                {ready && user ? t('landing.navPortal') : t('landing.navLogin')}
+              </Link>
+            </div>
+
+            {/* Mobile actions: login is always visible, rest behind the menu */}
+            <Link
+              to={portalLink}
+              className="md:hidden whitespace-nowrap"
+              style={{ ...font(600, '0.78rem'), padding: '0.5rem 0.85rem', background: navy, color: '#fff', borderRadius: '2px', textDecoration: 'none' }}
+            >
+              {ready && user ? t('landing.navPortal') : t('landing.navLogin')}
+            </Link>
+            <button
+              type="button"
+              className="md:hidden"
+              onClick={() => setMenuOpen((o) => !o)}
+              aria-label={menuOpen ? t('landing.navClose') : t('landing.navMenu')}
+              aria-expanded={menuOpen}
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', background: 'transparent', border: `1px solid ${border}`, borderRadius: '4px', color: navy, cursor: 'pointer' }}
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                {menuOpen
+                  ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />}
+              </svg>
+            </button>
+          </div>
+        </header>
+
+        {/* Mobile dropdown menu */}
+        {menuOpen && (
+          <nav
+            className="md:hidden flex flex-col px-5 py-4 gap-1"
+            style={{ background: white, borderBottom: `1.5px solid ${navy}`, boxShadow: '0 12px 24px rgba(10,22,40,0.10)' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${border}`, borderRadius: '4px', overflow: 'hidden', alignSelf: 'flex-start', marginBottom: '0.5rem' }}>
+              {(['pt', 'en'] as const).map((l) => (
+                <button
+                  key={l}
+                  onClick={() => handleLang(l)}
+                  style={{
+                    background: lang === l ? navy : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: '0.4rem 0.9rem',
+                    fontFamily: "'Montserrat', sans-serif",
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    color: lang === l ? '#ffffff' : navyMuted,
+                  }}
+                >
+                  {l.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <a href="#funcionalidades" onClick={() => setMenuOpen(false)} style={{ ...font(600, '0.95rem'), color: navy, textDecoration: 'none', padding: '0.75rem 0.25rem', borderBottom: `1px solid ${border}` }}>
+              {t('landing.navFeatures')}
+            </a>
+            <a href="#vantagens" onClick={() => setMenuOpen(false)} style={{ ...font(600, '0.95rem'), color: navy, textDecoration: 'none', padding: '0.75rem 0.25rem', borderBottom: `1px solid ${border}` }}>
+              {t('landing.navAdvantages')}
+            </a>
+            <Link to="/contact" onClick={() => setMenuOpen(false)} style={{ ...font(600, '0.9rem'), padding: '0.8rem 1rem', background: gold, color: '#fff', borderRadius: '2px', textDecoration: 'none', textAlign: 'center' as const, marginTop: '0.75rem' }}>
+              {t('landing.navContact')}
+            </Link>
+          </nav>
+        )}
+      </div>
+
 
       {/* ══════════ HERO ══════════ */}
       <section style={{ background: cream, padding: '6rem 2.5rem 5rem', position: 'relative' as const, overflow: 'hidden' as const }}>
