@@ -3230,3 +3230,75 @@ export const clientClearMustChangePassword = createServerFn({ method: 'POST' })
     if (error) throw new Error('Falha ao actualizar estado da conta.')
     return { success: true }
   })
+
+export const getAdminNavBadgeCounts = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .handler(async (): Promise<{ tasksCount: number; alertsCount: number }> => {
+    const scope = await getViewerScope()
+    const adminUserId = scope.user.id
+
+    const { data: navView } = await supabaseAdmin
+      .from('admin_nav_views')
+      .select('tasks_seen_at, alerts_seen_at')
+      .eq('admin_user_id', adminUserId)
+      .maybeSingle()
+
+    const tasksSeen = navView?.tasks_seen_at ?? new Date(0).toISOString()
+    const alertsSeen = navView?.alerts_seen_at ?? new Date(0).toISOString()
+
+    const { count: tasksCount, error: tasksErr } = await supabaseAdmin
+      .from('client_tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'pending')
+      .gt('created_at', tasksSeen)
+
+    if (tasksErr) console.error('getAdminNavBadgeCounts tasks:', tasksErr.message)
+
+    const today = new Date()
+    today.setUTCHours(0, 0, 0, 0)
+    const in60Days = new Date(today)
+    in60Days.setUTCDate(in60Days.getUTCDate() + 60)
+    const todayStr = today.toISOString().slice(0, 10)
+    const in60DaysStr = in60Days.toISOString().slice(0, 10)
+
+    // "entrou na janela após última visita" ↔ end_date > alerts_seen_at + 60 dias
+    const alertsSeenDate = new Date(alertsSeen)
+    alertsSeenDate.setUTCDate(alertsSeenDate.getUTCDate() + 60)
+    const alertsSeenPlus60Str = alertsSeenDate.toISOString().slice(0, 10)
+
+    const { count: alertsCount, error: alertsErr } = await supabaseAdmin
+      .from('policies')
+      .select('id', { count: 'exact', head: true })
+      .in('status', ['active', 'expiring'])
+      .not('end_date', 'is', null)
+      .gte('end_date', todayStr)
+      .lte('end_date', in60DaysStr)
+      .gt('end_date', alertsSeenPlus60Str)
+
+    if (alertsErr) console.error('getAdminNavBadgeCounts alerts:', alertsErr.message)
+
+    return {
+      tasksCount: tasksCount ?? 0,
+      alertsCount: alertsCount ?? 0,
+    }
+  })
+
+export const markAdminNavSeen = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { tab: 'tasks' | 'alerts' }) => d)
+  .handler(async ({ data }): Promise<{ success: true }> => {
+    const scope = await getViewerScope()
+    const adminUserId = scope.user.id
+    const now = new Date().toISOString()
+
+    const row = data.tab === 'tasks'
+      ? { admin_user_id: adminUserId, tasks_seen_at: now, updated_at: now }
+      : { admin_user_id: adminUserId, alerts_seen_at: now, updated_at: now }
+
+    const { error } = await supabaseAdmin
+      .from('admin_nav_views')
+      .upsert(row, { onConflict: 'admin_user_id' })
+
+    if (error) throw new Error(`markAdminNavSeen: ${error.message}`)
+    return { success: true }
+  })
