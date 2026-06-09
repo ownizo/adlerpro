@@ -24,7 +24,7 @@ import type {
   ClientTask,
 } from './types'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
-import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser, generateStrongPassword } from './identity-admin'
+import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser, generateStrongPassword, deleteIdentityUserById } from './identity-admin'
 
 function extractAccessToken(): string | null {
   try {
@@ -2371,6 +2371,16 @@ export const adminDeleteIndividualClient = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((id: string) => id)
   .handler(async ({ data: id }) => {
+    // Apagar o login do Auth ANTES de tocar na DB — se falhar, a DB fica intacta.
+    // deleteIdentityUserById trata 404 como no-op (UUID já inexistente no Auth).
+    const { data: clientRow } = await supabaseAdmin
+      .from('individual_clients')
+      .select('auth_user_id')
+      .eq('id', id)
+      .single()
+    if (clientRow?.auth_user_id) {
+      await deleteIdentityUserById(clientRow.auth_user_id as string)
+    }
     await db.deleteIndividualClientRelations(id)
     await db.deleteIndividualClient(id)
     return { success: true }
@@ -3167,6 +3177,41 @@ export const adminResetIndividualClientPassword = createServerFn({ method: 'POST
 
     // d) Devolver password — apenas nesta resposta, nunca persistida
     return { success: true, password }
+  })
+
+export const adminRevokeIndividualClientAccess = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { clientId: string }) => d)
+  .handler(async ({ data }): Promise<{ success: true }> => {
+    // a) Validar cliente e confirmar que tem acesso activo
+    const { data: client, error: clientErr } = await supabaseAdmin
+      .from('individual_clients')
+      .select('id, auth_user_id, full_name')
+      .eq('id', data.clientId)
+      .single()
+
+    if (clientErr || !client) {
+      throw new Error('Cliente não encontrado.')
+    }
+    if (!client.auth_user_id) {
+      throw new Error('Este cliente não tem acesso para revogar.')
+    }
+
+    // b) ORDEM SEGURA: apagar o login PRIMEIRO.
+    //    deleteIdentityUserById trata 404 como no-op — UUID órfão não bloqueia a limpeza do crachá.
+    await deleteIdentityUserById(client.auth_user_id as string)
+
+    // c) Limpar o crachá na DB (login já inexistente — badge inconsistente é preferível a login activo sem crachá)
+    const { error: updateErr } = await supabaseAdmin
+      .from('individual_clients')
+      .update({ auth_user_id: null })
+      .eq('id', data.clientId)
+
+    if (updateErr) {
+      throw new Error(`Falha ao limpar o acesso do cliente: ${updateErr.message}`)
+    }
+
+    return { success: true }
   })
 
 export const clientClearMustChangePassword = createServerFn({ method: 'POST' })

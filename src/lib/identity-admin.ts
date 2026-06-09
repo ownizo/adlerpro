@@ -82,6 +82,13 @@ export async function deleteIdentityUserByEmail(email: string): Promise<void> {
   if (error) throw new Error('Falha ao eliminar utilizador do Auth: ' + error.message)
 }
 
+export async function deleteIdentityUserById(uuid: string): Promise<void> {
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(uuid)
+  if (!error) return
+  if (error.status === 404 || error.message.toLowerCase().includes('not found')) return
+  throw new Error('Falha ao eliminar utilizador do Auth: ' + error.message)
+}
+
 /**
  * Cria um utilizador no Supabase Auth para um cliente individual.
  * Diferenças face a createIdentityUserWithConfirmation:
