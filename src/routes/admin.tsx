@@ -20,6 +20,7 @@ import {
   adminActivateAdlerOne,
   adminGrantIndividualClientAccess,
   adminResetIndividualClientPassword,
+  adminRevokeIndividualClientAccess,
   adminPromoteToCompany,
   adminUpdatePolicy,
   adminUploadPolicyDocument,
@@ -3614,6 +3615,10 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
   const [resetError,        setResetError]        = useState<string | null>(null)
   const [passwordContext,   setPasswordContext]   = useState<'grant' | 'reset'>('grant')
 
+  // Estado do fluxo de revogação de acesso
+  const [revoking,          setRevoking]          = useState(false)
+  const [revokeError,       setRevokeError]       = useState<string | null>(null)
+
   const handleClosePassword = async () => {
     setGeneratedPassword(null)
     setGrantError(null)
@@ -3669,16 +3674,17 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
         </div>
       )}
 
-      {/* Estado 1: cliente já tem acesso → badge verde + repor password */}
+      {/* Estado 1: cliente já tem acesso → badge verde + repor password + revogar */}
       {client.authUserId && (
         <>
           {resetError && <p className="text-xs text-red-600 mb-1">{resetError}</p>}
+          {revokeError && <p className="text-xs text-red-600 mb-1">{revokeError}</p>}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
               Os Meus Seguros ✓
             </span>
             <button
-              disabled={resetting}
+              disabled={resetting || revoking}
               onClick={async () => {
                 if (!confirm(`Gerar nova password para ${client.fullName}?`)) return
                 setResetting(true)
@@ -3696,6 +3702,25 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
               className="px-2 py-1 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50 whitespace-nowrap"
             >
               {resetting ? '...' : 'Repor password'}
+            </button>
+            <button
+              disabled={resetting || revoking}
+              onClick={async () => {
+                if (!confirm(`Revogar o acesso de ${client.fullName} ao portal Os Meus Seguros?\n\nO cliente deixa de poder entrar. A ficha (apólices, documentos, etc.) mantém-se e pode receber acesso novamente.`)) return
+                setRevoking(true)
+                setRevokeError(null)
+                try {
+                  await adminRevokeIndividualClientAccess({ data: { clientId: client.id } })
+                  await onSuccess()
+                } catch (e: any) {
+                  setRevokeError(`Erro: ${e?.message ?? 'falha ao revogar acesso'}`)
+                } finally {
+                  setRevoking(false)
+                }
+              }}
+              className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50 whitespace-nowrap"
+            >
+              {revoking ? '...' : 'Revogar acesso'}
             </button>
           </div>
         </>
