@@ -20,6 +20,7 @@
     "@tanstack/react-store": "^0.9.1",
     "@tanstack/router-plugin": "^1.164.0",
     "@tanstack/store": "^0.9.1",
+    "cookie": "^1.1.1",
     "i18next": "^26.0.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
