@@ -55,38 +55,46 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
 
       {/* ── Top nav ── */}
       <nav style={styles.nav}>
-        <a href="/one/dashboard" style={styles.logo}>
-          <span style={{ color: '#fff', fontWeight: 700, letterSpacing: '0.04em' }}>Os Meus Seguros</span>
-          <span style={{ color: gold, fontWeight: 300, fontSize: '0.6em', letterSpacing: '0.05em', marginLeft: 8 }}>by Adler &amp; Rochefort</span>
-        </a>
-
-        {/* Desktop links */}
-        <div style={styles.navLinks}>
-          {NAV_LINKS.map(l => (
-            <Link
-              key={l.to}
-              to={l.to as any}
-              style={styles.navLink}
-              activeProps={{ style: styles.navLinkActive }}
-            >
-              {l.label}
-            </Link>
-          ))}
-          <button onClick={handleSignOut} style={styles.signOutBtn}>
-            Sair
-          </button>
+        {/* Left zone — brand text */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}>
+          <a href="/one/dashboard" style={styles.logo}>
+            <span style={{ color: '#fff', fontWeight: 700, letterSpacing: '0.04em' }}>Os Meus Seguros</span>
+            <span style={{ color: gold, fontWeight: 300, fontSize: '0.6em', letterSpacing: '0.05em', marginLeft: 8 }}>by Adler &amp; Rochefort</span>
+          </a>
         </div>
 
-        {/* Mobile hamburger */}
-        <button
-          onClick={() => setMenuOpen(o => !o)}
-          style={styles.hamburger}
-          aria-label="Menu"
-        >
-          <span style={styles.bar} />
-          <span style={styles.bar} />
-          <span style={styles.bar} />
-        </button>
+        {/* Centre zone — logo centrado */}
+        <img src="/logo.png" alt="Adler & Rochefort" style={{ height: 32, width: 'auto', display: 'block', flexShrink: 0 }} />
+
+        {/* Right zone — links de navegação + sair */}
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', minWidth: 0 }}>
+          <div style={styles.navLinks}>
+            {NAV_LINKS.map(l => (
+              <Link
+                key={l.to}
+                to={l.to as any}
+                style={styles.navLink}
+                activeProps={{ style: styles.navLinkActive }}
+              >
+                {l.label}
+              </Link>
+            ))}
+            <button onClick={handleSignOut} style={styles.signOutBtn}>
+              Sair
+            </button>
+          </div>
+
+          {/* Mobile hamburger */}
+          <button
+            onClick={() => setMenuOpen(o => !o)}
+            style={styles.hamburger}
+            aria-label="Menu"
+          >
+            <span style={styles.bar} />
+            <span style={styles.bar} />
+            <span style={styles.bar} />
+          </button>
+        </div>
       </nav>
 
       {/* Mobile drawer */}
@@ -177,7 +185,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '0 1.5rem',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
     position: 'sticky' as const,
     top: 0,
     zIndex: 50,
