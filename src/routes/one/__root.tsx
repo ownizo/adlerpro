@@ -64,12 +64,7 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         {/* Centre zone — logo centrado */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-          <img src="/logo.png" alt="Adler & Rochefort" style={{ height: 32, width: 'auto', display: 'block', flexShrink: 0 }} />
-          <span style={{ color: gold, fontSize: '0.72rem', fontWeight: 300, letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
-            Adler &amp; Rochefort
-          </span>
-        </div>
+        <img src="/logo.png" alt="Adler & Rochefort" style={{ height: 32, width: 'auto', display: 'block', flexShrink: 0 }} />
 
         {/* Right zone — links de navegação + sair */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', minWidth: 0 }}>

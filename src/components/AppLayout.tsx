@@ -249,12 +249,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Centre zone — logo centrado */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
-            <img src={isAdminRoute ? '/admin-logo.png' : '/logo.png'} alt="Adler & Rochefort" style={{ height: '32px', width: 'auto', display: 'block', flexShrink: 0 }} />
-            <span style={{ fontFamily: font, fontSize: '0.72rem', fontWeight: 300, color: 'var(--ui-accent)', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>
-              Adler &amp; Rochefort
-            </span>
-          </div>
+          <img src={isAdminRoute ? '/admin-logo.png' : '/logo.png'} alt="Adler & Rochefort" style={{ height: '32px', width: 'auto', display: 'block', flexShrink: 0 }} />
 
           {/* Right zone — PT/EN + utilizador + sino */}
           <div className="flex-1 flex items-center justify-end gap-3" style={{ minWidth: 0 }}>
