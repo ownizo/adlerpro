@@ -3302,3 +3302,103 @@ export const markAdminNavSeen = createServerFn({ method: 'POST' })
     if (error) throw new Error(`markAdminNavSeen: ${error.message}`)
     return { success: true }
   })
+
+// ── Marketing ──────────────────────────────────────────────────────────────
+
+const VALID_TEMPLATE_KEYS = ['feedback', 'renewal', 'presentation', 'seasonal'] as const
+const VALID_AUDIENCES = ['companies', 'company_users', 'individual_clients', 'all'] as const
+type MarketingTemplateKey = (typeof VALID_TEMPLATE_KEYS)[number]
+type MarketingAudience = (typeof VALID_AUDIENCES)[number]
+
+export const previewMarketingAudience = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { audience: MarketingAudience }) => d)
+  .handler(async ({ data }): Promise<{ totalRaw: number; afterOptOut: number; afterDedup: number; sample: string[] }> => {
+    const resolved = await db.resolveMarketingRecipients(data.audience)
+    return {
+      totalRaw: resolved.totalRaw,
+      afterOptOut: resolved.afterOptOut,
+      afterDedup: resolved.afterDedup,
+      sample: resolved.recipients.slice(0, 5).map((r) => r.email),
+    }
+  })
+
+export const createMarketingCampaign = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: {
+    title: string
+    subject: string
+    templateKey: MarketingTemplateKey
+    audience: MarketingAudience
+    templateVars?: Record<string, unknown>
+  }) => d)
+  .handler(async ({ data }): Promise<{ campaignId: string }> => {
+    if (!data.title.trim()) throw new Error('Título obrigatório')
+    if (!data.subject.trim()) throw new Error('Assunto obrigatório')
+    if (!(VALID_TEMPLATE_KEYS as readonly string[]).includes(data.templateKey)) throw new Error('Template inválido')
+    if (!(VALID_AUDIENCES as readonly string[]).includes(data.audience)) throw new Error('Audiência inválida')
+
+    const scope = await getViewerScope()
+
+    const { data: row, error } = await supabaseAdmin
+      .from('marketing_campaigns')
+      .insert({
+        title: data.title.trim(),
+        subject: data.subject.trim(),
+        template_key: data.templateKey,
+        audience: data.audience,
+        template_vars: data.templateVars ?? null,
+        status: 'draft',
+        created_by: scope.user.id,
+      })
+      .select('id')
+      .single()
+
+    if (error) throw new Error(`createMarketingCampaign: ${error.message}`)
+    return { campaignId: row.id as string }
+  })
+
+export const fetchMarketingCampaigns = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .handler(async () => {
+    const { data, error } = await supabaseAdmin
+      .from('marketing_campaigns')
+      .select('id, title, subject, template_key, audience, status, created_at, sent_at, total_recipients, total_sent, total_errors')
+      .order('created_at', { ascending: false })
+
+    if (error) throw new Error(`fetchMarketingCampaigns: ${error.message}`)
+    return (data ?? []) as Array<{
+      id: string
+      title: string
+      subject: string
+      template_key: string
+      audience: string
+      status: string
+      created_at: string
+      sent_at: string | null
+      total_recipients: number | null
+      total_sent: number | null
+      total_errors: number | null
+    }>
+  })
+
+export const fetchMarketingSends = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { campaignId: string }) => d)
+  .handler(async ({ data }) => {
+    const { data: rows, error } = await supabaseAdmin
+      .from('marketing_sends')
+      .select('recipient_email, recipient_name, recipient_type, status, error_message, sent_at')
+      .eq('campaign_id', data.campaignId)
+      .order('recipient_email', { ascending: true })
+
+    if (error) throw new Error(`fetchMarketingSends: ${error.message}`)
+    return (rows ?? []) as Array<{
+      recipient_email: string
+      recipient_name: string | null
+      recipient_type: string | null
+      status: string
+      error_message: string | null
+      sent_at: string | null
+    }>
+  })
