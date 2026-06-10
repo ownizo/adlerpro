@@ -3402,3 +3402,28 @@ export const fetchMarketingSends = createServerFn({ method: 'POST' })
       sent_at: string | null
     }>
   })
+
+// Invoca a Netlify function marketing-send de forma autenticada — o secret fica server-side
+// e nunca entra no bundle do browser. O frontend (slice 5) chama apenas esta server fn.
+export const adminTriggerMarketingSend = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { campaignId: string }) => d)
+  .handler(async ({ data }): Promise<{ totalRecipients: number; sent: number; errors: number }> => {
+    // process.env.URL é definido pelo Netlify (prod e netlify dev); fallback para porto local
+    const baseUrl = process.env.URL ?? 'http://localhost:8888'
+    const secret = process.env.ADMIN_SECRET
+    if (!secret) throw new Error('ADMIN_SECRET não configurado no servidor')
+
+    const res = await fetch(`${baseUrl}/api/marketing-send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${secret}`,
+      },
+      body: JSON.stringify({ campaignId: data.campaignId }),
+    })
+
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error ?? `Erro ao enviar campanha (HTTP ${res.status})`)
+    return json as { totalRecipients: number; sent: number; errors: number }
+  })
