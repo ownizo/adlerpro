@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
+import { apiUrl } from '@/lib/api-base'
 import { useState, useEffect, useRef } from 'react'
 import { OneLayout } from './__root'
 
@@ -182,7 +183,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
-      const res = await fetch('/api/list-policy-docs', {
+      const res = await fetch(apiUrl('/api/list-policy-docs'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ policyId: policy.id, companyId: policy.company_id }),
@@ -209,7 +210,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
-      const res = await fetch('/api/get-signed-url', {
+      const res = await fetch(apiUrl('/api/get-signed-url'), {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: doc.storagePath }),
@@ -236,7 +237,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
       fd.append('type', 'policy_document')
       fd.append('policyId', policy.id)
       try {
-        await fetch('/api/upload', {
+        await fetch(apiUrl('/api/upload'), {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.access_token}` },
           body: fd,

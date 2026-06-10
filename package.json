@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",
+    "build:capacitor": "vite build --config vite.config.capacitor.ts",
     "backfill:claim-messages": "node --experimental-strip-types scripts/backfill-claim-messages.ts"
   },
   "dependencies": {

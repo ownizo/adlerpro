@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { OneLayout } from './__root'
-import { fetchClaimWorkspace, addClaimMessage, registerClaimDocument, getClaimDocumentUrl, fetchIndividualClaims, submitIndividualClaim, getStorageUploadUrl } from '@/lib/server-fns'
+import { fetchClaimWorkspace, addClaimMessage, registerClaimDocument, getClaimDocumentUrl, fetchIndividualClaims, submitIndividualClaim, getStorageUploadUrl } from '@/lib/one-api'
 import type { ClaimOperationalData } from '@/lib/types'
 
 export const Route = createFileRoute('/one/claims')({

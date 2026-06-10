@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { OneLayout } from './__root'
-import { clientClearMustChangePassword } from '@/lib/server-fns'
+import { clientClearMustChangePassword } from '@/lib/one-api'
 
 export const Route = createFileRoute('/one/profile')({
   component: OneProfile,
