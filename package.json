@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.82.0",
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
     "@google/generative-ai": "^0.24.1",
     "@netlify/blobs": "^10.7.4",
     "@netlify/functions": "^5.1.5",
