@@ -3,7 +3,8 @@ import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { resolveMarketingRecipients } from '../../src/lib/data'
 
-const FROM_EMAIL = 'Adler Pro <noreply@adlerrochefort.com>'
+const FROM_EMAIL = 'Adler & Rochefort <insurance@send.adlerrochefort.com>'
+const REPLY_TO = 'insurance@adlerrochefort.com'
 const BATCH_SIZE = 100
 
 // ── Brand tokens (espelham src/lib/email/templates/BaseLayout.tsx) ───────────
@@ -43,9 +44,8 @@ function emailHeader(): string {
           </div>
         </td>
         <td style="vertical-align:middle;padding-left:12px;">
-          <div style="color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.06em;line-height:1.2;font-family:Arial,sans-serif;">ADLER PRO</div>
-          <div style="color:rgba(255,255,255,.55);font-size:9px;letter-spacing:.08em;line-height:1.4;font-family:Arial,sans-serif;">by Adler &amp; Rochefort</div>
-          <div style="color:${GOLD};font-size:9px;letter-spacing:.18em;text-transform:uppercase;line-height:1.4;font-family:Arial,sans-serif;">Gestão de Seguros</div>
+          <div style="color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.06em;line-height:1.2;font-family:Arial,sans-serif;">ADLER &amp; ROCHEFORT</div>
+          <div style="color:${GOLD};font-size:9px;letter-spacing:.18em;text-transform:uppercase;line-height:1.4;font-family:Arial,sans-serif;">Mediadores de Seguros</div>
         </td>
       </tr></table>
     </td>
@@ -391,6 +391,7 @@ export default async function handler(req: Request, _context: Context) {
 
     const batchPayload = batchRecipients.map((r) => ({
       from: FROM_EMAIL,
+      replyTo: REPLY_TO,
       to: [r.email] as [string],
       subject,
       html: renderMarketingEmail(templateKey, vars, r.name, r.email),
@@ -420,6 +421,7 @@ export default async function handler(req: Request, _context: Context) {
         batchRecipients.map((r) =>
           resend.emails.send({
             from: FROM_EMAIL,
+            replyTo: REPLY_TO,
             to: [r.email],
             subject,
             html: renderMarketingEmail(templateKey, vars, r.name, r.email),
