@@ -9,8 +9,8 @@ export const config = {
 
 export default async function handler(req: Request, _context: Context) {
   const isAdmin =
-    req.headers.get('authorization') ===
-    `Bearer ${process.env.ADMIN_SECRET ?? 'adler-admin-2025'}`
+    !!process.env.ADMIN_SECRET &&
+    req.headers.get('authorization') === `Bearer ${process.env.ADMIN_SECRET}`
 
   if (!isAdmin) {
     return new Response(JSON.stringify({ error: 'Não autorizado' }), {

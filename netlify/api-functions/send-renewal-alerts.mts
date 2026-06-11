@@ -195,7 +195,7 @@ export default async function handler(req: Request, context: Context) {
   // Verificar autorização — aceita pedidos do Netlify Scheduled Functions ou com token admin
   const authHeader = req.headers.get('authorization')
   const isScheduled = req.headers.get('x-netlify-scheduled') === 'true'
-  const isAdmin = authHeader === `Bearer ${process.env.ADMIN_SECRET || 'adler-admin-2025'}`
+  const isAdmin = !!process.env.ADMIN_SECRET && authHeader === `Bearer ${process.env.ADMIN_SECRET}`
 
   if (!isScheduled && !isAdmin) {
     return new Response(JSON.stringify({ error: 'Não autorizado' }), {
