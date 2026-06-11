@@ -3,7 +3,7 @@ import { Resend } from 'resend'
 import { createClient } from '@supabase/supabase-js'
 import { resolveMarketingRecipients } from '../../src/lib/data'
 
-const FROM_EMAIL = 'Adler & Rochefort <insurance@send.adlerrochefort.com>'
+const FROM_EMAIL = 'Adler & Rochefort <insurance@adlerrochefort.com>'
 const REPLY_TO = 'insurance@adlerrochefort.com'
 const BATCH_SIZE = 100
 
