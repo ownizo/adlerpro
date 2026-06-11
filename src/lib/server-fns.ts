@@ -3329,8 +3329,21 @@ type MarketingAudience = (typeof VALID_AUDIENCES)[number]
 
 export const previewMarketingAudience = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
-  .inputValidator((d: { audience: MarketingAudience }) => d)
+  .inputValidator((d: { audience: MarketingAudience; singleRecipientEmail?: string }) => d)
   .handler(async ({ data }): Promise<{ totalRaw: number; afterOptOut: number; afterDedup: number; sample: string[] }> => {
+    if (data.singleRecipientEmail) {
+      const email = data.singleRecipientEmail.trim().toLowerCase()
+      const { data: row } = await supabaseAdmin
+        .from('individual_clients')
+        .select('full_name, email, marketing_opt_out')
+        .eq('email', email)
+        .maybeSingle()
+      if (!row) return { totalRaw: 0, afterOptOut: 0, afterDedup: 0, sample: [] }
+      const ic = row as { full_name: string | null; email: string; marketing_opt_out: boolean }
+      if (ic.marketing_opt_out) return { totalRaw: 1, afterOptOut: 0, afterDedup: 0, sample: [] }
+      const display = ic.full_name ? `${ic.full_name} <${ic.email}>` : ic.email
+      return { totalRaw: 1, afterOptOut: 1, afterDedup: 1, sample: [display] }
+    }
     const resolved = await db.resolveMarketingRecipients(data.audience)
     return {
       totalRaw: resolved.totalRaw,
@@ -3348,12 +3361,26 @@ export const createMarketingCampaign = createServerFn({ method: 'POST' })
     templateKey: MarketingTemplateKey
     audience: MarketingAudience
     templateVars?: Record<string, unknown>
+    singleRecipientEmail?: string
   }) => d)
   .handler(async ({ data }): Promise<{ campaignId: string }> => {
     if (!data.title.trim()) throw new Error('Título obrigatório')
     if (!data.subject.trim()) throw new Error('Assunto obrigatório')
     if (!(VALID_TEMPLATE_KEYS as readonly string[]).includes(data.templateKey)) throw new Error('Template inválido')
     if (!(VALID_AUDIENCES as readonly string[]).includes(data.audience)) throw new Error('Audiência inválida')
+
+    let singleRecipientEmail: string | null = null
+    if (data.singleRecipientEmail) {
+      const emailLower = data.singleRecipientEmail.trim().toLowerCase()
+      if (!emailLower.includes('@')) throw new Error('Email de destinatário único inválido')
+      const { data: ic } = await supabaseAdmin
+        .from('individual_clients')
+        .select('email')
+        .eq('email', emailLower)
+        .maybeSingle()
+      if (!ic) throw new Error(`Cliente com email ${emailLower} não encontrado`)
+      singleRecipientEmail = emailLower
+    }
 
     const scope = await getViewerScope()
 
@@ -3363,8 +3390,9 @@ export const createMarketingCampaign = createServerFn({ method: 'POST' })
         title: data.title.trim(),
         subject: data.subject.trim(),
         template_key: data.templateKey,
-        audience: data.audience,
+        audience: singleRecipientEmail ? 'individual_clients' : data.audience,
         template_vars: data.templateVars ?? null,
+        single_recipient_email: singleRecipientEmail,
         status: 'draft',
         created_by: scope.user.id,
       })
@@ -3418,6 +3446,27 @@ export const fetchMarketingSends = createServerFn({ method: 'POST' })
       error_message: string | null
       sent_at: string | null
     }>
+  })
+
+export const searchIndividualClients = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { query: string }) => d)
+  .handler(async ({ data }): Promise<Array<{ id: string; fullName: string; email: string }>> => {
+    if (!data.query || data.query.trim().length < 2) return []
+    const q = `%${data.query.trim()}%`
+    const { data: rows, error } = await supabaseAdmin
+      .from('individual_clients')
+      .select('id, full_name, email')
+      .or(`full_name.ilike.${q},email.ilike.${q}`)
+      .not('email', 'is', null)
+      .order('full_name', { ascending: true })
+      .limit(8)
+    if (error) throw new Error(`searchIndividualClients: ${error.message}`)
+    return (rows ?? []).map((r) => ({
+      id: r.id as string,
+      fullName: (r.full_name as string | null) ?? '',
+      email: r.email as string,
+    }))
   })
 
 // Invoca a Netlify function marketing-send de forma autenticada — o secret fica server-side

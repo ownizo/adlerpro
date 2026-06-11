@@ -282,7 +282,7 @@ export default async function handler(req: Request, _context: Context) {
     .update({ status: 'sending' })
     .eq('id', campaignId)
     .eq('status', 'draft')
-    .select('id, subject, template_key, audience, template_vars')
+    .select('id, subject, template_key, audience, template_vars, single_recipient_email')
     .maybeSingle()
 
   if (!campaign) {
@@ -300,19 +300,51 @@ export default async function handler(req: Request, _context: Context) {
     | 'individual_clients'
     | 'all'
   const vars = (campaign.template_vars as Record<string, unknown>) ?? {}
+  const singleRecipientEmail = campaign.single_recipient_email as string | null
 
-  // ── RESOLVER DESTINATÁRIOS (função partilhada da slice 2) ──────────────────────────────────
+  // ── RESOLVER DESTINATÁRIOS ─────────────────────────────────────────────────────────────────
+  // Quando single_recipient_email está presente (lido da BD — nunca do payload da chamada),
+  // a audience é IGNORADA por completo. O destinatário é construído exclusivamente a partir
+  // do registo em individual_clients verificado aqui no servidor.
   let recipients: Awaited<ReturnType<typeof resolveMarketingRecipients>>['recipients']
-  try {
-    const resolved = await resolveMarketingRecipients(audience)
-    recipients = resolved.recipients
-  } catch (err) {
-    // Reverte para draft se a resolução falhar — campanha pode ser resubmetida
-    await sb.from('marketing_campaigns').update({ status: 'draft' }).eq('id', campaignId)
-    return resp(
-      { error: `Erro ao resolver destinatários: ${err instanceof Error ? err.message : String(err)}` },
-      500,
-    )
+
+  if (singleRecipientEmail) {
+    const { data: ic } = await sb
+      .from('individual_clients')
+      .select('full_name, email, marketing_opt_out')
+      .eq('email', singleRecipientEmail)
+      .maybeSingle()
+
+    if (!ic) {
+      await sb.from('marketing_campaigns').update({ status: 'draft' }).eq('id', campaignId)
+      return resp({ error: `Destinatário único não encontrado: ${singleRecipientEmail}` }, 422)
+    }
+
+    const icRow = ic as { full_name: string | null; email: string; marketing_opt_out: boolean }
+    if (icRow.marketing_opt_out) {
+      await sb.from('marketing_campaigns').update({
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        total_recipients: 0,
+        total_sent: 0,
+        total_errors: 0,
+      }).eq('id', campaignId)
+      return resp({ totalRecipients: 0, sent: 0, errors: 0 }, 200)
+    }
+
+    recipients = [{ email: icRow.email, name: icRow.full_name ?? '', type: 'individual_client' as const, refId: '' }]
+  } else {
+    try {
+      const resolved = await resolveMarketingRecipients(audience)
+      recipients = resolved.recipients
+    } catch (err) {
+      // Reverte para draft se a resolução falhar — campanha pode ser resubmetida
+      await sb.from('marketing_campaigns').update({ status: 'draft' }).eq('id', campaignId)
+      return resp(
+        { error: `Erro ao resolver destinatários: ${err instanceof Error ? err.message : String(err)}` },
+        500,
+      )
+    }
   }
 
   const totalRecipients = recipients.length

@@ -5,6 +5,7 @@ import {
   fetchMarketingCampaigns,
   fetchMarketingSends,
   previewMarketingAudience,
+  searchIndividualClients,
 } from '@/lib/server-fns'
 
 // ─── Local type aliases (not exported from server-fns) ──────────────────────
@@ -143,6 +144,13 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
   const [subject, setSubject] = useState('')
   const [audience, setAudience] = useState<MarketingAudience | ''>('')
 
+  // Single-recipient mode (step 1)
+  const [singleMode, setSingleMode] = useState(false)
+  const [singleSearch, setSingleSearch] = useState('')
+  const [singleResults, setSingleResults] = useState<Array<{ id: string; fullName: string; email: string }>>([])
+  const [singleSearching, setSingleSearching] = useState(false)
+  const [singleSelected, setSingleSelected] = useState<{ id: string; fullName: string; email: string } | null>(null)
+
   // Step 2
   const [templateKey, setTemplateKey] = useState<MarketingTemplateKey | ''>('')
 
@@ -164,6 +172,27 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
   const inp = 'w-full border border-navy-200 rounded-[4px] px-3 py-2 text-sm text-navy-700 focus:outline-none focus:ring-1 focus:ring-navy-400'
   const ta  = `${inp} resize-y min-h-[80px]`
 
+  // Debounced search for single-recipient mode
+  useEffect(() => {
+    if (!singleMode || singleSearch.trim().length < 2) {
+      setSingleResults([])
+      setSingleSearching(false)
+      return
+    }
+    setSingleSearching(true)
+    const t = setTimeout(async () => {
+      try {
+        const results = await searchIndividualClients({ data: { query: singleSearch.trim() } })
+        setSingleResults(results)
+      } catch {
+        setSingleResults([])
+      } finally {
+        setSingleSearching(false)
+      }
+    }, 300)
+    return () => clearTimeout(t)
+  }, [singleSearch, singleMode]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleSelectTemplate(key: MarketingTemplateKey) {
     setTemplateKey(key)
     if (key === 'presentation') {
@@ -172,12 +201,18 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
   }
 
   async function loadPreview() {
-    if (!audience) return
+    if (singleMode && !singleSelected) return
+    if (!singleMode && !audience) return
     setPreviewLoading(true)
     setPreviewError(null)
     setPreview(null)
     try {
-      const r = await previewMarketingAudience({ data: { audience: audience as MarketingAudience } })
+      const r = await previewMarketingAudience({
+        data: {
+          audience: (singleMode ? 'individual_clients' : audience) as MarketingAudience,
+          ...(singleMode && singleSelected ? { singleRecipientEmail: singleSelected.email } : {}),
+        },
+      })
       setPreview(r)
     } catch (err: unknown) {
       setPreviewError(err instanceof Error ? err.message : 'Erro ao pré-visualizar audiência')
@@ -200,8 +235,9 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
           title: title.trim(),
           subject: subject.trim(),
           templateKey: templateKey as MarketingTemplateKey,
-          audience: audience as MarketingAudience,
+          audience: (singleMode ? 'individual_clients' : audience) as MarketingAudience,
           templateVars: buildTemplateVars(templateKey as MarketingTemplateKey, vars),
+          ...(singleMode && singleSelected ? { singleRecipientEmail: singleSelected.email } : {}),
         },
       })
       const result = await adminTriggerMarketingSend({ data: { campaignId } })
@@ -225,7 +261,9 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
 
   function canAdvance(): boolean {
     switch (step) {
-      case 1: return title.trim() !== '' && subject.trim() !== '' && audience !== ''
+      case 1:
+        if (singleMode) return title.trim() !== '' && subject.trim() !== '' && singleSelected !== null
+        return title.trim() !== '' && subject.trim() !== '' && audience !== ''
       case 2: return templateKey !== ''
       case 3: return true
       case 4: return !previewLoading && preview !== null && preview.afterDedup > 0
@@ -256,11 +294,12 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
 
     // Sending spinner
     if (isSending) {
+      const n = preview?.afterDedup ?? 1
       return (
         <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
           <div className="w-10 h-10 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-medium text-navy-700">
-            A enviar para {preview?.afterDedup ?? '…'} destinatários…
+            A enviar para {n} destinatário{n === 1 ? '' : 's'}…
           </p>
           <p className="text-xs text-navy-400">Pode demorar até 2 minutos. Não feche esta janela.</p>
         </div>
@@ -284,22 +323,93 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                 placeholder="ex: Proteja o que mais importa — fale connosco" maxLength={200} />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-navy-600 mb-2">Audiência *</label>
-              <div className="flex flex-col gap-2">
-                {AUDIENCE_OPTS.map((opt) => (
-                  <button key={opt.value} type="button"
-                    className={`text-left px-3 py-2.5 rounded-[4px] border transition-colors ${
-                      audience === opt.value
-                        ? 'border-[#C9A84C] bg-amber-50 ring-1 ring-[#C9A84C]'
-                        : 'border-navy-200 hover:border-navy-400'
-                    }`}
-                    onClick={() => setAudience(opt.value)}
-                  >
-                    <p className="text-sm font-semibold text-navy-700">{opt.label}</p>
-                    <p className="text-xs text-navy-400 mt-0.5">{opt.desc}</p>
-                  </button>
-                ))}
+              <label className="block text-xs font-semibold text-navy-600 mb-2">Destinatários *</label>
+
+              {/* Mode toggle */}
+              <div className="flex gap-1 p-1 bg-navy-100 rounded-[4px] mb-3">
+                <button type="button"
+                  className={`flex-1 text-xs font-semibold py-1.5 rounded-[4px] transition-colors ${!singleMode ? 'bg-white text-navy-700 shadow-sm' : 'text-navy-500 hover:text-navy-700'}`}
+                  onClick={() => { setSingleMode(false); setSingleSelected(null); setSingleSearch(''); setSingleResults([]) }}
+                >
+                  Audiência de grupo
+                </button>
+                <button type="button"
+                  className={`flex-1 text-xs font-semibold py-1.5 rounded-[4px] transition-colors ${singleMode ? 'bg-white text-navy-700 shadow-sm' : 'text-navy-500 hover:text-navy-700'}`}
+                  onClick={() => { setSingleMode(true); setAudience('') }}
+                >
+                  Cliente específico
+                </button>
               </div>
+
+              {/* Group audience options */}
+              {!singleMode && (
+                <div className="flex flex-col gap-2">
+                  {AUDIENCE_OPTS.map((opt) => (
+                    <button key={opt.value} type="button"
+                      className={`text-left px-3 py-2.5 rounded-[4px] border transition-colors ${
+                        audience === opt.value
+                          ? 'border-[#C9A84C] bg-amber-50 ring-1 ring-[#C9A84C]'
+                          : 'border-navy-200 hover:border-navy-400'
+                      }`}
+                      onClick={() => setAudience(opt.value)}
+                    >
+                      <p className="text-sm font-semibold text-navy-700">{opt.label}</p>
+                      <p className="text-xs text-navy-400 mt-0.5">{opt.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Single client selector */}
+              {singleMode && (
+                <div className="flex flex-col gap-2">
+                  {singleSelected ? (
+                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-[#C9A84C] rounded-[4px]">
+                      <span className="text-green-600 font-bold flex-shrink-0">✓</span>
+                      <span className="text-sm text-navy-700 flex-1 min-w-0 truncate">
+                        {singleSelected.fullName && <span className="font-semibold">{singleSelected.fullName} </span>}
+                        <span className="text-navy-500">&lt;{singleSelected.email}&gt;</span>
+                      </span>
+                      <button type="button"
+                        className="text-navy-400 hover:text-red-500 text-sm flex-shrink-0 leading-none"
+                        onClick={() => { setSingleSelected(null); setSingleSearch(''); setSingleResults([]) }}
+                        title="Limpar seleção"
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="relative">
+                        <input className={inp} value={singleSearch}
+                          onChange={(e) => setSingleSearch(e.target.value)}
+                          placeholder="Pesquisar por nome ou email…"
+                          autoComplete="off"
+                        />
+                        {singleSearching && (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                            <div className="w-4 h-4 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
+                          </div>
+                        )}
+                      </div>
+                      {singleResults.length > 0 && (
+                        <div className="border border-navy-200 rounded-[4px] bg-white divide-y divide-navy-100 max-h-48 overflow-y-auto shadow-sm">
+                          {singleResults.map((r) => (
+                            <button key={r.id} type="button"
+                              className="w-full text-left px-3 py-2.5 hover:bg-navy-50 transition-colors"
+                              onClick={() => { setSingleSelected(r); setSingleSearch(''); setSingleResults([]) }}
+                            >
+                              <p className="text-sm font-semibold text-navy-700">{r.fullName || '—'}</p>
+                              <p className="text-xs text-navy-400">{r.email}</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {!singleSearching && singleSearch.trim().length >= 2 && singleResults.length === 0 && (
+                        <p className="text-xs text-navy-400 px-1">Nenhum cliente encontrado.</p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )
@@ -473,7 +583,9 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
 
               {preview.afterDedup === 0 ? (
                 <div className="bg-red-50 border border-red-200 rounded-[4px] p-3 text-sm text-red-700">
-                  Não existem destinatários válidos para esta audiência. Volte ao Passo 1 e escolha outra audiência.
+                  {singleMode
+                    ? 'Este cliente tem opt-out de marketing activo ou não foi encontrado. Volte ao Passo 1 e selecione outro destinatário.'
+                    : 'Não existem destinatários válidos para esta audiência. Volte ao Passo 1 e escolha outra audiência.'}
                 </div>
               ) : (
                 <div className="bg-amber-50 border border-amber-200 rounded-[4px] p-3 text-sm text-amber-800">
@@ -501,15 +613,18 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
       case 5: {
         const z = preview?.afterDedup ?? 0
         const canSend = confirmText === title && !isSending
+        const summaryRows: [string, string][] = [
+          ['Título', title],
+          ['Assunto', subject],
+          singleMode && singleSelected
+            ? ['Destinatário único', singleSelected.fullName ? `${singleSelected.fullName} <${singleSelected.email}>` : singleSelected.email]
+            : ['Audiência', AUDIENCE_LABELS[audience] ?? audience],
+          ['Modelo', TEMPLATE_LABELS[templateKey] ?? templateKey],
+        ]
         return (
           <div className="flex flex-col gap-5">
             <div className="bg-white border border-navy-200 rounded-[4px] p-4 flex flex-col gap-2 text-sm">
-              {[
-                ['Título', title],
-                ['Assunto', subject],
-                ['Audiência', AUDIENCE_LABELS[audience] ?? audience],
-                ['Modelo', TEMPLATE_LABELS[templateKey] ?? templateKey],
-              ].map(([label, val]) => (
+              {summaryRows.map(([label, val]) => (
                 <div key={label} className="flex justify-between gap-4">
                   <span className="text-navy-500 flex-shrink-0">{label}</span>
                   <span className="font-semibold text-navy-700 text-right">{val}</span>
