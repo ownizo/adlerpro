@@ -39,6 +39,7 @@ import {
   fetchAdminFinancialDashboard,
   getRenewalAlerts,
   adminUpdateRenewalAlertStatus,
+  adminTriggerRenewalAlerts,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate, formatFileSize } from '@/lib/utils'
 import type {
@@ -2516,12 +2517,7 @@ function SendRenewalAlertsButton() {
     if (!confirm('Enviar alertas de renovação por email a todos os clientes com apólices a expirar nos próximos 90 dias?')) return
     setSending(true); setResult(null); setError(null)
     try {
-      const res = await fetch('/api/send-renewal-alerts', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer adler-admin-2025', 'Content-Type': 'application/json' },
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Erro ao enviar alertas')
+      const data = await adminTriggerRenewalAlerts()
       setResult({ sent: data.sent, companies: data.companies })
     } catch (err: any) {
       setError(err.message)

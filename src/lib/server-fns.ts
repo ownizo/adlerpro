@@ -2481,6 +2481,23 @@ export const adminGenerateRenewalTasks = createServerFn({ method: 'POST' })
     return { success: true, ...result }
   })
 
+// Invoca /api/send-renewal-alerts de forma autenticada — o ADMIN_SECRET fica server-side
+// e nunca entra no bundle do browser. O browser chama apenas esta server fn.
+export const adminTriggerRenewalAlerts = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .handler(async (): Promise<{ sent: number; companies: number }> => {
+    const baseUrl = process.env.URL ?? 'http://localhost:8888'
+    const secret = process.env.ADMIN_SECRET
+    if (!secret) throw new Error('ADMIN_SECRET não configurado no servidor')
+    const res = await fetch(`${baseUrl}/api/send-renewal-alerts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${secret}` },
+    })
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error ?? `Erro ao enviar alertas (HTTP ${res.status})`)
+    return json as { sent: number; companies: number }
+  })
+
 export const adminActivateAdlerOne = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { clientId: string; email: string; fullName: string }) => d)
