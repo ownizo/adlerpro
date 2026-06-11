@@ -9,6 +9,7 @@ export interface Company {
   accessEmail?: string
   address: string
   createdAt: string
+  marketingOptOut?: boolean
 }
 
 export interface CompanyUser {
@@ -410,6 +411,7 @@ export interface IndividualClient {
   status: string
   authUserId?: string
   createdAt?: string
+  marketingOptOut?: boolean
 }
 
 export interface ClientNote {

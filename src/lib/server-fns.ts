@@ -3319,3 +3319,177 @@ export const markAdminNavSeen = createServerFn({ method: 'POST' })
     if (error) throw new Error(`markAdminNavSeen: ${error.message}`)
     return { success: true }
   })
+
+// ── Marketing ──────────────────────────────────────────────────────────────
+
+const VALID_TEMPLATE_KEYS = ['feedback', 'renewal', 'presentation', 'seasonal'] as const
+const VALID_AUDIENCES = ['companies', 'company_users', 'individual_clients', 'all'] as const
+type MarketingTemplateKey = (typeof VALID_TEMPLATE_KEYS)[number]
+type MarketingAudience = (typeof VALID_AUDIENCES)[number]
+
+export const previewMarketingAudience = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { audience: MarketingAudience; singleRecipientEmail?: string }) => d)
+  .handler(async ({ data }): Promise<{ totalRaw: number; afterOptOut: number; afterDedup: number; sample: string[] }> => {
+    if (data.singleRecipientEmail) {
+      const email = data.singleRecipientEmail.trim().toLowerCase()
+      const { data: row } = await supabaseAdmin
+        .from('individual_clients')
+        .select('full_name, email, marketing_opt_out')
+        .eq('email', email)
+        .maybeSingle()
+      if (!row) return { totalRaw: 0, afterOptOut: 0, afterDedup: 0, sample: [] }
+      const ic = row as { full_name: string | null; email: string; marketing_opt_out: boolean }
+      if (ic.marketing_opt_out) return { totalRaw: 1, afterOptOut: 0, afterDedup: 0, sample: [] }
+      const display = ic.full_name ? `${ic.full_name} <${ic.email}>` : ic.email
+      return { totalRaw: 1, afterOptOut: 1, afterDedup: 1, sample: [display] }
+    }
+    const resolved = await db.resolveMarketingRecipients(data.audience)
+    return {
+      totalRaw: resolved.totalRaw,
+      afterOptOut: resolved.afterOptOut,
+      afterDedup: resolved.afterDedup,
+      sample: resolved.recipients.slice(0, 5).map((r) => r.email),
+    }
+  })
+
+export const createMarketingCampaign = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: {
+    title: string
+    subject: string
+    templateKey: MarketingTemplateKey
+    audience: MarketingAudience
+    templateVars?: Record<string, unknown>
+    singleRecipientEmail?: string
+  }) => d)
+  .handler(async ({ data }): Promise<{ campaignId: string }> => {
+    if (!data.title.trim()) throw new Error('Título obrigatório')
+    if (!data.subject.trim()) throw new Error('Assunto obrigatório')
+    if (!(VALID_TEMPLATE_KEYS as readonly string[]).includes(data.templateKey)) throw new Error('Template inválido')
+    if (!(VALID_AUDIENCES as readonly string[]).includes(data.audience)) throw new Error('Audiência inválida')
+
+    let singleRecipientEmail: string | null = null
+    if (data.singleRecipientEmail) {
+      const emailLower = data.singleRecipientEmail.trim().toLowerCase()
+      if (!emailLower.includes('@')) throw new Error('Email de destinatário único inválido')
+      const { data: ic } = await supabaseAdmin
+        .from('individual_clients')
+        .select('email')
+        .eq('email', emailLower)
+        .maybeSingle()
+      if (!ic) throw new Error(`Cliente com email ${emailLower} não encontrado`)
+      singleRecipientEmail = emailLower
+    }
+
+    const scope = await getViewerScope()
+
+    const { data: row, error } = await supabaseAdmin
+      .from('marketing_campaigns')
+      .insert({
+        title: data.title.trim(),
+        subject: data.subject.trim(),
+        template_key: data.templateKey,
+        audience: singleRecipientEmail ? 'individual_clients' : data.audience,
+        template_vars: data.templateVars ?? null,
+        single_recipient_email: singleRecipientEmail,
+        status: 'draft',
+        created_by: scope.user.id,
+      })
+      .select('id')
+      .single()
+
+    if (error) throw new Error(`createMarketingCampaign: ${error.message}`)
+    return { campaignId: row.id as string }
+  })
+
+export const fetchMarketingCampaigns = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .handler(async () => {
+    const { data, error } = await supabaseAdmin
+      .from('marketing_campaigns')
+      .select('id, title, subject, template_key, audience, status, created_at, sent_at, total_recipients, total_sent, total_errors')
+      .order('created_at', { ascending: false })
+
+    if (error) throw new Error(`fetchMarketingCampaigns: ${error.message}`)
+    return (data ?? []) as Array<{
+      id: string
+      title: string
+      subject: string
+      template_key: string
+      audience: string
+      status: string
+      created_at: string
+      sent_at: string | null
+      total_recipients: number | null
+      total_sent: number | null
+      total_errors: number | null
+    }>
+  })
+
+export const fetchMarketingSends = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { campaignId: string }) => d)
+  .handler(async ({ data }) => {
+    const { data: rows, error } = await supabaseAdmin
+      .from('marketing_sends')
+      .select('recipient_email, recipient_name, recipient_type, status, error_message, sent_at')
+      .eq('campaign_id', data.campaignId)
+      .order('recipient_email', { ascending: true })
+
+    if (error) throw new Error(`fetchMarketingSends: ${error.message}`)
+    return (rows ?? []) as Array<{
+      recipient_email: string
+      recipient_name: string | null
+      recipient_type: string | null
+      status: string
+      error_message: string | null
+      sent_at: string | null
+    }>
+  })
+
+export const searchIndividualClients = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { query: string }) => d)
+  .handler(async ({ data }): Promise<Array<{ id: string; fullName: string; email: string }>> => {
+    if (!data.query || data.query.trim().length < 2) return []
+    const q = `%${data.query.trim()}%`
+    const { data: rows, error } = await supabaseAdmin
+      .from('individual_clients')
+      .select('id, full_name, email')
+      .or(`full_name.ilike.${q},email.ilike.${q}`)
+      .not('email', 'is', null)
+      .order('full_name', { ascending: true })
+      .limit(8)
+    if (error) throw new Error(`searchIndividualClients: ${error.message}`)
+    return (rows ?? []).map((r) => ({
+      id: r.id as string,
+      fullName: (r.full_name as string | null) ?? '',
+      email: r.email as string,
+    }))
+  })
+
+// Invoca a Netlify function marketing-send de forma autenticada — o secret fica server-side
+// e nunca entra no bundle do browser. O frontend (slice 5) chama apenas esta server fn.
+export const adminTriggerMarketingSend = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { campaignId: string }) => d)
+  .handler(async ({ data }): Promise<{ totalRecipients: number; sent: number; errors: number }> => {
+    // process.env.URL é definido pelo Netlify (prod e netlify dev); fallback para porto local
+    const baseUrl = process.env.URL ?? 'http://localhost:8888'
+    const secret = process.env.ADMIN_SECRET
+    if (!secret) throw new Error('ADMIN_SECRET não configurado no servidor')
+
+    const res = await fetch(`${baseUrl}/api/marketing-send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${secret}`,
+      },
+      body: JSON.stringify({ campaignId: data.campaignId }),
+    })
+
+    const json = await res.json()
+    if (!res.ok) throw new Error(json.error ?? `Erro ao enviar campanha (HTTP ${res.status})`)
+    return json as { totalRecipients: number; sent: number; errors: number }
+  })

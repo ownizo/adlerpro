@@ -744,3 +744,87 @@ export function fileStore() {
     return null
   }
 }
+
+// ============================================================
+// Marketing — resolução de destinatários (partilhado entre
+// previewMarketingAudience e a Netlify Function marketing-send)
+// ============================================================
+export interface MarketingRecipient {
+  email: string
+  name: string
+  type: 'company' | 'company_user' | 'individual_client'
+  refId: string
+}
+
+export interface ResolvedMarketingRecipients {
+  recipients: MarketingRecipient[]
+  totalRaw: number    // com email válido, antes de filtrar opt-outs
+  afterOptOut: number // depois de excluir opt-outs, antes de deduplicar
+  afterDedup: number  // lista final = recipients.length
+}
+
+export async function resolveMarketingRecipients(
+  audience: 'companies' | 'company_users' | 'individual_clients' | 'all',
+): Promise<ResolvedMarketingRecipients> {
+  const sb = getSupabaseAdmin()
+
+  type RawRow = { email: string; name: string; type: MarketingRecipient['type']; refId: string; optOut: boolean }
+  const raw: RawRow[] = []
+
+  // Fonte A — companies: contact_email como principal, access_email como fallback.
+  // 1 destinatário por empresa; marketing_opt_out filtrado abaixo em TypeScript.
+  if (audience === 'companies' || audience === 'all') {
+    const { data: d } = await sb.from('companies').select('*').order('name', { ascending: true })
+    const rows = (d ?? []) as unknown as Array<{
+      id: string; name: string | null; contact_email: string | null; access_email: string | null; marketing_opt_out: boolean
+    }>
+    for (const c of rows) {
+      const email = (c.contact_email || c.access_email || '').trim()
+      if (!email) continue
+      raw.push({ email, name: c.name ?? '', type: 'company', refId: c.id, optOut: c.marketing_opt_out ?? false })
+    }
+  }
+
+  // Fonte B — company_users: owners + managers; sem coluna marketing_opt_out própria.
+  if (audience === 'company_users' || audience === 'all') {
+    const { data: d } = await sb.from('company_users').select('*').in('role', ['owner', 'manager']).order('name', { ascending: true })
+    const rows = (d ?? []) as unknown as Array<{ id: string; name: string | null; email: string | null; role: string }>
+    for (const u of rows) {
+      const email = (u.email || '').trim()
+      if (!email) continue
+      raw.push({ email, name: u.name ?? '', type: 'company_user', refId: u.id, optOut: false })
+    }
+  }
+
+  // Fonte C — individual_clients: marketing_opt_out filtrado abaixo em TypeScript.
+  if (audience === 'individual_clients' || audience === 'all') {
+    const { data: d } = await sb.from('individual_clients').select('*').not('email', 'is', null).order('full_name', { ascending: true })
+    const rows = (d ?? []) as unknown as Array<{
+      id: string; full_name: string | null; email: string | null; marketing_opt_out: boolean
+    }>
+    for (const ic of rows) {
+      const email = (ic.email || '').trim()
+      if (!email) continue
+      raw.push({ email, name: ic.full_name ?? '', type: 'individual_client', refId: ic.id, optOut: ic.marketing_opt_out ?? false })
+    }
+  }
+
+  const totalRaw = raw.length
+
+  // Excluir opt-outs
+  const afterOptOutList = raw.filter((r) => !r.optOut)
+  const afterOptOut = afterOptOutList.length
+
+  // Deduplicar por email (case-insensitive, preserva a primeira ocorrência — A → B → C)
+  const seen = new Set<string>()
+  const recipients: MarketingRecipient[] = []
+  for (const r of afterOptOutList) {
+    const key = r.email.toLowerCase()
+    if (!seen.has(key)) {
+      seen.add(key)
+      recipients.push({ email: r.email, name: r.name, type: r.type, refId: r.refId })
+    }
+  }
+
+  return { recipients, totalRaw, afterOptOut, afterDedup: recipients.length }
+}

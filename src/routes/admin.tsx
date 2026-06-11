@@ -63,6 +63,7 @@ import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
 import { ClientProfilePanel } from '@/components/admin/ClientProfilePanel'
 import { AdminTasksPanel } from '@/components/admin/AdminTasksPanel'
+import { AdminMarketingPanel } from '@/components/admin/AdminMarketingPanel'
 async function exportToExcel(data: Record<string, unknown>[], filename: string) {
   const XLSX = await import('xlsx')
   const ws = XLSX.utils.json_to_sheet(data)
@@ -71,7 +72,7 @@ async function exportToExcel(data: Record<string, unknown>[], filename: string) 
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
 
-const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'api', 'profiles', 'tasks', 'alerts'] as const
+const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'api', 'profiles', 'tasks', 'alerts', 'marketing'] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
 const RENEWAL_ALERT_STATUS_LABELS: Record<RenewalAlertStatus, string> = {
   pending: 'Pendente',
@@ -1527,6 +1528,8 @@ function AdminPage() {
                 )}
               </div>
             )}
+
+            {tab === 'marketing' && <AdminMarketingPanel />}
           </>
         )}
       </div>
@@ -2825,6 +2828,7 @@ function CompanyForm({
     contactPhone: initial?.contactPhone || '',
     accessEmail: initial?.accessEmail || '',
     address: initial?.address || '',
+    marketingOptOut: initial?.marketingOptOut ?? false,
   })
   const [submitting, setSubmitting] = useState(false)
 
@@ -2850,6 +2854,22 @@ function CompanyForm({
         <FormField label="Email de Acesso da Empresa" value={form.accessEmail} onChange={(v) => update('accessEmail', v)} type="email" required />
         <div className="sm:col-span-2">
           <FormField label="Morada" value={form.address} onChange={(v) => update('address', v)} required />
+        </div>
+        <div className="sm:col-span-2">
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={form.marketingOptOut}
+              onChange={(e) => setForm((f) => ({ ...f, marketingOptOut: e.target.checked }))}
+              className="mt-0.5 w-4 h-4 accent-gold-400"
+            />
+            <div>
+              <span className="text-sm font-medium text-navy-700">Não enviar comunicações de marketing</span>
+              <p className="text-xs text-navy-400 mt-0.5">
+                Quando ativo, esta empresa não recebe campanhas de marketing. Marque quando o cliente pedir para ser removido (resposta "Remover").
+              </p>
+            </div>
+          </label>
         </div>
         <div className="sm:col-span-2">
           <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 text-sm">
@@ -3805,6 +3825,7 @@ function IndividualClientForm({
     phone: initial?.phone || '',
     address: initial?.address || '',
     status: initial?.status || 'active',
+    marketingOptOut: initial?.marketingOptOut ?? false,
   })
   const [submitting, setSubmitting] = useState(false)
 
@@ -3838,6 +3859,22 @@ function IndividualClientForm({
             <option value="active">Ativo</option>
             <option value="inactive">Inativo</option>
           </select>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={form.marketingOptOut}
+              onChange={(e) => setForm((f) => ({ ...f, marketingOptOut: e.target.checked }))}
+              className="mt-0.5 w-4 h-4 accent-gold-400"
+            />
+            <div>
+              <span className="text-sm font-medium text-navy-700">Não enviar comunicações de marketing</span>
+              <p className="text-xs text-navy-400 mt-0.5">
+                Quando ativo, este cliente não recebe campanhas de marketing. Marque quando o cliente pedir para ser removido (resposta "Remover").
+              </p>
+            </div>
+          </label>
         </div>
         <div className="sm:col-span-2">
           <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 text-sm">
