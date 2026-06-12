@@ -36,18 +36,8 @@ function emailWrap(inner: string): string {
 function emailHeader(): string {
   return `
   <tr>
-    <td style="background:${NAVY};padding:24px 32px;">
-      <table cellpadding="0" cellspacing="0" role="presentation" width="100%"><tr>
-        <td style="width:44px;vertical-align:middle;">
-          <div style="width:36px;height:36px;background:${GOLD};border-radius:4px;text-align:center;line-height:36px;">
-            <span style="color:#ffffff;font-size:20px;font-weight:900;font-family:Arial,sans-serif;">A</span>
-          </div>
-        </td>
-        <td style="vertical-align:middle;padding-left:12px;">
-          <div style="color:#ffffff;font-size:16px;font-weight:700;letter-spacing:.06em;line-height:1.2;font-family:Arial,sans-serif;">ADLER &amp; ROCHEFORT</div>
-          <div style="color:${GOLD};font-size:9px;letter-spacing:.18em;text-transform:uppercase;line-height:1.4;font-family:Arial,sans-serif;">Mediadores de Seguros</div>
-        </td>
-      </tr></table>
+    <td style="background:${NAVY};padding:24px 32px;text-align:center;">
+      <img src="https://admin.adlerrochefort.com/logo-email.png" width="200" alt="Adler &amp; Rochefort" style="display:block;margin:0 auto;border:0;height:auto;" />
     </td>
   </tr>`
 }
