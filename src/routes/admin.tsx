@@ -40,6 +40,7 @@ import {
   getRenewalAlerts,
   adminUpdateRenewalAlertStatus,
   adminTriggerRenewalAlerts,
+  adminSendPolicyDocument,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate, formatFileSize } from '@/lib/utils'
 import type {
@@ -3981,7 +3982,15 @@ function AdminPolicyList({ policies, companies, individualClients, onReload, sel
 
             {/* Expanded: documents */}
             {isExpanded && !isEditing && (
-              <AdminPolicyStorageDocs policy={policy} onReload={onReload} />
+              <AdminPolicyStorageDocs
+                policy={policy}
+                clientEmail={
+                  individualClients.find((c) => c.id === policy.individualClientId)?.email
+                  ?? companies.find((c) => c.id === policy.companyId)?.contactEmail
+                  ?? undefined
+                }
+                onReload={onReload}
+              />
             )}
           </div>
         )
@@ -3991,8 +4000,172 @@ function AdminPolicyList({ policies, companies, individualClients, onReload, sel
 }
 
 
-function PolicyDocumentButtons({ storagePath, name }: { storagePath: string; name: string }) {
+const DEFAULT_MESSAGE =
+  'Junto envia-se o documento referente à sua apólice. Caso necessite de qualquer esclarecimento, não hesite em contactar-nos. Com os melhores cumprimentos, Adler & Rochefort.'
+
+function SendDocumentModal({
+  policyId,
+  storagePath,
+  filename,
+  policyNumber,
+  insurer,
+  defaultEmail,
+  onClose,
+}: {
+  policyId: string
+  storagePath: string
+  filename: string
+  policyNumber: string
+  insurer: string
+  defaultEmail?: string
+  onClose: () => void
+}) {
+  const [inputEmail, setInputEmail] = useState('')
+  const [recipients, setRecipients] = useState<string[]>(defaultEmail ? [defaultEmail] : [])
+  const [message, setMessage] = useState(DEFAULT_MESSAGE)
+  const [sending, setSending] = useState(false)
+  const [result, setResult] = useState<{ ok: boolean; msg: string } | null>(null)
+
+  const addRecipient = () => {
+    const email = inputEmail.trim().toLowerCase()
+    if (!email || !email.includes('@')) return
+    if (!recipients.includes(email)) setRecipients((prev) => [...prev, email])
+    setInputEmail('')
+  }
+
+  const removeRecipient = (email: string) =>
+    setRecipients((prev) => prev.filter((e) => e !== email))
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addRecipient() }
+  }
+
+  const handleSend = async () => {
+    if (!recipients.length) return
+    setSending(true)
+    setResult(null)
+    try {
+      const res = await adminSendPolicyDocument({
+        data: { policyId, storagePath, filename, recipients, message },
+      })
+      setResult({ ok: true, msg: `Documento enviado para ${res.sent} destinatário(s).` })
+      setTimeout(onClose, 2000)
+    } catch (e: any) {
+      setResult({ ok: false, msg: e?.message ?? 'Erro ao enviar documento.' })
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} onClick={onClose} />
+      <div style={{ position: 'relative', background: '#fff', borderRadius: 8, width: '95%', maxWidth: 520, padding: '1.75rem', fontFamily: 'Arial, sans-serif', boxShadow: '0 4px 24px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 1.25rem', color: '#1B2B4B' }}>
+          Enviar Documento ao Cliente
+        </h3>
+
+        {/* Referência readonly */}
+        <div style={{ background: '#F4F6F9', borderLeft: '3px solid #C9A84C', borderRadius: 3, padding: '10px 14px', marginBottom: '1.25rem' }}>
+          <p style={{ margin: '0 0 2px', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Apólice</p>
+          <p style={{ margin: '0 0 2px', fontSize: '0.95rem', fontWeight: 700, color: '#1B2B4B', fontFamily: 'Courier New, monospace', letterSpacing: '0.08em' }}>{policyNumber}</p>
+          <p style={{ margin: '0 0 4px', fontSize: '0.78rem', color: '#555' }}>{insurer}</p>
+          <p style={{ margin: 0, fontSize: '0.75rem', color: '#888' }}>📄 {filename}</p>
+        </div>
+
+        {/* Destinatários */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#555', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Destinatários *
+          </label>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <input
+              type="email"
+              value={inputEmail}
+              onChange={(e) => setInputEmail(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="email@exemplo.com"
+              style={{ flex: 1, padding: '0.45rem 0.75rem', border: '1px solid #ddd', borderRadius: 4, fontSize: '0.85rem' }}
+            />
+            <button
+              type="button"
+              onClick={addRecipient}
+              style={{ padding: '0.45rem 0.9rem', background: '#1B2B4B', color: '#fff', border: 'none', borderRadius: 4, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              Adicionar
+            </button>
+          </div>
+          {recipients.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+              {recipients.map((email) => (
+                <span key={email} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', background: '#EEF2F7', border: '1px solid #D1D9E8', borderRadius: 4, padding: '0.2rem 0.6rem', fontSize: '0.78rem', color: '#1B2B4B' }}>
+                  {email}
+                  <button type="button" onClick={() => removeRecipient(email)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999', fontSize: '1rem', lineHeight: 1, padding: 0 }}>×</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Mensagem de acompanhamento */}
+        <div style={{ marginBottom: '1rem' }}>
+          <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#555', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+            Mensagem de acompanhamento
+          </label>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+            style={{ width: '100%', padding: '0.5rem 0.75rem', border: '1px solid #ddd', borderRadius: 4, fontSize: '0.83rem', lineHeight: '1.55', resize: 'vertical', boxSizing: 'border-box' }}
+          />
+        </div>
+
+        {/* Aviso BCC */}
+        <p style={{ fontSize: '0.72rem', color: '#999', margin: '0 0 1.25rem' }}>
+          Uma cópia será arquivada em insurance@adlerrochefort.com (BCC automático).
+        </p>
+
+        {/* Feedback */}
+        {result && (
+          <div style={{ marginBottom: '1rem', padding: '0.6rem 0.9rem', borderRadius: 4, background: result.ok ? '#D1FAE5' : '#FEE2E2', color: result.ok ? '#065F46' : '#991B1B', fontSize: '0.82rem', fontWeight: 600 }}>
+            {result.msg}
+          </div>
+        )}
+
+        {/* Acções */}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+          <button
+            onClick={onClose}
+            style={{ padding: '0.5rem 1.1rem', background: 'none', border: '1px solid #ccc', borderRadius: 4, fontSize: '0.83rem', cursor: 'pointer', color: '#555' }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSend}
+            disabled={sending || !recipients.length}
+            style={{ padding: '0.5rem 1.3rem', background: recipients.length ? '#C9A84C' : '#ddd', border: 'none', borderRadius: 4, fontSize: '0.83rem', fontWeight: 700, cursor: recipients.length ? 'pointer' : 'not-allowed', color: recipients.length ? '#1B2B4B' : '#999' }}
+          >
+            {sending ? 'A enviar...' : 'Enviar documento'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PolicyDocumentButtons({
+  storagePath,
+  name,
+  policy,
+  clientEmail,
+}: {
+  storagePath: string
+  name: string
+  policy: Policy
+  clientEmail?: string
+}) {
   const [loading, setLoading] = useState(false)
+  const [showSendModal, setShowSendModal] = useState(false)
 
   const getUrl = async () => {
     setLoading(true)
@@ -4005,28 +4178,49 @@ function PolicyDocumentButtons({ storagePath, name }: { storagePath: string; nam
   }
 
   return (
-    <span className="flex gap-1">
-      <button
-        disabled={loading}
-        onClick={async () => { const url = await getUrl(); window.open(url, '_blank') }}
-        className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
-        title="Preview"
-      >
-        👁
-      </button>
-      <button
-        disabled={loading}
-        onClick={async () => {
-          const url = await getUrl()
-          const a = document.createElement('a')
-          a.href = url; a.download = name; a.click()
-        }}
-        className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
-        title="Download"
-      >
-        ↓
-      </button>
-    </span>
+    <>
+      <span className="flex gap-1">
+        <button
+          disabled={loading}
+          onClick={async () => { const url = await getUrl(); window.open(url, '_blank') }}
+          className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
+          title="Preview"
+        >
+          👁
+        </button>
+        <button
+          disabled={loading}
+          onClick={async () => {
+            const url = await getUrl()
+            const a = document.createElement('a')
+            a.href = url; a.download = name; a.click()
+          }}
+          className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
+          title="Download"
+        >
+          ↓
+        </button>
+        <button
+          disabled={loading}
+          onClick={() => setShowSendModal(true)}
+          className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
+          title="Enviar ao cliente"
+        >
+          📧
+        </button>
+      </span>
+      {showSendModal && (
+        <SendDocumentModal
+          policyId={policy.id}
+          storagePath={storagePath}
+          filename={name}
+          policyNumber={policy.policyNumber}
+          insurer={policy.insurer}
+          defaultEmail={clientEmail}
+          onClose={() => setShowSendModal(false)}
+        />
+      )}
+    </>
   )
 }
 
@@ -4085,7 +4279,7 @@ function PolicyDocumentUpload({ policyId, companyId, individualClientId, onUploa
   )
 }
 
-function AdminPolicyStorageDocs({ policy, onReload }: { policy: Policy; onReload: () => Promise<void> }) {
+function AdminPolicyStorageDocs({ policy, clientEmail, onReload }: { policy: Policy; clientEmail?: string; onReload: () => Promise<void> }) {
   const [docs, setDocs] = useState<PolicyDocFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -4134,7 +4328,7 @@ function AdminPolicyStorageDocs({ policy, onReload }: { policy: Policy; onReload
             <li key={d.id} className="text-xs text-navy-600 flex items-center gap-2 flex-wrap">
               <span>📄</span>
               <span className="font-medium">{d.name}</span>
-              <PolicyDocumentButtons storagePath={d.storagePath} name={d.name} />
+              <PolicyDocumentButtons storagePath={d.storagePath} name={d.name} policy={policy} clientEmail={clientEmail} />
             </li>
           ))}
         </ul>
