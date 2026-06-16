@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
+import { createElement } from 'react'
+import { render } from 'react-email'
 import { resendClient, FROM_EMAIL } from './email/client'
+import { DocumentEmail } from './email/templates/DocumentEmail'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
 import { getClaimOperationalData, saveClaimOperationalData, updateClaimOperationalData } from './claim-ops'
@@ -3492,4 +3495,81 @@ export const adminTriggerMarketingSend = createServerFn({ method: 'POST' })
     const json = await res.json()
     if (!res.ok) throw new Error(json.error ?? `Erro ao enviar campanha (HTTP ${res.status})`)
     return json as { totalRecipients: number; sent: number; errors: number }
+  })
+
+// ─── Envio transacional de documento de apólice ───────────────────────────────
+
+const FROM_TRANSACTIONAL = 'Adler & Rochefort <insurance@adlerrochefort.com>'
+const REPLY_TO_TRANSACTIONAL = 'insurance@adlerrochefort.com'
+const BCC_ARCHIVE = 'insurance@adlerrochefort.com'
+
+const MIME_BY_EXT: Record<string, string> = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+}
+
+export const adminSendPolicyDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: {
+    policyId: string
+    storagePath: string
+    filename: string
+    recipients: string[]
+    message: string
+  }) => d)
+  .handler(async ({ data }) => {
+    if (!data.recipients.length) throw new Error('Pelo menos um destinatário é obrigatório')
+    const invalid = data.recipients.filter((e) => !e.includes('@'))
+    if (invalid.length) throw new Error(`Email(s) inválido(s): ${invalid.join(', ')}`)
+
+    const policy = await db.getPolicy(data.policyId)
+    if (!policy) throw new Error('Apólice não encontrada')
+
+    let clientName = ''
+    if (policy.individualClientId) {
+      const client = await db.getIndividualClient(policy.individualClientId)
+      clientName = client?.fullName ?? ''
+    } else if (policy.companyId) {
+      const company = await db.getCompany(policy.companyId)
+      clientName = company?.contactName || company?.name || ''
+    }
+
+    const { data: blob, error: storageErr } = await supabaseAdmin.storage
+      .from('documents')
+      .download(data.storagePath)
+    if (storageErr || !blob) {
+      throw new Error(`Erro ao aceder ao documento: ${storageErr?.message ?? 'ficheiro não encontrado'}`)
+    }
+
+    const buffer = Buffer.from(await blob.arrayBuffer())
+    const ext = data.filename.split('.').pop()?.toLowerCase() ?? ''
+    const mimeType = MIME_BY_EXT[ext] ?? 'application/octet-stream'
+
+    const html = await render(
+      createElement(DocumentEmail, {
+        clientName,
+        policyNumber: policy.policyNumber,
+        insurer: policy.insurer,
+        filename: data.filename,
+        message: data.message,
+      }),
+    )
+
+    const { data: sent, error: sendErr } = await resendClient.emails.send({
+      from: FROM_TRANSACTIONAL,
+      replyTo: REPLY_TO_TRANSACTIONAL,
+      to: data.recipients,
+      bcc: BCC_ARCHIVE,
+      subject: `Documento: ${data.filename} — Apólice ${policy.policyNumber}`,
+      html,
+      attachments: [{ filename: data.filename, content: buffer, contentType: mimeType }],
+    })
+
+    if (sendErr) throw new Error(`Falha no envio: ${sendErr.message}`)
+
+    return { ok: true as const, sent: data.recipients.length, emailId: sent?.id }
   })
