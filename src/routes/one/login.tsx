@@ -1,15 +1,22 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
+import { isMyCoverVault, oneT, oneBrand } from '@/lib/one-brand'
 
 export const Route = createFileRoute('/one/login')({
-  component: OnLoginPage,
+  component: OneLoginRoute,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros' }] }),
+  head: () => ({ meta: [{ title: oneBrand().docTitle }] }),
 })
 
 const navy = '#0A1628'
 const gold  = '#C9A84C'
+
+/** Pick the branded English login for My Cover Vault, or the Portuguese
+ *  "Os Meus Seguros" login (unchanged) for every other deploy. */
+function OneLoginRoute() {
+  return isMyCoverVault() ? <MyCoverVaultLogin /> : <OnLoginPage />
+}
 
 function OnLoginPage() {
   const [tab,          setTab]        = useState<'login' | 'register'>('login')
@@ -264,4 +271,293 @@ const inputStyle: React.CSSProperties = {
   color: '#111',
   boxSizing: 'border-box',
   transition: 'border-color 0.15s',
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * My Cover Vault — English, light-themed client login.
+ * The root of mycovervault.com IS this screen. Same Supabase auth, same
+ * terms_accepted_at mechanism; only the language and branding differ.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+const mcvInk    = '#0A1628'  // primary text / buttons (the single restrained accent)
+const mcvBody   = '#5B6472'
+const mcvLine   = '#E6E8EC'
+const mcvBg     = '#F6F7F9'
+
+function MyCoverVaultLogin() {
+  const t     = oneT()
+  const brand = oneBrand()
+  const [mode,          setMode]          = useState<'signin' | 'register' | 'forgot'>('signin')
+  const [email,         setEmail]         = useState('')
+  const [password,      setPassword]      = useState('')
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [loading,       setLoading]       = useState(false)
+  const [error,         setError]         = useState('')
+  const [info,          setInfo]          = useState('')
+  const [checking,      setChecking]      = useState(true)
+
+  // Already authenticated → straight to the dashboard.
+  useEffect(() => {
+    document.title = brand.docTitle
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) window.location.replace('/one/dashboard')
+      else setChecking(false)
+    })
+  }, [brand.docTitle])
+
+  const resetMessages = () => { setError(''); setInfo('') }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    resetMessages()
+    setLoading(true)
+    try {
+      if (mode === 'forgot') {
+        if (!email) { setError(t.login.emailRequired); return }
+        const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/one/reset-password`,
+        })
+        if (err) { setError(t.login.resetError); return }
+        setInfo(t.login.resetSent)
+        return
+      }
+
+      if (mode === 'signin') {
+        const { error: err } = await supabase.auth.signInWithPassword({ email, password })
+        if (err) {
+          setError(err.message === 'Invalid login credentials' ? t.login.invalidCredentials : err.message)
+        } else {
+          window.location.replace('/one/dashboard')
+        }
+        return
+      }
+
+      // register
+      const { error: err } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { terms_accepted_at: new Date().toISOString() } },
+      })
+      if (err) {
+        setError(err.message)
+      } else {
+        setInfo(t.login.registerSuccess)
+        setEmail(''); setPassword(''); setTermsAccepted(false)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (checking) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: mcvBg }}>
+        <div style={{ width: 28, height: 28, borderRadius: '50%', border: `3px solid ${mcvInk}`, borderTopColor: 'transparent', animation: 'one-spin 0.75s linear infinite' }} />
+        <style>{`@keyframes one-spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    )
+  }
+
+  const submitLabel =
+    mode === 'signin' ? t.login.signIn : mode === 'register' ? t.login.register : t.login.forgot
+  const disableSubmit = loading || (mode === 'register' && !termsAccepted)
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: mcvBg,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '1.5rem',
+      fontFamily: "'Montserrat', sans-serif",
+    }}>
+      {/* Logo */}
+      <img
+        src="/adler-rochefort-logo.png"
+        alt="Adler & Rochefort"
+        style={{ height: 64, width: 'auto', marginBottom: '1.5rem' }}
+      />
+
+      {/* Headings */}
+      <div style={{ textAlign: 'center', marginBottom: '1.75rem' }}>
+        <h1 style={{ color: mcvInk, fontWeight: 700, fontSize: '1.5rem', letterSpacing: '-0.01em', margin: 0 }}>
+          {t.login.welcome}
+        </h1>
+        <p style={{ color: mcvBody, fontSize: '0.8rem', marginTop: '0.35rem', letterSpacing: '0.06em' }}>
+          {brand.tagline}
+        </p>
+      </div>
+
+      {/* Card */}
+      <div style={{
+        background: '#fff',
+        borderRadius: 10,
+        width: '100%',
+        maxWidth: 400,
+        border: `1px solid ${mcvLine}`,
+        boxShadow: '0 12px 40px rgba(10,22,40,0.08)',
+        overflow: 'hidden',
+      }}>
+        <form onSubmit={handleSubmit} style={{ padding: '1.75rem' }}>
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={mcvLabel}>{t.login.email}</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder={t.login.emailPlaceholder}
+              required
+              style={mcvInput}
+            />
+          </div>
+
+          {mode !== 'forgot' && (
+            <div style={{ marginBottom: mode === 'signin' ? '0.5rem' : '1.25rem' }}>
+              <label style={mcvLabel}>{t.login.password}</label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={mode === 'register' ? t.login.passwordPlaceholderRegister : t.login.passwordPlaceholderLogin}
+                required
+                minLength={6}
+                style={mcvInput}
+              />
+            </div>
+          )}
+
+          {mode === 'signin' && (
+            <div style={{ textAlign: 'right', marginBottom: '1.25rem' }}>
+              <button
+                type="button"
+                onClick={() => { setMode('forgot'); resetMessages() }}
+                style={{ background: 'none', border: 'none', color: mcvBody, fontSize: '0.72rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Montserrat', sans-serif", textDecoration: 'underline' }}
+              >
+                {t.login.forgot}
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 6, color: '#B91C1C', fontSize: '0.78rem' }}>
+              {error}
+            </div>
+          )}
+          {info && (
+            <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 6, color: '#166534', fontSize: '0.78rem' }}>
+              {info}
+            </div>
+          )}
+
+          {mode === 'register' && (
+            <div style={{ marginBottom: '1.25rem', display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+              <input
+                type="checkbox"
+                id="mcv-terms"
+                required
+                checked={termsAccepted}
+                onChange={e => setTermsAccepted(e.target.checked)}
+                style={{ marginTop: 3, flexShrink: 0, accentColor: mcvInk, width: 14, height: 14, cursor: 'pointer' }}
+              />
+              <label htmlFor="mcv-terms" style={{ fontSize: '0.68rem', color: mcvBody, lineHeight: 1.55, cursor: 'pointer' }}>
+                {t.login.termsPrefix}
+                <a href="/one/terms" target="_blank" rel="noopener noreferrer" style={{ color: mcvInk, fontWeight: 600, textDecoration: 'underline' }}>
+                  {t.login.termsLink}
+                </a>
+                {t.login.termsSuffix}
+              </label>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={disableSubmit}
+            style={{
+              width: '100%',
+              padding: '0.8rem',
+              background: mcvInk,
+              color: '#fff',
+              fontFamily: "'Montserrat', sans-serif",
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              letterSpacing: '0.04em',
+              border: 'none',
+              borderRadius: 6,
+              cursor: disableSubmit ? 'not-allowed' : 'pointer',
+              opacity: disableSubmit ? 0.55 : 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              transition: 'opacity 0.15s',
+            }}
+          >
+            {loading && (
+              <span style={{ width: 14, height: 14, borderRadius: '50%', border: '2px solid #fff', borderTopColor: 'transparent', display: 'inline-block', animation: 'one-spin 0.75s linear infinite' }} />
+            )}
+            {submitLabel}
+          </button>
+
+          {/* Mode switches */}
+          <p style={{ textAlign: 'center', marginTop: '1.1rem', fontSize: '0.72rem', color: mcvBody }}>
+            {mode === 'signin' && (
+              <>
+                {t.login.noAccount}{' '}
+                <button type="button" onClick={() => { setMode('register'); resetMessages() }} style={mcvLinkBtn}>
+                  {t.login.registerTab}
+                </button>
+              </>
+            )}
+            {(mode === 'register' || mode === 'forgot') && (
+              <button type="button" onClick={() => { setMode('signin'); resetMessages() }} style={mcvLinkBtn}>
+                ← {t.login.signInTab}
+              </button>
+            )}
+          </p>
+        </form>
+      </div>
+
+      {/* Regulatory footer */}
+      <p style={{ color: mcvBody, opacity: 0.85, fontSize: '0.65rem', marginTop: '2rem', letterSpacing: '0.03em', textAlign: 'center', maxWidth: 420, lineHeight: 1.6 }}>
+        {brand.regulatoryFooter}
+      </p>
+
+      <style>{`@keyframes one-spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
+
+const mcvLabel: React.CSSProperties = {
+  display: 'block',
+  fontSize: '0.68rem',
+  fontWeight: 600,
+  color: '#4A5361',
+  marginBottom: '0.35rem',
+  letterSpacing: '0.06em',
+  textTransform: 'uppercase',
+}
+
+const mcvInput: React.CSSProperties = {
+  width: '100%',
+  padding: '0.65rem 0.75rem',
+  fontSize: '0.85rem',
+  fontFamily: "'Montserrat', sans-serif",
+  border: `1px solid ${mcvLine}`,
+  borderRadius: 6,
+  outline: 'none',
+  color: '#111',
+  boxSizing: 'border-box',
+  transition: 'border-color 0.15s',
+}
+
+const mcvLinkBtn: React.CSSProperties = {
+  color: mcvInk,
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  fontWeight: 700,
+  fontSize: '0.72rem',
+  fontFamily: "'Montserrat', sans-serif",
 }

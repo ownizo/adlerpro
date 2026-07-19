@@ -3,11 +3,12 @@ import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { OneLayout } from './__root'
 import { clientClearMustChangePassword } from '@/lib/server-fns'
+import { oneT, oneBrand } from '@/lib/one-brand'
 
 export const Route = createFileRoute('/one/profile')({
   component: OneProfile,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros' }] }),
+  head: () => ({ meta: [{ title: oneBrand().docTitle }] }),
 })
 
 const navy = '#0A1628'
@@ -24,6 +25,7 @@ interface IndividualClient {
 }
 
 function OneProfile() {
+  const t = oneT()
   const [client,    setClient]    = useState<IndividualClient | null>(null)
   const [loading,   setLoading]   = useState(true)
   const [error,     setError]     = useState('')
@@ -65,7 +67,7 @@ function OneProfile() {
         setForm({ phone: clientData.phone ?? '', address: clientData.address ?? '' })
       }
     } catch (e: any) {
-      setError('Erro ao carregar perfil.')
+      setError(t.profile.loadError)
       console.error(e)
     } finally {
       setLoading(false)
@@ -75,11 +77,11 @@ function OneProfile() {
   async function handlePasswordChange() {
     setPwError('')
     if (pwForm.password.length < 6) {
-      setPwError('A password deve ter pelo menos 6 caracteres.')
+      setPwError(t.profile.pwTooShort)
       return
     }
     if (pwForm.password !== pwForm.confirm) {
-      setPwError('As passwords não coincidem.')
+      setPwError(t.profile.pwMismatch)
       return
     }
     setPwSaving(true)
@@ -89,7 +91,7 @@ function OneProfile() {
       await clientClearMustChangePassword()
       window.location.replace('/one/profile')
     } catch (e: any) {
-      setPwError(e?.message ?? 'Erro ao alterar password.')
+      setPwError(e?.message ?? t.profile.pwError)
       setPwSaving(false)
     }
   }
@@ -111,7 +113,7 @@ function OneProfile() {
       setSaveOk(true)
       setTimeout(() => setSaveOk(false), 3000)
     } catch (e: any) {
-      setSaveError('Erro ao guardar. Tente novamente.')
+      setSaveError(t.profile.saveError)
       console.error(e)
     } finally {
       setSaving(false)
@@ -126,38 +128,38 @@ function OneProfile() {
         <ErrorMsg msg={error} />
       ) : !client ? (
         <div style={{ padding: '1.5rem', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 6, fontSize: '0.85rem', color: '#92400E' }}>
-          <strong>Perfil não encontrado.</strong> Contacte a Adler Rochefort para associar a sua conta ao seu perfil.
+          <strong>{t.profile.notFoundTitle}</strong>{t.profile.notFoundBody}
         </div>
       ) : (
         <>
           <div style={{ marginBottom: '1.75rem' }}>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>Perfil</h1>
-            <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>Os seus dados pessoais</p>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>{t.profile.title}</h1>
+            <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>{t.profile.subtitle}</p>
           </div>
 
           {saveOk && (
             <div style={{ marginBottom: '1rem', padding: '0.65rem 0.85rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: 4, color: '#166534', fontSize: '0.82rem' }}>
-              Dados actualizados com sucesso.
+              {t.profile.saveOk}
             </div>
           )}
 
           <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', marginBottom: '1.5rem' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, margin: 0 }}>Dados Pessoais</h2>
+              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, margin: 0 }}>{t.profile.personalData}</h2>
             </div>
             <div style={{ padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
-              <ProfileField label="Nome Completo"  value={client.full_name} />
-              <ProfileField label="NIF"            value={client.nif}      />
-              <ProfileField label="Email"          value={client.email}    />
-              <ProfileField label="Telefone"       value={client.phone}    />
-              <ProfileField label="Morada" value={client.address} wide />
+              <ProfileField label={t.profile.fullName}  value={client.full_name} />
+              <ProfileField label={t.profile.nif}            value={client.nif}      />
+              <ProfileField label={t.profile.email}          value={client.email}    />
+              <ProfileField label={t.profile.phone}       value={client.phone}    />
+              <ProfileField label={t.profile.address} value={client.address} wide />
             </div>
           </div>
 
           {/* Alterar Password */}
           <div id="alterar-password" style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', marginBottom: '1.5rem' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #F1F5F9' }}>
-              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, margin: 0 }}>Alterar Password</h2>
+              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, margin: 0 }}>{t.profile.changePassword}</h2>
             </div>
             <div style={{ padding: '1.25rem 1.5rem' }}>
               {pwError && (
@@ -167,22 +169,22 @@ function OneProfile() {
               )}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', maxWidth: 520 }}>
                 <div>
-                  <FieldLabel>Nova password</FieldLabel>
+                  <FieldLabel>{t.profile.newPassword}</FieldLabel>
                   <input
                     type="password"
                     value={pwForm.password}
                     onChange={e => setPwForm(f => ({ ...f, password: e.target.value }))}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder={t.profile.newPasswordPlaceholder}
                     style={inputStyle}
                   />
                 </div>
                 <div>
-                  <FieldLabel>Confirmar password</FieldLabel>
+                  <FieldLabel>{t.profile.confirmPassword}</FieldLabel>
                   <input
                     type="password"
                     value={pwForm.confirm}
                     onChange={e => setPwForm(f => ({ ...f, confirm: e.target.value }))}
-                    placeholder="Repetir password"
+                    placeholder={t.profile.confirmPasswordPlaceholder}
                     style={inputStyle}
                   />
                 </div>
@@ -204,7 +206,7 @@ function OneProfile() {
                     fontFamily: "'Montserrat', sans-serif",
                   }}
                 >
-                  {pwSaving ? 'A alterar...' : 'Alterar password'}
+                  {pwSaving ? t.profile.changingPassword : t.profile.changePasswordBtn}
                 </button>
               </div>
             </div>
@@ -213,13 +215,13 @@ function OneProfile() {
           {/* Actualizar Contacto */}
           <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, margin: 0 }}>Actualizar Contacto</h2>
+              <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, margin: 0 }}>{t.profile.updateContact}</h2>
               {!editing && (
                 <button
                   onClick={() => setEditing(true)}
                   style={{ padding: '0.4rem 1rem', background: 'none', border: `1px solid ${gold}`, color: navy, fontWeight: 600, fontSize: '0.78rem', borderRadius: 4, cursor: 'pointer' }}
                 >
-                  Editar
+                  {t.profile.edit}
                 </button>
               )}
             </div>
@@ -227,20 +229,20 @@ function OneProfile() {
               {editing ? (
                 <form onSubmit={handleSave} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
                   <div>
-                    <FieldLabel>Telefone</FieldLabel>
+                    <FieldLabel>{t.profile.phone}</FieldLabel>
                     <input
                       value={form.phone}
                       onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
-                      placeholder="+351 912 345 678"
+                      placeholder={t.profile.phonePlaceholder}
                       style={inputStyle}
                     />
                   </div>
                   <div>
-                    <FieldLabel>Morada</FieldLabel>
+                    <FieldLabel>{t.profile.address}</FieldLabel>
                     <input
                       value={form.address}
                       onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
-                      placeholder="Rua, número, código postal"
+                      placeholder={t.profile.addressPlaceholder}
                       style={inputStyle}
                     />
                   </div>
@@ -255,21 +257,21 @@ function OneProfile() {
                       disabled={saving}
                       style={{ padding: '0.6rem 1.4rem', background: saving ? '#e5c97a' : gold, color: navy, fontWeight: 700, fontSize: '0.82rem', border: 'none', borderRadius: 4, cursor: saving ? 'not-allowed' : 'pointer' }}
                     >
-                      {saving ? 'A guardar...' : 'Guardar'}
+                      {saving ? t.profile.saving : t.profile.save}
                     </button>
                     <button
                       type="button"
                       onClick={() => { setEditing(false); setSaveError(''); setForm({ phone: client.phone ?? '', address: client.address ?? '' }) }}
                       style={{ padding: '0.6rem 1.2rem', background: 'none', border: '1px solid #E2E8F0', color: '#64748B', fontWeight: 600, fontSize: '0.82rem', borderRadius: 4, cursor: 'pointer' }}
                     >
-                      Cancelar
+                      {t.profile.cancel}
                     </button>
                   </div>
                 </form>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
-                  <ProfileField label="Telefone" value={client.phone} />
-                  <ProfileField label="Morada"   value={client.address} />
+                  <ProfileField label={t.profile.phone} value={client.phone} />
+                  <ProfileField label={t.profile.address}   value={client.address} />
                 </div>
               )}
             </div>

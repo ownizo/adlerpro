@@ -2,11 +2,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect, useRef } from 'react'
 import { OneLayout } from './__root'
+import { oneT, oneBrand, fmtDate } from '@/lib/one-brand'
 
 export const Route = createFileRoute('/one/documents')({
   component: OneDocuments,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros' }] }),
+  head: () => ({ meta: [{ title: oneBrand().docTitle }] }),
 })
 
 const navy = '#0A1628'
@@ -19,15 +20,6 @@ interface Document {
   size: number
   uploaded_at: string
   storage_path: string
-}
-
-const CATEGORY_LABELS: Record<string, string> = {
-  policy:      'Apólice',
-  claim:       'Sinistro',
-  invoice:     'Fatura',
-  report:      'Relatório',
-  certificate: 'Certificado',
-  other:       'Outro',
 }
 
 const CATEGORY_COLOR: Record<string, { bg: string; color: string }> = {
@@ -46,12 +38,8 @@ function formatSize(bytes: number) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-function formatDate(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
 function OneDocuments() {
+  const t = oneT()
   const [documents,    setDocuments]    = useState<Document[]>([])
   const [loading,      setLoading]      = useState(true)
   const [error,        setError]        = useState('')
@@ -97,7 +85,7 @@ function OneDocuments() {
         setDocuments(data ?? [])
       }
     } catch (e: any) {
-      setError('Erro ao carregar documentos.')
+      setError(t.documents.loadError)
       console.error(e)
     } finally {
       setLoading(false)
@@ -115,7 +103,7 @@ function OneDocuments() {
 
     const errors: string[] = []
     for (const file of Array.from(files)) {
-      setUploadMsg(`A carregar ${file.name}…`)
+      setUploadMsg(t.documents.uploadingName(file.name))
       try {
         const fd = new FormData()
         fd.append('file', file)
@@ -127,10 +115,10 @@ function OneDocuments() {
         })
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          errors.push(`${file.name}: ${err.error || 'Erro desconhecido'}`)
+          errors.push(`${file.name}: ${err.error || t.documents.unknownError}`)
         }
       } catch {
-        errors.push(`${file.name}: Erro de rede`)
+        errors.push(`${file.name}: ${t.documents.networkError}`)
       }
     }
 
@@ -142,7 +130,7 @@ function OneDocuments() {
       setUploadError(errors.join(' | '))
       setUploadMsg('')
     } else {
-      setUploadMsg('Carregado com sucesso!')
+      setUploadMsg(t.documents.uploadOk)
       setTimeout(() => setUploadMsg(''), 2000)
     }
     loadData()
@@ -158,12 +146,12 @@ function OneDocuments() {
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: doc.storage_path }),
       })
-      if (!res.ok) throw new Error('Erro ao obter URL')
+      if (!res.ok) throw new Error('signed url error')
       const { url } = await res.json()
       setPreviewName(doc.name)
       setPreviewUrl(url)
     } catch (e: any) {
-      alert('Erro ao abrir documento: ' + e.message)
+      alert(t.documents.openError + e.message)
     }
   }
 
@@ -176,16 +164,16 @@ function OneDocuments() {
       ) : (
         <>
           <div style={{ marginBottom: '1.75rem' }}>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>Documentos</h1>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>{t.documents.title}</h1>
             <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>
-              {documents.length} documento{documents.length !== 1 ? 's' : ''}
+              {t.documents.count(documents.length)}
             </p>
           </div>
 
           {/* Upload area */}
           <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, padding: '1.25rem', marginBottom: '1.5rem' }}>
             <p style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', margin: '0 0 0.85rem' }}>
-              Adicionar Documento
+              {t.documents.add}
             </p>
             <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button
@@ -198,7 +186,7 @@ function OneDocuments() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
-                Tirar Foto
+                {t.documents.takePhoto}
               </button>
               <button
                 type="button"
@@ -209,7 +197,7 @@ function OneDocuments() {
                 <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
                 </svg>
-                Escolher Ficheiro
+                {t.documents.chooseFile}
               </button>
             </div>
 
@@ -235,16 +223,16 @@ function OneDocuments() {
           {documents.length === 0 ? (
             <div style={{ padding: '3rem 2rem', textAlign: 'center', background: '#fff', borderRadius: 8, border: '1px solid #E2E8F0' }}>
               <p style={{ fontSize: '2rem', margin: '0 0 0.75rem' }}>📄</p>
-              <p style={{ fontSize: '0.9rem', fontWeight: 600, color: navy, margin: '0 0 0.4rem' }}>Sem documentos disponíveis</p>
+              <p style={{ fontSize: '0.9rem', fontWeight: 600, color: navy, margin: '0 0 0.4rem' }}>{t.documents.emptyTitle}</p>
               <p style={{ fontSize: '0.82rem', color: '#94A3B8', margin: 0 }}>
-                Os seus documentos serão disponibilizados aqui pela Adler Rochefort.
+                {t.documents.emptyBody}
               </p>
             </div>
           ) : (
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden' }}>
               {documents.map((doc, i) => {
                 const cat = CATEGORY_COLOR[doc.category] ?? CATEGORY_COLOR.other
-                const catLabel = CATEGORY_LABELS[doc.category] ?? doc.category
+                const catLabel = t.categories[doc.category as keyof typeof t.categories] ?? doc.category
                 const isPdf = doc.name.toLowerCase().endsWith('.pdf')
                 const isImage = /\.(jpg|jpeg|png|webp)$/i.test(doc.name)
                 return (
@@ -262,7 +250,7 @@ function OneDocuments() {
                         {doc.name}
                       </p>
                       <p style={{ fontSize: '0.72rem', color: '#94A3B8', margin: '0.15rem 0 0' }}>
-                        {formatSize(doc.size)} · {formatDate(doc.uploaded_at)}
+                        {formatSize(doc.size)} · {fmtDate(doc.uploaded_at)}
                       </p>
                     </div>
                     <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.2rem 0.6rem', borderRadius: 20, background: cat.bg, color: cat.color, flexShrink: 0 }}>
@@ -273,7 +261,7 @@ function OneDocuments() {
                         onClick={() => handlePreview(doc)}
                         style={{ padding: '0.3rem 0.7rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, cursor: 'pointer', fontSize: '0.72rem', fontWeight: 600, flexShrink: 0, fontFamily: "'Montserrat', sans-serif" }}
                       >
-                        Ver
+                        {t.documents.view}
                       </button>
                     )}
                   </div>
@@ -297,7 +285,7 @@ function OneDocuments() {
             <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ fontWeight: 600, fontSize: '0.85rem', color: navy, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{previewName}</p>
               <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                <a href={previewUrl} target="_blank" rel="noreferrer" style={{ padding: '0.3rem 0.75rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, textDecoration: 'none', fontSize: '0.78rem', fontWeight: 600 }}>Abrir</a>
+                <a href={previewUrl} target="_blank" rel="noreferrer" style={{ padding: '0.3rem 0.75rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, textDecoration: 'none', fontSize: '0.78rem', fontWeight: 600 }}>{t.documents.open}</a>
                 <button onClick={() => setPreviewUrl(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: '1.25rem' }}>×</button>
               </div>
             </div>

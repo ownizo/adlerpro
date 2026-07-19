@@ -23,6 +23,8 @@ import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OneIndexRouteImport } from './routes/one/index'
+import { Route as OneTermsRouteImport } from './routes/one/terms'
+import { Route as OneResetPasswordRouteImport } from './routes/one/reset-password'
 import { Route as OneProfileRouteImport } from './routes/one/profile'
 import { Route as OnePoliciesRouteImport } from './routes/one/policies'
 import { Route as OneLoginRouteImport } from './routes/one/login'
@@ -100,6 +102,16 @@ const OneIndexRoute = OneIndexRouteImport.update({
   path: '/one/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OneTermsRoute = OneTermsRouteImport.update({
+  id: '/one/terms',
+  path: '/one/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OneResetPasswordRoute = OneResetPasswordRouteImport.update({
+  id: '/one/reset-password',
+  path: '/one/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OneProfileRoute = OneProfileRouteImport.update({
   id: '/one/profile',
   path: '/one/profile',
@@ -151,6 +163,8 @@ export interface FileRoutesByFullPath {
   '/one/login': typeof OneLoginRoute
   '/one/policies': typeof OnePoliciesRoute
   '/one/profile': typeof OneProfileRoute
+  '/one/reset-password': typeof OneResetPasswordRoute
+  '/one/terms': typeof OneTermsRoute
   '/one/': typeof OneIndexRoute
 }
 export interface FileRoutesByTo {
@@ -173,6 +187,8 @@ export interface FileRoutesByTo {
   '/one/login': typeof OneLoginRoute
   '/one/policies': typeof OnePoliciesRoute
   '/one/profile': typeof OneProfileRoute
+  '/one/reset-password': typeof OneResetPasswordRoute
+  '/one/terms': typeof OneTermsRoute
   '/one': typeof OneIndexRoute
 }
 export interface FileRoutesById {
@@ -196,6 +212,8 @@ export interface FileRoutesById {
   '/one/login': typeof OneLoginRoute
   '/one/policies': typeof OnePoliciesRoute
   '/one/profile': typeof OneProfileRoute
+  '/one/reset-password': typeof OneResetPasswordRoute
+  '/one/terms': typeof OneTermsRoute
   '/one/': typeof OneIndexRoute
 }
 export interface FileRouteTypes {
@@ -220,6 +238,8 @@ export interface FileRouteTypes {
     | '/one/login'
     | '/one/policies'
     | '/one/profile'
+    | '/one/reset-password'
+    | '/one/terms'
     | '/one/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -242,6 +262,8 @@ export interface FileRouteTypes {
     | '/one/login'
     | '/one/policies'
     | '/one/profile'
+    | '/one/reset-password'
+    | '/one/terms'
     | '/one'
   id:
     | '__root__'
@@ -264,6 +286,8 @@ export interface FileRouteTypes {
     | '/one/login'
     | '/one/policies'
     | '/one/profile'
+    | '/one/reset-password'
+    | '/one/terms'
     | '/one/'
   fileRoutesById: FileRoutesById
 }
@@ -287,6 +311,8 @@ export interface RootRouteChildren {
   OneLoginRoute: typeof OneLoginRoute
   OnePoliciesRoute: typeof OnePoliciesRoute
   OneProfileRoute: typeof OneProfileRoute
+  OneResetPasswordRoute: typeof OneResetPasswordRoute
+  OneTermsRoute: typeof OneTermsRoute
   OneIndexRoute: typeof OneIndexRoute
 }
 
@@ -390,6 +416,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OneIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/one/terms': {
+      id: '/one/terms'
+      path: '/one/terms'
+      fullPath: '/one/terms'
+      preLoaderRoute: typeof OneTermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/one/reset-password': {
+      id: '/one/reset-password'
+      path: '/one/reset-password'
+      fullPath: '/one/reset-password'
+      preLoaderRoute: typeof OneResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/one/profile': {
       id: '/one/profile'
       path: '/one/profile'
@@ -455,6 +495,8 @@ const rootRouteChildren: RootRouteChildren = {
   OneLoginRoute: OneLoginRoute,
   OnePoliciesRoute: OnePoliciesRoute,
   OneProfileRoute: OneProfileRoute,
+  OneResetPasswordRoute: OneResetPasswordRoute,
+  OneTermsRoute: OneTermsRoute,
   OneIndexRoute: OneIndexRoute,
 }
 export const routeTree = rootRouteImport

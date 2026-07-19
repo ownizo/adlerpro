@@ -2,11 +2,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
 import { OneLayout } from './__root'
+import { oneT, oneBrand, fmtCurrency, fmtDate, typeLabel } from '@/lib/one-brand'
 
 export const Route = createFileRoute('/one/dashboard')({
   component: OneDashboard,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros' }] }),
+  head: () => ({ meta: [{ title: oneBrand().docTitle }] }),
 })
 
 const navy = '#0A1628'
@@ -42,40 +43,16 @@ function daysUntil(dateStr: string): number {
   return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-function formatCurrency(n: number): string {
-  return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(n)
-}
-
-function formatDate(s: string): string {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-const TYPE_LABELS: Record<string, string> = {
-  property:              'Propriedade',
-  liability:             'Responsabilidade Civil',
-  workers_comp:          'Acidentes de Trabalho',
-  auto:                  'Automóvel',
-  health:                'Saúde',
-  cyber:                 'Ciber-Risco',
-  directors_officers:    'D&O',
-  business_interruption: 'Interrupção de Negócio',
-  // Fallback for Portuguese names imported from vault
-  'Automovel':                    'Automóvel',
-  'Multirriscos Habitacao':       'Multirriscos Habitação',
-  'MR Empresas':                  'MR Empresas',
-  'Responsabilidade Civil':       'Responsabilidade Civil',
-}
-
-const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  ativa:      { bg: '#EAF3DE', color: '#3B6D11', label: 'Ativa'      },
-  active:     { bg: '#EAF3DE', color: '#3B6D11', label: 'Ativa'      },
-  expiring:   { bg: '#FAEEDA', color: '#854F0B', label: 'A Renovar'  },
-  expired:    { bg: '#FEE2E2', color: '#991B1B', label: 'Expirada'   },
-  cancelled:  { bg: '#F3F4F6', color: '#6B7280', label: 'Cancelada'  },
+const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+  ativa:      { bg: '#EAF3DE', color: '#3B6D11' },
+  active:     { bg: '#EAF3DE', color: '#3B6D11' },
+  expiring:   { bg: '#FAEEDA', color: '#854F0B' },
+  expired:    { bg: '#FEE2E2', color: '#991B1B' },
+  cancelled:  { bg: '#F3F4F6', color: '#6B7280' },
 }
 
 function OneDashboard() {
+  const t = oneT()
   const [client,   setClient]   = useState<IndividualClient | null>(null)
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -138,7 +115,7 @@ function OneDashboard() {
         setPolicies(policyData ?? [])
       }
     } catch (e: any) {
-      setError('Erro ao carregar dados. Tente novamente.')
+      setError(t.dashboard.loadError)
       console.error(e)
     } finally {
       setLoading(false)
@@ -165,31 +142,31 @@ function OneDashboard() {
           {/* Welcome header */}
           <div style={{ marginBottom: '1.75rem' }}>
             <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>
-              Olá{client?.full_name ? `, ${client.full_name.split(' ')[0]}` : ''}
+              {t.dashboard.greeting}{client?.full_name ? `, ${client.full_name.split(' ')[0]}` : ''}
             </h1>
             <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem', fontWeight: 400 }}>
-              Aqui está um resumo das suas apólices de seguro.
+              {t.dashboard.summary}
             </p>
           </div>
 
           {/* KPI cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
             <KPICard
-              label="Apólices Ativas"
+              label={t.dashboard.kpiActive}
               value={String(activePolicies.length)}
               icon="📋"
               accent="#3B82F6"
             />
             <KPICard
-              label="Prémio Anual Total"
-              value={totalPremium > 0 ? formatCurrency(totalPremium) : '—'}
+              label={t.dashboard.kpiPremium}
+              value={totalPremium > 0 ? fmtCurrency(totalPremium) : '—'}
               icon="💶"
               accent="#22C55E"
             />
             <KPICard
-              label="Próxima Renovação"
+              label={t.dashboard.kpiRenewal}
               value={nextRenewal ? `${daysUntil(nextRenewal.end_date)}d` : '—'}
-              sublabel={nextRenewal ? formatDate(nextRenewal.end_date) : undefined}
+              sublabel={nextRenewal ? fmtDate(nextRenewal.end_date) : undefined}
               icon="⏰"
               accent={nextRenewal && daysUntil(nextRenewal.end_date) <= 30 ? '#EF4444' : '#F59E0B'}
               highlight={!!nextRenewal && daysUntil(nextRenewal.end_date) <= 30}
@@ -199,7 +176,7 @@ function OneDashboard() {
           {/* No client record warning */}
           {!client && (
             <div style={{ padding: '1.5rem', background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: 6, marginBottom: '1.5rem', fontSize: '0.85rem', color: '#92400E' }}>
-              <strong>Conta sem apólices associadas.</strong> Se já tem apólices geridas pela Adler Rochefort, contacte-nos para ligar a sua conta ao seu perfil.
+              <strong>{t.dashboard.noClientTitle}</strong>{t.dashboard.noClientBody}
             </div>
           )}
 
@@ -207,12 +184,12 @@ function OneDashboard() {
           {client && (
             <div>
               <h2 style={{ fontSize: '0.95rem', fontWeight: 700, color: navy, marginBottom: '0.85rem', letterSpacing: '0.02em' }}>
-                As Suas Apólices {activePolicies.length > 0 && <span style={{ color: '#94A3B8', fontWeight: 400 }}>({policies.length})</span>}
+                {t.dashboard.yourPolicies} {activePolicies.length > 0 && <span style={{ color: '#94A3B8', fontWeight: 400 }}>({policies.length})</span>}
               </h2>
 
               {policies.length === 0 ? (
                 <div style={{ padding: '2.5rem', textAlign: 'center', background: '#fff', borderRadius: 8, border: '1px solid #E2E8F0', color: '#94A3B8', fontSize: '0.85rem' }}>
-                  Sem apólices registadas.
+                  {t.dashboard.noneRegistered}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -253,9 +230,11 @@ function KPICard({ label, value, sublabel, icon, accent, highlight }: {
 }
 
 function PolicyCard({ policy }: { policy: Policy }) {
+  const t = oneT()
   const [expanded, setExpanded] = useState(false)
-  const st = STATUS_STYLE[policy.status] ?? { bg: '#F3F4F6', color: '#6B7280', label: policy.status }
-  const typeLabel = TYPE_LABELS[policy.type] ?? policy.type
+  const st = STATUS_STYLE[policy.status] ?? { bg: '#F3F4F6', color: '#6B7280' }
+  const stLabel = t.policyStatus[policy.status as keyof typeof t.policyStatus] ?? policy.status
+  const label = typeLabel(policy.type)
   const days = policy.end_date ? daysUntil(policy.end_date) : null
   const urgency = days !== null && days <= 14 ? '#EF4444' : days !== null && days <= 30 ? '#F59E0B' : gold
 
@@ -268,10 +247,10 @@ function PolicyCard({ policy }: { policy: Policy }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.88rem', fontWeight: 700, color: navy, fontFamily: "'Montserrat', sans-serif" }}>
-              {typeLabel}
+              {label}
             </span>
             <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.55rem', borderRadius: 20, background: st.bg, color: st.color }}>
-              {st.label}
+              {stLabel}
             </span>
           </div>
           <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '0.2rem 0 0', fontFamily: "'Montserrat', sans-serif" }}>
@@ -281,13 +260,13 @@ function PolicyCard({ policy }: { policy: Policy }) {
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           {policy.annual_premium > 0 && (
             <p style={{ fontSize: '0.9rem', fontWeight: 700, color: navy, margin: 0, fontFamily: "'Montserrat', sans-serif" }}>
-              {formatCurrency(policy.annual_premium)}
-              <span style={{ fontSize: '0.65rem', fontWeight: 400, color: '#94A3B8' }}>/ano</span>
+              {fmtCurrency(policy.annual_premium)}
+              <span style={{ fontSize: '0.65rem', fontWeight: 400, color: '#94A3B8' }}>{t.dashboard.perYear}</span>
             </p>
           )}
           {days !== null && (
             <p style={{ fontSize: '0.7rem', color: urgency, fontWeight: 600, margin: '0.1rem 0 0', fontFamily: "'Montserrat', sans-serif" }}>
-              {days > 0 ? `Renova em ${days}d` : days === 0 ? 'Renova hoje' : 'Expirada'}
+              {days > 0 ? t.dashboard.renewsIn(days) : days === 0 ? t.dashboard.renewsToday : t.dashboard.expired}
             </p>
           )}
         </div>
@@ -295,11 +274,11 @@ function PolicyCard({ policy }: { policy: Policy }) {
 
       {expanded && (
         <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem' }}>
-          {policy.start_date     && <DetailItem label="Início"       value={formatDate(policy.start_date)} />}
-          {policy.end_date       && <DetailItem label="Fim"          value={formatDate(policy.end_date)} />}
-          {policy.renewal_date   && <DetailItem label="Renovação"    value={formatDate(policy.renewal_date)} />}
-          {policy.payment_frequency && <DetailItem label="Pagamento" value={policy.payment_frequency} />}
-          {policy.description    && <DetailItem label="Descrição"    value={policy.description} span />}
+          {policy.start_date     && <DetailItem label={t.detail.start}       value={fmtDate(policy.start_date)} />}
+          {policy.end_date       && <DetailItem label={t.detail.end}          value={fmtDate(policy.end_date)} />}
+          {policy.renewal_date   && <DetailItem label={t.detail.renewal}    value={fmtDate(policy.renewal_date)} />}
+          {policy.payment_frequency && <DetailItem label={t.detail.payment} value={policy.payment_frequency} />}
+          {policy.description    && <DetailItem label={t.detail.description}    value={policy.description} span />}
         </div>
       )}
     </div>
