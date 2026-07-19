@@ -1,5 +1,6 @@
 import { createFileRoute, redirect, Link } from '@tanstack/react-router'
 import { getServerHostname } from '@/lib/auth'
+import { isMyCoverVault } from '@/lib/one-brand'
 import { useIdentity } from '@/lib/identity-context'
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -10,6 +11,11 @@ export const Route = createFileRoute('/')({
     const hostname = typeof window !== 'undefined'
       ? window.location.hostname
       : await getServerHostname()
+
+    // My Cover Vault has no landing page — its root IS the client login screen.
+    if (isMyCoverVault() || /mycovervault\.com$/i.test(hostname ?? '')) {
+      throw redirect({ to: '/one/login' })
+    }
 
     if (hostname === 'admin.adlerrochefort.com') {
       throw redirect({ to: '/login' })

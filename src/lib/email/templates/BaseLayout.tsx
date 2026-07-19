@@ -11,6 +11,7 @@ import {
   Hr,
 } from 'react-email'
 import type { ReactNode } from 'react'
+import { EMAIL_BRAND_PT, type EmailBrand } from '../brand'
 
 // Brand tokens — fontes web (Montserrat) não são fiáveis em clientes de email;
 // Arial/Helvetica garante fidelidade universal.
@@ -21,9 +22,11 @@ const FONT = 'Arial, Helvetica, sans-serif'
 interface BaseLayoutProps {
   preview: string
   children: ReactNode
+  /** Defaults to the Portuguese "Os Meus Seguros" brand (unchanged output). */
+  brand?: EmailBrand
 }
 
-export function BaseLayout({ preview, children }: BaseLayoutProps) {
+export function BaseLayout({ preview, children, brand = EMAIL_BRAND_PT }: BaseLayoutProps) {
   return (
     <Html lang="pt">
       <Head />
@@ -84,7 +87,7 @@ export function BaseLayout({ preview, children }: BaseLayoutProps) {
                     fontFamily: FONT,
                   }}
                 >
-                  Os Meus Seguros
+                  {brand.name}
                 </Text>
                 <Text
                   style={{
@@ -97,7 +100,7 @@ export function BaseLayout({ preview, children }: BaseLayoutProps) {
                     fontFamily: FONT,
                   }}
                 >
-                  by Adler &amp; Rochefort
+                  {brand.tagline}
                 </Text>
                 <Text
                   style={{
@@ -111,7 +114,7 @@ export function BaseLayout({ preview, children }: BaseLayoutProps) {
                     fontFamily: FONT,
                   }}
                 >
-                  Gestão de Seguros
+                  {brand.kicker}
                 </Text>
               </Column>
             </Row>
@@ -135,9 +138,8 @@ export function BaseLayout({ preview, children }: BaseLayoutProps) {
               }}
             >
               <strong style={{ color: '#666666' }}>
-                Adler &amp; Rochefort
-              </strong>{' '}
-              · Mediadores de Seguros
+                {brand.footerName}
+              </strong>
             </Text>
             <Text
               style={{
@@ -148,8 +150,7 @@ export function BaseLayout({ preview, children }: BaseLayoutProps) {
                 fontFamily: FONT,
               }}
             >
-              Este email foi enviado automaticamente pelo sistema Os Meus Seguros. Para
-              deixar de receber estas notificações, contacte o seu mediador.
+              {brand.footerNote}
             </Text>
           </Section>
         </Container>

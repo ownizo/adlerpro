@@ -1,6 +1,7 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
 import { IdentityProvider } from '../lib/identity-context'
 import { CallbackHandler } from '../components/CallbackHandler'
+import { isMyCoverVault } from '../lib/one-brand'
 import '../styles.css'
 // Initialise i18n before any component renders
 import '../lib/i18n'
@@ -15,19 +16,25 @@ const THEME_BOOTSTRAP = `(function(){try{var r=document.documentElement;var s=fu
 const SW_REGISTER = `(function(){if('serviceWorker'in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}})();`
 
 export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: 'utf-8' },
-      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: 'Os Meus Seguros' },
-      { name: 'description', content: 'Portal seguro para clientes de corretagem de seguros empresariais' },
-      { name: 'theme-color', content: '#0A1628' },
-      { name: 'mobile-web-app-capable', content: 'yes' },
-      { name: 'apple-mobile-web-app-capable', content: 'yes' },
-      { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
-      { name: 'apple-mobile-web-app-title', content: 'Os Meus Seguros' },
-    ],
-    links: [
+  head: () => {
+    const mcv = isMyCoverVault()
+    const title = mcv ? 'My Cover Vault' : 'Os Meus Seguros'
+    const description = mcv
+      ? 'Secure client portal for Adler & Rochefort insurance clients.'
+      : 'Portal seguro para clientes de corretagem de seguros empresariais'
+    return {
+      meta: [
+        { charSet: 'utf-8' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { title },
+        { name: 'description', content: description },
+        { name: 'theme-color', content: '#0A1628' },
+        { name: 'mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-capable', content: 'yes' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+        { name: 'apple-mobile-web-app-title', content: title },
+      ],
+      links: [
       { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
       { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon.png' },
       { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/favicon-192.png' },
@@ -52,14 +59,15 @@ export const Route = createRootRoute({
         href: 'https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700&display=swap',
       },
     ],
-  }),
+    }
+  },
   component: RootComponent,
   shellComponent: RootDocument,
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-PT">
+    <html lang={isMyCoverVault() ? 'en-GB' : 'pt-PT'}>
       <head>
         {/* Apply the saved UI theme before first paint to avoid a flash. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />

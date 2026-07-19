@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import { OneLayout } from './__root'
 import { fetchClaimWorkspace, addClaimMessage, registerClaimDocument, getClaimDocumentUrl, fetchIndividualClaims, submitIndividualClaim, getStorageUploadUrl } from '@/lib/server-fns'
 import type { ClaimOperationalData } from '@/lib/types'
+import { oneT, oneBrand, fmtCurrency, fmtDate, fmtDateTime, typeLabel } from '@/lib/one-brand'
 
 export const Route = createFileRoute('/one/claims')({
   component: OneClaims,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros' }] }),
+  head: () => ({ meta: [{ title: oneBrand().docTitle }] }),
 })
 
 const navy = '#0A1628'
@@ -31,46 +32,18 @@ interface Claim {
   status: string
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  property:              'Propriedade',
-  liability:             'Responsabilidade Civil',
-  workers_comp:          'Acidentes de Trabalho',
-  auto:                  'Automóvel',
-  health:                'Saúde',
-  cyber:                 'Ciber-Risco',
-  directors_officers:    'D&O',
-  business_interruption: 'Interrupção de Negócio',
-  'Automovel':              'Automóvel',
-  'Multirriscos Habitacao': 'Multirriscos Habitação',
-  'MR Empresas':            'MR Empresas',
-  'Responsabilidade Civil': 'Responsabilidade Civil',
-}
-
-const CLAIM_STATUS: Record<string, { bg: string; color: string; label: string }> = {
-  submitted:    { bg: '#EFF6FF', color: '#1D4ED8', label: 'Submetido'     },
-  under_review: { bg: '#FEF3C7', color: '#92400E', label: 'Em Análise'    },
-  documentation:{ bg: '#F3E8FF', color: '#6D28D9', label: 'Documentação'  },
-  assessment:   { bg: '#FEF3C7', color: '#92400E', label: 'Avaliação'     },
-  approved:     { bg: '#EAF3DE', color: '#3B6D11', label: 'Aprovado'      },
-  denied:       { bg: '#FEE2E2', color: '#991B1B', label: 'Recusado'      },
-  paid:         { bg: '#D1FAE5', color: '#065F46', label: 'Pago'          },
-}
-
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(n)
-}
-
-function formatDate(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
-function formatDateTime(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+const CLAIM_STATUS: Record<string, { bg: string; color: string }> = {
+  submitted:    { bg: '#EFF6FF', color: '#1D4ED8' },
+  under_review: { bg: '#FEF3C7', color: '#92400E' },
+  documentation:{ bg: '#F3E8FF', color: '#6D28D9' },
+  assessment:   { bg: '#FEF3C7', color: '#92400E' },
+  approved:     { bg: '#EAF3DE', color: '#3B6D11' },
+  denied:       { bg: '#FEE2E2', color: '#991B1B' },
+  paid:         { bg: '#D1FAE5', color: '#065F46' },
 }
 
 function OneClaims() {
+  const t = oneT()
   const [clientId,   setClientId]   = useState<string | null>(null)
   const [policies,   setPolicies]   = useState<Policy[]>([])
   const [claims,     setClaims]     = useState<Claim[]>([])
@@ -120,7 +93,7 @@ function OneClaims() {
         setClaims((cData as Claim[]) ?? [])
       }
     } catch (e: any) {
-      setError('Erro ao carregar sinistros.')
+      setError(t.claims.loadError)
       console.error(e)
     } finally {
       setLoading(false)
@@ -131,7 +104,7 @@ function OneClaims() {
     e.preventDefault()
     if (!clientId) return
     setFormError('')
-    if (!form.policyId) { setFormError('Selecione uma apólice associada.'); return }
+    if (!form.policyId) { setFormError(t.claims.selectPolicyError); return }
     setSubmitting(true)
     try {
       await submitIndividualClaim({
@@ -147,7 +120,7 @@ function OneClaims() {
       setShowForm(false)
       await loadData()
     } catch (e: any) {
-      setFormError('Erro ao submeter sinistro. Tente novamente.')
+      setFormError(t.claims.submitError)
       console.error(e)
     } finally {
       setSubmitting(false)
@@ -166,9 +139,9 @@ function OneClaims() {
         <>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '1rem', marginBottom: '1.75rem', flexWrap: 'wrap' }}>
             <div>
-              <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>Sinistros</h1>
+              <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>{t.claims.title}</h1>
               <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>
-                {claims.length} sinistro{claims.length !== 1 ? 's' : ''} registado{claims.length !== 1 ? 's' : ''}
+                {t.claims.count(claims.length)}
               </p>
             </div>
             {clientId && (
@@ -176,40 +149,40 @@ function OneClaims() {
                 onClick={() => setShowForm(s => !s)}
                 style={{ padding: '0.6rem 1.2rem', background: showForm ? '#E2E8F0' : gold, color: showForm ? '#475569' : navy, fontWeight: 700, fontSize: '0.82rem', border: 'none', borderRadius: 6, cursor: 'pointer', letterSpacing: '0.02em' }}
               >
-                {showForm ? 'Cancelar' : 'Novo Sinistro'}
+                {showForm ? t.claims.cancel : t.claims.newClaim}
               </button>
             )}
           </div>
 
           {showForm && (
             <div style={{ background: '#fff', border: '1px solid #E2E8F0', borderRadius: 8, padding: '1.5rem', marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: navy, marginTop: 0, marginBottom: '1.25rem' }}>Novo Sinistro</h2>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, color: navy, marginTop: 0, marginBottom: '1.25rem' }}>{t.claims.formTitle}</h2>
               <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <FieldLabel>Apólice Associada *</FieldLabel>
+                  <FieldLabel>{t.claims.fieldPolicy}</FieldLabel>
                   <select value={form.policyId} onChange={e => update('policyId', e.target.value)} required style={selectStyle}>
-                    <option value="">Selecionar apólice</option>
+                    <option value="">{t.claims.selectPolicy}</option>
                     {policies.map(p => (
                       <option key={p.id} value={p.id}>
-                        {TYPE_LABELS[p.type] ?? p.type} · {p.insurer}{p.policy_number ? ` · ${p.policy_number}` : ''}
+                        {typeLabel(p.type)} · {p.insurer}{p.policy_number ? ` · ${p.policy_number}` : ''}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <FieldLabel>Título *</FieldLabel>
-                  <input value={form.title} onChange={e => update('title', e.target.value)} required placeholder="Resumo do sinistro" style={inputStyle} />
+                  <FieldLabel>{t.claims.fieldTitle}</FieldLabel>
+                  <input value={form.title} onChange={e => update('title', e.target.value)} required placeholder={t.claims.titlePlaceholder} style={inputStyle} />
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <FieldLabel>Descrição *</FieldLabel>
-                  <textarea value={form.description} onChange={e => update('description', e.target.value)} required rows={3} placeholder="Descrição detalhada do ocorrido" style={{ ...inputStyle, resize: 'vertical' }} />
+                  <FieldLabel>{t.claims.fieldDescription}</FieldLabel>
+                  <textarea value={form.description} onChange={e => update('description', e.target.value)} required rows={3} placeholder={t.claims.descriptionPlaceholder} style={{ ...inputStyle, resize: 'vertical' }} />
                 </div>
                 <div>
-                  <FieldLabel>Data do Incidente *</FieldLabel>
+                  <FieldLabel>{t.claims.fieldIncidentDate}</FieldLabel>
                   <input type="date" value={form.incidentDate} onChange={e => update('incidentDate', e.target.value)} required style={inputStyle} />
                 </div>
                 <div>
-                  <FieldLabel>Valor Estimado (EUR)</FieldLabel>
+                  <FieldLabel>{t.claims.fieldEstimated}</FieldLabel>
                   <input type="number" min="0" step="0.01" value={form.estimatedValue} onChange={e => update('estimatedValue', e.target.value)} placeholder="0.00" style={inputStyle} />
                 </div>
                 {formError && (
@@ -219,7 +192,7 @@ function OneClaims() {
                 )}
                 <div style={{ gridColumn: '1 / -1' }}>
                   <button type="submit" disabled={submitting} style={{ padding: '0.65rem 1.5rem', background: submitting ? '#e5c97a' : gold, color: navy, fontWeight: 700, fontSize: '0.83rem', border: 'none', borderRadius: 4, cursor: submitting ? 'not-allowed' : 'pointer' }}>
-                    {submitting ? 'A submeter...' : 'Submeter Sinistro'}
+                    {submitting ? t.claims.submitting : t.claims.submit}
                   </button>
                 </div>
               </form>
@@ -227,7 +200,7 @@ function OneClaims() {
           )}
 
           {claims.length === 0 ? (
-            <EmptyState msg="Sem sinistros registados." />
+            <EmptyState msg={t.claims.none} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {claims.map(c => <ClaimCard key={c.id} claim={c} />)}
@@ -240,13 +213,15 @@ function OneClaims() {
 }
 
 function ClaimCard({ claim }: { claim: Claim }) {
+  const t = oneT()
   const [expanded, setExpanded] = useState(false)
   const [ops, setOps] = useState<ClaimOperationalData | null>(null)
   const [loadingOps, setLoadingOps] = useState(false)
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const st = CLAIM_STATUS[claim.status] ?? { bg: '#F3F4F6', color: '#6B7280', label: claim.status }
+  const st = CLAIM_STATUS[claim.status] ?? { bg: '#F3F4F6', color: '#6B7280' }
+  const stLabel = t.claimStatus[claim.status as keyof typeof t.claimStatus] ?? claim.status
 
   async function loadOps() {
     setLoadingOps(true)
@@ -274,20 +249,20 @@ function ClaimCard({ claim }: { claim: Claim }) {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.88rem', fontWeight: 700, color: navy }}>{claim.title}</span>
-            <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.55rem', borderRadius: 20, background: st.bg, color: st.color }}>{st.label}</span>
+            <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.55rem', borderRadius: 20, background: st.bg, color: st.color }}>{stLabel}</span>
           </div>
           <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '0.2rem 0 0' }}>
-            Incidente: {formatDate(claim.incident_date)}
+            {t.claims.incident}: {fmtDate(claim.incident_date)}
           </p>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           {claim.estimated_value > 0 && (
             <p style={{ fontSize: '0.9rem', fontWeight: 700, color: navy, margin: 0 }}>
-              {formatCurrency(claim.estimated_value)}
+              {fmtCurrency(claim.estimated_value)}
             </p>
           )}
           <p style={{ fontSize: '0.7rem', color: '#94A3B8', margin: '0.1rem 0 0' }}>
-            Submetido: {formatDate(claim.claim_date)}
+            {t.claims.submitted}: {fmtDate(claim.claim_date)}
           </p>
         </div>
       </button>
@@ -296,19 +271,19 @@ function ClaimCard({ claim }: { claim: Claim }) {
         <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC', display: 'grid', gap: '0.9rem' }}>
           {claim.description && (
             <div>
-              <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.25rem' }}>Descrição</p>
+              <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.25rem' }}>{t.claims.description}</p>
               <p style={{ fontSize: '0.82rem', color: navy, margin: 0, lineHeight: 1.5 }}>{claim.description}</p>
             </div>
           )}
 
           <div>
-            <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>Documentos</p>
+            <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>{t.claims.documents}</p>
             {loadingOps ? (
-              <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: 0 }}>A carregar...</p>
+              <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: 0 }}>{t.claims.loading}</p>
             ) : (
               <>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem 0.75rem', background: navy, color: '#fff', borderRadius: 6, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', marginBottom: '0.6rem' }}>
-                  {uploading ? 'A carregar...' : 'Adicionar ficheiro'}
+                  {uploading ? t.claims.uploadingFile : t.claims.addFile}
                   <input
                     type="file"
                     style={{ display: 'none' }}
@@ -346,7 +321,7 @@ function ClaimCard({ claim }: { claim: Claim }) {
                       <div key={doc.id} style={{ padding: '0.55rem 0.65rem', border: '1px solid #E2E8F0', borderRadius: 6, display: 'flex', justifyContent: 'space-between', gap: '0.8rem', alignItems: 'center' }}>
                         <div>
                           <p style={{ fontSize: '0.78rem', color: navy, margin: 0, fontWeight: 600 }}>{doc.name}</p>
-                          <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '0.1rem 0 0' }}>{formatDateTime(doc.uploadedAt)} · {doc.uploadedByName}</p>
+                          <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '0.1rem 0 0' }}>{fmtDateTime(doc.uploadedAt)} · {doc.uploadedByName}</p>
                         </div>
                         <button
                           onClick={async () => {
@@ -358,20 +333,20 @@ function ClaimCard({ claim }: { claim: Claim }) {
                           }}
                           style={{ border: '1px solid #CBD5E1', background: '#fff', color: '#334155', borderRadius: 4, padding: '0.3rem 0.6rem', fontSize: '0.72rem', cursor: 'pointer' }}
                         >
-                          Download
+                          {t.claims.download}
                         </button>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: 0 }}>Sem documentos neste sinistro.</p>
+                  <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: 0 }}>{t.claims.noDocs}</p>
                 )}
               </>
             )}
           </div>
 
           <div>
-            <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>Mensagens</p>
+            <p style={{ fontSize: '0.62rem', fontWeight: 600, color: '#94A3B8', letterSpacing: '0.06em', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>{t.claims.messages}</p>
             {ops?.messages?.length ? (
               <div style={{ display: 'grid', gap: '0.45rem', marginBottom: '0.65rem', maxHeight: 220, overflowY: 'auto' }}>
                 {ops.messages.map((item) => (
@@ -385,18 +360,18 @@ function ClaimCard({ claim }: { claim: Claim }) {
                     }}
                   >
                     <p style={{ fontSize: '0.78rem', color: navy, margin: 0 }}>{item.body}</p>
-                    <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '0.18rem 0 0' }}>{item.senderName} · {formatDateTime(item.createdAt)}</p>
+                    <p style={{ fontSize: '0.68rem', color: '#94A3B8', margin: '0.18rem 0 0' }}>{item.senderName} · {fmtDateTime(item.createdAt)}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '0 0 0.65rem' }}>Ainda sem mensagens.</p>
+              <p style={{ fontSize: '0.78rem', color: '#94A3B8', margin: '0 0 0.65rem' }}>{t.claims.noMessages}</p>
             )}
             <div style={{ display: 'flex', gap: '0.45rem' }}>
               <input
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Escreva a sua resposta..."
+                placeholder={t.claims.replyPlaceholder}
                 style={{ ...inputStyle, flex: 1, padding: '0.5rem 0.65rem', fontSize: '0.78rem' }}
               />
               <button
@@ -414,7 +389,7 @@ function ClaimCard({ claim }: { claim: Claim }) {
                 disabled={sending}
                 style={{ padding: '0.5rem 0.8rem', border: 'none', background: gold, color: navy, borderRadius: 4, fontSize: '0.74rem', fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer' }}
               >
-                {sending ? '...' : 'Enviar'}
+                {sending ? '...' : t.claims.send}
               </button>
             </div>
           </div>

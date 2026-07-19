@@ -2,11 +2,12 @@ import { createFileRoute } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect, useRef } from 'react'
 import { OneLayout } from './__root'
+import { oneT, oneBrand, fmtCurrency, fmtDate, typeLabel } from '@/lib/one-brand'
 
 export const Route = createFileRoute('/one/policies')({
   component: OnePolicies,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros' }] }),
+  head: () => ({ meta: [{ title: oneBrand().docTitle }] }),
 })
 
 const navy = '#0A1628'
@@ -46,27 +47,12 @@ function formatDocSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
-const TYPE_LABELS: Record<string, string> = {
-  property:              'Propriedade',
-  liability:             'Responsabilidade Civil',
-  workers_comp:          'Acidentes de Trabalho',
-  auto:                  'Automóvel',
-  health:                'Saúde',
-  cyber:                 'Ciber-Risco',
-  directors_officers:    'D&O',
-  business_interruption: 'Interrupção de Negócio',
-  'Automovel':                 'Automóvel',
-  'Multirriscos Habitacao':    'Multirriscos Habitação',
-  'MR Empresas':               'MR Empresas',
-  'Responsabilidade Civil':    'Responsabilidade Civil',
-}
-
-const STATUS_STYLE: Record<string, { bg: string; color: string; label: string }> = {
-  ativa:     { bg: '#EAF3DE', color: '#3B6D11', label: 'Ativa'     },
-  active:    { bg: '#EAF3DE', color: '#3B6D11', label: 'Ativa'     },
-  expiring:  { bg: '#FAEEDA', color: '#854F0B', label: 'A Renovar' },
-  expired:   { bg: '#FEE2E2', color: '#991B1B', label: 'Expirada'  },
-  cancelled: { bg: '#F3F4F6', color: '#6B7280', label: 'Cancelada' },
+const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
+  ativa:     { bg: '#EAF3DE', color: '#3B6D11' },
+  active:    { bg: '#EAF3DE', color: '#3B6D11' },
+  expiring:  { bg: '#FAEEDA', color: '#854F0B' },
+  expired:   { bg: '#FEE2E2', color: '#991B1B' },
+  cancelled: { bg: '#F3F4F6', color: '#6B7280' },
 }
 
 function daysUntil(dateStr: string): number {
@@ -75,16 +61,8 @@ function daysUntil(dateStr: string): number {
   return Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 }
 
-function formatCurrency(n: number) {
-  return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(n)
-}
-
-function formatDate(s: string) {
-  if (!s) return '—'
-  return new Date(s).toLocaleDateString('pt-PT', { day: '2-digit', month: 'short', year: 'numeric' })
-}
-
 function OnePolicies() {
+  const t = oneT()
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState('')
@@ -125,7 +103,7 @@ function OnePolicies() {
         setPolicies(data ?? [])
       }
     } catch (e: any) {
-      setError('Erro ao carregar apólices.')
+      setError(t.policies.loadError)
       console.error(e)
     } finally {
       setLoading(false)
@@ -141,14 +119,14 @@ function OnePolicies() {
       ) : (
         <>
           <div style={{ marginBottom: '1.75rem' }}>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>As Suas Apólices</h1>
+            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>{t.policies.title}</h1>
             <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>
-              {policies.length} apólice{policies.length !== 1 ? 's' : ''} registada{policies.length !== 1 ? 's' : ''}
+              {t.policies.count(policies.length)}
             </p>
           </div>
 
           {policies.length === 0 ? (
-            <EmptyState msg="Sem apólices registadas." />
+            <EmptyState msg={t.policies.none} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {policies.map(p => <PolicyCard key={p.id} policy={p} />)}
@@ -161,6 +139,7 @@ function OnePolicies() {
 }
 
 function PolicyCard({ policy }: { policy: Policy }) {
+  const t = oneT()
   const [expanded,    setExpanded]    = useState(false)
   const [docs,        setDocs]        = useState<PolicyDoc[]>([])
   const [docsLoaded,  setDocsLoaded]  = useState(false)
@@ -171,8 +150,9 @@ function PolicyCard({ policy }: { policy: Policy }) {
   const [previewName, setPreviewName] = useState('')
   const docFileRef = useRef<HTMLInputElement>(null)
 
-  const st = STATUS_STYLE[policy.status] ?? { bg: '#F3F4F6', color: '#6B7280', label: policy.status }
-  const typeLabel = TYPE_LABELS[policy.type] ?? policy.type
+  const st = STATUS_STYLE[policy.status] ?? { bg: '#F3F4F6', color: '#6B7280' }
+  const stLabel = t.policyStatus[policy.status as keyof typeof t.policyStatus] ?? policy.status
+  const label = typeLabel(policy.type)
   const days = policy.end_date ? daysUntil(policy.end_date) : null
   const urgency = days !== null && days <= 14 ? '#EF4444' : days !== null && days <= 30 ? '#F59E0B' : gold
 
@@ -214,19 +194,19 @@ function PolicyCard({ policy }: { policy: Policy }) {
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: doc.storagePath }),
       })
-      if (!res.ok) throw new Error('Erro ao obter URL')
+      if (!res.ok) throw new Error('signed url error')
       const { url } = await res.json()
       setPreviewName(doc.name)
       setPreviewUrl(url)
     } catch (e: any) {
-      alert('Erro ao abrir: ' + e.message)
+      alert(t.documents.openError + e.message)
     }
   }
 
   async function handleDocUpload(files: FileList | null) {
     if (!files || !files.length) return
     setUploading(true)
-    setUploadMsg('A carregar…')
+    setUploadMsg(t.policies.uploading)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
@@ -249,7 +229,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
     if (docFileRef.current) docFileRef.current.value = ''
     setUploading(false)
     setDocsLoaded(false)
-    setUploadMsg('Carregado!')
+    setUploadMsg(t.policies.uploaded)
     setTimeout(() => { setUploadMsg(''); loadDocs() }, 800)
   }
 
@@ -262,8 +242,8 @@ function PolicyCard({ policy }: { policy: Policy }) {
         >
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: navy }}>{typeLabel}</span>
-              <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.55rem', borderRadius: 20, background: st.bg, color: st.color }}>{st.label}</span>
+              <span style={{ fontSize: '0.88rem', fontWeight: 700, color: navy }}>{label}</span>
+              <span style={{ fontSize: '0.68rem', fontWeight: 600, padding: '0.15rem 0.55rem', borderRadius: 20, background: st.bg, color: st.color }}>{stLabel}</span>
             </div>
             <p style={{ fontSize: '0.75rem', color: '#64748B', margin: '0.2rem 0 0' }}>
               {policy.insurer}{policy.policy_number ? ` · ${policy.policy_number}` : ''}
@@ -277,13 +257,13 @@ function PolicyCard({ policy }: { policy: Policy }) {
           <div style={{ textAlign: 'right', flexShrink: 0 }}>
             {policy.annual_premium > 0 && (
               <p style={{ fontSize: '0.9rem', fontWeight: 700, color: navy, margin: 0 }}>
-                {formatCurrency(policy.annual_premium)}
-                <span style={{ fontSize: '0.65rem', fontWeight: 400, color: '#94A3B8' }}>/ano</span>
+                {fmtCurrency(policy.annual_premium)}
+                <span style={{ fontSize: '0.65rem', fontWeight: 400, color: '#94A3B8' }}>{t.policies.perYear}</span>
               </p>
             )}
             {days !== null && (
               <p style={{ fontSize: '0.7rem', color: urgency, fontWeight: 600, margin: '0.1rem 0 0' }}>
-                {days > 0 ? `Renova em ${days}d` : days === 0 ? 'Renova hoje' : 'Expirada'}
+                {days > 0 ? t.policies.renewsIn(days) : days === 0 ? t.policies.renewsToday : t.policies.expired}
               </p>
             )}
           </div>
@@ -292,30 +272,30 @@ function PolicyCard({ policy }: { policy: Policy }) {
         {expanded && (
           <div style={{ borderTop: '1px solid #F1F5F9', padding: '0.85rem 1.25rem', background: '#F8FAFC' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.6rem', marginBottom: '1rem' }}>
-              {policy.start_date        && <DetailItem label="Início"     value={formatDate(policy.start_date)} />}
-              {policy.end_date          && <DetailItem label="Fim"        value={formatDate(policy.end_date)} />}
-              {policy.renewal_date      && <DetailItem label="Renovação"  value={formatDate(policy.renewal_date)} />}
-              {policy.payment_frequency && <DetailItem label="Pagamento"  value={policy.payment_frequency} />}
-              {policy.deductible != null && <DetailItem label="Franquia"   value={formatCurrency(policy.deductible)} />}
-              {policy.description       && <DetailItem label="Descrição"  value={policy.description} span />}
+              {policy.start_date        && <DetailItem label={t.detail.start}     value={fmtDate(policy.start_date)} />}
+              {policy.end_date          && <DetailItem label={t.detail.end}        value={fmtDate(policy.end_date)} />}
+              {policy.renewal_date      && <DetailItem label={t.detail.renewal}  value={fmtDate(policy.renewal_date)} />}
+              {policy.payment_frequency && <DetailItem label={t.detail.payment}  value={policy.payment_frequency} />}
+              {policy.deductible != null && <DetailItem label={t.detail.deductible}   value={fmtCurrency(policy.deductible)} />}
+              {policy.description       && <DetailItem label={t.detail.description}  value={policy.description} span />}
             </div>
 
             {/* Coberturas e exclusões (read-only) */}
             {policy.coverages && policy.coverages.length > 0 && (
-              <PolicyClauseList title="Coberturas" items={policy.coverages} tone="cover" />
+              <PolicyClauseList title={t.policies.coverages} items={policy.coverages} tone="cover" />
             )}
             {policy.exclusions && policy.exclusions.length > 0 && (
-              <PolicyClauseList title="Exclusões" items={policy.exclusions} tone="exclude" />
+              <PolicyClauseList title={t.policies.exclusions} items={policy.exclusions} tone="exclude" />
             )}
 
             {/* Documentos da apólice */}
             <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '0.85rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
                 <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>
-                  Documentos {docs.length > 0 ? `(${docs.length})` : ''}
+                  {t.policies.documents} {docs.length > 0 ? `(${docs.length})` : ''}
                 </p>
                 <label style={{ fontSize: '0.72rem', fontWeight: 600, padding: '0.28rem 0.65rem', background: uploading ? '#94A3B8' : navy, color: '#fff', borderRadius: 6, cursor: uploading ? 'not-allowed' : 'pointer', fontFamily: "'Montserrat', sans-serif", display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
-                  {uploading ? <><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'one-spin 0.75s linear infinite' }} /> A carregar…</> : '+ Adicionar'}
+                  {uploading ? <><span style={{ display: 'inline-block', width: 10, height: 10, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'one-spin 0.75s linear infinite' }} /> {t.policies.uploading}</> : t.policies.addDocument}
                   <input ref={docFileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" multiple style={{ display: 'none' }} disabled={uploading} onChange={e => handleDocUpload(e.target.files)} />
                 </label>
               </div>
@@ -325,7 +305,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
                   <div style={{ width: 18, height: 18, border: `2px solid ${gold}`, borderTopColor: 'transparent', borderRadius: '50%', animation: 'one-spin 0.75s linear infinite' }} />
                 </div>
               ) : docs.length === 0 ? (
-                <p style={{ fontSize: '0.78rem', color: '#94A3B8', textAlign: 'center', padding: '0.75rem 0', margin: 0 }}>Sem documentos para esta apólice.</p>
+                <p style={{ fontSize: '0.78rem', color: '#94A3B8', textAlign: 'center', padding: '0.75rem 0', margin: 0 }}>{t.policies.noDocs}</p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                   {docs.map(doc => {
@@ -341,7 +321,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
                         <button
                           onClick={() => handleDocPreview(doc)}
                           style={{ padding: '0.25rem 0.6rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, flexShrink: 0, fontFamily: "'Montserrat', sans-serif" }}
-                        >Ver</button>
+                        >{t.policies.view}</button>
                       </div>
                     )
                   })}
@@ -365,7 +345,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
             <div style={{ padding: '0.75rem 1rem', borderBottom: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ fontWeight: 600, fontSize: '0.85rem', color: navy, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{previewName}</p>
               <div style={{ display: 'flex', gap: '0.5rem', flexShrink: 0 }}>
-                <a href={previewUrl} target="_blank" rel="noreferrer" style={{ padding: '0.3rem 0.75rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, textDecoration: 'none', fontSize: '0.78rem', fontWeight: 600 }}>Abrir</a>
+                <a href={previewUrl} target="_blank" rel="noreferrer" style={{ padding: '0.3rem 0.75rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, textDecoration: 'none', fontSize: '0.78rem', fontWeight: 600 }}>{t.policies.open}</a>
                 <button onClick={() => setPreviewUrl(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8', fontSize: '1.25rem' }}>×</button>
               </div>
             </div>

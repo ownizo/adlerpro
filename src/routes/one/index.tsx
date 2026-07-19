@@ -1,6 +1,13 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, redirect } from '@tanstack/react-router'
+import { isMyCoverVault } from '@/lib/one-brand'
 
 export const Route = createFileRoute('/one/')({
+  beforeLoad: () => {
+    // My Cover Vault has no marketing landing — go straight to the login screen.
+    if (isMyCoverVault()) {
+      throw redirect({ to: '/one/login' })
+    }
+  },
   component: OneLanding,
   ssr: false,
   head: () => ({ meta: [{ title: 'Os Meus Seguros — Os seus seguros, num só lugar' }] }),

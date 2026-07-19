@@ -8,24 +8,30 @@
 import { Link } from '@tanstack/react-router'
 import { supabase } from '@/lib/supabase'
 import { useState, useEffect } from 'react'
+import { oneT, oneBrand } from '@/lib/one-brand'
 
 const navy = '#0A1628'
 const gold  = '#C9A84C'
 
-const NAV_LINKS = [
-  { to: '/one/dashboard',  label: 'Dashboard'    },
-  { to: '/one/policies',   label: 'Apólices'     },
-  { to: '/one/claims',     label: 'Sinistros'    },
-  { to: '/one/documents',  label: 'Documentos'   },
-  { to: '/one/profile',    label: 'Perfil'       },
+const NAV_ITEMS = [
+  { to: '/one/dashboard',  key: 'dashboard' as const },
+  { to: '/one/policies',   key: 'policies'  as const },
+  { to: '/one/claims',     key: 'claims'    as const },
+  { to: '/one/documents',  key: 'documents' as const },
+  { to: '/one/profile',    key: 'profile'   as const },
 ]
 
 export function OneLayout({ children }: { children: React.ReactNode }) {
+  const t     = oneT()
+  const brand = oneBrand()
   const [checking,           setChecking]           = useState(true)
   const [menuOpen,           setMenuOpen]           = useState(false)
   const [mustChangePassword, setMustChangePassword] = useState(false)
 
+  const NAV_LINKS = NAV_ITEMS.map(i => ({ to: i.to, label: t.nav[i.key] }))
+
   useEffect(() => {
+    document.title = brand.docTitle
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) {
         window.location.replace('/one/login')
@@ -34,7 +40,7 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
         setChecking(false)
       }
     })
-  }, [])
+  }, [brand.docTitle])
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -58,8 +64,8 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
         {/* Left zone — brand text */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}>
           <a href="/one/dashboard" style={styles.logo}>
-            <span style={{ color: '#fff', fontWeight: 700, letterSpacing: '0.04em' }}>Os Meus Seguros</span>
-            <span style={{ color: gold, fontWeight: 300, fontSize: '0.6em', letterSpacing: '0.05em', marginLeft: 8 }}>by Adler &amp; Rochefort</span>
+            <span style={{ color: '#fff', fontWeight: 700, letterSpacing: '0.04em' }}>{brand.name}</span>
+            <span style={{ color: gold, fontWeight: 300, fontSize: '0.6em', letterSpacing: '0.05em', marginLeft: 8 }}>{brand.tagline}</span>
           </a>
         </div>
 
@@ -80,7 +86,7 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
             <button onClick={handleSignOut} style={styles.signOutBtn}>
-              Sair
+              {t.nav.signOut}
             </button>
           </div>
 
@@ -111,7 +117,7 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
             </a>
           ))}
           <button onClick={handleSignOut} style={styles.drawerSignOut}>
-            Sair
+            {t.nav.signOut}
           </button>
         </div>
       )}
@@ -130,7 +136,7 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
           fontFamily: "'Montserrat', sans-serif",
         }}>
           <p style={{ fontSize: '0.82rem', color: '#92400E', margin: 0, fontWeight: 500 }}>
-            ⚠ A sua password foi definida pelo seu mediador. Por segurança, altere-a.
+            {t.mustChange.text}
           </p>
           <a
             href="/one/profile#alterar-password"
@@ -146,7 +152,7 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
               whiteSpace: 'nowrap' as const,
             }}
           >
-            Alterar password agora →
+            {t.mustChange.cta}
           </a>
         </div>
       )}
