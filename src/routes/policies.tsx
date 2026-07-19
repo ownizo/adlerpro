@@ -138,9 +138,8 @@ function PolicyDetailModal({ policy, onClose, onEdit, onDelete, formatCurrency, 
       try {
         const fd = new FormData()
         fd.append('file', file)
-        fd.append('type', 'policy_document')
         fd.append('policyId', policy.id)
-        const res = await fetch('/api/upload', { method: 'POST', body: fd })
+        const res = await fetch('/api/policy-document', { method: 'POST', body: fd })
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
           errors.push(`${file.name}: ${err.error || 'Erro desconhecido'}`)
@@ -388,6 +387,7 @@ function PoliciesPage() {
   const [formData, setFormData] = useState<any>({})
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [pendingDocument, setPendingDocument] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = () => { setLoading(true); fetchPolicies().then((p) => { setPolicies(p); setLoading(false) }) }
@@ -418,7 +418,11 @@ function PoliciesPage() {
         if (/JSON|extrair|reconhecível/i.test(raw)) throw new Error('__jsonparse__')
         throw new Error('__generic__')
       }
-      setFormData({ ...result, description: `${t('policies.aiExtracted').replace('✦ ', '')} ${file.name}` })
+      setPendingDocument(file)
+      setFormData({
+        ...result,
+        description: result.name || `${t('policies.aiExtracted').replace('✦ ', '')} ${file.name}`,
+      })
       setShowForm(true)
     } catch (err: any) {
       const msg: string = err.message ?? ''
@@ -435,9 +439,23 @@ function PoliciesPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true)
     try {
-      if (editMode && selected) await updatePolicy({ data: { id: selected.id, updates: formData } })
-      else await createPolicy({ data: { ...formData, companyId: 'comp_001' } })
-      setShowForm(false); setEditMode(false); setSelected(null); load()
+      if (editMode && selected) {
+        await updatePolicy({ data: { id: selected.id, updates: formData } })
+      } else {
+        const created = await createPolicy({ data: formData })
+        if (pendingDocument) {
+          const documentData = new FormData()
+          documentData.append('policyId', created.id)
+          documentData.append('file', pendingDocument)
+          const uploadResponse = await fetch('/api/policy-document', { method: 'POST', body: documentData })
+          if (!uploadResponse.ok) {
+            const result = await uploadResponse.json().catch(() => ({}))
+            await deletePolicy({ data: created.id }).catch(() => undefined)
+            throw new Error(result.error || 'Erro ao associar documento')
+          }
+        }
+      }
+      setPendingDocument(null); setShowForm(false); setEditMode(false); setSelected(null); load()
     } catch { alert(t('policies.errors.saveFailed')); setLoading(false) }
   }
 
@@ -469,7 +487,7 @@ function PoliciesPage() {
                 : <>{t('policies.extractViaAI')}</>}
               <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleUpload} style={{ display: 'none' }} disabled={uploading} />
             </label>
-            <button onClick={() => { setFormData({}); setEditMode(false); setShowForm(true) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.addManual')}</button>
+            <button onClick={() => { setPendingDocument(null); setFormData({}); setEditMode(false); setShowForm(true) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem', padding: '0.6rem 1rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.addManual')}</button>
           </div>
         </div>
 
@@ -613,12 +631,18 @@ function PoliciesPage() {
           <div style={{ background: '#ffffff', borderRadius: '4px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
             <div style={{ padding: '1.25rem 1.5rem', borderBottom: '1px solid #eeeeee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 700, fontSize: '1rem', color: '#111111', margin: 0 }}>{editMode ? t('policies.editPolicy') : t('policies.newPolicy')}</h2>
-              <button onClick={() => { setShowForm(false); setEditMode(false); setFormData({}) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888888', fontSize: '1.25rem', lineHeight: 1 }}>×</button>
+              <button onClick={() => { setPendingDocument(null); setShowForm(false); setEditMode(false); setFormData({}) }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#888888', fontSize: '1.25rem', lineHeight: 1 }}>×</button>
             </div>
-            {formData.description?.includes('extraída') && (
+            {pendingDocument && (
               <div style={{ margin: '1rem 1.5rem 0', padding: '0.75rem 1rem', background: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '4px' }}>
                 <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', fontWeight: 600, color: '#166534', margin: '0 0 0.25rem' }}>{t('policies.aiExtracted')}</p>
                 <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#555555', margin: 0 }}>{t('policies.aiExtractedDetails', { capital: formatCurrency(formData.insuredValue || 0), premium: formatCurrency(formData.annualPremium || 0), deductible: formatCurrency(formData.deductible || 0) })}</p>
+              </div>
+            )}
+            {pendingDocument && (
+              <div style={{ margin: '1rem 1.5rem 0', padding: '0.75rem 1rem', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '4px' }}>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', fontWeight: 600, color: '#1D4ED8', margin: '0 0 0.2rem' }}>{t('policies.documentReady')}</p>
+                <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.72rem', color: '#555555', margin: 0 }}>{pendingDocument.name} · {formatFileSize(pendingDocument.size)}</p>
               </div>
             )}
             <form onSubmit={handleSave} style={{ padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -640,7 +664,7 @@ function PoliciesPage() {
                 <FormField label={t('policies.description')}><input type="text" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })} style={inputStyle} /></FormField>
               </div>
               <div style={{ gridColumn: '1 / -1', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end', paddingTop: '0.5rem' }}>
-                <button type="button" onClick={() => { setShowForm(false); setEditMode(false); setFormData({}) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.cancel')}</button>
+                <button type="button" onClick={() => { setPendingDocument(null); setShowForm(false); setEditMode(false); setFormData({}) }} style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#f5f5f5', color: '#555555', border: '1px solid #dddddd', borderRadius: '4px', cursor: 'pointer' }}>{t('policies.cancel')}</button>
                 <button type="submit" style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.85rem', padding: '0.65rem 1.25rem', background: '#111111', color: '#ffffff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>{editMode ? t('policies.saveChanges') : t('policies.createPolicy')}</button>
               </div>
             </form>

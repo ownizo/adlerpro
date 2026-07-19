@@ -21,7 +21,7 @@ export const Route = createFileRoute('/one/reset-password')({
 const ink  = '#0A1628'
 const body = '#5B6472'
 const line = '#E6E8EC'
-const bg   = '#F6F7F9'
+const bg   = '#FFFFFF'
 
 function ResetPasswordPage() {
   const t     = oneT()

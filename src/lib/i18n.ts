@@ -5,10 +5,7 @@ import en from '@/locales/en.json'
 
 export type LangCode = 'pt' | 'en'
 
-const storedLang: LangCode =
-  typeof window !== 'undefined'
-    ? ((localStorage.getItem('lang') as LangCode) ?? 'pt')
-    : 'pt'
+const storedLang: LangCode = 'en'
 
 if (!i18n.isInitialized) {
   i18n.use(initReactI18next).init({
@@ -17,7 +14,7 @@ if (!i18n.isInitialized) {
       en: { translation: en },
     },
     lng: storedLang,
-    fallbackLng: 'pt',
+    fallbackLng: 'en',
     interpolation: { escapeValue: false },
   })
 }

@@ -282,7 +282,7 @@ const inputStyle: React.CSSProperties = {
 const mcvInk    = '#0A1628'  // primary text / buttons (the single restrained accent)
 const mcvBody   = '#5B6472'
 const mcvLine   = '#E6E8EC'
-const mcvBg     = '#F6F7F9'
+const mcvBg     = '#FFFFFF'
 
 function MyCoverVaultLogin() {
   const t     = oneT()

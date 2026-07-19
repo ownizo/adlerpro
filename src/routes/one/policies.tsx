@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useState, useEffect, useRef } from 'react'
 import { OneLayout } from './__root'
 import { oneT, oneBrand, fmtCurrency, fmtDate, typeLabel } from '@/lib/one-brand'
+import { adminDeletePolicyDocument, createPolicy, deletePolicy, fetchPolicyDocuments, getDocumentUrl } from '@/lib/server-fns'
 
 export const Route = createFileRoute('/one/policies')({
   component: OnePolicies,
@@ -40,6 +41,20 @@ interface PolicyDoc {
   uploadedAt: string
 }
 
+type PolicyDraft = {
+  name: string
+  type: string
+  insurer: string
+  policyNumber: string
+  startDate: string
+  endDate: string
+  annualPremium: number
+  insuredValue: number
+  deductible: number
+  coverages: string[]
+  exclusions: string[]
+}
+
 function formatDocSize(bytes: number): string {
   if (!bytes) return '—'
   if (bytes < 1024) return `${bytes} B`
@@ -66,6 +81,16 @@ function OnePolicies() {
   const [policies, setPolicies] = useState<Policy[]>([])
   const [loading,  setLoading]  = useState(true)
   const [error,    setError]    = useState('')
+  const [extracting, setExtracting] = useState(false)
+  const [addError, setAddError] = useState('')
+  const [showAdd, setShowAdd] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [draft, setDraft] = useState({
+    name: '', type: '', insurer: '', policyNumber: '', startDate: '', endDate: '',
+    annualPremium: 0, insuredValue: 0, deductible: 0, coverages: [] as string[], exclusions: [] as string[],
+  })
+  const addFileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -110,6 +135,91 @@ function OnePolicies() {
     }
   }
 
+  async function handlePolicyFile(file: File | undefined) {
+    if (!file) return
+    setExtracting(true)
+    setAddError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error(t.policies.addAuthError)
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await fetch('/api/extract-policy', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      })
+      const extracted = await response.json()
+      if (!response.ok) throw new Error(extracted.error || t.policies.addReadError)
+      setPendingFile(file)
+      setDraft({
+        name: extracted.name || file.name,
+        type: extracted.type || 'other',
+        insurer: extracted.insurer || '',
+        policyNumber: extracted.policyNumber || '',
+        startDate: extracted.startDate || '',
+        endDate: extracted.endDate || '',
+        annualPremium: Number(extracted.annualPremium) || 0,
+        insuredValue: Number(extracted.insuredValue) || 0,
+        deductible: Number(extracted.deductible) || 0,
+        coverages: Array.isArray(extracted.coverages) ? extracted.coverages : [],
+        exclusions: Array.isArray(extracted.exclusions) ? extracted.exclusions : [],
+      })
+      setShowAdd(true)
+    } catch (e: any) {
+      setAddError(e.message || t.policies.addReadError)
+    } finally {
+      setExtracting(false)
+      if (addFileRef.current) addFileRef.current.value = ''
+    }
+  }
+
+  async function savePolicy(event: React.FormEvent) {
+    event.preventDefault()
+    if (!pendingFile) return
+    setSaving(true)
+    setAddError('')
+    try {
+      const created = await createPolicy({
+        data: {
+          type: draft.type,
+          insurer: draft.insurer,
+          policyNumber: draft.policyNumber,
+          description: draft.name,
+          startDate: draft.startDate,
+          endDate: draft.endDate,
+          annualPremium: draft.annualPremium,
+          insuredValue: draft.insuredValue,
+          deductible: draft.deductible,
+          coverages: draft.coverages,
+          exclusions: draft.exclusions,
+        },
+      })
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error(t.policies.addAuthError)
+      const formData = new FormData()
+      formData.append('policyId', created.id)
+      formData.append('file', pendingFile)
+      const response = await fetch('/api/policy-document', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      })
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}))
+        await deletePolicy({ data: created.id }).catch(() => undefined)
+        throw new Error(result.error || t.policies.addSaveError)
+      }
+      setShowAdd(false)
+      setPendingFile(null)
+      await loadData()
+    } catch (e: any) {
+      setAddError(e.message || t.policies.addSaveError)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <OneLayout>
       {loading ? (
@@ -118,19 +228,47 @@ function OnePolicies() {
         <ErrorMsg msg={error} />
       ) : (
         <>
-          <div style={{ marginBottom: '1.75rem' }}>
-            <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>{t.policies.title}</h1>
-            <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>
-              {t.policies.count(policies.length)}
-            </p>
+          <div style={{ marginBottom: '1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', flexWrap: 'wrap' }}>
+            <div>
+              <h1 style={{ fontSize: '1.4rem', fontWeight: 700, color: navy, margin: 0 }}>{t.policies.title}</h1>
+              <p style={{ fontSize: '0.82rem', color: '#64748B', marginTop: '0.3rem' }}>{t.policies.count(policies.length)}</p>
+            </div>
+            <button
+              type="button"
+              disabled={extracting}
+              onClick={() => addFileRef.current?.click()}
+              style={{ background: gold, color: '#fff', border: 0, borderRadius: 6, padding: '0.65rem 1rem', fontSize: '0.82rem', fontWeight: 700, cursor: extracting ? 'wait' : 'pointer', opacity: extracting ? 0.7 : 1 }}
+            >
+              {extracting ? t.policies.extracting : t.policies.addPolicy}
+            </button>
+            <input ref={addFileRef} type="file" accept="application/pdf,image/jpeg,image/png,image/webp" hidden onChange={(event) => handlePolicyFile(event.target.files?.[0])} />
           </div>
+
+          {addError && <ErrorMsg msg={addError} />}
 
           {policies.length === 0 ? (
             <EmptyState msg={t.policies.none} />
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              {policies.map(p => <PolicyCard key={p.id} policy={p} />)}
+              {policies.map(p => (
+                <PolicyCard
+                  key={p.id}
+                  policy={p}
+                  onDeleted={() => setPolicies((current) => current.filter((item) => item.id !== p.id))}
+                />
+              ))}
             </div>
+          )}
+          {showAdd && (
+            <AddPolicyModal
+              draft={draft}
+              file={pendingFile}
+              saving={saving}
+              error={addError}
+              onChange={setDraft}
+              onClose={() => { setShowAdd(false); setPendingFile(null); setAddError('') }}
+              onSubmit={savePolicy}
+            />
           )}
         </>
       )}
@@ -138,7 +276,7 @@ function OnePolicies() {
   )
 }
 
-function PolicyCard({ policy }: { policy: Policy }) {
+function PolicyCard({ policy, onDeleted }: { policy: Policy; onDeleted: () => void }) {
   const t = oneT()
   const [expanded,    setExpanded]    = useState(false)
   const [docs,        setDocs]        = useState<PolicyDoc[]>([])
@@ -148,6 +286,8 @@ function PolicyCard({ policy }: { policy: Policy }) {
   const [uploadMsg,   setUploadMsg]   = useState('')
   const [previewUrl,  setPreviewUrl]  = useState<string | null>(null)
   const [previewName, setPreviewName] = useState('')
+  const [deletingDocId, setDeletingDocId] = useState<string | null>(null)
+  const [deletingPolicy, setDeletingPolicy] = useState(false)
   const docFileRef = useRef<HTMLInputElement>(null)
 
   const st = STATUS_STYLE[policy.status] ?? { bg: '#F3F4F6', color: '#6B7280' }
@@ -157,20 +297,11 @@ function PolicyCard({ policy }: { policy: Policy }) {
   const urgency = days !== null && days <= 14 ? '#EF4444' : days !== null && days <= 30 ? '#F59E0B' : gold
 
   async function loadDocs() {
-    if (docsLoaded || !policy.company_id) return
+    if (docsLoaded) return
     setDocsLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      const res = await fetch('/api/list-policy-docs', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ policyId: policy.id, companyId: policy.company_id }),
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setDocs(data.files ?? [])
-      }
+      const data = await fetchPolicyDocuments({ data: { policyId: policy.id, companyId: policy.company_id } })
+      setDocs(data)
     } catch (e) {
       console.error('loadDocs error', e)
     } finally {
@@ -187,15 +318,7 @@ function PolicyCard({ policy }: { policy: Policy }) {
 
   async function handleDocPreview(doc: PolicyDoc) {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
-      const res = await fetch('/api/get-signed-url', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: doc.storagePath }),
-      })
-      if (!res.ok) throw new Error('signed url error')
-      const { url } = await res.json()
+      const { url } = await getDocumentUrl({ data: { storagePath: doc.storagePath } })
       setPreviewName(doc.name)
       setPreviewUrl(url)
     } catch (e: any) {
@@ -213,14 +336,14 @@ function PolicyCard({ policy }: { policy: Policy }) {
     for (const file of Array.from(files)) {
       const fd = new FormData()
       fd.append('file', file)
-      fd.append('type', 'policy_document')
       fd.append('policyId', policy.id)
       try {
-        await fetch('/api/upload', {
+        const response = await fetch('/api/policy-document', {
           method: 'POST',
           headers: { Authorization: `Bearer ${session.access_token}` },
           body: fd,
         })
+        if (!response.ok) throw new Error('upload error')
       } catch (e) {
         console.error('upload error', e)
       }
@@ -231,6 +354,31 @@ function PolicyCard({ policy }: { policy: Policy }) {
     setDocsLoaded(false)
     setUploadMsg(t.policies.uploaded)
     setTimeout(() => { setUploadMsg(''); loadDocs() }, 800)
+  }
+
+  async function handleDocDelete(doc: PolicyDoc) {
+    if (!window.confirm(t.policies.confirmDeleteDocument.replace('{name}', doc.name))) return
+    setDeletingDocId(doc.id)
+    try {
+      await adminDeletePolicyDocument({ data: { storagePath: doc.storagePath } })
+      setDocs((current) => current.filter((item) => item.id !== doc.id))
+    } catch {
+      window.alert(t.policies.deleteFailed)
+    } finally {
+      setDeletingDocId(null)
+    }
+  }
+
+  async function handlePolicyDelete() {
+    if (!window.confirm(t.policies.confirmDeletePolicy)) return
+    setDeletingPolicy(true)
+    try {
+      await deletePolicy({ data: policy.id })
+      onDeleted()
+    } catch {
+      window.alert(t.policies.deleteFailed)
+      setDeletingPolicy(false)
+    }
   }
 
   return (
@@ -322,11 +470,27 @@ function PolicyCard({ policy }: { policy: Policy }) {
                           onClick={() => handleDocPreview(doc)}
                           style={{ padding: '0.25rem 0.6rem', background: '#EFF6FF', color: '#1D4ED8', border: '1px solid #BFDBFE', borderRadius: 6, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 600, flexShrink: 0, fontFamily: "'Montserrat', sans-serif" }}
                         >{t.policies.view}</button>
+                        <button
+                          type="button"
+                          disabled={deletingDocId === doc.id}
+                          onClick={() => handleDocDelete(doc)}
+                          style={{ padding: '0.25rem 0.6rem', background: '#FFF1F2', color: '#BE123C', border: '1px solid #FECDD3', borderRadius: 6, cursor: deletingDocId === doc.id ? 'wait' : 'pointer', fontSize: '0.7rem', fontWeight: 600, flexShrink: 0, opacity: deletingDocId === doc.id ? 0.65 : 1 }}
+                        >{deletingDocId === doc.id ? t.policies.deleting : t.policies.deleteDocument}</button>
                       </div>
                     )
                   })}
                 </div>
               )}
+            </div>
+            <div style={{ borderTop: '1px solid #E2E8F0', marginTop: '1rem', paddingTop: '0.85rem', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                disabled={deletingPolicy}
+                onClick={handlePolicyDelete}
+                style={{ padding: '0.45rem 0.8rem', background: '#FFF1F2', color: '#BE123C', border: '1px solid #FECDD3', borderRadius: 6, cursor: deletingPolicy ? 'wait' : 'pointer', fontSize: '0.72rem', fontWeight: 700, opacity: deletingPolicy ? 0.65 : 1 }}
+              >
+                {deletingPolicy ? t.policies.deleting : t.policies.deletePolicy}
+              </button>
             </div>
           </div>
         )}
@@ -360,6 +524,73 @@ function PolicyCard({ policy }: { policy: Policy }) {
         </div>
       )}
     </>
+  )
+}
+
+function AddPolicyModal({ draft, file, saving, error, onChange, onClose, onSubmit }: {
+  draft: PolicyDraft
+  file: File | null
+  saving: boolean
+  error: string
+  onChange: (draft: PolicyDraft) => void
+  onClose: () => void
+  onSubmit: (event: React.FormEvent) => void
+}) {
+  const t = oneT()
+  const inputStyle: React.CSSProperties = {
+    width: '100%', border: '1px solid #CBD5E1', borderRadius: 6, padding: '0.6rem 0.7rem',
+    fontSize: '0.82rem', color: navy, background: '#fff', boxSizing: 'border-box',
+  }
+  const field = (key: keyof PolicyDraft, value: string | number) => onChange({ ...draft, [key]: value })
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(10,22,40,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={onClose}>
+      <div style={{ width: '100%', maxWidth: 620, maxHeight: '92vh', overflowY: 'auto', background: '#fff', borderRadius: 8 }} onClick={(event) => event.stopPropagation()}>
+        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ margin: 0, fontSize: '1rem', color: navy }}>{t.policies.addTitle}</h2>
+            {file && <p style={{ margin: '0.2rem 0 0', fontSize: '0.72rem', color: '#64748B' }}>{file.name} · {formatDocSize(file.size)}</p>}
+          </div>
+          <button type="button" onClick={onClose} style={{ border: 0, background: 'none', fontSize: '1.3rem', color: '#64748B', cursor: 'pointer' }}>×</button>
+        </div>
+        <form onSubmit={onSubmit} style={{ padding: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.9rem' }}>
+          <label style={{ gridColumn: '1 / -1', fontSize: '0.72rem', fontWeight: 700, color: '#64748B' }}>
+            {t.policies.fieldName}
+            <input value={draft.name} onChange={(event) => field('name', event.target.value)} style={{ ...inputStyle, marginTop: '0.3rem' }} />
+          </label>
+          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B' }}>
+            {t.policies.fieldType}
+            <select required value={draft.type} onChange={(event) => field('type', event.target.value)} style={{ ...inputStyle, marginTop: '0.3rem' }}>
+              <option value="">—</option>
+              {['auto', 'health', 'property', 'life', 'liability', 'workers_comp', 'cyber', 'directors_officers', 'business_interruption', 'other'].map((value) => (
+                <option key={value} value={value}>{typeLabel(value)}</option>
+              ))}
+            </select>
+          </label>
+          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B' }}>
+            {t.policies.fieldInsurer}
+            <input required value={draft.insurer} onChange={(event) => field('insurer', event.target.value)} style={{ ...inputStyle, marginTop: '0.3rem' }} />
+          </label>
+          <label style={{ gridColumn: '1 / -1', fontSize: '0.72rem', fontWeight: 700, color: '#64748B' }}>
+            {t.policies.fieldNumber}
+            <input value={draft.policyNumber} onChange={(event) => field('policyNumber', event.target.value)} style={{ ...inputStyle, marginTop: '0.3rem' }} />
+          </label>
+          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B' }}>
+            {t.policies.fieldStart}
+            <input required type="date" value={draft.startDate} onChange={(event) => field('startDate', event.target.value)} style={{ ...inputStyle, marginTop: '0.3rem' }} />
+          </label>
+          <label style={{ fontSize: '0.72rem', fontWeight: 700, color: '#64748B' }}>
+            {t.policies.fieldEnd}
+            <input required type="date" value={draft.endDate} onChange={(event) => field('endDate', event.target.value)} style={{ ...inputStyle, marginTop: '0.3rem' }} />
+          </label>
+          {error && <p style={{ gridColumn: '1 / -1', margin: 0, color: '#B91C1C', fontSize: '0.78rem' }}>{error}</p>}
+          <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', paddingTop: '0.3rem' }}>
+            <button type="button" onClick={onClose} style={{ border: '1px solid #CBD5E1', background: '#fff', color: navy, borderRadius: 6, padding: '0.6rem 1rem', cursor: 'pointer' }}>{t.policies.cancel}</button>
+            <button disabled={saving} type="submit" style={{ border: 0, background: gold, color: '#fff', borderRadius: 6, padding: '0.6rem 1rem', fontWeight: 700, cursor: saving ? 'wait' : 'pointer', opacity: saving ? 0.7 : 1 }}>{saving ? t.policies.saving : t.policies.savePolicy}</button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 

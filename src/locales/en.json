@@ -191,6 +191,7 @@
     "close": "Close",
     "aiExtracted": "✦ Data extracted via AI",
     "aiExtractedDetails": "Capital: {{capital}} · Premium: {{premium}} · Deductible: {{deductible}}",
+    "documentReady": "Document ready to attach to the policy",
     "deleteConfirm": "Are you sure you want to delete this policy?",
     "selectType": "Select type...",
     "insurerPlaceholder": "E.g.: Allianz",

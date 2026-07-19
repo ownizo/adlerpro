@@ -78,9 +78,11 @@ export type PolicyType =
   | 'workers_comp'
   | 'auto'
   | 'health'
+  | 'life'
   | 'cyber'
   | 'directors_officers'
   | 'business_interruption'
+  | 'other'
 
 export const POLICY_TYPE_LABELS: Record<PolicyType, string> = {
   property: 'Propriedade',
@@ -88,9 +90,11 @@ export const POLICY_TYPE_LABELS: Record<PolicyType, string> = {
   workers_comp: 'Acidentes de Trabalho',
   auto: 'Automóvel',
   health: 'Saúde',
+  life: 'Vida',
   cyber: 'Ciber-Risco',
   directors_officers: 'D&O',
   business_interruption: 'Interrupção de Negócio',
+  other: 'Outro',
 }
 
 export interface Claim {
