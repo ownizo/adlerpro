@@ -10,7 +10,7 @@ export const Route = createFileRoute('/one/')({
   },
   component: OneLanding,
   ssr: false,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros — Os seus seguros, num só lugar' }] }),
+  head: () => ({ meta: [{ title: 'My Cover Vault — Your insurance, in one secure place' }] }),
 })
 
 const navy = '#0A1628'

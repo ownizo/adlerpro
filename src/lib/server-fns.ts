@@ -2,10 +2,14 @@ import { createServerFn } from '@tanstack/react-start'
 import { getRequestHeader, getCookies } from '@tanstack/react-start/server'
 import { createElement } from 'react'
 import { render } from 'react-email'
+import { getStore } from '@netlify/blobs'
+import { eq } from 'drizzle-orm'
 import { resendClient, FROM_EMAIL } from './email/client'
 import { DocumentEmail } from './email/templates/DocumentEmail'
 import { supabaseAdmin } from './supabase-admin'
 import * as db from './data'
+import { netlifyDb } from '../../db/index'
+import { policyDocuments } from '../../db/schema'
 import { getClaimOperationalData, saveClaimOperationalData, updateClaimOperationalData } from './claim-ops'
 import { claimMessageToTicketMessage, mergeClaimMessages } from './claim-message-sync'
 import { normalizeClaimsByPolicy, selectPreferredClaimForPolicy } from './claim-resolution'
@@ -99,16 +103,25 @@ async function _resolveScope(token: string) {
     roles: appMeta.roles as string[] | undefined,
   }
 
-  const isAdmin = user.roles?.includes('admin')
-  if (isAdmin) return { user, isAdmin: true as const, companyId: null as string | null }
+  const isAdmin = Boolean(user.roles?.includes('admin'))
+  if (isAdmin) {
+    return {
+      user,
+      isAdmin: true as const,
+      companyId: null as string | null,
+      individualClientId: null as string | null,
+    }
+  }
 
-  if (!user.email) return { user, isAdmin: false as const, companyId: null as string | null }
-
-  const companyUser = await db.getCompanyUserByEmail(user.email)
+  const [companyUser, individualClient] = await Promise.all([
+    user.email ? db.getCompanyUserByEmail(user.email) : Promise.resolve(undefined),
+    resolveIndividualClientScope(user),
+  ])
   return {
     user,
     isAdmin: false as const,
     companyId: companyUser?.companyId ?? null,
+    individualClientId: individualClient?.id ?? null,
   }
 }
 
@@ -463,8 +476,10 @@ export const fetchPolicies = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
     const scope = await getViewerScope()
-    if (!scope.isAdmin && !scope.companyId) return []
-    return db.getPolicies(scope.companyId ?? undefined)
+    if (scope.isAdmin) return db.getPolicies()
+    if (scope.companyId) return db.getPolicies(scope.companyId)
+    if (scope.individualClientId) return db.getPoliciesByIndividualClientId(scope.individualClientId)
+    return []
   })
 
 export const fetchPolicy = createServerFn({ method: 'GET' })
@@ -474,8 +489,9 @@ export const fetchPolicy = createServerFn({ method: 'GET' })
     const scope = await getViewerScope()
     const policy = await db.getPolicy(id)
     if (!policy) return undefined
-    if (!scope.isAdmin && !scope.companyId) return undefined
+    if (!scope.isAdmin && !scope.companyId && !scope.individualClientId) return undefined
     if (scope.companyId && policy.companyId !== scope.companyId) return undefined
+    if (scope.individualClientId && policy.individualClientId !== scope.individualClientId) return undefined
     return policy
   })
 
@@ -505,7 +521,7 @@ export const submitClaim = createServerFn({ method: 'POST' })
   .inputValidator(
     (d: {
       policyId: string
-      companyId: string
+      companyId?: string
       title: string
       description: string
       incidentDate: string
@@ -738,6 +754,25 @@ export const fetchDocuments = createServerFn({ method: 'GET' })
     return db.getDocuments(scope.companyId ?? undefined)
   })
 
+export const deleteDocument = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    const [scope, document] = await Promise.all([getViewerScope(), db.getDocument(id)])
+    if (!document) return { success: true }
+    const canDelete = scope.isAdmin
+      || Boolean(scope.companyId && document.companyId === scope.companyId)
+      || Boolean(scope.individualClientId && document.individualClientId === scope.individualClientId)
+    if (!canDelete) throw new Error('Sem acesso a este documento')
+
+    if (document.storagePath) {
+      const { error } = await supabaseAdmin.storage.from('documents').remove([document.storagePath])
+      if (error) throw new Error(error.message)
+    }
+    await db.deleteDocument(id)
+    return { success: true }
+  })
+
 export const fetchAlerts = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .handler(async () => {
@@ -833,7 +868,7 @@ export const fetchApiConnections = createServerFn({ method: 'GET' })
 export const fetchAdminAll = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
-    const [companies, companyUsers, userEvents, apiConnections, policies, rawClaims, documents, individualClients] = await Promise.all([
+    const [companies, companyUsers, userEvents, apiConnections, policies, rawClaims, documents, individualClients, managedPolicyDocuments] = await Promise.all([
       db.getCompanies(),
       db.getCompanyUsers(),
       db.getUserMetricEvents(),
@@ -842,6 +877,7 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       db.getClaims(),
       db.getDocuments(),
       db.getIndividualClients(),
+      netlifyDb.select().from(policyDocuments),
     ])
     const claims = normalizeClaimsByPolicy(rawClaims)
     const claimOperationalSummary = Object.fromEntries(
@@ -892,7 +928,22 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       policies,
       claims,
       claimOperationalSummary,
-      documents,
+      documents: [
+        ...managedPolicyDocuments.map((document) => ({
+          id: document.id,
+          companyId: document.companyId || undefined,
+          individualClientId: document.individualClientId || undefined,
+          name: document.fileName,
+          category: 'policy' as const,
+          size: document.size,
+          mimeType: document.contentType,
+          uploadedBy: document.uploadedByUserId,
+          uploadedByType: 'client' as const,
+          uploadedAt: document.createdAt.toISOString(),
+          storagePath: `netlify:${document.id}`,
+        })),
+        ...documents,
+      ],
       individualClients: filteredIndividualClients,
     }
   })
@@ -1630,6 +1681,22 @@ export const getDocumentUrl = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: { storagePath: string }) => d)
   .handler(async ({ data }) => {
+    if (data.storagePath.startsWith('netlify:')) {
+      const documentId = data.storagePath.slice('netlify:'.length)
+      const [document] = await netlifyDb
+        .select()
+        .from(policyDocuments)
+        .where(eq(policyDocuments.id, documentId))
+        .limit(1)
+      if (!document || !(await fetchAccessiblePolicy(document.policyId))) {
+        throw new Error('Sem acesso a este documento')
+      }
+      return { url: `/api/policy-document?documentId=${encodeURIComponent(documentId)}` }
+    }
+    const policyId = data.storagePath.split('/policies/')[1]?.split('/')[0]
+    if (policyId && !(await fetchAccessiblePolicy(policyId))) {
+      throw new Error('Sem acesso a este documento')
+    }
     const { data: urlData, error } = await supabaseAdmin.storage
       .from('documents')
       .createSignedUrl(data.storagePath, 3600)
@@ -2591,7 +2658,7 @@ export const createPolicy = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator(
     (d: {
-      companyId: string
+      companyId?: string
       type: string
       insurer: string
       policyNumber: string
@@ -2607,14 +2674,18 @@ export const createPolicy = createServerFn({ method: 'POST' })
   )
   .handler(async ({ data }) => {
     const scope = await getViewerScope()
-    const companyId = scope.companyId ?? data.companyId
-    if (!companyId) throw new Error('Empresa não associada ao utilizador')
+    const companyId = scope.companyId ?? (scope.isAdmin ? data.companyId : undefined)
+    const individualClientId = scope.individualClientId ?? undefined
+    if (!scope.isAdmin && !companyId && !individualClientId) {
+      throw new Error('Cliente não associado ao utilizador')
+    }
 
     const id = `pol_${Date.now()}`
     await db.createPolicy({
       id,
       ...data,
-      companyId,
+      companyId: companyId ?? '',
+      individualClientId,
       type: data.type as any,
       status: 'active',
       createdAt: new Date().toISOString(),
@@ -2631,6 +2702,8 @@ export const updatePolicy = createServerFn({ method: 'POST' })
     }) => d
   )
   .handler(async ({ data }) => {
+    const policy = await fetchAccessiblePolicy(data.id)
+    if (!policy) throw new Error('Sem acesso a esta apólice')
     await db.updatePolicy(data.id, data.updates)
     return { success: true }
   })
@@ -2639,9 +2712,31 @@ export const deletePolicy = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((id: string) => id)
   .handler(async ({ data: id }) => {
+    const policy = await fetchAccessiblePolicy(id)
+    if (!policy) throw new Error('Sem acesso a esta apólice')
+    const managedDocuments = await netlifyDb
+      .select()
+      .from(policyDocuments)
+      .where(eq(policyDocuments.policyId, id))
+    const store = getStore({ name: 'policy-documents', consistency: 'strong' })
+    await Promise.all(managedDocuments.map((document) => store.delete(document.blobKey)))
+    await netlifyDb.delete(policyDocuments).where(eq(policyDocuments.policyId, id))
+
+    const legacyPrefix = `${policy.companyId || 'general'}/policies/${id}`
+    const { data: legacyFiles } = await supabaseAdmin.storage
+      .from('documents')
+      .list(legacyPrefix, { limit: 100 })
+    const legacyPaths = (legacyFiles ?? [])
+      .filter((file) => file.name !== '.emptyFolderPlaceholder')
+      .map((file) => `${legacyPrefix}/${file.name}`)
+    if (legacyPaths.length > 0) {
+      await supabaseAdmin.storage.from('documents').remove(legacyPaths)
+    }
+
     await Promise.all([
       supabaseAdmin.from('renewal_alerts_state').delete().eq('policy_id', id),
       supabaseAdmin.from('renewal_alerts_history').delete().eq('policy_id', id),
+      supabaseAdmin.from('documents').delete().eq('policy_id', id),
     ])
     await db.deletePolicy(id)
     return { success: true }
@@ -3040,18 +3135,34 @@ export const fetchIXTaxes = createServerFn({ method: 'GET' })
 // Policy Documents (Supabase Storage)
 // ============================================================
 
+async function fetchAccessiblePolicy(policyId: string) {
+  const [scope, policy] = await Promise.all([getViewerScope(), db.getPolicy(policyId)])
+  if (!policy) return undefined
+  if (scope.isAdmin) return policy
+  if (scope.companyId && policy.companyId === scope.companyId) return policy
+  if (scope.individualClientId && policy.individualClientId === scope.individualClientId) return policy
+  return undefined
+}
+
 export const fetchPolicyDocuments = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: { policyId: string; companyId?: string }) => d)
   .handler(async ({ data }) => {
-    const scope = await getViewerScope()
-    const companyId = scope.companyId ?? data.companyId ?? 'general'
+    const policy = await fetchAccessiblePolicy(data.policyId)
+    if (!policy) throw new Error('Sem acesso a esta apólice')
+    const companyId = policy.companyId || data.companyId || 'general'
     const prefix = `${companyId}/policies/${data.policyId}`
-    const { data: files, error } = await supabaseAdmin.storage
-      .from('documents')
-      .list(prefix, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } })
-    if (error) throw new Error(error.message)
-    return (files ?? [])
+    const [{ data: files, error }, netlifyFiles] = await Promise.all([
+      supabaseAdmin.storage
+        .from('documents')
+        .list(prefix, { limit: 100, sortBy: { column: 'created_at', order: 'desc' } }),
+      netlifyDb
+        .select()
+        .from(policyDocuments)
+        .where(eq(policyDocuments.policyId, data.policyId)),
+    ])
+    if (error) console.error('fetchPolicyDocuments legacy storage:', error.message)
+    const legacyDocuments = (files ?? [])
       .filter((f) => f.name !== '.emptyFolderPlaceholder')
       .map((f) => ({
         id: f.id ?? f.name,
@@ -3061,16 +3172,45 @@ export const fetchPolicyDocuments = createServerFn({ method: 'GET' })
         mimeType: (f.metadata as any)?.mimetype ?? '',
         uploadedAt: f.created_at ?? '',
       }))
+    const managedDocuments = netlifyFiles.map((file) => ({
+      id: file.id,
+      name: file.fileName,
+      storagePath: `netlify:${file.id}`,
+      size: file.size,
+      mimeType: file.contentType,
+      uploadedAt: file.createdAt.toISOString(),
+    }))
+    return [...managedDocuments, ...legacyDocuments]
   })
 
 export const adminDeletePolicyDocument = createServerFn({ method: 'POST' })
-  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .middleware([requireAuthMiddleware])
   .inputValidator((d: { storagePath: string }) => d)
   .handler(async ({ data }) => {
+    if (data.storagePath.startsWith('netlify:')) {
+      const documentId = data.storagePath.slice('netlify:'.length)
+      const [document] = await netlifyDb
+        .select()
+        .from(policyDocuments)
+        .where(eq(policyDocuments.id, documentId))
+        .limit(1)
+      if (!document || !(await fetchAccessiblePolicy(document.policyId))) {
+        throw new Error('Sem acesso a este documento')
+      }
+      await getStore({ name: 'policy-documents', consistency: 'strong' }).delete(document.blobKey)
+      await netlifyDb.delete(policyDocuments).where(eq(policyDocuments.id, documentId))
+      return { success: true }
+    }
+
+    const policyId = data.storagePath.split('/policies/')[1]?.split('/')[0]
+    if (!policyId || !(await fetchAccessiblePolicy(policyId))) {
+      throw new Error('Sem acesso a este documento')
+    }
     const { error } = await supabaseAdmin.storage
       .from('documents')
       .remove([data.storagePath])
     if (error) throw new Error(error.message)
+    await supabaseAdmin.from('documents').delete().eq('storage_path', data.storagePath)
     return { success: true }
   })
 

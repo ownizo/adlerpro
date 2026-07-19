@@ -1,5 +1,5 @@
 /**
- * OneLayout — layout shell for all /one/* routes (Os Meus Seguros portal).
+ * OneLayout — layout shell for all /one/* My Cover Vault routes.
  * Not a TanStack Router route file; used as a wrapper component by each
  * /one/* route, similar to how AppLayout works for the main portal.
  *
@@ -57,19 +57,18 @@ export function OneLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F4F6FA', fontFamily: "'Montserrat', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: '#ffffff', fontFamily: "'Montserrat', sans-serif" }}>
 
       {/* ── Top nav ── */}
       <nav style={styles.nav}>
-        {/* Left zone — brand text */}
+        {/* Left zone — My Cover Vault wordmark from the approved reference */}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', minWidth: 0 }}>
           <a href="/one/dashboard" style={styles.logo}>
-            <span style={{ color: '#fff', fontWeight: 700, letterSpacing: '0.04em' }}>{brand.name}</span>
-            <span style={{ color: gold, fontWeight: 300, fontSize: '0.6em', letterSpacing: '0.05em', marginLeft: 8 }}>{brand.tagline}</span>
+            <img src="/my-cover-vault-logo.svg" alt={`${brand.name} ${brand.tagline}`} style={{ width: 285, maxWidth: '100%', height: 34, display: 'block' }} />
           </a>
         </div>
 
-        {/* Centre zone — logo centrado */}
+        {/* Centre zone — Adler & Rochefort mark */}
         <img src="/logo.png" alt="Adler & Rochefort" style={{ height: 32, width: 'auto', display: 'block', flexShrink: 0 }} />
 
         {/* Right zone — links de navegação + sair */}
@@ -175,7 +174,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#F4F6FA',
+    background: '#ffffff',
   },
   spinner: {
     width: 32,
@@ -286,6 +285,7 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: 1100,
     margin: '0 auto',
     padding: '2rem 1.25rem',
+    background: '#ffffff',
   },
 }
 

@@ -207,6 +207,17 @@ export async function getPolicies(companyId?: string): Promise<Policy[]> {
   return rowsToCamel<Policy>(data ?? [])
 }
 
+export async function getPoliciesByIndividualClientId(individualClientId: string): Promise<Policy[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('policies')
+    .select('*')
+    .eq('individual_client_id', individualClientId)
+    .order('created_at', { ascending: true })
+  if (error) { console.error('getPoliciesByIndividualClientId error:', error); return [] }
+  return rowsToCamel<Policy>(data ?? [])
+}
+
 export async function getPolicy(id: string): Promise<Policy | undefined> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('policies').select('*').eq('id', id).single()

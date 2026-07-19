@@ -72,12 +72,16 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+*, *::before, *::after {
+  font-family: 'Montserrat', sans-serif !important;
+}
+
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--ui-font-family);
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-family: 'Montserrat', sans-serif !important;
 }
 
 ::-webkit-scrollbar {

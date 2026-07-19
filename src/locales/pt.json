@@ -191,6 +191,7 @@
     "close": "Fechar",
     "aiExtracted": "✦ Dados extraídos via IA",
     "aiExtractedDetails": "Capital: {{capital}} · Prémio: {{premium}} · Franquia: {{deductible}}",
+    "documentReady": "Documento pronto para associar à apólice",
     "deleteConfirm": "Tem a certeza que deseja eliminar esta apólice?",
     "selectType": "Seleccionar tipo...",
     "insurerPlaceholder": "Ex: Fidelidade",

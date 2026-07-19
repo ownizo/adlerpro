@@ -1,8 +1,8 @@
 {
-  "name": "Os Meus Seguros",
-  "short_name": "Os Meus Seguros",
-  "description": "Portal seguro para clientes de corretagem de seguros empresariais",
-  "lang": "pt-PT",
+  "name": "My Cover Vault",
+  "short_name": "My Cover Vault",
+  "description": "A secure insurance portal for international clients",
+  "lang": "en-GB",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useState, useEffect, useRef } from 'react'
 import { OneLayout } from './__root'
 import { oneT, oneBrand, fmtDate } from '@/lib/one-brand'
+import { deleteDocument } from '@/lib/server-fns'
 
 export const Route = createFileRoute('/one/documents')({
   component: OneDocuments,
@@ -48,6 +49,7 @@ function OneDocuments() {
   const [uploadError,  setUploadError]  = useState('')
   const [previewUrl,   setPreviewUrl]   = useState<string | null>(null)
   const [previewName,  setPreviewName]  = useState('')
+  const [deletingId,   setDeletingId]   = useState<string | null>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
   const fileRef   = useRef<HTMLInputElement>(null)
 
@@ -152,6 +154,19 @@ function OneDocuments() {
       setPreviewUrl(url)
     } catch (e: any) {
       alert(t.documents.openError + e.message)
+    }
+  }
+
+  async function handleDelete(doc: Document) {
+    if (!window.confirm(t.documents.confirmDelete.replace('{name}', doc.name))) return
+    setDeletingId(doc.id)
+    try {
+      await deleteDocument({ data: doc.id })
+      setDocuments((current) => current.filter((item) => item.id !== doc.id))
+    } catch {
+      window.alert(t.documents.deleteError)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -264,6 +279,14 @@ function OneDocuments() {
                         {t.documents.view}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      disabled={deletingId === doc.id}
+                      onClick={() => handleDelete(doc)}
+                      style={{ padding: '0.3rem 0.7rem', background: '#FFF1F2', color: '#BE123C', border: '1px solid #FECDD3', borderRadius: 6, cursor: deletingId === doc.id ? 'wait' : 'pointer', fontSize: '0.72rem', fontWeight: 600, flexShrink: 0, opacity: deletingId === doc.id ? 0.65 : 1 }}
+                    >
+                      {deletingId === doc.id ? t.documents.deleting : t.documents.delete}
+                    </button>
                   </div>
                 )
               })}

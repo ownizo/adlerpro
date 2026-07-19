@@ -3,6 +3,7 @@ import { CLAIM_STATUS_LABELS, POLICY_TYPE_LABELS } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { ClientNotes } from './ClientNotes'
 import { ClientTasks } from './ClientTasks'
+import { getDocumentUrl } from '@/lib/server-fns'
 
 type Subject =
   | { kind: 'company'; company: Company }
@@ -114,8 +115,20 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
                 key={d.id}
                 className="bg-white rounded-[4px] border border-navy-200 px-4 py-3 flex items-center justify-between gap-2"
               >
-                <p className="text-sm text-navy-700">{d.name}</p>
-                <span className="text-xs text-navy-500">{d.category} · {formatDate(d.uploadedAt)}</span>
+                <div>
+                  <p className="text-sm text-navy-700">{d.name}</p>
+                  <span className="text-xs text-navy-500">{d.category} · {formatDate(d.uploadedAt)}</span>
+                </div>
+                <button
+                  type="button"
+                  className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                  onClick={async () => {
+                    const { url } = await getDocumentUrl({ data: { storagePath: d.storagePath } })
+                    window.open(url, '_blank', 'noopener,noreferrer')
+                  }}
+                >
+                  Abrir
+                </button>
               </div>
             ))}
           </div>

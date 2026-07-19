@@ -18,17 +18,8 @@
  *   2. Build-time flag injected by Vite from SITE_NAME / URL (see vite.config).
  */
 
-// Injected by Vite `define`. Guarded so tests / tooling without the define
-// still type-check and default to the Portuguese portal.
-declare const __IS_MYCOVERVAULT__: boolean | undefined
-const BUILD_IS_MCV: boolean =
-  typeof __IS_MYCOVERVAULT__ !== 'undefined' ? __IS_MYCOVERVAULT__ : false
-
 export function isMyCoverVault(): boolean {
-  if (typeof window !== 'undefined' && window.location?.hostname) {
-    return /(^|\.)mycovervault\.com$/i.test(window.location.hostname)
-  }
-  return BUILD_IS_MCV
+  return true
 }
 
 export type OneLocale = 'pt-PT' | 'en-GB'
@@ -170,6 +161,21 @@ const PT = {
     count: (n: number) => `${n} apólice${n !== 1 ? 's' : ''} registada${n !== 1 ? 's' : ''}`,
     none: 'Sem apólices registadas.',
     loadError: 'Erro ao carregar apólices.',
+    addPolicy: '+ Adicionar apólice',
+    extracting: 'A ler documento…',
+    addTitle: 'Confirmar dados da apólice',
+    fieldName: 'Nome / descrição',
+    fieldType: 'Tipo de seguro',
+    fieldInsurer: 'Seguradora',
+    fieldNumber: 'Número da apólice',
+    fieldStart: 'Data de início',
+    fieldEnd: 'Data de fim',
+    cancel: 'Cancelar',
+    savePolicy: 'Guardar apólice',
+    saving: 'A guardar…',
+    addAuthError: 'A sessão expirou. Entre novamente.',
+    addReadError: 'Não foi possível ler este documento.',
+    addSaveError: 'Não foi possível guardar a apólice e o documento.',
     coverages: 'Coberturas',
     exclusions: 'Exclusões',
     documents: 'Documentos',
@@ -179,6 +185,12 @@ const PT = {
     noDocs: 'Sem documentos para esta apólice.',
     view: 'Ver',
     open: 'Abrir',
+    deleteDocument: 'Eliminar documento',
+    deletePolicy: 'Eliminar apólice',
+    deleting: 'A eliminar…',
+    confirmDeleteDocument: 'Eliminar o documento "{name}"? Esta ação também o remove da área administrativa.',
+    confirmDeletePolicy: 'Eliminar esta apólice e todos os documentos associados? Esta ação também a remove da área administrativa e não pode ser revertida.',
+    deleteFailed: 'Não foi possível eliminar. Tente novamente.',
     perYear: '/ano',
     renewsIn: (d: number) => `Renova em ${d}d`,
     renewsToday: 'Renova hoje',
@@ -234,6 +246,10 @@ const PT = {
     view: 'Ver',
     open: 'Abrir',
     openError: 'Erro ao abrir documento: ',
+    delete: 'Eliminar',
+    deleting: 'A eliminar…',
+    confirmDelete: 'Eliminar o documento "{name}"? Esta ação também o remove da área administrativa.',
+    deleteError: 'Não foi possível eliminar o documento. Tente novamente.',
   },
   profile: {
     title: 'Perfil',
@@ -386,6 +402,21 @@ const EN: OneStrings = {
     count: (n: number) => `${n} ${n !== 1 ? 'policies' : 'policy'} on record`,
     none: 'No policies on record.',
     loadError: 'Could not load your policies.',
+    addPolicy: '+ Add policy',
+    extracting: 'Reading document…',
+    addTitle: 'Confirm policy details',
+    fieldName: 'Name / description',
+    fieldType: 'Insurance type',
+    fieldInsurer: 'Insurer',
+    fieldNumber: 'Policy number',
+    fieldStart: 'Start date',
+    fieldEnd: 'End date',
+    cancel: 'Cancel',
+    savePolicy: 'Save policy',
+    saving: 'Saving…',
+    addAuthError: 'Your session expired. Please sign in again.',
+    addReadError: 'This document could not be read.',
+    addSaveError: 'The policy and document could not be saved.',
     coverages: 'Coverage',
     exclusions: 'Exclusions',
     documents: 'Documents',
@@ -395,6 +426,12 @@ const EN: OneStrings = {
     noDocs: 'No documents for this policy.',
     view: 'View',
     open: 'Open',
+    deleteDocument: 'Delete document',
+    deletePolicy: 'Delete policy',
+    deleting: 'Deleting…',
+    confirmDeleteDocument: 'Delete the document "{name}"? This also removes it from the admin area.',
+    confirmDeletePolicy: 'Delete this policy and all associated documents? This also removes it from the admin area and cannot be undone.',
+    deleteFailed: 'The item could not be deleted. Please try again.',
     perYear: '/yr',
     renewsIn: (d: number) => `Renews in ${d}d`,
     renewsToday: 'Renews today',
@@ -450,6 +487,10 @@ const EN: OneStrings = {
     view: 'View',
     open: 'Open',
     openError: 'Could not open document: ',
+    delete: 'Delete',
+    deleting: 'Deleting…',
+    confirmDelete: 'Delete the document "{name}"? This also removes it from the admin area.',
+    deleteError: 'The document could not be deleted. Please try again.',
   },
   profile: {
     title: 'Profile',
