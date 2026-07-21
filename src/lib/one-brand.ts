@@ -18,8 +18,13 @@
  *   2. Build-time flag injected by Vite from SITE_NAME / URL (see vite.config).
  */
 
+declare const __IS_MYCOVERVAULT__: boolean
+
 export function isMyCoverVault(): boolean {
-  return true
+  if (typeof window !== 'undefined') {
+    return window.location.hostname.endsWith('mycovervault.com')
+  }
+  return __IS_MYCOVERVAULT__
 }
 
 export type OneLocale = 'pt-PT' | 'en-GB'
