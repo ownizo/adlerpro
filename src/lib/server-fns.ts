@@ -868,7 +868,7 @@ export const fetchApiConnections = createServerFn({ method: 'GET' })
 export const fetchAdminAll = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .handler(async () => {
-    const [companies, companyUsers, userEvents, apiConnections, policies, rawClaims, documents, individualClients, managedPolicyDocuments] = await Promise.all([
+    const [companies, companyUsers, userEvents, apiConnections, policies, rawClaims, documents, individualClients, managedPolicyDocuments, websiteLeadClientIdsSet] = await Promise.all([
       db.getCompanies(),
       db.getCompanyUsers(),
       db.getUserMetricEvents(),
@@ -878,6 +878,7 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
       db.getDocuments(),
       db.getIndividualClients(),
       netlifyDb.select().from(policyDocuments),
+      db.getWebsiteLeadIndividualClientIds(),
     ])
     const claims = normalizeClaimsByPolicy(rawClaims)
     const claimOperationalSummary = Object.fromEntries(
@@ -945,6 +946,10 @@ export const fetchAdminAll = createServerFn({ method: 'GET' })
         ...documents,
       ],
       individualClients: filteredIndividualClients,
+      // Só os ids — usado para o indicador "Origem: Website" na listagem;
+      // o detalhe de cada lead é lido à parte (fetchWebsiteLeads) quando a
+      // ficha do cliente é aberta.
+      websiteLeadClientIds: [...websiteLeadClientIdsSet],
     }
   })
 
@@ -2455,6 +2460,14 @@ export const adminDeleteIndividualClient = createServerFn({ method: 'POST' })
     await db.deleteIndividualClient(id)
     return { success: true }
   })
+
+// ── Website Leads (histórico de pedidos do site público) ────────
+// Só leitura — a escrita é exclusivamente via netlify/api-functions/lead-intake.mts.
+
+export const fetchWebsiteLeads = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((individualClientId: string) => individualClientId)
+  .handler(async ({ data: individualClientId }) => db.getWebsiteLeadsByIndividualClientId(individualClientId))
 
 export const fetchClientNotes = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])

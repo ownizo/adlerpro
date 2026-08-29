@@ -441,3 +441,32 @@ export interface ClientTask {
   source: 'manual' | 'renewal'
   policyId?: string            // FK policies.id; só preenchido na fatia 4
 }
+
+/**
+ * Uma submissão de formulário do site público (adlerrochefort.com)
+ * já classificada como pessoa singular e associada a um
+ * individual_client. Histórico de pedidos, não um pipeline de vendas
+ * — ver netlify/api-functions/lead-intake.mts.
+ *
+ * Deliberadamente não inclui dados sensíveis do formulário original
+ * (saúde, datas de nascimento, documentos de identificação, morada) —
+ * ver a nota de privacidade em migrations/20260829_website_leads.sql.
+ */
+export interface WebsiteLead {
+  id: string
+  individualClientId: string
+  submissionId?: string
+  formName: string
+  market?: string
+  product?: string
+  source?: string
+  sourceUrl?: string
+  utmSource?: string
+  utmMedium?: string
+  utmCampaign?: string
+  utmContent?: string
+  utmTerm?: string
+  metadata?: Record<string, string | number | boolean>
+  receivedAt: string
+  createdAt: string
+}

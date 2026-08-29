@@ -298,6 +298,7 @@ function AdminPage() {
   const [claimOperationalSummary, setClaimOperationalSummary] = useState<Record<string, { responsibleName?: string; messagesCount: number; documentsCount: number; lastMessageAt?: string; updatedAt?: string }>>({})
   const [documents, setDocuments] = useState<DocType[]>([])
   const [individualClients, setIndividualClients] = useState<IndividualClient[]>([])
+  const [websiteLeadClientIds, setWebsiteLeadClientIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [showNewCompany, setShowNewCompany] = useState(false)
   const [showNewPolicy, setShowNewPolicy] = useState(false)
@@ -326,7 +327,7 @@ function AdminPage() {
   const [loadingClaimWorkspace, setLoadingClaimWorkspace] = useState(false)
 
   const reload = async () => {
-    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, claimOperationalSummary: cos, documents: d, individualClients: ic } = await fetchAdminAll()
+    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, claimOperationalSummary: cos, documents: d, individualClients: ic, websiteLeadClientIds: wlc } = await fetchAdminAll()
     setCompanies(c)
     setCompanyUsers(u)
     setUserEvents(e)
@@ -336,6 +337,7 @@ function AdminPage() {
     setClaimOperationalSummary(cos ?? {})
     setDocuments(d)
     setIndividualClients(ic ?? [])
+    setWebsiteLeadClientIds(new Set(wlc ?? []))
   }
 
   useEffect(() => {
@@ -955,6 +957,14 @@ function AdminPage() {
                               <td className="px-4 py-3 text-sm font-medium text-navy-700">
                                 <span className="mr-1 text-navy-400">{isExpanded ? '▾' : '▸'}</span>
                                 {client.fullName}
+                                {websiteLeadClientIds.has(client.id) && (
+                                  <span
+                                    title="Origem: Website"
+                                    className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-600 align-middle"
+                                  >
+                                    Website
+                                  </span>
+                                )}
                               </td>
                               <td className="px-4 py-3 text-sm text-navy-500">{client.nif || '—'}</td>
                               <td className="px-4 py-3 text-sm text-navy-500">{client.email || '—'}</td>
