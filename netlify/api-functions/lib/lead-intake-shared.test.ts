@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { parseLeadIntakePayload } from './lead-intake-shared.ts'
+import { parseLeadIntakePayload, buildLeadIntakeResponse } from './lead-intake-shared.ts'
 
 function basePayload(overrides: Record<string, unknown> = {}) {
   return {
@@ -97,4 +97,80 @@ test('caps metadata to a small number of flat keys', () => {
   if (result.ok) {
     assert.ok(Object.keys(result.value.metadata ?? {}).length <= 20)
   }
+})
+
+// ── Hardening: opportunity creation is best-effort, never fails the intake ──
+
+// A: lead novo + opportunity success -> ok true
+test('buildLeadIntakeResponse: fresh lead + opportunity created -> ok:true with both flags true', () => {
+  const response = buildLeadIntakeResponse({
+    clientId: 'client-1',
+    clientCreated: true,
+    leadCreated: true,
+    opportunityCreated: true,
+  })
+  assert.deepEqual(response, {
+    ok: true,
+    clientId: 'client-1',
+    clientCreated: true,
+    leadCreated: true,
+    duplicateSubmission: false,
+    opportunityCreated: true,
+  })
+})
+
+// B: lead novo + opportunity failure -> lead permanece válido, resposta
+// global continua ok, opportunityCreated false
+test('buildLeadIntakeResponse: fresh lead + opportunity failure -> still ok:true, leadCreated:true, opportunityCreated:false', () => {
+  const response = buildLeadIntakeResponse({
+    clientId: 'client-1',
+    clientCreated: true,
+    leadCreated: true,
+    opportunityCreated: false,
+  })
+  assert.equal(response.ok, true)
+  assert.equal(response.leadCreated, true)
+  assert.equal(response.opportunityCreated, false)
+  assert.equal(response.duplicateSubmission, false)
+})
+
+// C/D: retry — lead reutilizado. A resposta continua ok:true e nunca expõe
+// se por trás disto houve uma cura de uma falha anterior ou uma reutilização
+// pura; o que importa é nunca haver erro nem duplicado.
+test('buildLeadIntakeResponse: retry (lead reused) + opportunity healed on this attempt -> duplicateSubmission true, opportunityCreated true', () => {
+  const response = buildLeadIntakeResponse({
+    clientId: 'client-1',
+    clientCreated: false,
+    leadCreated: false,
+    opportunityCreated: true,
+  })
+  assert.equal(response.ok, true)
+  assert.equal(response.duplicateSubmission, true)
+  assert.equal(response.opportunityCreated, true)
+})
+
+test('buildLeadIntakeResponse: retry (lead reused) + opportunity already existed -> opportunityCreated false, still ok', () => {
+  const response = buildLeadIntakeResponse({
+    clientId: 'client-1',
+    clientCreated: false,
+    leadCreated: false,
+    opportunityCreated: false,
+  })
+  assert.equal(response.ok, true)
+  assert.equal(response.duplicateSubmission, true)
+  assert.equal(response.opportunityCreated, false)
+})
+
+test('buildLeadIntakeResponse: never accepts or leaks an internal error message', () => {
+  // A própria assinatura da função não tem parâmetro para uma mensagem de
+  // erro — este teste documenta essa garantia estrutural.
+  const response = buildLeadIntakeResponse({
+    clientId: 'client-1',
+    clientCreated: true,
+    leadCreated: true,
+    opportunityCreated: false,
+  })
+  const serialized = JSON.stringify(response)
+  assert.equal(serialized.includes('Supabase'), false)
+  assert.equal(serialized.includes('error'), false)
 })

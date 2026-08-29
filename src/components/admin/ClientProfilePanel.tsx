@@ -4,6 +4,7 @@ import { formatDate } from '@/lib/utils'
 import { ClientNotes } from './ClientNotes'
 import { ClientTasks } from './ClientTasks'
 import { WebsiteLeads } from './WebsiteLeads'
+import { SalesOpportunitiesSection } from './SalesOpportunitiesSection'
 import { getDocumentUrl } from '@/lib/server-fns'
 
 type Subject =
@@ -72,9 +73,19 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
   }
 
   const timeline = buildClientTimeline(subjectPolicies, subjectClaims, subjectDocs)
+  const activePolicies = subjectPolicies.filter((p) => p.status === 'active').length
+  const openClaims = subjectClaims.filter((c) => c.status !== 'paid' && c.status !== 'denied').length
 
   return (
     <div className="mt-6 pt-6 border-t border-navy-200 space-y-6">
+      {/* Resumo rápido — "o que é preciso saber já", sem repetir os detalhes
+          que já aparecem nas secções abaixo. Ver requisito "client summary". */}
+      <div className="flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-navy-500">
+        <span><strong className="text-navy-700 font-semibold">{activePolicies}</strong> apólices ativas</span>
+        <span><strong className="text-navy-700 font-semibold">{openClaims}</strong> sinistros abertos</span>
+        <span><strong className="text-navy-700 font-semibold">{subjectDocs.length}</strong> documentos</span>
+      </div>
+
       {/* Sinistros */}
       <div>
         <h4 className="text-sm font-semibold text-navy-700 mb-3">
@@ -160,6 +171,13 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
 
       {/* Pedidos do Website — só para clientes particulares (é a origem deste histórico) */}
       {subject.kind === 'individual' && <WebsiteLeads individualClientId={subject.client.id} />}
+
+      {/* Oportunidades — CRM comercial (backoffice only) */}
+      <SalesOpportunitiesSection
+        companyId={subject.kind === 'company' ? subject.company.id : undefined}
+        individualClientId={subject.kind === 'individual' ? subject.client.id : undefined}
+        clientName={subject.kind === 'company' ? subject.company.name : subject.client.fullName}
+      />
 
       {/* Tarefas */}
       <ClientTasks

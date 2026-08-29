@@ -438,8 +438,9 @@ export interface ClientTask {
   status: 'pending' | 'done'
   doneAt?: string              // ISO timestamp; undefined enquanto pending
   createdAt: string
-  source: 'manual' | 'renewal'
+  source: 'manual' | 'renewal' | 'opportunity'
   policyId?: string            // FK policies.id; só preenchido na fatia 4
+  opportunityId?: string       // FK sales_opportunities.id; follow-up de uma oportunidade (CRM 2)
 }
 
 /**
@@ -469,4 +470,103 @@ export interface WebsiteLead {
   metadata?: Record<string, string | number | boolean>
   receivedAt: string
   createdAt: string
+}
+
+export type SalesOpportunityStage =
+  | 'new'
+  | 'contacted'
+  | 'needs_analysis'
+  | 'quoted'
+  | 'negotiation'
+  | 'won'
+  | 'lost'
+
+/**
+ * Uma oportunidade comercial no pipeline (CRM 2, fase 1) — BACKOFFICE ONLY,
+ * nunca exposta aos portais de cliente. Pertence a uma company OU a um
+ * individual_client (XOR, igual a client_notes/client_tasks), nunca às duas
+ * nem a nenhuma. Pode nascer de um website_lead (websiteLeadId preenchido,
+ * source: 'website') ou ser criada manualmente no admin.
+ *
+ * Só guarda contexto comercial — nunca dados sensíveis do formulário de
+ * origem (saúde, DOB, documentos, NIF, notas clínicas); ver privacidade em
+ * migrations/20260829_sales_opportunities.sql.
+ */
+export interface SalesOpportunity {
+  id: string
+  companyId?: string
+  individualClientId?: string
+  websiteLeadId?: string
+
+  title: string
+  market?: string
+  product?: string
+
+  stage: SalesOpportunityStage
+
+  source?: string
+  sourceDetail?: string
+
+  estimatedAnnualPremium?: number
+  estimatedRevenue?: number
+  currency: string
+
+  assignedTo?: string
+
+  expectedCloseDate?: string   // 'YYYY-MM-DD'
+  nextFollowUpAt?: string      // ISO timestamp
+
+  lostReason?: string
+
+  createdAt: string
+  updatedAt: string
+  closedAt?: string
+}
+
+// Campos que um update genérico (adminUpdateSalesOpportunity) pode alterar.
+// Deliberadamente exclui id/companyId/individualClientId/websiteLeadId/
+// createdAt/closedAt/stage — dono e proveniência não mudam por aqui (stage
+// tem a sua própria função, que também deriva closedAt automaticamente) —
+// ver pickEditableOpportunityFields em sales-opportunity-rules.ts.
+export const SALES_OPPORTUNITY_EDITABLE_FIELDS = [
+  'title',
+  'market',
+  'product',
+  'source',
+  'sourceDetail',
+  'estimatedAnnualPremium',
+  'estimatedRevenue',
+  'currency',
+  'assignedTo',
+  'expectedCloseDate',
+  'nextFollowUpAt',
+  'lostReason',
+] as const satisfies readonly (keyof SalesOpportunity)[]
+
+export type SalesOpportunityEditableUpdate = Partial<
+  Pick<SalesOpportunity, (typeof SALES_OPPORTUNITY_EDITABLE_FIELDS)[number]>
+>
+
+/**
+ * Resumo comercial pequeno para o dashboard — sem forecasting complexo.
+ * Prémio (o que o cliente paga à seguradora) e receita (o que fica para a
+ * Adler) são métricas distintas e nunca se substituem uma à outra — ver
+ * computeSalesPipelineStats em sales-opportunity-rules.ts.
+ */
+export interface SalesPipelineStats {
+  openCount: number
+  newThisMonthCount: number
+  quotedCount: number
+  wonThisMonthCount: number
+  lostThisMonthCount: number
+  /** sum(estimatedAnnualPremium) das oportunidades abertas. */
+  openPipelinePremium: number
+  /** sum(estimatedRevenue) das oportunidades abertas. */
+  openPipelineRevenue: number
+  /** sum(estimatedRevenue) das oportunidades won fechadas este mês. */
+  wonRevenueThisMonth: number
+  /** Oportunidades abertas com next_follow_up_at no passado — ver dashboard "o que precisa de atenção hoje". */
+  overdueFollowUpsCount: number
+  /** Oportunidades abertas com next_follow_up_at hoje. */
+  dueTodayFollowUpsCount: number
 }

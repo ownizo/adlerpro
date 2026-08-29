@@ -41,6 +41,7 @@ import {
   adminUpdateRenewalAlertStatus,
   adminTriggerRenewalAlerts,
   adminSendPolicyDocument,
+  fetchSalesPipelineStats,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate, formatFileSize } from '@/lib/utils'
 import type {
@@ -57,6 +58,7 @@ import type {
   RenewalAlertsResponse,
   RenewalAlertStatus,
   ClaimOperationalData,
+  SalesOpportunityStage,
 } from '@/lib/types'
 import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
@@ -65,6 +67,8 @@ import { supabase } from '@/lib/supabase'
 import { ClientProfilePanel } from '@/components/admin/ClientProfilePanel'
 import { AdminTasksPanel } from '@/components/admin/AdminTasksPanel'
 import { AdminMarketingPanel } from '@/components/admin/AdminMarketingPanel'
+import { SalesWorkspace } from '@/components/admin/sales/SalesWorkspace'
+import { SALES_OPPORTUNITY_STAGES } from '@/lib/sales-opportunity-rules'
 async function exportToExcel(data: Record<string, unknown>[], filename: string) {
   const XLSX = await import('xlsx')
   const ws = XLSX.utils.json_to_sheet(data)
@@ -73,7 +77,7 @@ async function exportToExcel(data: Record<string, unknown>[], filename: string) 
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
 
-const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'api', 'profiles', 'tasks', 'alerts', 'marketing'] as const
+const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'api', 'profiles', 'tasks', 'alerts', 'marketing', 'sales'] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
 const RENEWAL_ALERT_STATUS_LABELS: Record<RenewalAlertStatus, string> = {
   pending: 'Pendente',
@@ -277,9 +281,22 @@ function isAdminTab(value: unknown): value is AdminTab {
   return typeof value === 'string' && ADMIN_TABS.includes(value as AdminTab)
 }
 
+// Deep-link leve para métricas clicáveis do dashboard comercial (ver
+// requisito "clickable metrics") — sem arquitetura de routing nova: só mais
+// dois parâmetros opcionais de pesquisa, lidos uma vez por SalesWorkspace
+// para semear os filtros iniciais do separador Comercial.
+function isSalesStageParam(value: unknown): value is SalesOpportunityStage {
+  return typeof value === 'string' && (SALES_OPPORTUNITY_STAGES as string[]).includes(value)
+}
+
+// Anotado explicitamente com propriedades opcionais (`?:`, não `| undefined`)
+// para que <Link search={{ tab: '...' }}> continue válido nos restantes
+// pontos do ficheiro sem ter de passar sempre stage/overdue também.
 export const Route = createFileRoute('/admin')({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): { tab?: AdminTab; stage?: SalesOpportunityStage; overdue?: boolean } => ({
     tab: isAdminTab(search.tab) ? search.tab : undefined,
+    stage: isSalesStageParam(search.stage) ? search.stage : undefined,
+    overdue: search.overdue === '1' || search.overdue === true ? true : undefined,
   }),
   component: AdminPage,
   head: () => ({ meta: [{ title: 'Os Meus Seguros · Admin' }] }),
@@ -287,7 +304,7 @@ export const Route = createFileRoute('/admin')({
 
 function AdminPage() {
   const { user, ready } = useIdentity()
-  const { tab: searchTab } = Route.useSearch()
+  const { tab: searchTab, stage: searchStage, overdue: searchOverdue } = Route.useSearch()
   const tab: AdminTab = searchTab ?? 'dashboard'
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
@@ -1541,10 +1558,107 @@ function AdminPage() {
             )}
 
             {tab === 'marketing' && <AdminMarketingPanel />}
+
+            {tab === 'sales' && (
+              <SalesWorkspace
+                individualClients={individualClients}
+                companies={companies}
+                initialStage={searchStage}
+                initialOverdueOnly={searchOverdue}
+              />
+            )}
           </>
         )}
       </div>
     </AppLayout>
+  )
+}
+
+// Resumo comercial pequeno para o dashboard (CRM 2, fase 1) — sem
+// forecasting complexo, só as contagens/somas pedidas. Busca os seus
+// próprios dados (fetchSalesPipelineStats), independente do resto do
+// dashboard, para não acoplar o pipeline comercial ao carregamento
+// financeiro/renovações já existente.
+function SalesPipelineSummaryWidget() {
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof fetchSalesPipelineStats>> | null>(null)
+
+  useEffect(() => {
+    let active = true
+    fetchSalesPipelineStats()
+      .then((result) => { if (active) setStats(result) })
+      .catch((error) => console.error('[SalesPipelineSummaryWidget] fetchSalesPipelineStats error:', error))
+    return () => { active = false }
+  }, [])
+
+  if (!stats) return null
+
+  // Prémio (o que o cliente paga à seguradora) e receita (o que fica para a
+  // Adler) são métricas diferentes — nunca uma serve de substituto da outra
+  // aqui, ver computeSalesPipelineStats em sales-opportunity-rules.ts.
+  // Hierarquia: 3 primárias (o que importa agora) bem maiores que as 5
+  // secundárias — em vez de 8 cartões idênticos a competir pela atenção.
+  const primary: Array<{ label: string; value: string }> = [
+    { label: 'Oportunidades abertas', value: String(stats.openCount) },
+    { label: 'Pipeline (prémio)', value: formatCurrency(stats.openPipelinePremium) },
+    { label: 'Pipeline (receita)', value: formatCurrency(stats.openPipelineRevenue) },
+  ]
+  const secondary: Array<{ label: string; value: string; to?: { stage?: SalesOpportunityStage } }> = [
+    { label: 'Novas este mês', value: String(stats.newThisMonthCount) },
+    { label: 'Em cotação', value: String(stats.quotedCount), to: { stage: 'quoted' } },
+    { label: 'Ganhas este mês', value: String(stats.wonThisMonthCount), to: { stage: 'won' } },
+    { label: 'Perdidas este mês', value: String(stats.lostThisMonthCount), to: { stage: 'lost' } },
+    { label: 'Receita ganha (mês)', value: formatCurrency(stats.wonRevenueThisMonth) },
+  ]
+  const hasAttention = stats.overdueFollowUpsCount > 0 || stats.dueTodayFollowUpsCount > 0
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-[16px] font-semibold text-slate-800">Comercial</h3>
+        <Link to="/admin" search={{ tab: 'sales' }} className="text-[13px] font-medium text-indigo-600 hover:text-indigo-700">
+          Ver pipeline →
+        </Link>
+      </div>
+
+      {/* "O que precisa de atenção hoje" — ver requisito "actionable dashboard" */}
+      {hasAttention && (
+        <Link
+          to="/admin"
+          search={{ tab: 'sales', overdue: stats.overdueFollowUpsCount > 0 ? true : undefined }}
+          className="flex items-center gap-2 mb-4 px-3 py-2 rounded-md bg-rose-50 border border-rose-100 text-[13px] text-rose-700 hover:bg-rose-100 w-fit"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+          {stats.overdueFollowUpsCount > 0 && <span>{stats.overdueFollowUpsCount} follow-up(s) atrasado(s)</span>}
+          {stats.overdueFollowUpsCount > 0 && stats.dueTodayFollowUpsCount > 0 && <span>·</span>}
+          {stats.dueTodayFollowUpsCount > 0 && <span>{stats.dueTodayFollowUpsCount} para hoje</span>}
+        </Link>
+      )}
+
+      <div className="grid grid-cols-3 gap-4 mb-4">
+        {primary.map((card) => (
+          <div key={card.label}>
+            <p className="text-[26px] font-semibold text-slate-800 tabular-nums">{card.value}</p>
+            <p className="text-[13px] text-slate-500 mt-0.5">{card.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-4 border-t border-slate-100">
+        {secondary.map((card) =>
+          card.to ? (
+            <Link key={card.label} to="/admin" search={{ tab: 'sales', ...card.to }} className="text-center group">
+              <p className="text-[16px] font-semibold text-slate-700 group-hover:text-indigo-600 tabular-nums">{card.value}</p>
+              <p className="text-[12px] text-slate-400 mt-0.5 group-hover:text-indigo-500">{card.label}</p>
+            </Link>
+          ) : (
+            <div key={card.label} className="text-center">
+              <p className="text-[16px] font-semibold text-slate-700 tabular-nums">{card.value}</p>
+              <p className="text-[12px] text-slate-400 mt-0.5">{card.label}</p>
+            </div>
+          ),
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1757,6 +1871,9 @@ function AdminDashboardTab({
   return (
     <div>
       <h2 className="text-lg font-semibold text-navy-700 mb-4">Dashboard Administração</h2>
+
+      <SalesPipelineSummaryWidget />
+
       <div className="bg-white rounded-[4px] border border-navy-200 p-4 mb-6">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <label className="text-sm text-navy-600">

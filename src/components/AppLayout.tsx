@@ -17,7 +17,7 @@ const NAV_ITEMS = [
   { to: '/profile' as const, key: 'nav.profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
 ]
 
-type AdminTab = 'dashboard' | 'companies' | 'individual_clients' | 'policies' | 'claims' | 'billing' | 'api' | 'profiles' | 'tasks' | 'alerts' | 'marketing'
+type AdminTab = 'dashboard' | 'companies' | 'individual_clients' | 'policies' | 'claims' | 'billing' | 'api' | 'profiles' | 'tasks' | 'alerts' | 'marketing' | 'sales'
 
 const ADMIN_NAV_ROOT = {
   to: '/admin' as const,
@@ -25,18 +25,50 @@ const ADMIN_NAV_ROOT = {
   icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
 }
 
-const ADMIN_SUBNAV_ITEMS: Array<{ key: string; tab: AdminTab }> = [
-  { key: 'nav.adminDashboard', tab: 'dashboard' },
-  { key: 'nav.adminCompanies', tab: 'companies' },
-  { key: 'nav.adminIndividualClients', tab: 'individual_clients' },
-  { key: 'nav.adminPoliciesDocs', tab: 'policies' },
-  { key: 'nav.adminClaims', tab: 'claims' },
-  { key: 'nav.adminBilling', tab: 'billing' },
-  { key: 'nav.adminApiLinks', tab: 'api' },
-  { key: 'nav.adminProfilesMetrics', tab: 'profiles' },
-  { key: 'nav.adminTasks', tab: 'tasks' },
-  { key: 'nav.adminAlerts60d', tab: 'alerts' },
-  { key: 'nav.adminMarketing', tab: 'marketing' },
+// Agrupamento conceptual da navegação admin (ver requisito "recommended
+// information architecture") — só reorganiza a apresentação dos MESMOS tabs
+// que já existiam; nenhuma rota nova, nenhuma mudança de comportamento.
+// Escopado inteiramente dentro do bloco `{isAdmin && ...}` deste componente,
+// por isso nunca é visto nem afetado por B2C/B2B.
+const ADMIN_SUBNAV_GROUPS: Array<{ label: string; items: Array<{ key: string; tab: AdminTab }> }> = [
+  {
+    label: 'Vista Geral',
+    items: [{ key: 'nav.adminDashboard', tab: 'dashboard' }],
+  },
+  {
+    label: 'CRM',
+    items: [
+      { key: 'nav.adminSales', tab: 'sales' },
+      { key: 'nav.adminTasks', tab: 'tasks' },
+    ],
+  },
+  {
+    label: 'Clientes',
+    items: [
+      { key: 'nav.adminIndividualClients', tab: 'individual_clients' },
+      { key: 'nav.adminCompanies', tab: 'companies' },
+    ],
+  },
+  {
+    label: 'Seguros',
+    items: [
+      { key: 'nav.adminPoliciesDocs', tab: 'policies' },
+      { key: 'nav.adminAlerts60d', tab: 'alerts' },
+      { key: 'nav.adminClaims', tab: 'claims' },
+    ],
+  },
+  {
+    label: 'Crescimento',
+    items: [{ key: 'nav.adminMarketing', tab: 'marketing' }],
+  },
+  {
+    label: 'Administração',
+    items: [
+      { key: 'nav.adminBilling', tab: 'billing' },
+      { key: 'nav.adminApiLinks', tab: 'api' },
+      { key: 'nav.adminProfilesMetrics', tab: 'profiles' },
+    ],
+  },
 ]
 
 const BOTTOM_NAV_ITEMS = [
@@ -168,42 +200,53 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </button>
 
               {adminSectionOpen && (
-                <div className="pl-4 mt-1 space-y-1">
-                  {ADMIN_SUBNAV_ITEMS.map((item) => {
-                    const badge = item.tab === 'tasks' ? navBadges.tasks : item.tab === 'alerts' ? navBadges.alerts : 0
-                    return (
-                      <Link
-                        key={item.tab}
-                        to="/admin"
-                        search={{ tab: item.tab }}
-                        className="flex items-center justify-between px-3 py-2 text-sm font-medium transition-colors"
-                        style={{ fontFamily: font, color: 'var(--ui-menu-text)', borderRadius: '2px' }}
-                        activeProps={{ style: { fontFamily: font, color: 'var(--ui-menu-active-text)', background: 'var(--ui-menu-active-bg)', borderRadius: '2px' } }}
-                        activeOptions={{ includeSearch: true }}
-                        onClick={() => setSidebarOpen(false)}
+                <div className="pl-4 mt-1 space-y-3">
+                  {ADMIN_SUBNAV_GROUPS.map((group) => (
+                    <div key={group.label}>
+                      <p
+                        style={{ fontFamily: font, fontSize: '0.68rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--ui-text-muted)', padding: '0 0.75rem', marginBottom: '0.2rem' }}
                       >
-                        <span>{t(item.key)}</span>
-                        {badge > 0 && (
-                          <span style={{
-                            background: '#dc2626',
-                            color: '#fff',
-                            borderRadius: '9999px',
-                            fontSize: '0.6rem',
-                            fontWeight: 700,
-                            minWidth: '1.1rem',
-                            height: '1.1rem',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: '0 0.3rem',
-                            lineHeight: 1,
-                          }}>
-                            {badge > 99 ? '99+' : badge}
-                          </span>
-                        )}
-                      </Link>
-                    )
-                  })}
+                        {group.label}
+                      </p>
+                      <div className="space-y-0.5">
+                        {group.items.map((item) => {
+                          const badge = item.tab === 'tasks' ? navBadges.tasks : item.tab === 'alerts' ? navBadges.alerts : 0
+                          return (
+                            <Link
+                              key={item.tab}
+                              to="/admin"
+                              search={{ tab: item.tab }}
+                              className="flex items-center justify-between px-3 py-2 text-sm font-medium transition-colors"
+                              style={{ fontFamily: font, color: 'var(--ui-menu-text)', borderRadius: '2px' }}
+                              activeProps={{ style: { fontFamily: font, color: 'var(--ui-menu-active-text)', background: 'var(--ui-menu-active-bg)', borderRadius: '2px' } }}
+                              activeOptions={{ includeSearch: true }}
+                              onClick={() => setSidebarOpen(false)}
+                            >
+                              <span>{t(item.key)}</span>
+                              {badge > 0 && (
+                                <span style={{
+                                  background: '#dc2626',
+                                  color: '#fff',
+                                  borderRadius: '9999px',
+                                  fontSize: '0.6rem',
+                                  fontWeight: 700,
+                                  minWidth: '1.1rem',
+                                  height: '1.1rem',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  padding: '0 0.3rem',
+                                  lineHeight: 1,
+                                }}>
+                                  {badge > 99 ? '99+' : badge}
+                                </span>
+                              )}
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </>

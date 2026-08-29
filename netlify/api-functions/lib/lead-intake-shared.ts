@@ -132,3 +132,33 @@ export function parseLeadIntakePayload(body: unknown): LeadIntakeValidationResul
 
   return { ok: true, value }
 }
+
+export interface LeadIntakeOutcome {
+  clientId: string
+  clientCreated: boolean
+  leadCreated: boolean
+  opportunityCreated: boolean
+}
+
+/**
+ * Constrói o corpo de resposta de sucesso do intake — a única fonte da
+ * forma de resposta, para o handler nunca ter de decidir isto ad-hoc.
+ * `opportunityCreated` reflete só se ESTA chamada criou a oportunidade
+ * agora (false tanto quando já existia como quando a criação falhou —
+ * ver requisito "proteger o lead-intake": a oportunidade é sempre
+ * best-effort e nunca faz esta função devolver `ok: false`).
+ *
+ * Não recebe nenhuma mensagem de erro interna/Supabase como argumento — não
+ * há como esta função expor por engano um detalhe interno ao website, ela
+ * simplesmente não tem essa informação disponível.
+ */
+export function buildLeadIntakeResponse(outcome: LeadIntakeOutcome) {
+  return {
+    ok: true as const,
+    clientId: outcome.clientId,
+    clientCreated: outcome.clientCreated,
+    leadCreated: outcome.leadCreated,
+    duplicateSubmission: !outcome.leadCreated,
+    opportunityCreated: outcome.opportunityCreated,
+  }
+}

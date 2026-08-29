@@ -21,7 +21,22 @@ import type {
   ClientNote,
   ClientTask,
   WebsiteLead,
+  SalesOpportunity,
+  SalesOpportunityStage,
+  SalesPipelineStats,
 } from './types'
+import {
+  buildWebsiteLeadOpportunityPayload,
+  computeClosedAtForStageChange,
+  computeSalesPipelineStats,
+  followUpTaskNeedsDateUpdate,
+  isValidSalesOpportunityMarket,
+  isValidSalesOpportunitySource,
+  isValidSalesOpportunityStage,
+  isWebsiteLeadIdUniqueViolation,
+  pickEditableOpportunityFields,
+  validateOpportunityOwner,
+} from './sales-opportunity-rules'
 
 // ============================================================
 // Cliente Supabase (server-side — usa service_role key)
@@ -653,6 +668,286 @@ export async function getWebsiteLeadIndividualClientIds(): Promise<Set<string>> 
   const { data, error } = await sb.from('website_leads').select('individual_client_id')
   if (error) { console.error('getWebsiteLeadIndividualClientIds error:', error); return new Set() }
   return new Set((data ?? []).map((r: { individual_client_id: string }) => r.individual_client_id))
+}
+
+// ============================================================
+// Sales Opportunities — pipeline comercial (CRM 2, fase 1)
+// BACKOFFICE ONLY: nunca chamado a partir de rotas /one/* nem exposto a
+// clientes autenticados (B2B ou B2C) — ver RLS em
+// migrations/20260829_sales_opportunities.sql.
+// ============================================================
+export interface SalesOpportunityFilters {
+  stage?: SalesOpportunityStage
+  market?: string
+  product?: string
+  source?: string
+  assignedTo?: string
+  /** 'open' = nem won nem lost; omitido = todas. */
+  status?: 'open' | 'won' | 'lost'
+  /** Pesquisa livre — cliente/empresa (via join), produto ou título. */
+  search?: string
+}
+
+export async function getSalesOpportunities(filters: SalesOpportunityFilters = {}): Promise<SalesOpportunity[]> {
+  const sb = getSupabaseAdmin()
+  let query = sb.from('sales_opportunities').select('*').order('created_at', { ascending: false })
+
+  if (filters.stage) query = query.eq('stage', filters.stage)
+  if (filters.market) query = query.eq('market', filters.market)
+  if (filters.product) query = query.eq('product', filters.product)
+  if (filters.source) query = query.eq('source', filters.source)
+  if (filters.assignedTo) query = query.eq('assigned_to', filters.assignedTo)
+  if (filters.status === 'won') query = query.eq('stage', 'won')
+  else if (filters.status === 'lost') query = query.eq('stage', 'lost')
+  else if (filters.status === 'open') query = query.not('stage', 'in', '("won","lost")')
+  // Pesquisa por cliente/empresa faz-se em memória no server-fn, depois de
+  // cruzar com individual_clients/companies (sales_opportunities não tem o
+  // nome do cliente numa coluna própria) — aqui só o filtro por título/produto,
+  // que já vive nesta tabela.
+  if (filters.search) query = query.or(`title.ilike.%${filters.search}%,product.ilike.%${filters.search}%`)
+
+  const { data, error } = await query
+  if (error) { console.error('getSalesOpportunities error:', error); return [] }
+  return rowsToCamel<SalesOpportunity>(data ?? [])
+}
+
+export async function getSalesOpportunity(id: string): Promise<SalesOpportunity | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('sales_opportunities').select('*').eq('id', id).single()
+  if (error) return undefined
+  return objectToCamel(data) as SalesOpportunity
+}
+
+export async function getSalesOpportunitiesByOwner(
+  scope: { companyId?: string; individualClientId?: string },
+): Promise<SalesOpportunity[]> {
+  const sb = getSupabaseAdmin()
+  let query = sb.from('sales_opportunities').select('*').order('created_at', { ascending: false })
+  if (scope.companyId) query = query.eq('company_id', scope.companyId)
+  else if (scope.individualClientId) query = query.eq('individual_client_id', scope.individualClientId)
+  else return []
+  const { data, error } = await query
+  if (error) { console.error('getSalesOpportunitiesByOwner error:', error); return [] }
+  return rowsToCamel<SalesOpportunity>(data ?? [])
+}
+
+export async function createSalesOpportunity(
+  opportunity: Omit<SalesOpportunity, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<{ id: string }> {
+  const ownerCheck = validateOpportunityOwner(opportunity)
+  if (!ownerCheck.ok) throw new Error(`createSalesOpportunity: ${ownerCheck.error}`)
+  if (!isValidSalesOpportunityStage(opportunity.stage)) throw new Error('createSalesOpportunity: invalid_stage')
+  if (!isValidSalesOpportunityMarket(opportunity.market)) throw new Error('createSalesOpportunity: invalid_market')
+  if (!isValidSalesOpportunitySource(opportunity.source)) throw new Error('createSalesOpportunity: invalid_source')
+
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('sales_opportunities')
+    .insert(objectToSnake(opportunity as unknown as Record<string, unknown>))
+    .select('id')
+    .single()
+  if (error) throw new Error(`createSalesOpportunity: ${error.message}`)
+  return { id: data.id as string }
+}
+
+export type CreateSalesOpportunityForWebsiteLeadResult =
+  | { created: true; id: string }
+  // O website_lead já tinha uma oportunidade (submission_id idempotente já
+  // garante que isto só acontece num retry/reprocessamento, nunca por um
+  // segundo pedido genuíno) — devolve a existente em vez de duplicar.
+  | { created: false; id: string }
+
+/**
+ * Cria a oportunidade comercial associada a um website_lead recém-criado.
+ * Chamado só quando o lead é genuinamente novo — ver
+ * shouldCreateOpportunityForWebsiteLead em sales-opportunity-rules.ts — mas
+ * mesmo assim protegido ao nível da BD pelo índice único parcial em
+ * website_lead_id, para o caso de o próprio chamador ser reprocessado.
+ */
+export async function createSalesOpportunityForWebsiteLead(input: {
+  individualClientId: string
+  websiteLeadId: string
+  clientName: string
+  market?: string
+  product?: string
+}): Promise<CreateSalesOpportunityForWebsiteLeadResult> {
+  const sb = getSupabaseAdmin()
+  const payload = buildWebsiteLeadOpportunityPayload(input)
+  const { data, error } = await sb
+    .from('sales_opportunities')
+    .insert(objectToSnake(payload as unknown as Record<string, unknown>))
+    .select('id')
+    .single()
+
+  if (!error) return { created: true, id: data.id as string }
+
+  // Não assumir genericamente que qualquer 23505 nesta tabela significa
+  // "já existe uma opportunity para este website_lead" — confirma primeiro
+  // que foi mesmo o índice único de website_lead_id que disparou (defesa
+  // contra uma futura constraint UNIQUE nesta tabela ser mal interpretada
+  // como idempotência de lead). Só depois disso tenta reaproveitar uma
+  // linha existente; se essa linha afinal não existir, propaga o erro em
+  // vez de fingir sucesso.
+  if (isWebsiteLeadIdUniqueViolation(error)) {
+    const { data: existing, error: selErr } = await sb
+      .from('sales_opportunities')
+      .select('id')
+      .eq('website_lead_id', input.websiteLeadId)
+      .single()
+    if (selErr || !existing) {
+      throw new Error(`createSalesOpportunityForWebsiteLead (lookup): ${selErr?.message ?? 'not found'}`)
+    }
+    return { created: false, id: existing.id as string }
+  }
+
+  throw new Error(`createSalesOpportunityForWebsiteLead: ${error.message}`)
+}
+
+/**
+ * Update genérico da oportunidade — restrito à allowlist de campos
+ * editáveis (ver SALES_OPPORTUNITY_EDITABLE_FIELDS/pickEditableOpportunityFields):
+ * dono (companyId/individualClientId), websiteLeadId, id, createdAt,
+ * closedAt e stage nunca mudam por aqui, mesmo que um chamador os inclua em
+ * `updates` — são silenciosamente descartados. Stage tem a sua própria
+ * função (updateSalesOpportunityStage), que também deriva closedAt.
+ */
+export async function updateSalesOpportunity(
+  id: string,
+  updates: Record<string, unknown>,
+): Promise<void> {
+  const editable = pickEditableOpportunityFields(updates)
+  if ('market' in editable && !isValidSalesOpportunityMarket(editable.market)) {
+    throw new Error('updateSalesOpportunity: invalid_market')
+  }
+  if ('source' in editable && !isValidSalesOpportunitySource(editable.source)) {
+    throw new Error('updateSalesOpportunity: invalid_source')
+  }
+  const payload = { ...editable, updatedAt: new Date().toISOString() }
+  const sb = getSupabaseAdmin()
+  const { error } = await sb
+    .from('sales_opportunities')
+    .update(objectToSnake(payload as Record<string, unknown>))
+    .eq('id', id)
+  if (error) throw new Error(`updateSalesOpportunity: ${error.message}`)
+}
+
+/**
+ * Muda o stage e deriva closedAt automaticamente (won/lost -> agora; reopen
+ * para um stage aberto -> null) — ver computeClosedAtForStageChange. Não
+ * cria policy nem faz mais nada além disto (ver requisito "regras de
+ * stage").
+ */
+export async function updateSalesOpportunityStage(
+  id: string,
+  stage: SalesOpportunityStage,
+  extra: { lostReason?: string | null } = {},
+): Promise<void> {
+  // Não confiar só no tipo TypeScript — um pedido direto ao server-fn (fora
+  // do frontend) contorna o compilador. A BD também tem o seu próprio CHECK
+  // (defesa em profundidade), mas rejeitar aqui evita gastar um round-trip
+  // com um valor já sabido inválido.
+  if (!isValidSalesOpportunityStage(stage)) throw new Error('updateSalesOpportunityStage: invalid_stage')
+  const nowIso = new Date().toISOString()
+  const closedAt = computeClosedAtForStageChange(stage, nowIso)
+  const updates: Record<string, unknown> = {
+    stage,
+    closedAt,
+    updatedAt: nowIso,
+  }
+  if ('lostReason' in extra) updates.lostReason = extra.lostReason ?? null
+
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('sales_opportunities').update(objectToSnake(updates)).eq('id', id)
+  if (error) throw new Error(`updateSalesOpportunityStage: ${error.message}`)
+}
+
+export async function deleteSalesOpportunity(id: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('sales_opportunities').delete().eq('id', id)
+  if (error) throw new Error(`deleteSalesOpportunity: ${error.message}`)
+}
+
+/**
+ * Resumo pequeno para o dashboard — sem forecasting complexo. O cálculo em
+ * si é puro (computeSalesPipelineStats, em sales-opportunity-rules.ts, onde
+ * está testado); esta função só busca os dados.
+ */
+export async function getSalesPipelineStats(): Promise<SalesPipelineStats> {
+  const all = await getSalesOpportunities()
+  return computeSalesPipelineStats(all)
+}
+
+/**
+ * Cria uma client_task de follow-up ligada à oportunidade, evitando
+ * duplicar quando já existe uma tarefa pendente para a mesma oportunidade
+ * (ver requisito "evitar duplicação de tarefas para o mesmo follow-up").
+ */
+/**
+ * sales_opportunities.next_follow_up_at é um resumo/cache comercial;
+ * client_tasks é a fonte operacional das tarefas (ver
+ * followUpTaskNeedsDateUpdate em sales-opportunity-rules.ts). Esta função é
+ * o único ponto onde um follow-up é definido a partir de uma oportunidade,
+ * para nunca haver duas datas contraditórias:
+ *   - sem tarefa pendente ainda -> cria uma nova, ligada por opportunity_id
+ *   - já existe uma tarefa pendente com a mesma data -> reutiliza-a
+ *   - já existe mas com outra data -> atualiza essa tarefa (nunca cria uma
+ *     segunda)
+ * Em qualquer um dos casos, opportunity.next_follow_up_at fica sempre igual
+ * à data pedida no fim.
+ */
+export async function ensureFollowUpTaskForOpportunity(input: {
+  opportunityId: string
+  title: string
+  dueDate: string
+  companyId?: string
+  individualClientId?: string
+}): Promise<{ created: boolean; task: ClientTask }> {
+  const sb = getSupabaseAdmin()
+  const { data: existingRows, error: selErr } = await sb
+    .from('client_tasks')
+    .select('*')
+    .eq('opportunity_id', input.opportunityId)
+    .eq('status', 'pending')
+    .eq('source', 'opportunity')
+    .limit(1)
+  if (selErr) throw new Error(`ensureFollowUpTaskForOpportunity (lookup): ${selErr.message}`)
+
+  let result: { created: boolean; task: ClientTask }
+
+  if (existingRows && existingRows.length > 0) {
+    const existingTask = objectToCamel(existingRows[0]) as ClientTask
+    if (followUpTaskNeedsDateUpdate(existingTask.dueDate, input.dueDate)) {
+      const { error: updErr } = await sb
+        .from('client_tasks')
+        .update({ due_date: input.dueDate })
+        .eq('id', existingTask.id)
+      if (updErr) throw new Error(`ensureFollowUpTaskForOpportunity (update): ${updErr.message}`)
+      result = { created: false, task: { ...existingTask, dueDate: input.dueDate } }
+    } else {
+      result = { created: false, task: existingTask }
+    }
+  } else {
+    const task: ClientTask = {
+      id: crypto.randomUUID(),
+      companyId: input.companyId,
+      individualClientId: input.individualClientId,
+      title: input.title,
+      dueDate: input.dueDate,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      source: 'opportunity',
+      opportunityId: input.opportunityId,
+    }
+    await createClientTask(task)
+    result = { created: true, task }
+  }
+
+  // Mantém o resumo comercial em sincronia num único ponto — ver comentário
+  // acima. nextFollowUpAt está na allowlist de campos editáveis, por isso
+  // este updateSalesOpportunity interno nunca é bloqueado pela allowlist.
+  await updateSalesOpportunity(input.opportunityId, { nextFollowUpAt: input.dueDate })
+
+  return result
 }
 
 // ============================================================

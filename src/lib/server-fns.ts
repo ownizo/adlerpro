@@ -29,7 +29,10 @@ import type {
   ClaimFileRef,
   ClientNote,
   ClientTask,
+  SalesOpportunityStage,
+  SalesOpportunityEditableUpdate,
 } from './types'
+import { buildOpportunityTitle, pickWebsiteLeadContextFields } from './sales-opportunity-rules'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser, generateStrongPassword, deleteIdentityUserById } from './identity-admin'
 
@@ -2556,6 +2559,131 @@ export const fetchAllTasksByDueDate = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { status?: 'pending' | 'done' }) => d)
   .handler(async ({ data }) => db.getAllTasksByDueDate(data.status ? { status: data.status } : undefined))
+
+// ── Sales Opportunities (CRM 2, fase 1) ──────────────────────────
+// BACKOFFICE ONLY: toda a função aqui exige requireRoleMiddleware('admin'),
+// nunca só requireAuthMiddleware — ver requisito "não permitir operações
+// comerciais apenas com sessão autenticada". Nenhuma destas funções é
+// chamada a partir de rotas /one/* nem de qualquer portal de cliente.
+
+export const fetchSalesOpportunities = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: db.SalesOpportunityFilters = {}) => d)
+  .handler(async ({ data }) => db.getSalesOpportunities(data))
+
+export const fetchSalesOpportunity = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((id: string) => id)
+  .handler(async ({ data: id }) => db.getSalesOpportunity(id))
+
+export const fetchSalesOpportunitiesByOwner = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { companyId?: string; individualClientId?: string }) => d)
+  .handler(async ({ data }) => db.getSalesOpportunitiesByOwner(data))
+
+export const adminCreateSalesOpportunity = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: {
+    companyId?: string
+    individualClientId?: string
+    clientName: string
+    product?: string
+    market?: string
+    stage?: SalesOpportunityStage
+    source?: string
+    sourceDetail?: string
+    estimatedAnnualPremium?: number
+    estimatedRevenue?: number
+    currency?: string
+    assignedTo?: string
+    expectedCloseDate?: string
+    nextFollowUpAt?: string
+  }) => d)
+  .handler(async ({ data }) => {
+    const { id } = await db.createSalesOpportunity({
+      companyId: data.companyId,
+      individualClientId: data.individualClientId,
+      title: buildOpportunityTitle(data.product, data.clientName),
+      product: data.product,
+      market: data.market,
+      stage: data.stage ?? 'new',
+      source: data.source ?? 'manual',
+      sourceDetail: data.sourceDetail,
+      estimatedAnnualPremium: data.estimatedAnnualPremium,
+      estimatedRevenue: data.estimatedRevenue,
+      currency: data.currency ?? 'EUR',
+      assignedTo: data.assignedTo,
+      expectedCloseDate: data.expectedCloseDate,
+      nextFollowUpAt: data.nextFollowUpAt,
+    })
+    return { success: true, id }
+  })
+
+// Só os campos em SalesOpportunityEditableUpdate são aceites — owner
+// (companyId/individualClientId), websiteLeadId, id, createdAt, closedAt e
+// stage nunca passam por aqui, nem em TypeScript (este tipo já os exclui)
+// nem em runtime (db.updateSalesOpportunity aplica a mesma allowlist outra
+// vez do lado do data layer — ver requisito "validar update payload").
+export const adminUpdateSalesOpportunity = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { id: string; updates: SalesOpportunityEditableUpdate }) => d)
+  .handler(async ({ data }) => {
+    await db.updateSalesOpportunity(data.id, data.updates)
+    return { success: true }
+  })
+
+export const adminUpdateSalesOpportunityStage = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { id: string; stage: SalesOpportunityStage; lostReason?: string | null }) => d)
+  .handler(async ({ data }) => {
+    await db.updateSalesOpportunityStage(data.id, data.stage, { lostReason: data.lostReason })
+    return { success: true }
+  })
+
+export const adminDeleteSalesOpportunity = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    await db.deleteSalesOpportunity(id)
+    return { success: true }
+  })
+
+export const fetchSalesPipelineStats = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .handler(async () => db.getSalesPipelineStats())
+
+// Follow-up: cria (ou reutiliza, se já houver uma pendente) uma client_task
+// ligada à oportunidade — ver requisito "evitar duplicação de tarefas para o
+// mesmo follow-up".
+export const adminCreateOpportunityFollowUpTask = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { opportunityId: string; title: string; dueDate: string }) => d)
+  .handler(async ({ data }) => {
+    const opportunity = await db.getSalesOpportunity(data.opportunityId)
+    if (!opportunity) throw new Error('Oportunidade não encontrada')
+    const { created, task } = await db.ensureFollowUpTaskForOpportunity({
+      opportunityId: data.opportunityId,
+      title: data.title,
+      dueDate: data.dueDate,
+      companyId: opportunity.companyId,
+      individualClientId: opportunity.individualClientId,
+    })
+    return { success: true, created, task }
+  })
+
+// Contexto seguro do website_lead associado a uma oportunidade — reutiliza
+// getWebsiteLeadsByIndividualClientId (nada de novo em website_leads) e só
+// devolve os campos permitidos em pickWebsiteLeadContextFields (form_name,
+// source_url, utm_*, received_at) — nunca `metadata`, nunca o objeto
+// completo. Ver requisito "website lead context".
+export const fetchWebsiteLeadContextForOpportunity = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { individualClientId: string; websiteLeadId: string }) => d)
+  .handler(async ({ data }) => {
+    const leads = await db.getWebsiteLeadsByIndividualClientId(data.individualClientId)
+    const lead = leads.find((l) => l.id === data.websiteLeadId)
+    return lead ? pickWebsiteLeadContextFields(lead) : undefined
+  })
 
 export const adminGenerateRenewalTasks = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
