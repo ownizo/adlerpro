@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import type { SalesOpportunity } from '@/lib/types'
 import {
   SALES_OPPORTUNITY_STAGE_LABELS_PT,
-  SALES_OPPORTUNITY_PRODUCT_OPTIONS,
+  formatFollowUpLabel,
 } from '@/lib/sales-opportunity-rules'
-import { fetchSalesOpportunitiesByOwner, adminCreateSalesOpportunity } from '@/lib/server-fns'
+import { fetchSalesOpportunitiesByOwner } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { STAGE_PALETTE, FOLLOW_UP_URGENCY_STYLE, type OwnerLookup } from './sales/salesPipelineUi'
+import { SalesOpportunityDrawer } from './sales/SalesOpportunityDrawer'
+import { CreateOpportunityDialog } from './sales/CreateOpportunityDialog'
 
 interface Props {
   companyId?: string
@@ -14,18 +17,19 @@ interface Props {
 }
 
 /**
- * Secção "Oportunidades" na ficha unificada do cliente (individual ou
- * empresa) — histórico comercial, não um pipeline completo (isso vive no
- * separador Comercial/Pipeline). BACKOFFICE ONLY, tal como o resto do CRM
- * comercial.
+ * Secção "Oportunidades" na ficha unificada do cliente — histórico
+ * comercial compacto, não o pipeline completo (isso vive no separador
+ * Comercial). Clicar abre a mesma drawer de detalhe do workspace principal
+ * — ver requisito "opportunities in client profile". BACKOFFICE ONLY.
  */
 export function SalesOpportunitiesSection({ companyId, individualClientId, clientName }: Props) {
   const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showNewForm, setShowNewForm] = useState(false)
-  const [product, setProduct] = useState('')
-  const [saving, setSaving] = useState(false)
+  const [showCreate, setShowCreate] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  const owner: OwnerLookup = { name: clientName, kind: individualClientId ? 'individual' : 'company' }
 
   const reload = () => {
     setLoading(true)
@@ -41,79 +45,76 @@ export function SalesOpportunitiesSection({ companyId, individualClientId, clien
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, individualClientId])
 
+  const selected = selectedId ? opportunities.find((o) => o.id === selectedId) : undefined
+  const openCount = opportunities.filter((o) => o.stage !== 'won' && o.stage !== 'lost').length
+
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-navy-700">Oportunidades</h4>
+        <h4 className="text-[15px] font-semibold text-slate-700">
+          Oportunidades {opportunities.length > 0 && <span className="text-slate-400 font-normal">({openCount} abertas)</span>}
+        </h4>
         <button
-          onClick={() => setShowNewForm((v) => !v)}
-          className="text-xs px-3 py-1.5 rounded-[4px] bg-navy-700 text-white font-medium"
+          onClick={() => setShowCreate(true)}
+          className="text-[13px] px-3 py-1.5 rounded-md bg-indigo-600 text-white font-medium hover:bg-indigo-700"
         >
-          {showNewForm ? 'Cancelar' : 'Nova oportunidade'}
+          + Oportunidade
         </button>
       </div>
 
-      {showNewForm && (
-        <div className="mb-3 bg-navy-50 border border-navy-200 rounded-[4px] p-3 flex flex-wrap items-end gap-2">
-          <div>
-            <label className="text-[11px] text-navy-600">Produto</label>
-            <select value={product} onChange={(e) => setProduct(e.target.value)} className="block mt-1 px-2 py-1 text-xs border border-navy-200 rounded-[2px]">
-              <option value="">Selecionar…</option>
-              {SALES_OPPORTUNITY_PRODUCT_OPTIONS.map((p) => (
-                <option key={p.id} value={p.id}>{p.label}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            disabled={!product || saving}
-            onClick={async () => {
-              setSaving(true)
-              setError(null)
-              try {
-                await adminCreateSalesOpportunity({
-                  data: { companyId, individualClientId, clientName, product, source: 'manual' },
-                })
-                setShowNewForm(false)
-                setProduct('')
-                reload()
-              } catch (err) {
-                setError(err instanceof Error ? err.message : 'Erro ao criar oportunidade')
-              } finally {
-                setSaving(false)
-              }
-            }}
-            className="text-xs px-3 py-1.5 rounded-[2px] bg-gold-400 text-navy-700 font-semibold disabled:opacity-50"
-          >
-            {saving ? 'A criar…' : 'Criar'}
-          </button>
+      {error && <p className="text-[13px] text-rose-600 mb-2">{error}</p>}
+
+      {loading ? (
+        <p className="text-[14px] text-slate-400">A carregar…</p>
+      ) : opportunities.length === 0 ? (
+        <p className="text-[14px] text-slate-400">Sem oportunidades registadas.</p>
+      ) : (
+        <div className="grid gap-2">
+          {opportunities.map((opp) => {
+            const palette = STAGE_PALETTE[opp.stage]
+            const followUp = formatFollowUpLabel(opp.nextFollowUpAt)
+            return (
+              <button
+                key={opp.id}
+                onClick={() => setSelectedId(opp.id)}
+                className="text-left bg-white rounded-lg border border-slate-200 px-4 py-3 flex flex-wrap items-center justify-between gap-2 hover:border-slate-300 hover:shadow-sm transition-shadow"
+              >
+                <div>
+                  <p className="text-[14px] font-medium text-slate-700">{opp.product ?? opp.title}</p>
+                  <p className="text-[13px] text-slate-500 mt-0.5">
+                    {formatDate(opp.createdAt)} · {opp.source ?? 'manual'}
+                    {opp.estimatedAnnualPremium != null && ` · Prémio ${formatCurrency(opp.estimatedAnnualPremium)}`}
+                    {opp.estimatedRevenue != null && ` · Receita ${formatCurrency(opp.estimatedRevenue)}`}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {followUp.urgency !== 'none' && (
+                    <span className={`inline-flex px-1.5 py-0.5 rounded text-[12px] font-medium border ${FOLLOW_UP_URGENCY_STYLE[followUp.urgency]}`}>
+                      {followUp.label}
+                    </span>
+                  )}
+                  <span className={`text-[12px] px-2 py-0.5 rounded-full font-medium ${palette.badgeBg} ${palette.badgeText}`}>
+                    {SALES_OPPORTUNITY_STAGE_LABELS_PT[opp.stage]}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
         </div>
       )}
 
-      {error && <p className="text-sm text-red-500 mb-2">{error}</p>}
+      {selected && (
+        <SalesOpportunityDrawer opportunity={selected} owner={owner} onClose={() => setSelectedId(null)} onChanged={reload} />
+      )}
 
-      {loading ? (
-        <p className="text-sm text-navy-400">A carregar…</p>
-      ) : opportunities.length === 0 ? (
-        <p className="text-sm text-navy-400">Sem oportunidades registadas.</p>
-      ) : (
-        <div className="grid gap-2">
-          {opportunities.map((opp) => (
-            <div key={opp.id} className="bg-white rounded-[4px] border border-navy-200 px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-sm font-medium text-navy-700">{opp.product ?? opp.title}</p>
-                <p className="text-xs text-navy-500 mt-0.5">
-                  {formatDate(opp.createdAt)} · {opp.source ?? 'manual'}
-                  {(opp.estimatedAnnualPremium || opp.estimatedRevenue) &&
-                    ` · ${formatCurrency(opp.estimatedAnnualPremium ?? opp.estimatedRevenue ?? 0)}`}
-                  {opp.nextFollowUpAt && ` · Follow-up: ${formatDate(opp.nextFollowUpAt)}`}
-                </p>
-              </div>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-navy-100 text-navy-600">
-                {SALES_OPPORTUNITY_STAGE_LABELS_PT[opp.stage]}
-              </span>
-            </div>
-          ))}
-        </div>
+      {showCreate && (
+        <CreateOpportunityDialog
+          individualClients={[]}
+          companies={[]}
+          initialOwner={{ kind: individualClientId ? 'individual' : 'company', id: (individualClientId ?? companyId)!, name: clientName }}
+          onClose={() => setShowCreate(false)}
+          onCreated={() => { setShowCreate(false); reload() }}
+        />
       )}
     </div>
   )

@@ -3,11 +3,13 @@ import assert from 'node:assert/strict'
 
 import {
   SALES_OPPORTUNITY_STAGES,
+  ageInDays,
   buildOpportunityTitle,
   buildWebsiteLeadOpportunityPayload,
   computeClosedAtForStageChange,
   computeSalesPipelineStats,
   followUpTaskNeedsDateUpdate,
+  formatFollowUpLabel,
   isClosedStage,
   isValidSalesOpportunityMarket,
   isValidSalesOpportunitySource,
@@ -15,6 +17,7 @@ import {
   isWebsiteLeadIdUniqueViolation,
   pickEditableOpportunityFields,
   pickWebsiteLeadContextFields,
+  suggestedNextStages,
   validateOpportunityOwner,
 } from './sales-opportunity-rules.ts'
 import type { SalesOpportunity, SalesOpportunityStage, WebsiteLead } from './types.ts'
@@ -281,6 +284,20 @@ test('computeSalesPipelineStats: won revenue this month never falls back to prem
   assert.equal(stats.wonThisMonthCount, 1)
 })
 
+test('computeSalesPipelineStats: overdue/due-today follow-ups counted only for open opportunities', () => {
+  const now = new Date('2026-08-29T12:00:00.000Z')
+  const opportunities = [
+    makeOpportunity({ id: '1', stage: 'new', nextFollowUpAt: '2026-08-27T09:00:00.000Z' }), // overdue
+    makeOpportunity({ id: '2', stage: 'contacted', nextFollowUpAt: '2026-08-29T09:00:00.000Z' }), // today
+    makeOpportunity({ id: '3', stage: 'quoted', nextFollowUpAt: '2026-09-10T09:00:00.000Z' }), // upcoming
+    // Fechada com follow-up "atrasado" -> não deve contar, já não é operacional.
+    makeOpportunity({ id: '4', stage: 'won', closedAt: now.toISOString(), nextFollowUpAt: '2026-08-01T09:00:00.000Z' }),
+  ]
+  const stats = computeSalesPipelineStats(opportunities, now)
+  assert.equal(stats.overdueFollowUpsCount, 1)
+  assert.equal(stats.dueTodayFollowUpsCount, 1)
+})
+
 test('computeSalesPipelineStats: closed (won/lost) opportunities never count towards the open pipeline', () => {
   const now = new Date('2026-08-29T12:00:00.000Z')
   const opportunities = [
@@ -330,4 +347,51 @@ test('pickWebsiteLeadContextFields: only form_name/source_url/utm_*/received_at,
   })
   assert.equal('metadata' in context, false)
   assert.equal(JSON.stringify(context).includes('branchLabel'), false)
+})
+
+// ── UI redesign: follow-up humanização, idade, próximos stages ────────────
+test('formatFollowUpLabel: today/tomorrow', () => {
+  const now = new Date('2026-08-29T09:00:00.000Z')
+  assert.deepEqual(formatFollowUpLabel('2026-08-29', now), { label: 'Hoje', urgency: 'today' })
+  assert.deepEqual(formatFollowUpLabel('2026-08-30', now), { label: 'Amanhã', urgency: 'tomorrow' })
+})
+
+test('formatFollowUpLabel: overdue by N days', () => {
+  const now = new Date('2026-08-29T09:00:00.000Z')
+  assert.deepEqual(formatFollowUpLabel('2026-08-28', now), { label: 'Atrasado há 1 dia', urgency: 'overdue' })
+  assert.deepEqual(formatFollowUpLabel('2026-08-27', now), { label: 'Atrasado há 2 dias', urgency: 'overdue' })
+})
+
+test('formatFollowUpLabel: further-out dates use "dd mmm", missing date is a neutral dash', () => {
+  const now = new Date('2026-08-29T09:00:00.000Z')
+  assert.deepEqual(formatFollowUpLabel('2026-09-15', now), { label: '15 set', urgency: 'upcoming' })
+  assert.deepEqual(formatFollowUpLabel(undefined, now), { label: '—', urgency: 'none' })
+})
+
+test('formatFollowUpLabel: compares by calendar day, not exact time of day', () => {
+  // A hora exata dentro do mesmo dia civil nunca deve mudar o resultado —
+  // usa horas bem afastadas da meia-noite para não depender do fuso
+  // horário local de quem corre o teste.
+  const now = new Date('2026-08-29T08:00:00.000Z')
+  assert.deepEqual(formatFollowUpLabel('2026-08-29T18:00:00.000Z', now), { label: 'Hoje', urgency: 'today' })
+})
+
+test('ageInDays: whole days since createdAt, never negative', () => {
+  const now = new Date('2026-08-29T12:00:00.000Z')
+  assert.equal(ageInDays('2026-08-29T12:00:00.000Z', now), 0)
+  assert.equal(ageInDays('2026-08-27T12:00:00.000Z', now), 2)
+  assert.equal(ageInDays('2026-08-30T12:00:00.000Z', now), 0) // no futuro -> nunca negativo
+})
+
+test('suggestedNextStages: follows the funnel order, never suggests skipping backward', () => {
+  assert.deepEqual(suggestedNextStages('new'), ['contacted'])
+  assert.deepEqual(suggestedNextStages('contacted'), ['needs_analysis'])
+  assert.deepEqual(suggestedNextStages('needs_analysis'), ['quoted'])
+  assert.deepEqual(suggestedNextStages('quoted'), ['negotiation', 'won', 'lost'])
+  assert.deepEqual(suggestedNextStages('negotiation'), ['won', 'lost'])
+})
+
+test('suggestedNextStages: won/lost are terminal, no automatic next step suggested', () => {
+  assert.deepEqual(suggestedNextStages('won'), [])
+  assert.deepEqual(suggestedNextStages('lost'), [])
 })

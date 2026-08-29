@@ -316,6 +316,8 @@ export function computeSalesPipelineStats(opportunities: SalesOpportunity[], now
     openPipelinePremium: 0,
     openPipelineRevenue: 0,
     wonRevenueThisMonth: 0,
+    overdueFollowUpsCount: 0,
+    dueTodayFollowUpsCount: 0,
   }
 
   for (const opp of opportunities) {
@@ -327,6 +329,11 @@ export function computeSalesPipelineStats(opportunities: SalesOpportunity[], now
       // fica para a Adler), mesmo quando só um dos dois está preenchido.
       stats.openPipelinePremium += opp.estimatedAnnualPremium ?? 0
       stats.openPipelineRevenue += opp.estimatedRevenue ?? 0
+      // Um follow-up "atrasado" numa oportunidade já fechada não é
+      // operacionalmente relevante — só interessa nas abertas.
+      const followUp = formatFollowUpLabel(opp.nextFollowUpAt, now).urgency
+      if (followUp === 'overdue') stats.overdueFollowUpsCount++
+      if (followUp === 'today') stats.dueTodayFollowUpsCount++
     }
     if (opp.stage === 'quoted') stats.quotedCount++
     if (isThisMonth(opp.createdAt)) stats.newThisMonthCount++
@@ -378,5 +385,75 @@ export function pickWebsiteLeadContextFields(lead: WebsiteLead): WebsiteLeadCont
     utmMedium: lead.utmMedium,
     utmCampaign: lead.utmCampaign,
     receivedAt: lead.receivedAt,
+  }
+}
+
+// -----------------------------------------------------------------------------
+// UI redesign (workspace de Vendas) — regras puras de apresentação, sem JSX,
+// para ficarem testáveis sem montar componentes. Usadas por
+// src/components/admin/sales/*.
+// -----------------------------------------------------------------------------
+
+export type FollowUpUrgency = 'overdue' | 'today' | 'tomorrow' | 'upcoming' | 'none'
+
+export interface FollowUpDisplay {
+  label: string
+  urgency: FollowUpUrgency
+}
+
+function startOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
+}
+
+const PT_MONTHS_SHORT = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez']
+
+/**
+ * Traduz uma data de follow-up num rótulo humano (Hoje / Amanhã / Atrasado
+ * há N dias / dd mmm) — ver requisito "follow-up visibility". `dueDateIso`
+ * pode ser uma data pura ('YYYY-MM-DD') ou um timestamp ISO completo;
+ * comparado sempre ao dia civil de `now`, nunca à hora exata.
+ */
+export function formatFollowUpLabel(dueDateIso: string | undefined, now: Date = new Date()): FollowUpDisplay {
+  if (!dueDateIso) return { label: '—', urgency: 'none' }
+
+  const due = startOfDay(new Date(dueDateIso))
+  const today = startOfDay(now)
+  const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays < 0) {
+    const days = Math.abs(diffDays)
+    return { label: days === 1 ? 'Atrasado há 1 dia' : `Atrasado há ${days} dias`, urgency: 'overdue' }
+  }
+  if (diffDays === 0) return { label: 'Hoje', urgency: 'today' }
+  if (diffDays === 1) return { label: 'Amanhã', urgency: 'tomorrow' }
+  return { label: `${due.getDate()} ${PT_MONTHS_SHORT[due.getMonth()]}`, urgency: 'upcoming' }
+}
+
+/** Idade da oportunidade em dias — usada no card do Kanban. */
+export function ageInDays(createdAtIso: string, now: Date = new Date()): number {
+  return Math.max(0, Math.floor((now.getTime() - new Date(createdAtIso).getTime()) / (1000 * 60 * 60 * 24)))
+}
+
+/**
+ * Próximo(s) stage(s) sugerido(s) para uma ação rápida a partir do stage
+ * atual — ver requisito "quick stage actions". Won/lost nunca aparecem como
+ * "próximo passo automático" a meio do funil para não incentivar saltos;
+ * continuam sempre disponíveis via seleção manual completa de stage.
+ */
+export function suggestedNextStages(currentStage: SalesOpportunityStage): SalesOpportunityStage[] {
+  switch (currentStage) {
+    case 'new':
+      return ['contacted']
+    case 'contacted':
+      return ['needs_analysis']
+    case 'needs_analysis':
+      return ['quoted']
+    case 'quoted':
+      return ['negotiation', 'won', 'lost']
+    case 'negotiation':
+      return ['won', 'lost']
+    case 'won':
+    case 'lost':
+      return []
   }
 }

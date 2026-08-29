@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import type { ClientTask, Company, IndividualClient } from '@/lib/types'
-import { fetchAllTasksByDueDate, adminUpdateClientTaskStatus, adminGenerateRenewalTasks } from '@/lib/server-fns'
+import type { ClientTask, Company, IndividualClient, SalesOpportunity } from '@/lib/types'
+import { fetchAllTasksByDueDate, adminUpdateClientTaskStatus, adminGenerateRenewalTasks, fetchSalesOpportunity } from '@/lib/server-fns'
 import { formatDate } from '@/lib/utils'
+import { SalesOpportunityDrawer } from './sales/SalesOpportunityDrawer'
+import { buildOwnerLookup } from './sales/salesPipelineUi'
 
 interface Props {
   companies: Company[]
@@ -20,6 +22,7 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
   const [filter, setFilter] = useState<'pending' | 'all'>('pending')
   const [generating, setGenerating] = useState(false)
   const [generateResult, setGenerateResult] = useState<{ created: number; skipped: number } | null>(null)
+  const [openOpportunity, setOpenOpportunity] = useState<SalesOpportunity | null>(null)
 
   async function loadTasks() {
     setLoading(true)
@@ -120,6 +123,18 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
                     <span className="text-xs text-navy-500 bg-navy-50 px-1.5 py-0.5 rounded">
                       {clientName}
                     </span>
+                    {task.source === 'opportunity' && task.opportunityId && (
+                      <button
+                        onClick={async () => {
+                          const opp = await fetchSalesOpportunity({ data: task.opportunityId! })
+                          if (opp) setOpenOpportunity(opp)
+                        }}
+                        className="text-[11px] font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded"
+                        title="Ver oportunidade comercial ligada a este follow-up"
+                      >
+                        Comercial →
+                      </button>
+                    )}
                     <span
                       className={`text-xs ${
                         isOverdue ? 'text-red-500 font-medium' : 'text-navy-400'
@@ -211,6 +226,15 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
             </p>
           )}
         </div>
+      )}
+
+      {openOpportunity && (
+        <SalesOpportunityDrawer
+          opportunity={openOpportunity}
+          owner={buildOwnerLookup(openOpportunity, individualClients, companies)}
+          onClose={() => setOpenOpportunity(null)}
+          onChanged={loadTasks}
+        />
       )}
     </div>
   )

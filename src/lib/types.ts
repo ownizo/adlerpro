@@ -565,4 +565,8 @@ export interface SalesPipelineStats {
   openPipelineRevenue: number
   /** sum(estimatedRevenue) das oportunidades won fechadas este mês. */
   wonRevenueThisMonth: number
+  /** Oportunidades abertas com next_follow_up_at no passado — ver dashboard "o que precisa de atenção hoje". */
+  overdueFollowUpsCount: number
+  /** Oportunidades abertas com next_follow_up_at hoje. */
+  dueTodayFollowUpsCount: number
 }
