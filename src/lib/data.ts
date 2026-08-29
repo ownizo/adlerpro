@@ -20,6 +20,7 @@ import type {
   ClaimMessage,
   ClientNote,
   ClientTask,
+  WebsiteLead,
 } from './types'
 
 // ============================================================
@@ -563,6 +564,95 @@ export async function deleteIndividualClientRelations(clientId: string): Promise
   ])
   const errors = results.filter((r) => r.error).map((r) => r.error!.message)
   if (errors.length > 0) throw new Error(`deleteIndividualClientRelations: ${errors.join('; ')}`)
+}
+
+// ============================================================
+// Website Leads — intake do site público (adlerrochefort.com)
+// ============================================================
+
+/**
+ * Encontra ou cria o individual_client dono de `email` (já
+ * normalizado pelo chamador — ver src/lib/email.ts normalizeEmail).
+ * Delega no lado da BD (função find_or_create_individual_client_by_email,
+ * ver migrations/20260829_website_leads.sql) para que a verificação e
+ * a criação sejam atómicas mesmo com duas submissões concorrentes do
+ * mesmo email — algo que um SELECT seguido de INSERT em dois pedidos
+ * HTTP separados não garante.
+ *
+ * Nunca atualiza um cliente já existente (nome/telefone ficam como
+ * estavam) — ver requisito "não alterar clientes existentes".
+ */
+export async function findOrCreateIndividualClientByEmail(input: {
+  email: string
+  fullName: string
+  phone?: string
+}): Promise<{ id: string; created: boolean }> {
+  const sb = getSupabaseAdmin()
+  // .rpc() só tipa bem com tipos gerados a partir do schema (não usados neste
+  // projeto — ver os `never`/`Record<string, unknown>` já pré-existentes em
+  // todo este ficheiro para .insert()/.update()); cast pontual, mesma causa.
+  const { data, error } = await (sb.rpc as any)('find_or_create_individual_client_by_email', {
+    p_email: input.email,
+    p_full_name: input.fullName,
+    p_phone: input.phone ?? null,
+  }).single()
+  if (error) throw new Error(`findOrCreateIndividualClientByEmail: ${error.message}`)
+  const row = data as { client_id: string; created: boolean }
+  return { id: row.client_id, created: row.created }
+}
+
+export type CreateWebsiteLeadResult =
+  | { created: true; id: string }
+  // A mesma submission_id já tinha gerado uma linha (retry do Netlify Forms
+  // ou reprocessamento manual) — não duplica, devolve o lead existente.
+  | { created: false; duplicate: true; id: string }
+
+export async function createWebsiteLead(
+  lead: Omit<WebsiteLead, 'id' | 'createdAt'>,
+): Promise<CreateWebsiteLeadResult> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('website_leads')
+    .insert(objectToSnake(lead as unknown as Record<string, unknown>))
+    .select('id')
+    .single()
+
+  if (!error) return { created: true, id: data.id as string }
+
+  // 23505 = unique_violation. Só website_leads_submission_id_uidx pode disparar
+  // aqui (não há outra constraint UNIQUE na tabela), então isto é sempre uma
+  // submissão duplicada, nunca um erro genuíno a esconder.
+  if (error.code === '23505' && lead.submissionId) {
+    const { data: existing, error: selErr } = await sb
+      .from('website_leads')
+      .select('id')
+      .eq('submission_id', lead.submissionId)
+      .single()
+    if (selErr || !existing) throw new Error(`createWebsiteLead (duplicate lookup): ${selErr?.message ?? 'not found'}`)
+    return { created: false, duplicate: true, id: existing.id as string }
+  }
+
+  throw new Error(`createWebsiteLead: ${error.message}`)
+}
+
+export async function getWebsiteLeadsByIndividualClientId(individualClientId: string): Promise<WebsiteLead[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('website_leads')
+    .select('*')
+    .eq('individual_client_id', individualClientId)
+    .order('received_at', { ascending: false })
+  if (error) { console.error('getWebsiteLeadsByIndividualClientId error:', error); return [] }
+  return rowsToCamel<WebsiteLead>(data ?? [])
+}
+
+/** IDs de clientes com pelo menos um website_lead — usado só para mostrar o
+ * indicador "Origem: Website" na listagem de clientes individuais do admin. */
+export async function getWebsiteLeadIndividualClientIds(): Promise<Set<string>> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('website_leads').select('individual_client_id')
+  if (error) { console.error('getWebsiteLeadIndividualClientIds error:', error); return new Set() }
+  return new Set((data ?? []).map((r: { individual_client_id: string }) => r.individual_client_id))
 }
 
 // ============================================================

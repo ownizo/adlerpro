@@ -3,6 +3,7 @@ import { CLAIM_STATUS_LABELS, POLICY_TYPE_LABELS } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { ClientNotes } from './ClientNotes'
 import { ClientTasks } from './ClientTasks'
+import { WebsiteLeads } from './WebsiteLeads'
 import { getDocumentUrl } from '@/lib/server-fns'
 
 type Subject =
@@ -156,6 +157,9 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
           </div>
         )}
       </div>
+
+      {/* Pedidos do Website — só para clientes particulares (é a origem deste histórico) */}
+      {subject.kind === 'individual' && <WebsiteLeads individualClientId={subject.client.id} />}
 
       {/* Tarefas */}
       <ClientTasks
