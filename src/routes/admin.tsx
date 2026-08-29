@@ -1575,14 +1575,18 @@ function SalesPipelineSummaryWidget() {
 
   if (!stats) return null
 
+  // Prémio (o que o cliente paga à seguradora) e receita (o que fica para a
+  // Adler) são métricas diferentes — nunca uma serve de substituto da outra
+  // aqui, ver computeSalesPipelineStats em sales-opportunity-rules.ts.
   const cards: Array<{ label: string; value: string }> = [
     { label: 'Oportunidades abertas', value: String(stats.openCount) },
     { label: 'Novas este mês', value: String(stats.newThisMonthCount) },
     { label: 'Em cotação', value: String(stats.quotedCount) },
     { label: 'Ganhas este mês', value: String(stats.wonThisMonthCount) },
     { label: 'Perdidas este mês', value: String(stats.lostThisMonthCount) },
-    { label: 'Pipeline estimado', value: formatCurrency(stats.estimatedPipelineValue) },
-    { label: 'Receita ganha (mês)', value: formatCurrency(stats.estimatedWonRevenueThisMonth) },
+    { label: 'Pipeline (prémio)', value: formatCurrency(stats.openPipelinePremium) },
+    { label: 'Pipeline (receita)', value: formatCurrency(stats.openPipelineRevenue) },
+    { label: 'Receita ganha (mês)', value: formatCurrency(stats.wonRevenueThisMonth) },
   ]
 
   return (
@@ -1593,7 +1597,7 @@ function SalesPipelineSummaryWidget() {
           Ver pipeline →
         </Link>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
         {cards.map((card) => (
           <div key={card.label} className="text-center">
             <p className="text-lg font-semibold text-navy-700">{card.value}</p>

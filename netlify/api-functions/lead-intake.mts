@@ -4,7 +4,7 @@ import {
   createWebsiteLead,
   createSalesOpportunityForWebsiteLead,
 } from '../../src/lib/data'
-import { parseLeadIntakePayload } from './lib/lead-intake-shared'
+import { parseLeadIntakePayload, buildLeadIntakeResponse } from './lib/lead-intake-shared'
 
 // -----------------------------------------------------------------------------
 // lead-intake.mts — porta de entrada server-to-server para leads de PESSOAS
@@ -94,12 +94,21 @@ export default async function handler(req: Request, _context: Context) {
     return resp({ error: 'not_configured' }, 500)
   }
 
+  // ── Passos obrigatórios: cliente + website_lead ─────────────────────────
+  // Uma falha aqui é um erro real do intake (500) — ao contrário da
+  // oportunidade comercial abaixo, que é sempre best-effort.
+  let clientId: string
+  let clientCreated: boolean
+  let leadCreated: boolean
+  let leadId: string
   try {
-    const { id: clientId, created: clientCreated } = await findOrCreateIndividualClientByEmail({
+    const clientResult = await findOrCreateIndividualClientByEmail({
       email: lead.email,
       fullName: lead.name,
       phone: lead.phone,
     })
+    clientId = clientResult.id
+    clientCreated = clientResult.created
     logEvent(clientCreated ? 'CLIENT_CREATED' : 'CLIENT_REUSED', { submissionId: lead.submissionId })
 
     const leadResult = await createWebsiteLead({
@@ -118,36 +127,43 @@ export default async function handler(req: Request, _context: Context) {
       metadata: lead.metadata,
       receivedAt: new Date().toISOString(),
     })
-
-    if (!leadResult.created) {
-      logEvent('DUPLICATE_SUBMISSION', { submissionId: lead.submissionId })
-      return resp({ ok: true, clientId, clientCreated: false, leadCreated: false, duplicateSubmission: true }, 200)
-    }
-
-    logEvent('LEAD_CREATED', { submissionId: lead.submissionId })
-
-    // Só cria a oportunidade comercial quando o website_lead é genuinamente
-    // novo (leadResult.created acima) — um retry da mesma submissão nunca
-    // chega aqui. Protegido também ao nível da BD (índice único parcial em
-    // website_lead_id) para o caso de este próprio endpoint ser reprocessado.
-    const opportunityResult = await createSalesOpportunityForWebsiteLead({
-      individualClientId: clientId,
-      websiteLeadId: leadResult.id,
-      clientName: lead.name,
-      market: lead.market,
-      product: lead.product,
-    })
-    logEvent(opportunityResult.created ? 'OPPORTUNITY_CREATED' : 'OPPORTUNITY_REUSED', {
-      submissionId: lead.submissionId,
-    })
-
-    return resp(
-      { ok: true, clientId, clientCreated, leadCreated: true, opportunityCreated: opportunityResult.created },
-      200,
-    )
+    leadCreated = leadResult.created
+    leadId = leadResult.id
+    logEvent(leadCreated ? 'LEAD_CREATED' : 'DUPLICATE_SUBMISSION', { submissionId: lead.submissionId })
   } catch (err) {
     logEvent('CRM_SYNC_FAILED', { reason: 'internal_error', submissionId: lead.submissionId })
     console.error('[lead-intake] internal error:', err instanceof Error ? err.message : err)
     return resp({ error: 'internal_error' }, 500)
   }
+
+  // ── Passo best-effort: oportunidade comercial ───────────────────────────
+  // Camada adicional sobre um intake que já teve sucesso — nunca pode fazer
+  // falhar a resposta. Tentado SEMPRE, quer o website_lead seja novo ou
+  // reutilizado (um retry depois de uma falha aqui tem de conseguir
+  // recuperar e criar a oportunidade em falta) — a idempotência vem do
+  // índice único parcial em website_lead_id
+  // (sales_opportunities_website_lead_id_uidx), nunca de uma flag "já foi
+  // tentado". Nunca apaga o cliente nem o website_lead já criados, e nunca
+  // expõe a mensagem de erro interna/Supabase na resposta.
+  let opportunityCreated = false
+  try {
+    const opportunityResult = await createSalesOpportunityForWebsiteLead({
+      individualClientId: clientId,
+      websiteLeadId: leadId,
+      clientName: lead.name,
+      market: lead.market,
+      product: lead.product,
+    })
+    opportunityCreated = opportunityResult.created
+    logEvent(opportunityResult.created ? 'OPPORTUNITY_CREATED' : 'OPPORTUNITY_REUSED', {
+      submissionId: lead.submissionId,
+    })
+  } catch (err) {
+    logEvent('OPPORTUNITY_CREATE_FAILED', { submissionId: lead.submissionId })
+    console.error('[lead-intake] opportunity creation failed (non-fatal):', err instanceof Error ? err.message : err)
+    // opportunityCreated fica false; client/website_lead já criados não são
+    // desfeitos e a resposta continua ok:true — ver buildLeadIntakeResponse.
+  }
+
+  return resp(buildLeadIntakeResponse({ clientId, clientCreated, leadCreated, opportunityCreated }), 200)
 }

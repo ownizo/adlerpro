@@ -522,3 +522,47 @@ export interface SalesOpportunity {
   updatedAt: string
   closedAt?: string
 }
+
+// Campos que um update genérico (adminUpdateSalesOpportunity) pode alterar.
+// Deliberadamente exclui id/companyId/individualClientId/websiteLeadId/
+// createdAt/closedAt/stage — dono e proveniência não mudam por aqui (stage
+// tem a sua própria função, que também deriva closedAt automaticamente) —
+// ver pickEditableOpportunityFields em sales-opportunity-rules.ts.
+export const SALES_OPPORTUNITY_EDITABLE_FIELDS = [
+  'title',
+  'market',
+  'product',
+  'source',
+  'sourceDetail',
+  'estimatedAnnualPremium',
+  'estimatedRevenue',
+  'currency',
+  'assignedTo',
+  'expectedCloseDate',
+  'nextFollowUpAt',
+  'lostReason',
+] as const satisfies readonly (keyof SalesOpportunity)[]
+
+export type SalesOpportunityEditableUpdate = Partial<
+  Pick<SalesOpportunity, (typeof SALES_OPPORTUNITY_EDITABLE_FIELDS)[number]>
+>
+
+/**
+ * Resumo comercial pequeno para o dashboard — sem forecasting complexo.
+ * Prémio (o que o cliente paga à seguradora) e receita (o que fica para a
+ * Adler) são métricas distintas e nunca se substituem uma à outra — ver
+ * computeSalesPipelineStats em sales-opportunity-rules.ts.
+ */
+export interface SalesPipelineStats {
+  openCount: number
+  newThisMonthCount: number
+  quotedCount: number
+  wonThisMonthCount: number
+  lostThisMonthCount: number
+  /** sum(estimatedAnnualPremium) das oportunidades abertas. */
+  openPipelinePremium: number
+  /** sum(estimatedRevenue) das oportunidades abertas. */
+  openPipelineRevenue: number
+  /** sum(estimatedRevenue) das oportunidades won fechadas este mês. */
+  wonRevenueThisMonth: number
+}

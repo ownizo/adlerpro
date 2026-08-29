@@ -2,14 +2,22 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  SALES_OPPORTUNITY_STAGES,
   buildOpportunityTitle,
   buildWebsiteLeadOpportunityPayload,
   computeClosedAtForStageChange,
+  computeSalesPipelineStats,
+  followUpTaskNeedsDateUpdate,
   isClosedStage,
-  shouldCreateOpportunityForWebsiteLead,
+  isValidSalesOpportunityMarket,
+  isValidSalesOpportunitySource,
+  isValidSalesOpportunityStage,
+  isWebsiteLeadIdUniqueViolation,
+  pickEditableOpportunityFields,
+  pickWebsiteLeadContextFields,
   validateOpportunityOwner,
 } from './sales-opportunity-rules.ts'
-import type { SalesOpportunityStage } from './types.ts'
+import type { SalesOpportunity, SalesOpportunityStage, WebsiteLead } from './types.ts'
 
 test('buildOpportunityTitle produces a readable "product — client" label', () => {
   assert.equal(buildOpportunityTitle('health', 'Anna Weber'), 'Seguro de Saúde — Anna Weber')
@@ -96,11 +104,6 @@ test('validateOpportunityOwner: rejects no owner present', () => {
   })
 })
 
-test('shouldCreateOpportunityForWebsiteLead mirrors the website_lead creation outcome', () => {
-  assert.equal(shouldCreateOpportunityForWebsiteLead(true), true)
-  assert.equal(shouldCreateOpportunityForWebsiteLead(false), false)
-})
-
 test('buildWebsiteLeadOpportunityPayload: market ES is preserved, never rewritten', () => {
   const payload = buildWebsiteLeadOpportunityPayload({
     individualClientId: 'client-1',
@@ -136,4 +139,195 @@ test('buildWebsiteLeadOpportunityPayload: builds a readable title and preserves 
   assert.equal(payload.title, 'Seguro de Saúde — Anna Weber')
   assert.equal(payload.individualClientId, 'client-1')
   assert.equal(payload.websiteLeadId, 'lead-1')
+})
+
+// ── E: 23505 só é idempotente para o índice de website_lead_id ────────────
+test('isWebsiteLeadIdUniqueViolation: true only for a 23505 naming the website_lead_id index', () => {
+  assert.equal(
+    isWebsiteLeadIdUniqueViolation({
+      code: '23505',
+      message: 'duplicate key value violates unique constraint "sales_opportunities_website_lead_id_uidx"',
+    }),
+    true,
+  )
+})
+
+test('isWebsiteLeadIdUniqueViolation: false for a 23505 on a different constraint — must propagate, not silently swallow', () => {
+  assert.equal(
+    isWebsiteLeadIdUniqueViolation({
+      code: '23505',
+      message: 'duplicate key value violates unique constraint "sales_opportunities_pkey"',
+    }),
+    false,
+  )
+})
+
+test('isWebsiteLeadIdUniqueViolation: false for any non-23505 error code', () => {
+  assert.equal(isWebsiteLeadIdUniqueViolation({ code: '23514', message: 'sales_opportunities_scope_xor' }), false)
+  assert.equal(isWebsiteLeadIdUniqueViolation({ code: null, message: 'sales_opportunities_website_lead_id_uidx' }), false)
+})
+
+// ── G: update genérico não consegue alterar owner/websiteLeadId/createdAt/closedAt/stage ──
+test('pickEditableOpportunityFields: strips owner, websiteLeadId, createdAt, closedAt and stage', () => {
+  const attempted = {
+    id: 'opp-1',
+    companyId: 'acme',
+    individualClientId: 'client-1',
+    websiteLeadId: 'lead-1',
+    createdAt: '2020-01-01T00:00:00.000Z',
+    closedAt: '2020-01-02T00:00:00.000Z',
+    stage: 'won',
+    product: 'health',
+    assignedTo: 'agent@adlerrochefort.com',
+  }
+  const picked = pickEditableOpportunityFields(attempted)
+  assert.deepEqual(picked, { product: 'health', assignedTo: 'agent@adlerrochefort.com' })
+  assert.equal('id' in picked, false)
+  assert.equal('companyId' in picked, false)
+  assert.equal('individualClientId' in picked, false)
+  assert.equal('websiteLeadId' in picked, false)
+  assert.equal('createdAt' in picked, false)
+  assert.equal('closedAt' in picked, false)
+  assert.equal('stage' in picked, false)
+})
+
+test('pickEditableOpportunityFields: allows every field explicitly meant to be editable', () => {
+  const attempted = {
+    title: 'Novo título',
+    market: 'ES',
+    product: 'home',
+    source: 'referral',
+    sourceDetail: 'Indicação do João',
+    estimatedAnnualPremium: 500,
+    estimatedRevenue: 100,
+    currency: 'EUR',
+    assignedTo: 'agent@adlerrochefort.com',
+    expectedCloseDate: '2026-09-30',
+    nextFollowUpAt: '2026-09-01T10:00:00.000Z',
+    lostReason: 'Preço',
+  }
+  assert.deepEqual(pickEditableOpportunityFields(attempted), attempted)
+})
+
+// ── Enum validation server-side (não confiar só no TypeScript) ────────────
+test('isValidSalesOpportunityMarket: only PT/ES, but empty/undefined is allowed (not yet determined)', () => {
+  assert.equal(isValidSalesOpportunityMarket('PT'), true)
+  assert.equal(isValidSalesOpportunityMarket('ES'), true)
+  assert.equal(isValidSalesOpportunityMarket(undefined), true)
+  assert.equal(isValidSalesOpportunityMarket(null), true)
+  assert.equal(isValidSalesOpportunityMarket(''), true)
+  assert.equal(isValidSalesOpportunityMarket('EN'), false)
+  assert.equal(isValidSalesOpportunityMarket('US'), false)
+})
+
+test('isValidSalesOpportunityStage: only the seven known stages', () => {
+  for (const stage of SALES_OPPORTUNITY_STAGES) {
+    assert.equal(isValidSalesOpportunityStage(stage), true)
+  }
+  assert.equal(isValidSalesOpportunityStage('archived'), false)
+  assert.equal(isValidSalesOpportunityStage(''), false)
+  assert.equal(isValidSalesOpportunityStage(undefined), false)
+})
+
+test('isValidSalesOpportunitySource: only the defined taxonomy, empty/undefined allowed', () => {
+  assert.equal(isValidSalesOpportunitySource('website'), true)
+  assert.equal(isValidSalesOpportunitySource('whatsapp'), true)
+  assert.equal(isValidSalesOpportunitySource(undefined), true)
+  assert.equal(isValidSalesOpportunitySource(''), true)
+  assert.equal(isValidSalesOpportunitySource('tiktok'), false)
+})
+
+// ── F: premium e revenue nunca são confundidos nos KPIs ────────────────────
+function makeOpportunity(overrides: Partial<SalesOpportunity>): SalesOpportunity {
+  return {
+    id: 'opp',
+    individualClientId: 'client-1',
+    title: 'Oportunidade',
+    stage: 'new',
+    currency: 'EUR',
+    createdAt: '2026-08-01T00:00:00.000Z',
+    updatedAt: '2026-08-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+test('computeSalesPipelineStats: open pipeline premium and revenue are summed separately, never mixed', () => {
+  const now = new Date('2026-08-29T12:00:00.000Z')
+  const opportunities = [
+    makeOpportunity({ id: '1', stage: 'new', estimatedAnnualPremium: 1000 }),
+    makeOpportunity({ id: '2', stage: 'contacted', estimatedRevenue: 200 }),
+    makeOpportunity({ id: '3', stage: 'quoted', estimatedAnnualPremium: 500, estimatedRevenue: 80 }),
+  ]
+  const stats = computeSalesPipelineStats(opportunities, now)
+  assert.equal(stats.openPipelinePremium, 1500) // 1000 + 0 + 500 — nunca usa revenue como fallback
+  assert.equal(stats.openPipelineRevenue, 280) // 0 + 200 + 80 — nunca usa premium como fallback
+  assert.equal(stats.openCount, 3)
+  assert.equal(stats.quotedCount, 1)
+})
+
+test('computeSalesPipelineStats: won revenue this month never falls back to premium when revenue is missing', () => {
+  const now = new Date('2026-08-29T12:00:00.000Z')
+  const opportunities = [
+    makeOpportunity({
+      id: '1',
+      stage: 'won',
+      closedAt: '2026-08-15T00:00:00.000Z',
+      estimatedAnnualPremium: 900,
+      // estimatedRevenue ausente de propósito
+    }),
+  ]
+  const stats = computeSalesPipelineStats(opportunities, now)
+  assert.equal(stats.wonRevenueThisMonth, 0, 'must not use estimatedAnnualPremium as a stand-in for revenue')
+  assert.equal(stats.wonThisMonthCount, 1)
+})
+
+test('computeSalesPipelineStats: closed (won/lost) opportunities never count towards the open pipeline', () => {
+  const now = new Date('2026-08-29T12:00:00.000Z')
+  const opportunities = [
+    makeOpportunity({ id: '1', stage: 'won', closedAt: now.toISOString(), estimatedAnnualPremium: 1000, estimatedRevenue: 200 }),
+    makeOpportunity({ id: '2', stage: 'lost', closedAt: now.toISOString(), estimatedAnnualPremium: 500 }),
+  ]
+  const stats = computeSalesPipelineStats(opportunities, now)
+  assert.equal(stats.openCount, 0)
+  assert.equal(stats.openPipelinePremium, 0)
+  assert.equal(stats.openPipelineRevenue, 0)
+  assert.equal(stats.lostThisMonthCount, 1)
+})
+
+// ── H: follow-up mantém next_follow_up_at e client_task coerentes ─────────
+test('followUpTaskNeedsDateUpdate: true only when the requested date actually differs', () => {
+  assert.equal(followUpTaskNeedsDateUpdate('2026-09-01', '2026-09-05'), true)
+  assert.equal(followUpTaskNeedsDateUpdate('2026-09-01', '2026-09-01'), false)
+})
+
+// ── I: website lead context não expõe metadata/raw sensitive fields ───────
+test('pickWebsiteLeadContextFields: only form_name/source_url/utm_*/received_at, never metadata', () => {
+  const lead: WebsiteLead = {
+    id: 'lead-1',
+    individualClientId: 'client-1',
+    formName: 'expat-health-quote',
+    market: 'PT',
+    product: 'health',
+    source: 'website',
+    sourceUrl: 'https://adlerrochefort.com/en/health-insurance-quote/',
+    utmSource: 'instagram',
+    utmMedium: 'bio',
+    utmCampaign: 'saude-expat',
+    utmContent: undefined,
+    utmTerm: undefined,
+    metadata: { branchLabel: 'Saúde', language: 'EN' },
+    receivedAt: '2026-08-29T10:00:00.000Z',
+    createdAt: '2026-08-29T10:00:00.000Z',
+  }
+  const context = pickWebsiteLeadContextFields(lead)
+  assert.deepEqual(context, {
+    formName: 'expat-health-quote',
+    sourceUrl: 'https://adlerrochefort.com/en/health-insurance-quote/',
+    utmSource: 'instagram',
+    utmMedium: 'bio',
+    utmCampaign: 'saude-expat',
+    receivedAt: '2026-08-29T10:00:00.000Z',
+  })
+  assert.equal('metadata' in context, false)
+  assert.equal(JSON.stringify(context).includes('branchLabel'), false)
 })

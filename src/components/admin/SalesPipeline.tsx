@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import type { Company, IndividualClient, SalesOpportunity, SalesOpportunityStage } from '@/lib/types'
 import {
   SALES_OPPORTUNITY_STAGES,
@@ -14,6 +15,7 @@ import {
   adminUpdateSalesOpportunityStage,
   adminDeleteSalesOpportunity,
   adminCreateOpportunityFollowUpTask,
+  fetchWebsiteLeadContextForOpportunity,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
@@ -557,6 +559,24 @@ function OpportunityDetail({
   const [error, setError] = useState<string | null>(null)
   const [followUpDate, setFollowUpDate] = useState('')
   const [followUpMsg, setFollowUpMsg] = useState<string | null>(null)
+  const [websiteLeadContext, setWebsiteLeadContext] = useState<Awaited<ReturnType<typeof fetchWebsiteLeadContextForOpportunity>> | null>(null)
+
+  // Contexto do website_lead associado — reutiliza website_leads (nunca
+  // duplicado em sales_opportunities); nunca mostra `metadata` nem qualquer
+  // campo fora do allowlist (ver pickWebsiteLeadContextFields).
+  useEffect(() => {
+    if (!opportunity.websiteLeadId || !opportunity.individualClientId) {
+      setWebsiteLeadContext(null)
+      return
+    }
+    let active = true
+    fetchWebsiteLeadContextForOpportunity({
+      data: { individualClientId: opportunity.individualClientId, websiteLeadId: opportunity.websiteLeadId },
+    })
+      .then((result) => { if (active) setWebsiteLeadContext(result ?? null) })
+      .catch(() => { if (active) setWebsiteLeadContext(null) })
+    return () => { active = false }
+  }, [opportunity.websiteLeadId, opportunity.individualClientId])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
@@ -564,7 +584,21 @@ function OpportunityDetail({
         <div className="flex items-start justify-between mb-3">
           <div>
             <h3 className="text-sm font-semibold text-navy-700">{opportunity.title}</h3>
-            <p className="text-xs text-navy-500 mt-0.5">{owner?.name} {owner?.email ? `· ${owner.email}` : ''}</p>
+            <p className="text-xs text-navy-500 mt-0.5">
+              {owner?.name} {owner?.email ? `· ${owner.email}` : ''}
+              {owner && (
+                <>
+                  {' · '}
+                  <Link
+                    to="/admin"
+                    search={{ tab: owner.kind === 'individual' ? 'individual_clients' : 'companies' }}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    Ver cliente →
+                  </Link>
+                </>
+              )}
+            </p>
           </div>
           <button onClick={onClose} className="text-navy-400 hover:text-navy-700">✕</button>
         </div>
@@ -583,8 +617,37 @@ function OpportunityDetail({
           <div className="flex justify-between"><dt>Próximo follow-up</dt><dd>{opportunity.nextFollowUpAt ? formatDate(opportunity.nextFollowUpAt) : '—'}</dd></div>
           <div className="flex justify-between"><dt>Criada em</dt><dd>{formatDate(opportunity.createdAt)}</dd></div>
           {opportunity.closedAt && <div className="flex justify-between"><dt>Fechada em</dt><dd>{formatDate(opportunity.closedAt)}</dd></div>}
-          {opportunity.websiteLeadId && <div className="flex justify-between"><dt>Pedido do website</dt><dd className="text-navy-400">origem: website_lead</dd></div>}
         </dl>
+
+        {opportunity.websiteLeadId && (
+          <div className="border-t border-navy-100 pt-3 mb-3">
+            <p className="text-xs font-semibold text-navy-700 mb-1.5">Pedido do website</p>
+            {websiteLeadContext ? (
+              <dl className="text-xs text-navy-600 space-y-1">
+                <div className="flex justify-between"><dt>Formulário</dt><dd>{websiteLeadContext.formName}</dd></div>
+                {websiteLeadContext.sourceUrl && (
+                  <div className="flex justify-between gap-2">
+                    <dt>Página de origem</dt>
+                    <dd className="truncate max-w-[220px]" title={websiteLeadContext.sourceUrl}>
+                      <a href={websiteLeadContext.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800">
+                        {websiteLeadContext.sourceUrl}
+                      </a>
+                    </dd>
+                  </div>
+                )}
+                {(websiteLeadContext.utmSource || websiteLeadContext.utmMedium || websiteLeadContext.utmCampaign) && (
+                  <div className="flex justify-between">
+                    <dt>UTM</dt>
+                    <dd>{[websiteLeadContext.utmSource, websiteLeadContext.utmMedium, websiteLeadContext.utmCampaign].filter(Boolean).join(' / ')}</dd>
+                  </div>
+                )}
+                <div className="flex justify-between"><dt>Recebido em</dt><dd>{formatDate(websiteLeadContext.receivedAt)}</dd></div>
+              </dl>
+            ) : (
+              <p className="text-xs text-navy-400">A carregar…</p>
+            )}
+          </div>
+        )}
 
         <div className="border-t border-navy-100 pt-3 space-y-2">
           <label className="text-xs text-navy-600">Mudar stage</label>
@@ -652,6 +715,10 @@ function OpportunityDetail({
                 setSaving(true)
                 setFollowUpMsg(null)
                 try {
+                  // adminCreateOpportunityFollowUpTask já mantém
+                  // opportunity.nextFollowUpAt e a client_task pendente em
+                  // sincronia num único ponto no servidor — ver
+                  // ensureFollowUpTaskForOpportunity em data.ts.
                   const result = await adminCreateOpportunityFollowUpTask({
                     data: {
                       opportunityId: opportunity.id,
@@ -659,8 +726,9 @@ function OpportunityDetail({
                       dueDate: followUpDate,
                     },
                   })
-                  setFollowUpMsg(result.created ? 'Tarefa criada.' : 'Já existia uma tarefa pendente para esta oportunidade.')
-                  await adminUpdateSalesOpportunity({ data: { id: opportunity.id, updates: { nextFollowUpAt: followUpDate } } })
+                  setFollowUpMsg(
+                    result.created ? 'Tarefa criada.' : 'Tarefa de follow-up existente atualizada para a nova data.',
+                  )
                   onChanged()
                 } catch (err) {
                   setError(err instanceof Error ? err.message : 'Erro ao criar tarefa')

@@ -23,10 +23,18 @@ import type {
   WebsiteLead,
   SalesOpportunity,
   SalesOpportunityStage,
+  SalesPipelineStats,
 } from './types'
 import {
   buildWebsiteLeadOpportunityPayload,
   computeClosedAtForStageChange,
+  computeSalesPipelineStats,
+  followUpTaskNeedsDateUpdate,
+  isValidSalesOpportunityMarket,
+  isValidSalesOpportunitySource,
+  isValidSalesOpportunityStage,
+  isWebsiteLeadIdUniqueViolation,
+  pickEditableOpportunityFields,
   validateOpportunityOwner,
 } from './sales-opportunity-rules'
 
@@ -728,6 +736,9 @@ export async function createSalesOpportunity(
 ): Promise<{ id: string }> {
   const ownerCheck = validateOpportunityOwner(opportunity)
   if (!ownerCheck.ok) throw new Error(`createSalesOpportunity: ${ownerCheck.error}`)
+  if (!isValidSalesOpportunityStage(opportunity.stage)) throw new Error('createSalesOpportunity: invalid_stage')
+  if (!isValidSalesOpportunityMarket(opportunity.market)) throw new Error('createSalesOpportunity: invalid_market')
+  if (!isValidSalesOpportunitySource(opportunity.source)) throw new Error('createSalesOpportunity: invalid_source')
 
   const sb = getSupabaseAdmin()
   const { data, error } = await sb
@@ -770,10 +781,14 @@ export async function createSalesOpportunityForWebsiteLead(input: {
 
   if (!error) return { created: true, id: data.id as string }
 
-  // 23505 = unique_violation — só sales_opportunities_website_lead_id_uidx
-  // pode disparar aqui, portanto é sempre o caso "já existe", nunca um erro
-  // genuíno a esconder.
-  if (error.code === '23505') {
+  // Não assumir genericamente que qualquer 23505 nesta tabela significa
+  // "já existe uma opportunity para este website_lead" — confirma primeiro
+  // que foi mesmo o índice único de website_lead_id que disparou (defesa
+  // contra uma futura constraint UNIQUE nesta tabela ser mal interpretada
+  // como idempotência de lead). Só depois disso tenta reaproveitar uma
+  // linha existente; se essa linha afinal não existir, propaga o erro em
+  // vez de fingir sucesso.
+  if (isWebsiteLeadIdUniqueViolation(error)) {
     const { data: existing, error: selErr } = await sb
       .from('sales_opportunities')
       .select('id')
@@ -788,9 +803,27 @@ export async function createSalesOpportunityForWebsiteLead(input: {
   throw new Error(`createSalesOpportunityForWebsiteLead: ${error.message}`)
 }
 
-export async function updateSalesOpportunity(id: string, updates: Partial<SalesOpportunity>): Promise<void> {
+/**
+ * Update genérico da oportunidade — restrito à allowlist de campos
+ * editáveis (ver SALES_OPPORTUNITY_EDITABLE_FIELDS/pickEditableOpportunityFields):
+ * dono (companyId/individualClientId), websiteLeadId, id, createdAt,
+ * closedAt e stage nunca mudam por aqui, mesmo que um chamador os inclua em
+ * `updates` — são silenciosamente descartados. Stage tem a sua própria
+ * função (updateSalesOpportunityStage), que também deriva closedAt.
+ */
+export async function updateSalesOpportunity(
+  id: string,
+  updates: Record<string, unknown>,
+): Promise<void> {
+  const editable = pickEditableOpportunityFields(updates)
+  if ('market' in editable && !isValidSalesOpportunityMarket(editable.market)) {
+    throw new Error('updateSalesOpportunity: invalid_market')
+  }
+  if ('source' in editable && !isValidSalesOpportunitySource(editable.source)) {
+    throw new Error('updateSalesOpportunity: invalid_source')
+  }
+  const payload = { ...editable, updatedAt: new Date().toISOString() }
   const sb = getSupabaseAdmin()
-  const payload = { ...updates, updatedAt: new Date().toISOString() }
   const { error } = await sb
     .from('sales_opportunities')
     .update(objectToSnake(payload as Record<string, unknown>))
@@ -809,6 +842,11 @@ export async function updateSalesOpportunityStage(
   stage: SalesOpportunityStage,
   extra: { lostReason?: string | null } = {},
 ): Promise<void> {
+  // Não confiar só no tipo TypeScript — um pedido direto ao server-fn (fora
+  // do frontend) contorna o compilador. A BD também tem o seu próprio CHECK
+  // (defesa em profundidade), mas rejeitar aqui evita gastar um round-trip
+  // com um valor já sabido inválido.
+  if (!isValidSalesOpportunityStage(stage)) throw new Error('updateSalesOpportunityStage: invalid_stage')
   const nowIso = new Date().toISOString()
   const closedAt = computeClosedAtForStageChange(stage, nowIso)
   const updates: Record<string, unknown> = {
@@ -829,58 +867,33 @@ export async function deleteSalesOpportunity(id: string): Promise<void> {
   if (error) throw new Error(`deleteSalesOpportunity: ${error.message}`)
 }
 
-export interface SalesPipelineStats {
-  openCount: number
-  newThisMonthCount: number
-  quotedCount: number
-  wonThisMonthCount: number
-  lostThisMonthCount: number
-  estimatedPipelineValue: number
-  estimatedWonRevenueThisMonth: number
-}
-
-/** Resumo pequeno para o dashboard — sem forecasting complexo. */
+/**
+ * Resumo pequeno para o dashboard — sem forecasting complexo. O cálculo em
+ * si é puro (computeSalesPipelineStats, em sales-opportunity-rules.ts, onde
+ * está testado); esta função só busca os dados.
+ */
 export async function getSalesPipelineStats(): Promise<SalesPipelineStats> {
   const all = await getSalesOpportunities()
-  const now = new Date()
-  const isThisMonth = (iso?: string) => {
-    if (!iso) return false
-    const d = new Date(iso)
-    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
-  }
-
-  const stats: SalesPipelineStats = {
-    openCount: 0,
-    newThisMonthCount: 0,
-    quotedCount: 0,
-    wonThisMonthCount: 0,
-    lostThisMonthCount: 0,
-    estimatedPipelineValue: 0,
-    estimatedWonRevenueThisMonth: 0,
-  }
-
-  for (const opp of all) {
-    const isOpen = opp.stage !== 'won' && opp.stage !== 'lost'
-    if (isOpen) {
-      stats.openCount++
-      stats.estimatedPipelineValue += opp.estimatedAnnualPremium ?? opp.estimatedRevenue ?? 0
-    }
-    if (opp.stage === 'quoted') stats.quotedCount++
-    if (isThisMonth(opp.createdAt)) stats.newThisMonthCount++
-    if (opp.stage === 'won' && isThisMonth(opp.closedAt)) {
-      stats.wonThisMonthCount++
-      stats.estimatedWonRevenueThisMonth += opp.estimatedRevenue ?? opp.estimatedAnnualPremium ?? 0
-    }
-    if (opp.stage === 'lost' && isThisMonth(opp.closedAt)) stats.lostThisMonthCount++
-  }
-
-  return stats
+  return computeSalesPipelineStats(all)
 }
 
 /**
  * Cria uma client_task de follow-up ligada à oportunidade, evitando
  * duplicar quando já existe uma tarefa pendente para a mesma oportunidade
  * (ver requisito "evitar duplicação de tarefas para o mesmo follow-up").
+ */
+/**
+ * sales_opportunities.next_follow_up_at é um resumo/cache comercial;
+ * client_tasks é a fonte operacional das tarefas (ver
+ * followUpTaskNeedsDateUpdate em sales-opportunity-rules.ts). Esta função é
+ * o único ponto onde um follow-up é definido a partir de uma oportunidade,
+ * para nunca haver duas datas contraditórias:
+ *   - sem tarefa pendente ainda -> cria uma nova, ligada por opportunity_id
+ *   - já existe uma tarefa pendente com a mesma data -> reutiliza-a
+ *   - já existe mas com outra data -> atualiza essa tarefa (nunca cria uma
+ *     segunda)
+ * Em qualquer um dos casos, opportunity.next_follow_up_at fica sempre igual
+ * à data pedida no fim.
  */
 export async function ensureFollowUpTaskForOpportunity(input: {
   opportunityId: string
@@ -898,23 +911,43 @@ export async function ensureFollowUpTaskForOpportunity(input: {
     .eq('source', 'opportunity')
     .limit(1)
   if (selErr) throw new Error(`ensureFollowUpTaskForOpportunity (lookup): ${selErr.message}`)
+
+  let result: { created: boolean; task: ClientTask }
+
   if (existingRows && existingRows.length > 0) {
-    return { created: false, task: objectToCamel(existingRows[0]) as ClientTask }
+    const existingTask = objectToCamel(existingRows[0]) as ClientTask
+    if (followUpTaskNeedsDateUpdate(existingTask.dueDate, input.dueDate)) {
+      const { error: updErr } = await sb
+        .from('client_tasks')
+        .update({ due_date: input.dueDate })
+        .eq('id', existingTask.id)
+      if (updErr) throw new Error(`ensureFollowUpTaskForOpportunity (update): ${updErr.message}`)
+      result = { created: false, task: { ...existingTask, dueDate: input.dueDate } }
+    } else {
+      result = { created: false, task: existingTask }
+    }
+  } else {
+    const task: ClientTask = {
+      id: crypto.randomUUID(),
+      companyId: input.companyId,
+      individualClientId: input.individualClientId,
+      title: input.title,
+      dueDate: input.dueDate,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      source: 'opportunity',
+      opportunityId: input.opportunityId,
+    }
+    await createClientTask(task)
+    result = { created: true, task }
   }
 
-  const task: ClientTask = {
-    id: crypto.randomUUID(),
-    companyId: input.companyId,
-    individualClientId: input.individualClientId,
-    title: input.title,
-    dueDate: input.dueDate,
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-    source: 'opportunity',
-    opportunityId: input.opportunityId,
-  }
-  await createClientTask(task)
-  return { created: true, task }
+  // Mantém o resumo comercial em sincronia num único ponto — ver comentário
+  // acima. nextFollowUpAt está na allowlist de campos editáveis, por isso
+  // este updateSalesOpportunity interno nunca é bloqueado pela allowlist.
+  await updateSalesOpportunity(input.opportunityId, { nextFollowUpAt: input.dueDate })
+
+  return result
 }
 
 // ============================================================
