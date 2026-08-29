@@ -2,6 +2,7 @@ import type { Context } from '@netlify/functions'
 import {
   findOrCreateIndividualClientByEmail,
   createWebsiteLead,
+  createSalesOpportunityForWebsiteLead,
 } from '../../src/lib/data'
 import { parseLeadIntakePayload } from './lib/lead-intake-shared'
 
@@ -124,7 +125,26 @@ export default async function handler(req: Request, _context: Context) {
     }
 
     logEvent('LEAD_CREATED', { submissionId: lead.submissionId })
-    return resp({ ok: true, clientId, clientCreated, leadCreated: true }, 200)
+
+    // Só cria a oportunidade comercial quando o website_lead é genuinamente
+    // novo (leadResult.created acima) — um retry da mesma submissão nunca
+    // chega aqui. Protegido também ao nível da BD (índice único parcial em
+    // website_lead_id) para o caso de este próprio endpoint ser reprocessado.
+    const opportunityResult = await createSalesOpportunityForWebsiteLead({
+      individualClientId: clientId,
+      websiteLeadId: leadResult.id,
+      clientName: lead.name,
+      market: lead.market,
+      product: lead.product,
+    })
+    logEvent(opportunityResult.created ? 'OPPORTUNITY_CREATED' : 'OPPORTUNITY_REUSED', {
+      submissionId: lead.submissionId,
+    })
+
+    return resp(
+      { ok: true, clientId, clientCreated, leadCreated: true, opportunityCreated: opportunityResult.created },
+      200,
+    )
   } catch (err) {
     logEvent('CRM_SYNC_FAILED', { reason: 'internal_error', submissionId: lead.submissionId })
     console.error('[lead-intake] internal error:', err instanceof Error ? err.message : err)

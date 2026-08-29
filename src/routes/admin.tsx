@@ -41,6 +41,7 @@ import {
   adminUpdateRenewalAlertStatus,
   adminTriggerRenewalAlerts,
   adminSendPolicyDocument,
+  fetchSalesPipelineStats,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate, formatFileSize } from '@/lib/utils'
 import type {
@@ -65,6 +66,7 @@ import { supabase } from '@/lib/supabase'
 import { ClientProfilePanel } from '@/components/admin/ClientProfilePanel'
 import { AdminTasksPanel } from '@/components/admin/AdminTasksPanel'
 import { AdminMarketingPanel } from '@/components/admin/AdminMarketingPanel'
+import { SalesPipeline } from '@/components/admin/SalesPipeline'
 async function exportToExcel(data: Record<string, unknown>[], filename: string) {
   const XLSX = await import('xlsx')
   const ws = XLSX.utils.json_to_sheet(data)
@@ -73,7 +75,7 @@ async function exportToExcel(data: Record<string, unknown>[], filename: string) 
   XLSX.writeFile(wb, `${filename}.xlsx`)
 }
 
-const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'api', 'profiles', 'tasks', 'alerts', 'marketing'] as const
+const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'api', 'profiles', 'tasks', 'alerts', 'marketing', 'sales'] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
 const RENEWAL_ALERT_STATUS_LABELS: Record<RenewalAlertStatus, string> = {
   pending: 'Pendente',
@@ -1541,10 +1543,65 @@ function AdminPage() {
             )}
 
             {tab === 'marketing' && <AdminMarketingPanel />}
+
+            {tab === 'sales' && (
+              <div>
+                <h2 className="text-lg font-semibold text-navy-700 mb-4">Pipeline Comercial</h2>
+                <SalesPipeline individualClients={individualClients} companies={companies} />
+              </div>
+            )}
           </>
         )}
       </div>
     </AppLayout>
+  )
+}
+
+// Resumo comercial pequeno para o dashboard (CRM 2, fase 1) — sem
+// forecasting complexo, só as contagens/somas pedidas. Busca os seus
+// próprios dados (fetchSalesPipelineStats), independente do resto do
+// dashboard, para não acoplar o pipeline comercial ao carregamento
+// financeiro/renovações já existente.
+function SalesPipelineSummaryWidget() {
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof fetchSalesPipelineStats>> | null>(null)
+
+  useEffect(() => {
+    let active = true
+    fetchSalesPipelineStats()
+      .then((result) => { if (active) setStats(result) })
+      .catch((error) => console.error('[SalesPipelineSummaryWidget] fetchSalesPipelineStats error:', error))
+    return () => { active = false }
+  }, [])
+
+  if (!stats) return null
+
+  const cards: Array<{ label: string; value: string }> = [
+    { label: 'Oportunidades abertas', value: String(stats.openCount) },
+    { label: 'Novas este mês', value: String(stats.newThisMonthCount) },
+    { label: 'Em cotação', value: String(stats.quotedCount) },
+    { label: 'Ganhas este mês', value: String(stats.wonThisMonthCount) },
+    { label: 'Perdidas este mês', value: String(stats.lostThisMonthCount) },
+    { label: 'Pipeline estimado', value: formatCurrency(stats.estimatedPipelineValue) },
+    { label: 'Receita ganha (mês)', value: formatCurrency(stats.estimatedWonRevenueThisMonth) },
+  ]
+
+  return (
+    <div className="bg-white rounded-[4px] border border-navy-200 p-4 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm font-semibold text-navy-700">Comercial</h3>
+        <Link to="/admin" search={{ tab: 'sales' }} className="text-xs text-blue-600 hover:text-blue-800">
+          Ver pipeline →
+        </Link>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        {cards.map((card) => (
+          <div key={card.label} className="text-center">
+            <p className="text-lg font-semibold text-navy-700">{card.value}</p>
+            <p className="text-[11px] text-navy-500 mt-0.5">{card.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -1757,6 +1814,9 @@ function AdminDashboardTab({
   return (
     <div>
       <h2 className="text-lg font-semibold text-navy-700 mb-4">Dashboard Administração</h2>
+
+      <SalesPipelineSummaryWidget />
+
       <div className="bg-white rounded-[4px] border border-navy-200 p-4 mb-6">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <label className="text-sm text-navy-600">

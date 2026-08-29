@@ -4,6 +4,7 @@ import { formatDate } from '@/lib/utils'
 import { ClientNotes } from './ClientNotes'
 import { ClientTasks } from './ClientTasks'
 import { WebsiteLeads } from './WebsiteLeads'
+import { SalesOpportunitiesSection } from './SalesOpportunitiesSection'
 import { getDocumentUrl } from '@/lib/server-fns'
 
 type Subject =
@@ -160,6 +161,13 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
 
       {/* Pedidos do Website — só para clientes particulares (é a origem deste histórico) */}
       {subject.kind === 'individual' && <WebsiteLeads individualClientId={subject.client.id} />}
+
+      {/* Oportunidades — CRM comercial (backoffice only) */}
+      <SalesOpportunitiesSection
+        companyId={subject.kind === 'company' ? subject.company.id : undefined}
+        individualClientId={subject.kind === 'individual' ? subject.client.id : undefined}
+        clientName={subject.kind === 'company' ? subject.company.name : subject.client.fullName}
+      />
 
       {/* Tarefas */}
       <ClientTasks

@@ -17,7 +17,7 @@ const NAV_ITEMS = [
   { to: '/profile' as const, key: 'nav.profile', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
 ]
 
-type AdminTab = 'dashboard' | 'companies' | 'individual_clients' | 'policies' | 'claims' | 'billing' | 'api' | 'profiles' | 'tasks' | 'alerts' | 'marketing'
+type AdminTab = 'dashboard' | 'companies' | 'individual_clients' | 'policies' | 'claims' | 'billing' | 'api' | 'profiles' | 'tasks' | 'alerts' | 'marketing' | 'sales'
 
 const ADMIN_NAV_ROOT = {
   to: '/admin' as const,
@@ -37,6 +37,7 @@ const ADMIN_SUBNAV_ITEMS: Array<{ key: string; tab: AdminTab }> = [
   { key: 'nav.adminTasks', tab: 'tasks' },
   { key: 'nav.adminAlerts60d', tab: 'alerts' },
   { key: 'nav.adminMarketing', tab: 'marketing' },
+  { key: 'nav.adminSales', tab: 'sales' },
 ]
 
 const BOTTOM_NAV_ITEMS = [

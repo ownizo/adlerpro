@@ -438,8 +438,9 @@ export interface ClientTask {
   status: 'pending' | 'done'
   doneAt?: string              // ISO timestamp; undefined enquanto pending
   createdAt: string
-  source: 'manual' | 'renewal'
+  source: 'manual' | 'renewal' | 'opportunity'
   policyId?: string            // FK policies.id; só preenchido na fatia 4
+  opportunityId?: string       // FK sales_opportunities.id; follow-up de uma oportunidade (CRM 2)
 }
 
 /**
@@ -469,4 +470,55 @@ export interface WebsiteLead {
   metadata?: Record<string, string | number | boolean>
   receivedAt: string
   createdAt: string
+}
+
+export type SalesOpportunityStage =
+  | 'new'
+  | 'contacted'
+  | 'needs_analysis'
+  | 'quoted'
+  | 'negotiation'
+  | 'won'
+  | 'lost'
+
+/**
+ * Uma oportunidade comercial no pipeline (CRM 2, fase 1) — BACKOFFICE ONLY,
+ * nunca exposta aos portais de cliente. Pertence a uma company OU a um
+ * individual_client (XOR, igual a client_notes/client_tasks), nunca às duas
+ * nem a nenhuma. Pode nascer de um website_lead (websiteLeadId preenchido,
+ * source: 'website') ou ser criada manualmente no admin.
+ *
+ * Só guarda contexto comercial — nunca dados sensíveis do formulário de
+ * origem (saúde, DOB, documentos, NIF, notas clínicas); ver privacidade em
+ * migrations/20260829_sales_opportunities.sql.
+ */
+export interface SalesOpportunity {
+  id: string
+  companyId?: string
+  individualClientId?: string
+  websiteLeadId?: string
+
+  title: string
+  market?: string
+  product?: string
+
+  stage: SalesOpportunityStage
+
+  source?: string
+  sourceDetail?: string
+
+  estimatedAnnualPremium?: number
+  estimatedRevenue?: number
+  currency: string
+
+  assignedTo?: string
+
+  expectedCloseDate?: string   // 'YYYY-MM-DD'
+  nextFollowUpAt?: string      // ISO timestamp
+
+  lostReason?: string
+
+  createdAt: string
+  updatedAt: string
+  closedAt?: string
 }
