@@ -175,20 +175,53 @@ CREATE INDEX IF NOT EXISTS client_tasks_opportunity_id_idx
 -- dois valores originais). O nome da constraint gerada
 -- automaticamente pelo Postgres para um CHECK de coluna inline nunca
 -- foi fixado explicitamente em 20260605_client_tasks.sql, por isso
--- este bloco encontra-a por inspeção em vez de assumir um nome —
--- seguro mesmo que o nome real não seja o convencional
--- "client_tasks_source_check".
+-- este bloco encontra-a por inspeção em vez de assumir um nome.
+--
+-- BUG CORRIGIDO (descoberto numa tentativa real de migration em
+-- produção): a versão anterior procurava a constraint por texto —
+-- pg_get_constraintdef(...) ILIKE '%source%IN%' — assumindo que o
+-- Postgres devolve a definição na forma escrita "source IN (...)".
+-- Em produção a constraint existente ("client_tasks_source_check")
+-- está normalizada para "source = ANY (ARRAY[...])", que o padrão
+-- "%IN%" não apanha (não há a substring "IN" nessa forma). O ILIKE
+-- não encontrava nada, a DROP nunca corria, e o ADD CONSTRAINT
+-- seguinte falhava com 42710 (constraint já existe) — a migration
+-- inteira era revertida pelo Postgres.
+--
+-- Correção: identificar a constraint estruturalmente via catálogo —
+-- pg_constraint.conkey (colunas envolvidas) cruzado com o attnum da
+-- coluna "source" em pg_attribute — em vez de interpretar o texto
+-- pretty-printed da definição, que o Postgres pode normalizar de
+-- formas diferentes (IN (...), = ANY (ARRAY[...]), etc.) e que nunca
+-- deve ser usado como fonte de verdade para automação. Isto também
+-- torna o bloco à prova de qualquer nome de constraint histórico,
+-- exatamente como o comentário original já pretendia.
+--
+-- Fica implicitamente idempotente: se este bloco for corrido de novo
+-- (ex.: reaplicar a migration depois de já ter tido sucesso), volta a
+-- encontrar "client_tasks_source_check" (porque essa constraint
+-- também depende da coluna source), remove-a e recria-a de igual —
+-- nunca falha por "constraint already exists".
 DO $$
 DECLARE
   con record;
+  source_attnum smallint;
 BEGIN
+  SELECT attnum INTO source_attnum
+  FROM pg_attribute
+  WHERE attrelid = 'public.client_tasks'::regclass
+    AND attname = 'source'
+    AND NOT attisdropped;
+
   FOR con IN
     SELECT pgc.conname
     FROM pg_constraint pgc
     JOIN pg_class rel ON rel.oid = pgc.conrelid
-    WHERE rel.relname = 'client_tasks'
+    JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+    WHERE nsp.nspname = 'public'
+      AND rel.relname = 'client_tasks'
       AND pgc.contype = 'c'
-      AND pg_get_constraintdef(pgc.oid) ILIKE '%source%IN%'
+      AND source_attnum = ANY (pgc.conkey)
   LOOP
     EXECUTE format('ALTER TABLE public.client_tasks DROP CONSTRAINT %I', con.conname);
   END LOOP;

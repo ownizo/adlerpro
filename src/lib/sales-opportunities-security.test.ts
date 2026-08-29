@@ -95,6 +95,77 @@ test('client_tasks gains a nullable opportunity_id FK with ON DELETE SET NULL an
   assert.match(migrationSql, /CREATE INDEX IF NOT EXISTS client_tasks_opportunity_id_idx/)
 })
 
+/**
+ * REGRESSÃO — bug descoberto numa tentativa real de migration em produção
+ * (2026-08-29): a constraint existente em produção,
+ * "client_tasks_source_check", está normalizada pelo Postgres para
+ * "source = ANY (ARRAY[...])" em vez da forma escrita "source IN (...)".
+ * A versão anterior do bloco DO $$ procurava a constraint a substituir com
+ * `pg_get_constraintdef(pgc.oid) ILIKE '%source%IN%'`, que não apanha essa
+ * forma normalizada (não existe a substring "IN"). A DROP nunca corria, o
+ * ADD CONSTRAINT seguinte falhava com 42710 (already exists), e a
+ * transação inteira era revertida — sales_opportunities nunca chegava a
+ * ser criada. Estes testes impedem a reintrodução dessa suposição textual.
+ */
+function extractSourceCheckDoBlock(): string {
+  const marker = 'ALTER TABLE public.client_tasks\n  ADD CONSTRAINT client_tasks_source_check'
+  const doStart = migrationSql.lastIndexOf('DO $$', migrationSql.indexOf(marker))
+  assert.ok(doStart !== -1, 'could not locate the DO $$ block preceding the client_tasks_source_check ADD CONSTRAINT')
+  const doEnd = migrationSql.indexOf('END $$;', doStart)
+  assert.ok(doEnd !== -1, 'could not locate the end of the DO $$ block')
+  return migrationSql.slice(doStart, doEnd + 'END $$;'.length)
+}
+
+test('REGRESSION: client_tasks source-constraint discovery is catalog-based (conkey + pg_attribute), not text matching on pg_get_constraintdef()', () => {
+  const block = extractSourceCheckDoBlock()
+
+  // A causa raiz do bug de produção: nunca voltar a confiar no texto
+  // pretty-printed da definição da constraint para decidir o que fazer.
+  assert.doesNotMatch(
+    block,
+    /pg_get_constraintdef/i,
+    'must not inspect pg_get_constraintdef() text — Postgres normalizes CHECK definitions ' +
+      '(e.g. "source = ANY (ARRAY[...])") differently from how they were written ("source IN (...)"), ' +
+      'so text matching against it is unreliable',
+  )
+  assert.doesNotMatch(
+    block,
+    /ILIKE\s*'%[^']*IN[^']*%'/i,
+    'must not pattern-match "IN" against constraint text — this is exactly the pattern that missed ' +
+      'the production "source = ANY (ARRAY[...])" normalized form',
+  )
+
+  // A correção: identificar a constraint estruturalmente via catálogo.
+  assert.match(block, /pg_attribute/, 'must resolve the "source" column via pg_attribute')
+  assert.match(block, /attname\s*=\s*'source'/, 'must look up the attnum for the "source" column specifically')
+  assert.match(
+    block,
+    /source_attnum\s*=\s*ANY\s*\(\s*pgc\.conkey\s*\)/,
+    'must match constraints structurally via pg_constraint.conkey, not via textual definition',
+  )
+
+  // Continua com o mesmo âmbito estrito de sempre.
+  assert.match(block, /nsp\.nspname\s*=\s*'public'/, 'must scope to schema public')
+  assert.match(block, /rel\.relname\s*=\s*'client_tasks'/, 'must scope to table client_tasks')
+  assert.match(block, /pgc\.contype\s*=\s*'c'/, 'must scope to CHECK constraints only')
+})
+
+test('REGRESSION: the source-constraint discovery never targets unrelated client_tasks CHECK constraints by name', () => {
+  const block = extractSourceCheckDoBlock()
+  assert.doesNotMatch(block, /client_tasks_scope_xor/, 'must not reference/drop the scope XOR constraint')
+  assert.doesNotMatch(block, /client_tasks_status_check/, 'must not reference/drop the status constraint')
+})
+
+test('REGRESSION: the source-constraint block is safely re-runnable — it always drops-and-recreates by structural match, never assumes absence', () => {
+  const block = extractSourceCheckDoBlock()
+  // A garantia de idempotência: o loop de DROP não depende de o nome já
+  // ser conhecido — encontra qualquer CHECK que dependa da coluna
+  // "source" (incluindo o que ele próprio recriou numa corrida anterior)
+  // e remove-o antes do ADD CONSTRAINT seguinte, portanto nunca pode
+  // falhar com "constraint ... already exists".
+  assert.match(block, /DROP CONSTRAINT %I/, 'must drop whatever constraint(s) it structurally finds before the ADD CONSTRAINT below')
+})
+
 const SALES_SERVER_FN_NAMES = [
   'fetchSalesOpportunities',
   'fetchSalesOpportunity',
