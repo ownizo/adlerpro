@@ -119,7 +119,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen flex" style={{ background: 'var(--ui-surface-bg)' }}>
+    <div
+      className={cn('min-h-screen flex', isAdminRoute && 'admin-backoffice-shell')}
+      style={{ background: isAdminRoute ? '#F4F3F0' : 'var(--ui-surface-bg)' }}
+    >
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
@@ -127,7 +130,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <aside
         className={cn(
           'fixed lg:static inset-y-0 left-0 z-50 w-64 flex flex-col transition-transform duration-200 lg:translate-x-0',
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
+          isAdminRoute && 'admin-backoffice-sidebar lg:w-72'
         )}
         style={{ background: 'var(--ui-surface-bg)', borderRight: '1.5px solid var(--ui-text-primary)' }}
       >
@@ -135,14 +139,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <Link to="/dashboard" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
             <div style={{ width: '100%', display: 'flex', alignItems: 'baseline', gap: '0.2rem' }}>
               <span style={{ fontFamily: font, fontSize: '1rem', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--ui-text-primary)' }}>
-                Os Meus Seguros
+                {isAdminRoute ? 'ADLER & ROCHEFORT' : 'Os Meus Seguros'}
               </span>
               <span style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 300, color: 'var(--ui-text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase', marginLeft: '0.3rem' }}>
-                {t('common.portal')}
+                {isAdminRoute ? 'BACKOFFICE' : t('common.portal')}
               </span>
             </div>
             <span style={{ fontFamily: font, fontSize: '0.6rem', fontWeight: 300, color: 'var(--ui-accent)', letterSpacing: '0.08em' }}>
-              by Adler &amp; Rochefort
+              {isAdminRoute ? 'Corretagem · Operações · CRM' : <>by Adler &amp; Rochefort</>}
             </span>
           </Link>
         </div>
@@ -277,7 +281,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="px-4 lg:px-8 h-14 flex items-center shrink-0" style={{ background: 'var(--ui-surface-bg)', borderBottom: '1px solid var(--ui-border)' }}>
+        <header
+          className={cn(
+            'px-4 lg:px-8 h-14 flex items-center shrink-0',
+            isAdminRoute && 'admin-backoffice-header'
+          )}
+          style={{ background: 'var(--ui-surface-bg)', borderBottom: '1px solid var(--ui-border)' }}
+        >
           {/* Left zone — flex-1, só tem conteúdo em mobile */}
           <div className="flex-1 flex items-center" style={{ minWidth: 0 }}>
             <button
@@ -336,7 +346,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 pb-20 lg:pb-8" style={{ background: 'var(--ui-page-bg)' }}>
+        <main
+          className={cn(
+            'flex-1 overflow-y-auto p-4 lg:p-8 pb-20 lg:pb-8',
+            isAdminRoute && 'admin-backoffice-main'
+          )}
+          style={{ background: isAdminRoute ? '#F4F3F0' : 'var(--ui-page-bg)' }}
+        >
           {children}
         </main>
       </div>
@@ -360,7 +376,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         ))}
       </nav>
 
-      <ThemeCustomizer />
+      {!isAdminRoute && <ThemeCustomizer />}
     </div>
   )
 }
