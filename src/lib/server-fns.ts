@@ -2729,54 +2729,35 @@ export const adminPromoteToCompany = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { clientId: string }) => d)
   .handler(async ({ data }) => {
-    const { data: client, error: readErr } = await supabaseAdmin
-      .from('individual_clients').select('*').eq('id', data.clientId).single()
-    if (readErr || !client) throw new Error('Cliente não encontrado')
+    // The ENTIRE promotion — resolving or creating the destination company,
+    // re-parenting every child record (policies, claims, documents,
+    // client_notes, client_tasks, sales_opportunities, website_leads), and
+    // deleting the individual_clients row — happens inside a single atomic
+    // RPC call/transaction. See migrations/20260830_fix_promote_client_to_company.sql.
+    //
+    // Deliberately no separate reads/inserts/updates here: an earlier
+    // version of this fix resolved-or-created the company in TypeScript
+    // before calling the (then relation-move-only) RPC, which meant a
+    // failure inside the RPC could leave a newly created company behind
+    // with nothing re-parented into it. This is the single mutation for
+    // the whole operation.
+    const result = await db.promoteIndividualClientToCompany(data.clientId)
+    console.log('promoted individual_client to company:', data.clientId, '->', result.companyId, result)
 
-    // Check for existing company with same NIF to avoid duplicates
-    let companyId: string
-    let alreadyExisted = false
-    const nif = client.nif ?? ''
-    if (nif) {
-      const { data: existing } = await supabaseAdmin
-        .from('companies').select('id').eq('nif', nif).maybeSingle()
-      if (existing) {
-        companyId = existing.id
-        alreadyExisted = true
-      }
+    return {
+      success: true,
+      companyId: result.companyId,
+      alreadyExisted: result.alreadyExisted,
+      relationsMoved: {
+        policies: result.policies,
+        claims: result.claims,
+        documents: result.documents,
+        clientNotes: result.clientNotes,
+        clientTasks: result.clientTasks,
+        salesOpportunities: result.salesOpportunities,
+        websiteLeads: result.websiteLeads,
+      },
     }
-
-    if (!alreadyExisted) {
-      companyId = crypto.randomUUID()
-      const now = new Date().toISOString()
-      const { error: companyErr } = await supabaseAdmin.from('companies').insert({
-        id: companyId,
-        name: client.full_name,
-        nif,
-        sector: '',
-        contact_name: client.full_name,
-        contact_email: client.email ?? '',
-        contact_phone: client.phone ?? '',
-        address: client.address ?? '',
-        created_at: now,
-      })
-      if (companyErr) throw new Error(companyErr.message)
-    }
-
-    // Re-parent every child record (policies, claims, documents,
-    // client_notes, client_tasks, sales_opportunities, website_leads) from
-    // the individual client to the destination company, and only then
-    // delete the individual_clients row — all inside a single atomic
-    // transaction. See migrations/20260830_fix_promote_client_to_company.sql
-    // for why this replaced a previous update/update/delete sequence here
-    // that lost CRM history (claims, notes, tasks, opportunities, website
-    // leads were CASCADE-deleted by the individual_clients DELETE below,
-    // and documents ended up with both company_id and individual_client_id
-    // populated).
-    const relationsMoved = await db.promoteIndividualClientToCompanyRelations(data.clientId, companyId!)
-    console.log('promoted individual_client to company:', data.clientId, '->', companyId!, relationsMoved)
-
-    return { success: true, companyId: companyId!, alreadyExisted, relationsMoved }
   })
 
 export const adminUpdateApiConnection = createServerFn({ method: 'POST' })

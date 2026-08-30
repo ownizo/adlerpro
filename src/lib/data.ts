@@ -581,7 +581,9 @@ export async function deleteIndividualClientRelations(clientId: string): Promise
   if (errors.length > 0) throw new Error(`deleteIndividualClientRelations: ${errors.join('; ')}`)
 }
 
-export interface PromoteIndividualClientToCompanyRelationsResult {
+export interface PromoteIndividualClientToCompanyResult {
+  companyId: string
+  alreadyExisted: boolean
   policies: number
   claims: number
   documents: number
@@ -592,32 +594,42 @@ export interface PromoteIndividualClientToCompanyRelationsResult {
 }
 
 /**
- * Re-parenta TUDO o que pertence a um individual_client para uma company e
- * só depois apaga o individual_client — atomicamente, dentro da mesma
- * transação implícita de uma única chamada RPC (ver
- * promote_individual_client_to_company_relations em
- * migrations/20260830_fix_promote_client_to_company.sql). Se qualquer passo
- * falhar, o Postgres reverte tudo — nunca fica uma promoção parcial.
+ * Promove um individual_client a company — INTEIRAMENTE dentro de uma única
+ * chamada RPC (ver promote_individual_client_to_company em
+ * migrations/20260830_fix_promote_client_to_company.sql), que corre numa só
+ * transação implícita do Postgres:
+ *   a. lê o individual_client de origem (só o id atravessa esta fronteira —
+ *      nome/nif/email/telefone nunca são confiados ao chamador);
+ *   b. resolve uma company existente pelo NIF exato, se não vazio;
+ *   c. cria a company de destino se nenhuma foi encontrada;
+ *   d. re-parenta TUDO o que pertencia ao individual_client
+ *      (policies/claims/documents/client_notes/client_tasks/
+ *      sales_opportunities/website_leads);
+ *   e. só depois apaga o individual_client.
+ * Se qualquer passo falhar — incluindo a criação da company em (c) — o
+ * Postgres reverte tudo: nunca fica uma company nova órfã nem uma promoção
+ * parcial. Isto substitui uma primeira versão desta função em que a
+ * resolução/criação da company acontecia em TypeScript, fora da transação
+ * (bug: uma company nova sobrevivia se o re-parenting seguinte falhasse).
  *
  * NÃO usar deleteIndividualClientRelations aqui: essa função apaga
  * definitivamente claims/policies (e as suas dependências), o que é o
  * comportamento certo para "apagar cliente" mas destruiria o histórico de
  * CRM (claims, notas, tarefas, oportunidades, website leads) numa promoção,
- * que é uma operação de re-parenting, não de delete — ver bug corrigido
- * nesta migration.
+ * que é uma operação de re-parenting, não de delete.
  */
-export async function promoteIndividualClientToCompanyRelations(
+export async function promoteIndividualClientToCompany(
   clientId: string,
-  companyId: string,
-): Promise<PromoteIndividualClientToCompanyRelationsResult> {
+): Promise<PromoteIndividualClientToCompanyResult> {
   const sb = getSupabaseAdmin()
-  const { data, error } = await (sb.rpc as any)('promote_individual_client_to_company_relations', {
+  const { data, error } = await (sb.rpc as any)('promote_individual_client_to_company', {
     p_client_id: clientId,
-    p_company_id: companyId,
   }).single()
-  if (error) throw new Error(`promoteIndividualClientToCompanyRelations: ${error.message}`)
-  if (!data) throw new Error('promoteIndividualClientToCompanyRelations: sem resultado da RPC')
+  if (error) throw new Error(`promoteIndividualClientToCompany: ${error.message}`)
+  if (!data) throw new Error('promoteIndividualClientToCompany: sem resultado da RPC')
   const row = data as {
+    company_id: string
+    already_existed: boolean
     policies: number
     claims: number
     documents: number
@@ -627,6 +639,8 @@ export async function promoteIndividualClientToCompanyRelations(
     website_leads: number
   }
   return {
+    companyId: row.company_id,
+    alreadyExisted: row.already_existed,
     policies: row.policies,
     claims: row.claims,
     documents: row.documents,
