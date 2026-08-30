@@ -2729,59 +2729,35 @@ export const adminPromoteToCompany = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { clientId: string }) => d)
   .handler(async ({ data }) => {
-    const { data: client, error: readErr } = await supabaseAdmin
-      .from('individual_clients').select('*').eq('id', data.clientId).single()
-    if (readErr || !client) throw new Error('Cliente não encontrado')
+    // The ENTIRE promotion — resolving or creating the destination company,
+    // re-parenting every child record (policies, claims, documents,
+    // client_notes, client_tasks, sales_opportunities, website_leads), and
+    // deleting the individual_clients row — happens inside a single atomic
+    // RPC call/transaction. See migrations/20260830_fix_promote_client_to_company.sql.
+    //
+    // Deliberately no separate reads/inserts/updates here: an earlier
+    // version of this fix resolved-or-created the company in TypeScript
+    // before calling the (then relation-move-only) RPC, which meant a
+    // failure inside the RPC could leave a newly created company behind
+    // with nothing re-parented into it. This is the single mutation for
+    // the whole operation.
+    const result = await db.promoteIndividualClientToCompany(data.clientId)
+    console.log('promoted individual_client to company:', data.clientId, '->', result.companyId, result)
 
-    // Check for existing company with same NIF to avoid duplicates
-    let companyId: string
-    let alreadyExisted = false
-    const nif = client.nif ?? ''
-    if (nif) {
-      const { data: existing } = await supabaseAdmin
-        .from('companies').select('id').eq('nif', nif).maybeSingle()
-      if (existing) {
-        companyId = existing.id
-        alreadyExisted = true
-      }
+    return {
+      success: true,
+      companyId: result.companyId,
+      alreadyExisted: result.alreadyExisted,
+      relationsMoved: {
+        policies: result.policies,
+        claims: result.claims,
+        documents: result.documents,
+        clientNotes: result.clientNotes,
+        clientTasks: result.clientTasks,
+        salesOpportunities: result.salesOpportunities,
+        websiteLeads: result.websiteLeads,
+      },
     }
-
-    if (!alreadyExisted) {
-      companyId = crypto.randomUUID()
-      const now = new Date().toISOString()
-      const { error: companyErr } = await supabaseAdmin.from('companies').insert({
-        id: companyId,
-        name: client.full_name,
-        nif,
-        sector: '',
-        contact_name: client.full_name,
-        contact_email: client.email ?? '',
-        contact_phone: client.phone ?? '',
-        address: client.address ?? '',
-        created_at: now,
-      })
-      if (companyErr) throw new Error(companyErr.message)
-    }
-
-    // Move policies
-    await supabaseAdmin
-      .from('policies')
-      .update({ company_id: companyId!, individual_client_id: null })
-      .eq('individual_client_id', data.clientId)
-
-    // Move documents (best-effort)
-    await supabaseAdmin
-      .from('documents')
-      .update({ company_id: companyId! })
-      .eq('individual_client_id', data.clientId)
-
-    // Delete individual client — throw on error
-    const { error: delErr } = await supabaseAdmin
-      .from('individual_clients').delete().eq('id', data.clientId)
-    if (delErr) throw new Error(`Erro ao apagar individual_client: ${delErr.message}`)
-    console.log('deleted individual_client:', data.clientId)
-
-    return { success: true, companyId: companyId!, alreadyExisted }
   })
 
 export const adminUpdateApiConnection = createServerFn({ method: 'POST' })

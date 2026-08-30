@@ -581,6 +581,76 @@ export async function deleteIndividualClientRelations(clientId: string): Promise
   if (errors.length > 0) throw new Error(`deleteIndividualClientRelations: ${errors.join('; ')}`)
 }
 
+export interface PromoteIndividualClientToCompanyResult {
+  companyId: string
+  alreadyExisted: boolean
+  policies: number
+  claims: number
+  documents: number
+  clientNotes: number
+  clientTasks: number
+  salesOpportunities: number
+  websiteLeads: number
+}
+
+/**
+ * Promove um individual_client a company — INTEIRAMENTE dentro de uma única
+ * chamada RPC (ver promote_individual_client_to_company em
+ * migrations/20260830_fix_promote_client_to_company.sql), que corre numa só
+ * transação implícita do Postgres:
+ *   a. lê o individual_client de origem (só o id atravessa esta fronteira —
+ *      nome/nif/email/telefone nunca são confiados ao chamador);
+ *   b. resolve uma company existente pelo NIF exato, se não vazio;
+ *   c. cria a company de destino se nenhuma foi encontrada;
+ *   d. re-parenta TUDO o que pertencia ao individual_client
+ *      (policies/claims/documents/client_notes/client_tasks/
+ *      sales_opportunities/website_leads);
+ *   e. só depois apaga o individual_client.
+ * Se qualquer passo falhar — incluindo a criação da company em (c) — o
+ * Postgres reverte tudo: nunca fica uma company nova órfã nem uma promoção
+ * parcial. Isto substitui uma primeira versão desta função em que a
+ * resolução/criação da company acontecia em TypeScript, fora da transação
+ * (bug: uma company nova sobrevivia se o re-parenting seguinte falhasse).
+ *
+ * NÃO usar deleteIndividualClientRelations aqui: essa função apaga
+ * definitivamente claims/policies (e as suas dependências), o que é o
+ * comportamento certo para "apagar cliente" mas destruiria o histórico de
+ * CRM (claims, notas, tarefas, oportunidades, website leads) numa promoção,
+ * que é uma operação de re-parenting, não de delete.
+ */
+export async function promoteIndividualClientToCompany(
+  clientId: string,
+): Promise<PromoteIndividualClientToCompanyResult> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await (sb.rpc as any)('promote_individual_client_to_company', {
+    p_client_id: clientId,
+  }).single()
+  if (error) throw new Error(`promoteIndividualClientToCompany: ${error.message}`)
+  if (!data) throw new Error('promoteIndividualClientToCompany: sem resultado da RPC')
+  const row = data as {
+    company_id: string
+    already_existed: boolean
+    policies: number
+    claims: number
+    documents: number
+    client_notes: number
+    client_tasks: number
+    sales_opportunities: number
+    website_leads: number
+  }
+  return {
+    companyId: row.company_id,
+    alreadyExisted: row.already_existed,
+    policies: row.policies,
+    claims: row.claims,
+    documents: row.documents,
+    clientNotes: row.client_notes,
+    clientTasks: row.client_tasks,
+    salesOpportunities: row.sales_opportunities,
+    websiteLeads: row.website_leads,
+  }
+}
+
 // ============================================================
 // Website Leads — intake do site público (adlerrochefort.com)
 // ============================================================
@@ -661,13 +731,39 @@ export async function getWebsiteLeadsByIndividualClientId(individualClientId: st
   return rowsToCamel<WebsiteLead>(data ?? [])
 }
 
+/**
+ * Website leads de uma company — só populado depois de um
+ * individual_client com histórico de pedidos ser promovido a company
+ * (ver adminPromoteToCompany / promote_individual_client_to_company_relations
+ * em migrations/20260830_fix_promote_client_to_company.sql). Nenhum lead é
+ * criado diretamente com company_id hoje (o intake endpoint só serve
+ * pessoas singulares — ver 20260829_website_leads.sql).
+ */
+export async function getWebsiteLeadsByCompanyId(companyId: string): Promise<WebsiteLead[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('website_leads')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('received_at', { ascending: false })
+  if (error) { console.error('getWebsiteLeadsByCompanyId error:', error); return [] }
+  return rowsToCamel<WebsiteLead>(data ?? [])
+}
+
 /** IDs de clientes com pelo menos um website_lead — usado só para mostrar o
- * indicador "Origem: Website" na listagem de clientes individuais do admin. */
+ * indicador "Origem: Website" na listagem de clientes individuais do admin.
+ * individual_client_id pode ser NULL desde que website_leads passou a
+ * suportar company_id (promoção a company) — filtrado aqui para nunca
+ * incluir `null` no Set. */
 export async function getWebsiteLeadIndividualClientIds(): Promise<Set<string>> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('website_leads').select('individual_client_id')
   if (error) { console.error('getWebsiteLeadIndividualClientIds error:', error); return new Set() }
-  return new Set((data ?? []).map((r: { individual_client_id: string }) => r.individual_client_id))
+  return new Set(
+    (data ?? [])
+      .map((r: { individual_client_id: string | null }) => r.individual_client_id)
+      .filter((id): id is string => id != null),
+  )
 }
 
 // ============================================================

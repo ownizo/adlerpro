@@ -481,10 +481,17 @@ export interface ClientTask {
  * Deliberadamente não inclui dados sensíveis do formulário original
  * (saúde, datas de nascimento, documentos de identificação, morada) —
  * ver a nota de privacidade em migrations/20260829_website_leads.sql.
+ *
+ * companyId é opcional e só é preenchido quando o individual_client
+ * original é promovido a company (ver adminPromoteToCompany em
+ * src/lib/server-fns.ts e migrations/20260830_fix_promote_client_to_company.sql) —
+ * exatamente um de companyId/individualClientId está sempre presente
+ * (XOR imposto na BD), nunca os dois nem nenhum.
  */
 export interface WebsiteLead {
   id: string
-  individualClientId: string
+  companyId?: string
+  individualClientId?: string
   submissionId?: string
   formName: string
   market?: string
