@@ -3895,6 +3895,9 @@ export const adminLinkCarrierClientIdentity = createServerFn({ method: 'POST' })
   }) => d)
   .handler(async ({ data }) => db.createExternalClientIdentity(data))
 
+// externalPolicyNumberNormalized is deliberately NOT accepted here — the
+// browser/caller must never be trusted to supply it; db.createExternalPolicyIdentity
+// derives it itself, server-side, via normalizePolicyNumber.
 export const adminLinkCarrierPolicyIdentity = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: {
@@ -3902,7 +3905,6 @@ export const adminLinkCarrierPolicyIdentity = createServerFn({ method: 'POST' })
     provider: string
     externalPolicyNumber: string
     externalPolicyId?: string
-    externalPolicyNumberNormalized?: string
     metadata?: Record<string, Json>
   }) => d)
   .handler(async ({ data }) => db.createExternalPolicyIdentity(data))

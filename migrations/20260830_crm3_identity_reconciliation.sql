@@ -32,12 +32,37 @@
 -- WHAT THIS MIGRATION DELIBERATELY DOES NOT DO
 --   * No UNIQUE constraint on any raw/stored NIF column.
 --   * No UNIQUE constraint on policies.policy_number (raw or normalized).
---   * No UNIQUE constraint on external_policy_identities.
---     external_policy_number_normalized — only a plain, partial, non-unique
---     index (two carriers, or two records from the same carrier, might
---     legitimately share a raw-looking number before dedup review).
+--   * No GLOBAL UNIQUE constraint on external_policy_identities
+--     (provider, external_policy_number_normalized) — the plain, partial,
+--     non-unique lookup index on that pair stays exactly as it was (two
+--     different internal policies, or two different providers, may
+--     legitimately share the same normalized number). The one scoped
+--     uniqueness added below (policy_id, provider,
+--     external_policy_number_normalized) is narrower still: it only
+--     stops the SAME internal policy from accumulating duplicate
+--     fallback-identity rows for the SAME provider+number, never a
+--     cross-policy or cross-provider identity claim.
 --   * No merge/import/write code, no admin UI, no carrier API calls or
 --     credentials — this is schema only.
+--
+-- AMENDMENT (same day, still pending — never applied to production)
+-- A pre-production review found two integrity gaps:
+--   * carrier_import_records had no constraint stopping a staging record
+--     from claiming BOTH a matched individual_client AND a matched
+--     company at once — added carrier_import_records_matched_owner_check
+--     (at most one, matching "AT MOST ONE customer candidate owner";
+--     unlike the XOR checks elsewhere, NEITHER is still valid here, since
+--     unmatched/new/error records have no owner yet).
+--   * external_policy_identities had no protection against the fallback
+--     (no external_policy_id) linking path creating duplicate rows for
+--     the same policy/provider/number on a race or a repeated deliberate
+--     link — added the scoped partial unique index described above.
+--     The corresponding data-layer function
+--     (createExternalPolicyIdentity in src/lib/data.ts) now derives
+--     external_policy_number_normalized itself via normalizePolicyNumber
+--     server-side rather than trusting a caller-supplied value, and
+--     treats a race against this index as "already_linked" (re-queries
+--     rather than assuming a conflict).
 -- =============================================================
 
 -- ── 1. external_client_identities ───────────────────────────────
@@ -150,7 +175,10 @@ CREATE INDEX IF NOT EXISTS external_policy_identities_policy_idx
 CREATE INDEX IF NOT EXISTS external_policy_identities_provider_idx
   ON public.external_policy_identities (provider);
 
--- Lookup aid only — deliberately NOT unique (see migration header).
+-- Lookup aid only — deliberately NOT unique (see migration header). Global
+-- across providers/policies on purpose: it is a reconciliation-evidence
+-- index, never an identity guarantee. Different internal policies, and
+-- different providers, may legitimately share the same normalized number.
 CREATE INDEX IF NOT EXISTS external_policy_identities_number_idx
   ON public.external_policy_identities (provider, external_policy_number_normalized)
   WHERE external_policy_number_normalized IS NOT NULL;
@@ -162,6 +190,19 @@ CREATE INDEX IF NOT EXISTS external_policy_identities_number_idx
 CREATE UNIQUE INDEX IF NOT EXISTS external_policy_identities_provider_external_id_uidx
   ON public.external_policy_identities (provider, external_policy_id)
   WHERE external_policy_id IS NOT NULL;
+
+-- Fallback-link idempotency (only relevant when external_policy_id is
+-- absent): prevents linking the SAME internal policy to the SAME provider
+-- with the SAME normalized number more than once. Scoped to policy_id —
+-- NOT a global (provider, external_policy_number_normalized) uniqueness.
+-- Two different internal policies, or the same number under a different
+-- provider, are explicitly allowed to coexist; policy_number is
+-- reconciliation evidence for ONE already-known policy here, never a
+-- cross-policy identity claim (see "WHAT THIS MIGRATION DELIBERATELY DOES
+-- NOT DO" at the top of this file).
+CREATE UNIQUE INDEX IF NOT EXISTS external_policy_identities_policy_provider_number_uidx
+  ON public.external_policy_identities (policy_id, provider, external_policy_number_normalized)
+  WHERE external_policy_id IS NULL AND external_policy_number_normalized IS NOT NULL;
 
 ALTER TABLE public.external_policy_identities ENABLE ROW LEVEL SECURITY;
 
@@ -297,7 +338,17 @@ CREATE TABLE IF NOT EXISTS public.carrier_import_records (
   decided_at                    timestamptz NULL,
 
   created_at                    timestamptz NOT NULL DEFAULT now(),
-  updated_at                    timestamptz NOT NULL DEFAULT now()
+  updated_at                    timestamptz NOT NULL DEFAULT now(),
+
+  -- AT MOST one customer candidate owner — never both. Unlike
+  -- companies/individual_clients' own XOR checks elsewhere (which require
+  -- EXACTLY one), this is deliberately weaker: unmatched/new/error records
+  -- legitimately have NEITHER a matched individual client nor a matched
+  -- company yet.
+  CONSTRAINT carrier_import_records_matched_owner_check CHECK (
+    matched_individual_client_id IS NULL
+    OR matched_company_id IS NULL
+  )
 );
 
 CREATE INDEX IF NOT EXISTS carrier_import_records_run_idx

@@ -49,6 +49,7 @@ import {
   pickEditableOpportunityFields,
   validateOpportunityOwner,
 } from './sales-opportunity-rules'
+import { normalizePolicyNumber } from './identity-normalization'
 
 // ============================================================
 // Cliente Supabase (server-side — usa service_role key)
@@ -1518,6 +1519,33 @@ export async function findExternalPolicyIdentity(
   return objectToCamel(data) as unknown as ExternalPolicyIdentity
 }
 
+/**
+ * Lookup for the FALLBACK link path only (externalPolicyId absent) —
+ * deliberately scoped to policyId (never a global provider+number lookup):
+ * a match on a different internal policy is not "found" here at all, it is
+ * simply invisible to this function, because policy_number is
+ * reconciliation evidence for one already-known policy, never a
+ * cross-policy identity claim (see createExternalPolicyIdentity below and
+ * migrations/20260830_crm3_identity_reconciliation.sql).
+ */
+async function findExternalPolicyIdentityByFallbackKey(
+  policyId: string,
+  provider: string,
+  externalPolicyNumberNormalized: string,
+): Promise<ExternalPolicyIdentity | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('external_policy_identities')
+    .select('*')
+    .eq('policy_id', policyId)
+    .eq('provider', provider)
+    .eq('external_policy_number_normalized', externalPolicyNumberNormalized)
+    .is('external_policy_id', null)
+    .maybeSingle()
+  if (error || !data) return undefined
+  return objectToCamel(data) as unknown as ExternalPolicyIdentity
+}
+
 // ── External identities (link/create) ───────────────────────
 
 export interface CreateExternalClientIdentityInput {
@@ -1613,24 +1641,60 @@ export interface CreateExternalPolicyIdentityInput {
   provider: string
   externalPolicyNumber: string
   externalPolicyId?: string
-  externalPolicyNumberNormalized?: string
+  // Deliberately NO externalPolicyNumberNormalized field — a caller-
+  // supplied normalization is never trusted as authoritative (see
+  // requirement). The only normalized value ever stored is the one this
+  // function derives itself, below, via normalizePolicyNumber.
   metadata?: Record<string, Json>
 }
 
 export type CreateExternalPolicyIdentityResult =
   | { status: 'created'; identity: ExternalPolicyIdentity }
+  // Idempotent — same identity already existed for the same owner. Two
+  // distinct cases collapse into this one status:
+  //   - externalPolicyId present: (provider, externalPolicyId) already
+  //     pointed at this SAME internal policy.
+  //   - externalPolicyId absent (fallback path): a fallback row already
+  //     existed for this SAME policy_id + provider + normalized number.
   | { status: 'already_linked'; identity: ExternalPolicyIdentity }
-  // (provider, externalPolicyId) já pertence a OUTRA policy interna.
+  // ONLY possible on the externalPolicyId-present path: (provider,
+  // externalPolicyId) already pertence a OUTRA policy interna. The
+  // fallback (number-only) path never produces this status — a number
+  // match against a different internal policy is not authoritative and is
+  // never even looked up (see below).
   | { status: 'conflict'; identity: ExternalPolicyIdentity }
 
 /**
  * Liga (ou cria a ligação de) uma apólice de seguradora a uma policy
- * interna. O número de apólice NUNCA é, por si só, tratado como identidade
- * autoritativa (ver requisito "Do not use policy number alone as
- * authoritative identity") — a verificação de conflito só acontece quando
- * externalPolicyId está presente, exatamente como a UNIQUE parcial
- * (provider, external_policy_id) WHERE external_policy_id IS NOT NULL na
- * migration.
+ * interna.
+ *
+ * Duas fontes de identidade, com garantias muito diferentes:
+ *
+ *   A) externalPolicyId presente — AUTORITATIVA, inalterada nesta revisão:
+ *      (provider, externalPolicyId) só pode apontar para UMA policy
+ *      interna (UNIQUE parcial na migration). Mesma policy -> already_linked;
+ *      policy diferente -> conflict.
+ *
+ *   B) externalPolicyId ausente — FALLBACK, apenas idempotente DENTRO da
+ *      MESMA policy interna (nunca uma identidade cross-policy — ver
+ *      requisito "Do not use policy number alone as authoritative
+ *      identity" / "Never interpret a number match against ANOTHER
+ *      internal policy as an authoritative identity conflict"). Verifica
+ *      SÓ se já existe uma ligação fallback para (policyId, provider,
+ *      número normalizado) — nunca consulta outras policies, por isso este
+ *      caminho nunca pode devolver 'conflict'.
+ *
+ * O número normalizado NUNCA vem do chamador — é sempre derivado aqui,
+ * server-side, via normalizePolicyNumber (mesmo normalizador usado em todo
+ * o CRM3), porque um valor de normalização vindo do browser não pode ser
+ * confiado como autoritativo.
+ *
+ * Corrida (dois pedidos concorrentes a criar a mesma ligação): o INSERT
+ * pode colidir com qualquer um dos dois UNIQUE índices da migration
+ * (provider+externalPolicyId, ou policy_id+provider+número normalizado
+ * fallback) — em ambos os casos volta a consultar e devolve
+ * already_linked/conflict a partir do que realmente ficou gravado, nunca
+ * assume.
  */
 export async function createExternalPolicyIdentity(
   input: CreateExternalPolicyIdentityInput,
@@ -1639,10 +1703,23 @@ export async function createExternalPolicyIdentity(
     throw new Error('createExternalPolicyIdentity: policyId, provider and externalPolicyNumber are required')
   }
 
+  const externalPolicyNumberNormalized = normalizePolicyNumber(input.externalPolicyNumber, input.provider)
+
   if (input.externalPolicyId) {
+    // A) Authoritative path — unchanged.
     const existing = await findExternalPolicyIdentity(input.provider, input.externalPolicyId)
     if (existing) {
       return { status: existing.policyId === input.policyId ? 'already_linked' : 'conflict', identity: existing }
+    }
+  } else if (externalPolicyNumberNormalized) {
+    // B) Fallback path — idempotent within the same policy only.
+    const existing = await findExternalPolicyIdentityByFallbackKey(
+      input.policyId,
+      input.provider,
+      externalPolicyNumberNormalized,
+    )
+    if (existing) {
+      return { status: 'already_linked', identity: existing }
     }
   }
 
@@ -1654,7 +1731,7 @@ export async function createExternalPolicyIdentity(
     provider: input.provider,
     externalPolicyId: input.externalPolicyId,
     externalPolicyNumber: input.externalPolicyNumber,
-    externalPolicyNumberNormalized: input.externalPolicyNumberNormalized,
+    externalPolicyNumberNormalized,
     metadata: input.metadata ?? {},
     firstSeenAt: now,
     lastSeenAt: now,
@@ -1671,6 +1748,18 @@ export async function createExternalPolicyIdentity(
     if (input.externalPolicyId && isUniqueViolationOn(error, 'external_policy_identities_provider_external_id_uidx')) {
       const raced = await findExternalPolicyIdentity(input.provider, input.externalPolicyId)
       if (raced) return { status: raced.policyId === input.policyId ? 'already_linked' : 'conflict', identity: raced }
+    }
+    if (
+      !input.externalPolicyId &&
+      externalPolicyNumberNormalized &&
+      isUniqueViolationOn(error, 'external_policy_identities_policy_provider_number_uidx')
+    ) {
+      const raced = await findExternalPolicyIdentityByFallbackKey(
+        input.policyId,
+        input.provider,
+        externalPolicyNumberNormalized,
+      )
+      if (raced) return { status: 'already_linked', identity: raced }
     }
     throw new Error(`createExternalPolicyIdentity: ${error.message}`)
   }
