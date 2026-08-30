@@ -31,7 +31,7 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
       const result = await fetchAllTasksByDueDate({ data: {} })
       setTasks(result)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar tarefas')
+      setError(err instanceof Error ? err.message : 'Could not load tasks')
     } finally {
       setLoading(false)
     }
@@ -48,7 +48,7 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
       setGenerateResult({ created: result.created, skipped: result.skipped })
       await loadTasks()
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao gerar tarefas de renovação')
+      setError(err instanceof Error ? err.message : 'Could not generate renewal tasks')
     } finally {
       setGenerating(false)
     }
@@ -57,7 +57,7 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
   async function handleToggle(task: ClientTask) {
     const nextStatus: 'pending' | 'done' = task.status === 'pending' ? 'done' : 'pending'
     const snapshot = tasks
-    // Optimistic — não reagrupa imediatamente para evitar salto visual
+    // Optimistic — doesn't regroup immediately, to avoid a visual jump.
     setTasks((prev) =>
       prev.map((t) =>
         t.id === task.id
@@ -70,7 +70,7 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
       await adminUpdateClientTaskStatus({ data: { id: task.id, status: nextStatus } })
     } catch (err) {
       setTasks(snapshot)
-      setError(err instanceof Error ? err.message : 'Erro ao atualizar tarefa')
+      setError(err instanceof Error ? err.message : 'Could not update task')
     }
   }
 
@@ -84,15 +84,11 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
   function renderGroup(title: string, groupTasks: ClientTask[], urgent = false) {
     if (groupTasks.length === 0) return null
     return (
-      <div>
-        <h3
-          className={`text-xs font-semibold uppercase tracking-wide mb-2 ${
-            urgent ? 'text-red-500' : 'text-navy-500'
-          }`}
-        >
+      <div className="admin-task-list-group">
+        <h3 className={`admin-task-list-heading${urgent ? ' admin-task-list-heading--overdue' : ''}`}>
           {title} ({groupTasks.length})
         </h3>
-        <div className="grid gap-2">
+        <div>
           {groupTasks.map((task) => {
             const isDone = task.status === 'done'
             const isOverdue = task.status === 'pending' && task.dueDate < today
@@ -100,53 +96,37 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
             return (
               <div
                 key={task.id}
-                className="bg-white rounded-[4px] border border-navy-200 px-4 py-3 flex items-start gap-3"
+                className={`admin-task-list-row${isOverdue ? ' admin-task-list-row--overdue' : ''}`}
               >
                 <button
-                  className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${
-                    isDone ? 'bg-navy-600 border-navy-600' : 'border-navy-300 bg-white'
-                  }`}
+                  className={`admin-task-checkbox${isDone ? ' admin-task-checkbox--done' : ''}`}
                   onClick={() => handleToggle(task)}
-                  aria-label={isDone ? 'Marcar por fazer' : 'Marcar feita'}
+                  aria-label={isDone ? 'Mark open' : 'Mark done'}
                 >
                   {isDone && <span className="text-white text-[10px] leading-none">✓</span>}
                 </button>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-sm break-words ${
-                      isDone ? 'line-through text-navy-400' : 'text-navy-700'
-                    }`}
-                  >
+                <div className="admin-task-main">
+                  <p className={`admin-task-title${isDone ? ' admin-task-title--done' : ''}`}>
                     {task.title}
                   </p>
-                  <div className="flex flex-wrap items-center gap-2 mt-0.5">
-                    <span className="text-xs text-navy-500 bg-navy-50 px-1.5 py-0.5 rounded">
-                      {clientName}
-                    </span>
+                  <div className="admin-task-meta">
+                    <span className="admin-task-tag">{clientName}</span>
                     {task.source === 'opportunity' && task.opportunityId && (
                       <button
                         onClick={async () => {
                           const opp = await fetchSalesOpportunity({ data: task.opportunityId! })
                           if (opp) setOpenOpportunity(opp)
                         }}
-                        className="text-[11px] font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.5 rounded"
-                        title="Ver oportunidade comercial ligada a este follow-up"
+                        className="admin-task-link"
+                        title="View the linked sales opportunity"
                       >
-                        Comercial →
+                        Opportunity →
                       </button>
                     )}
-                    <span
-                      className={`text-xs ${
-                        isOverdue ? 'text-red-500 font-medium' : 'text-navy-400'
-                      }`}
-                    >
-                      Prazo: {formatDate(task.dueDate)}
+                    <span className={`admin-task-due${isOverdue ? ' admin-task-due--overdue' : ''}`}>
+                      Due {formatDate(task.dueDate)}
                     </span>
-                    {isOverdue && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-red-500 bg-red-50 px-1.5 py-0.5 rounded">
-                        Atrasada
-                      </span>
-                    )}
+                    {isOverdue && <span className="admin-task-overdue-flag">Overdue</span>}
                   </div>
                 </div>
               </div>
@@ -165,45 +145,40 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold text-navy-700">
-          Tarefas
-          {pending.length > 0 && (
-            <span className="ml-2 text-navy-500 font-normal">
-              ({pending.length} por fazer
-              {overdue.length > 0 ? `, ${overdue.length} atrasadas` : ''})
-            </span>
-          )}
-        </h2>
-        <div className="flex items-center gap-2">
-          {(['pending', 'all'] as const).map((f) => (
-            <button
-              key={f}
-              className={`px-3 py-1.5 rounded-[4px] text-sm font-medium ${
-                filter === f
-                  ? 'bg-navy-700 text-white'
-                  : 'border border-navy-300 text-navy-600 hover:bg-navy-50'
-              }`}
-              onClick={() => setFilter(f)}
-            >
-              {f === 'pending' ? 'Por fazer' : 'Todas'}
-            </button>
-          ))}
+      <div className="admin-page-header">
+        <div>
+          <h1 className="admin-page-title">Tasks</h1>
+          <p className="admin-page-subtitle">
+            {pending.length} open{overdue.length > 0 ? ` · ${overdue.length} overdue` : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            className="admin-panel-link"
+            onClick={handleGenerate}
+            disabled={generating}
+          >
+            {generating ? 'Generating…' : 'Generate renewal tasks'}
+          </button>
         </div>
       </div>
 
-      <div className="flex items-center justify-end mb-4 gap-3">
-        <button
-          className="px-3 py-1.5 rounded-[4px] text-sm font-medium border border-navy-300 text-navy-600 hover:bg-navy-50 disabled:opacity-40"
-          onClick={handleGenerate}
-          disabled={generating}
-        >
-          {generating ? 'A gerar…' : 'Gerar tarefas de renovação'}
-        </button>
+      <div className="flex items-center justify-between mt-4 mb-4">
+        <div className="admin-segmented">
+          {(['pending', 'all'] as const).map((f) => (
+            <button
+              key={f}
+              className={`admin-segmented-btn${filter === f ? ' admin-segmented-btn--active' : ''}`}
+              onClick={() => setFilter(f)}
+            >
+              {f === 'pending' ? 'Open' : 'All'}
+            </button>
+          ))}
+        </div>
         {generateResult !== null && (
-          <p className="text-sm text-navy-500">
-            {generateResult.created} criada{generateResult.created !== 1 ? 's' : ''}
-            {generateResult.skipped > 0 ? `, ${generateResult.skipped} já existia${generateResult.skipped !== 1 ? 'm' : ''}` : ''}
+          <p className="admin-muted-note">
+            {generateResult.created} created
+            {generateResult.skipped > 0 ? `, ${generateResult.skipped} already existed` : ''}
           </p>
         )}
       </div>
@@ -215,14 +190,14 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
           <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="space-y-6">
-          {renderGroup('Atrasadas', overdue, true)}
-          {renderGroup('Hoje', dueToday)}
-          {renderGroup('Próximas', upcoming)}
-          {filter === 'all' && renderGroup('Feitas', done)}
+        <div className="admin-panel admin-task-list">
+          {renderGroup('Overdue', overdue, true)}
+          {renderGroup('Today', dueToday)}
+          {renderGroup('Upcoming', upcoming)}
+          {filter === 'all' && renderGroup('Done', done)}
           {nothingVisible && (
-            <p className="text-navy-500">
-              {tasks.length === 0 ? 'Sem tarefas registadas.' : 'Sem tarefas por fazer.'}
+            <p className="admin-muted-note">
+              {tasks.length === 0 ? 'No tasks registered.' : 'No open tasks.'}
             </p>
           )}
         </div>

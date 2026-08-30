@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { Company, IndividualClient, SalesOpportunity } from '@/lib/types'
-import { SALES_OPPORTUNITY_STAGE_LABELS_PT, formatFollowUpLabel } from '@/lib/sales-opportunity-rules'
+import { SALES_OPPORTUNITY_STAGE_LABELS_EN, formatFollowUpLabelEn } from '@/lib/sales-opportunity-rules'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { STAGE_PALETTE, FOLLOW_UP_URGENCY_STYLE, buildOwnerLookup } from './salesPipelineUi'
 
@@ -15,19 +15,19 @@ type SortKey = 'client' | 'product' | 'stage' | 'premium' | 'revenue' | 'followU
 type SortDir = 'asc' | 'desc'
 
 const COLUMNS: Array<{ key: SortKey; label: string; align?: 'right' }> = [
-  { key: 'client', label: 'Cliente' },
-  { key: 'product', label: 'Produto' },
+  { key: 'client', label: 'Client' },
+  { key: 'product', label: 'Product' },
   { key: 'stage', label: 'Stage' },
-  { key: 'premium', label: 'Prémio', align: 'right' },
-  { key: 'revenue', label: 'Receita', align: 'right' },
+  { key: 'premium', label: 'Premium', align: 'right' },
+  { key: 'revenue', label: 'Revenue', align: 'right' },
   { key: 'followUp', label: 'Follow-up' },
-  { key: 'created', label: 'Criada' },
+  { key: 'created', label: 'Created' },
 ]
 
 /**
- * Tabela de dados a sério: cabeçalho fixo, alinhamento à direita para
- * valores, separadores subtis (não bordas pesadas em cada célula), hover e
- * ordenação por coluna — ver requisito "table design".
+ * A real data table: fixed header, right-alignment for values, subtle
+ * separators (not heavy borders on every cell), hover and per-column
+ * sorting — see requirement "table design".
  */
 export function SalesOpportunityList({ opportunities, individualClients, companies, onOpen }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('created')
@@ -55,39 +55,40 @@ export function SalesOpportunityList({ opportunities, individualClients, compani
   }, [opportunities, individualClients, companies, sortKey, sortDir])
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <div className="admin-panel" style={{ padding: 0 }}>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[920px] text-[14px]">
+        <table className="admin-table min-w-[920px]">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+            <tr>
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
                   onClick={() => toggleSort(col.key)}
-                  className={`px-4 py-2.5 text-[12px] font-semibold text-slate-500 uppercase tracking-wide cursor-pointer select-none hover:text-slate-700 ${col.align === 'right' ? 'text-right' : 'text-left'}`}
+                  className="cursor-pointer select-none hover:text-slate-700"
+                  style={{ textAlign: col.align === 'right' ? 'right' : 'left' }}
                 >
                   {col.label}{sortKey === col.key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}
                 </th>
               ))}
-              <th className="px-4 py-2.5 text-[12px] font-semibold text-slate-500 uppercase tracking-wide text-left">Responsável</th>
+              <th>Owner</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody>
             {rows.map(({ opp, owner }) => {
               const palette = STAGE_PALETTE[opp.stage]
-              const followUp = formatFollowUpLabel(opp.nextFollowUpAt)
+              const followUp = formatFollowUpLabelEn(opp.nextFollowUpAt)
               return (
-                <tr key={opp.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => onOpen(opp.id)}>
-                  <td className="px-4 py-3 text-slate-800 font-medium">{owner.name}</td>
-                  <td className="px-4 py-3 text-slate-600">{opp.product ?? '—'}</td>
-                  <td className="px-4 py-3">
+                <tr key={opp.id} className="cursor-pointer" onClick={() => onOpen(opp.id)}>
+                  <td className="font-medium">{owner.name}</td>
+                  <td>{opp.product ?? '—'}</td>
+                  <td>
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[12px] font-medium ${palette.badgeBg} ${palette.badgeText}`}>
-                      {SALES_OPPORTUNITY_STAGE_LABELS_PT[opp.stage]}
+                      {SALES_OPPORTUNITY_STAGE_LABELS_EN[opp.stage]}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-600 text-right tabular-nums">{opp.estimatedAnnualPremium ? formatCurrency(opp.estimatedAnnualPremium) : '—'}</td>
-                  <td className="px-4 py-3 text-slate-600 text-right tabular-nums">{opp.estimatedRevenue ? formatCurrency(opp.estimatedRevenue) : '—'}</td>
-                  <td className="px-4 py-3">
+                  <td className="text-right tabular-nums">{opp.estimatedAnnualPremium ? formatCurrency(opp.estimatedAnnualPremium) : '—'}</td>
+                  <td className="text-right tabular-nums">{opp.estimatedRevenue ? formatCurrency(opp.estimatedRevenue) : '—'}</td>
+                  <td>
                     {followUp.urgency !== 'none' ? (
                       <span className={`inline-flex px-1.5 py-0.5 rounded text-[12px] font-medium border ${FOLLOW_UP_URGENCY_STYLE[followUp.urgency]}`}>
                         {followUp.label}
@@ -96,15 +97,15 @@ export function SalesOpportunityList({ opportunities, individualClients, compani
                       <span className="text-slate-400">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-500">{formatDate(opp.createdAt)}</td>
-                  <td className="px-4 py-3 text-slate-500">{opp.assignedTo ?? '—'}</td>
+                  <td>{formatDate(opp.createdAt)}</td>
+                  <td>{opp.assignedTo ?? '—'}</td>
                 </tr>
               )
             })}
             {rows.length === 0 && (
               <tr>
                 <td colSpan={8} className="px-4 py-10 text-center text-[14px] text-slate-400">
-                  Sem oportunidades para os filtros escolhidos.
+                  No opportunities for the selected filters.
                 </td>
               </tr>
             )}

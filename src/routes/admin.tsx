@@ -80,9 +80,9 @@ async function exportToExcel(data: Record<string, unknown>[], filename: string) 
 const ADMIN_TABS = ['dashboard', 'companies', 'individual_clients', 'policies', 'claims', 'billing', 'api', 'profiles', 'tasks', 'alerts', 'marketing', 'sales'] as const
 type AdminTab = (typeof ADMIN_TABS)[number]
 const RENEWAL_ALERT_STATUS_LABELS: Record<RenewalAlertStatus, string> = {
-  pending: 'Pendente',
-  negotiating: 'Em negociação',
-  renewed: 'Renovado',
+  pending: 'Pending',
+  negotiating: 'Negotiating',
+  renewed: 'Renewed',
 }
 
 type RenewalKanbanColumnId = 'pending' | 'negotiating' | 'renewed'
@@ -243,24 +243,24 @@ function buildRenewalPipelineIntelligence(alerts: RenewalAlertItem[]): RenewalPi
 
   const insights: string[] = []
   if (totalAlerts === 0) {
-    insights.push('Sem alertas ativos no período atual para gerar insights.')
+    insights.push('No active alerts in the current period to generate insights.')
   } else {
-    insights.push(`Taxa de renovação atual em ${formatPctValue(renewalRatePct)} (${renewedCount}/${totalAlerts}).`)
+    insights.push(`Current renewal rate at ${formatPctValue(renewalRatePct)} (${renewedCount}/${totalAlerts}).`)
     if (highestRiskPeriod && highestRiskPeriod.valueAtRisk > 0) {
-      insights.push(`Maior concentração de risco no D-${highestRiskPeriod.urgency}: ${formatCurrency(highestRiskPeriod.valueAtRisk)}.`)
+      insights.push(`Highest risk concentration at D-${highestRiskPeriod.urgency}: ${formatCurrency(highestRiskPeriod.valueAtRisk)}.`)
     }
     if (topRiskClients[0]) {
       const topClient = topRiskClients[0]
-      insights.push(`Maior risco financeiro concentrado em ${topClient.client} (${formatCurrency(topClient.valueAtRisk)}).`)
+      insights.push(`Highest financial risk concentrated on ${topClient.client} (${formatCurrency(topClient.valueAtRisk)}).`)
     }
     if (avgDaysPendingToRenewed !== null) {
-      insights.push(`Tempo médio de transição pending → renewed em ${avgDaysPendingToRenewed.toFixed(1)} dias (${durations.length} casos).`)
+      insights.push(`Average pending → renewed transition time is ${avgDaysPendingToRenewed.toFixed(1)} days (${durations.length} cases).`)
     }
     if (overduePending.length > 0) {
-      insights.push(`${overduePending.length} apólices com renovação em até 30 dias ainda sem estado renovado.`)
+      insights.push(`${overduePending.length} policies renewing within 30 days still without a renewed status.`)
     }
     if (unassignedCount > 0) {
-      insights.push(`${unassignedCount} apólices em risco ainda sem responsável definido.`)
+      insights.push(`${unassignedCount} at-risk policies still without an owner assigned.`)
     }
   }
 
@@ -422,12 +422,7 @@ function AdminPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-navy-700">Painel de Administração</h1>
-          <p className="text-navy-500 mt-1">Gestão de empresas, acessos, apólices, sinistros e integrações</p>
-        </div>
-
+      <div>
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
@@ -1579,85 +1574,100 @@ function AdminPage() {
 // próprios dados (fetchSalesPipelineStats), independente do resto do
 // dashboard, para não acoplar o pipeline comercial ao carregamento
 // financeiro/renovações já existente.
-function SalesPipelineSummaryWidget() {
+function SalesPipelineSummaryWidget({ onStats }: { onStats?: (stats: Awaited<ReturnType<typeof fetchSalesPipelineStats>>) => void }) {
   const [stats, setStats] = useState<Awaited<ReturnType<typeof fetchSalesPipelineStats>> | null>(null)
 
   useEffect(() => {
     let active = true
     fetchSalesPipelineStats()
-      .then((result) => { if (active) setStats(result) })
+      .then((result) => {
+        if (!active) return
+        setStats(result)
+        onStats?.(result)
+      })
       .catch((error) => console.error('[SalesPipelineSummaryWidget] fetchSalesPipelineStats error:', error))
     return () => { active = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   if (!stats) return null
 
-  // Prémio (o que o cliente paga à seguradora) e receita (o que fica para a
-  // Adler) são métricas diferentes — nunca uma serve de substituto da outra
-  // aqui, ver computeSalesPipelineStats em sales-opportunity-rules.ts.
-  // Hierarquia: 3 primárias (o que importa agora) bem maiores que as 5
-  // secundárias — em vez de 8 cartões idênticos a competir pela atenção.
+  // Premium (what the client pays the insurer) and revenue (what stays with
+  // Adler) are different metrics — never a substitute for one another here,
+  // see computeSalesPipelineStats in sales-opportunity-rules.ts. Hierarchy:
+  // 3 primary figures (what matters right now) much larger than the 5
+  // secondary ones — instead of 8 identical cards competing for attention.
   const primary: Array<{ label: string; value: string }> = [
-    { label: 'Oportunidades abertas', value: String(stats.openCount) },
-    { label: 'Pipeline (prémio)', value: formatCurrency(stats.openPipelinePremium) },
-    { label: 'Pipeline (receita)', value: formatCurrency(stats.openPipelineRevenue) },
+    { label: 'Open opportunities', value: String(stats.openCount) },
+    { label: 'Pipeline (premium)', value: formatCurrency(stats.openPipelinePremium) },
+    { label: 'Pipeline (revenue)', value: formatCurrency(stats.openPipelineRevenue) },
   ]
   const secondary: Array<{ label: string; value: string; to?: { stage?: SalesOpportunityStage } }> = [
-    { label: 'Novas este mês', value: String(stats.newThisMonthCount) },
-    { label: 'Em cotação', value: String(stats.quotedCount), to: { stage: 'quoted' } },
-    { label: 'Ganhas este mês', value: String(stats.wonThisMonthCount), to: { stage: 'won' } },
-    { label: 'Perdidas este mês', value: String(stats.lostThisMonthCount), to: { stage: 'lost' } },
-    { label: 'Receita ganha (mês)', value: formatCurrency(stats.wonRevenueThisMonth) },
+    { label: 'New this month', value: String(stats.newThisMonthCount) },
+    { label: 'Quoted', value: String(stats.quotedCount), to: { stage: 'quoted' } },
+    { label: 'Won this month', value: String(stats.wonThisMonthCount), to: { stage: 'won' } },
+    { label: 'Lost this month', value: String(stats.lostThisMonthCount), to: { stage: 'lost' } },
+    { label: 'Revenue won (month)', value: formatCurrency(stats.wonRevenueThisMonth) },
   ]
   const hasAttention = stats.overdueFollowUpsCount > 0 || stats.dueTodayFollowUpsCount > 0
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-[16px] font-semibold text-slate-800">Comercial</h3>
-        <Link to="/admin" search={{ tab: 'sales' }} className="text-[13px] font-medium text-indigo-600 hover:text-indigo-700">
-          Ver pipeline →
+    <div className="admin-panel">
+      <div className="admin-panel-head">
+        <h3 className="admin-panel-title">Sales pipeline</h3>
+        <Link to="/admin" search={{ tab: 'sales' }} className="admin-panel-link">
+          View pipeline →
         </Link>
       </div>
 
-      {/* "O que precisa de atenção hoje" — ver requisito "actionable dashboard" */}
+      {/* "What needs attention today" — see requirement "actionable dashboard" */}
       {hasAttention && (
         <Link
           to="/admin"
           search={{ tab: 'sales', overdue: stats.overdueFollowUpsCount > 0 ? true : undefined }}
-          className="flex items-center gap-2 mb-4 px-3 py-2 rounded-md bg-rose-50 border border-rose-100 text-[13px] text-rose-700 hover:bg-rose-100 w-fit"
+          className="admin-attention-chip"
         >
-          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-          {stats.overdueFollowUpsCount > 0 && <span>{stats.overdueFollowUpsCount} follow-up(s) atrasado(s)</span>}
+          <span className="admin-attention-dot" />
+          {stats.overdueFollowUpsCount > 0 && <span>{stats.overdueFollowUpsCount} overdue follow-up{stats.overdueFollowUpsCount !== 1 ? 's' : ''}</span>}
           {stats.overdueFollowUpsCount > 0 && stats.dueTodayFollowUpsCount > 0 && <span>·</span>}
-          {stats.dueTodayFollowUpsCount > 0 && <span>{stats.dueTodayFollowUpsCount} para hoje</span>}
+          {stats.dueTodayFollowUpsCount > 0 && <span>{stats.dueTodayFollowUpsCount} due today</span>}
         </Link>
       )}
 
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="admin-stage-strip">
         {primary.map((card) => (
-          <div key={card.label}>
-            <p className="text-[26px] font-semibold text-slate-800 tabular-nums">{card.value}</p>
-            <p className="text-[13px] text-slate-500 mt-0.5">{card.label}</p>
+          <div key={card.label} className="admin-stage-strip-item">
+            <p className="admin-stage-strip-value">{card.value}</p>
+            <p className="admin-stage-strip-label">{card.label}</p>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-4 border-t border-slate-100">
+      <div className="admin-stage-mini-grid">
         {secondary.map((card) =>
           card.to ? (
-            <Link key={card.label} to="/admin" search={{ tab: 'sales', ...card.to }} className="text-center group">
-              <p className="text-[16px] font-semibold text-slate-700 group-hover:text-indigo-600 tabular-nums">{card.value}</p>
-              <p className="text-[12px] text-slate-400 mt-0.5 group-hover:text-indigo-500">{card.label}</p>
+            <Link key={card.label} to="/admin" search={{ tab: 'sales', ...card.to }} className="admin-stage-mini group">
+              <p className="admin-stage-mini-value">{card.value}</p>
+              <p className="admin-stage-mini-label">{card.label}</p>
             </Link>
           ) : (
-            <div key={card.label} className="text-center">
-              <p className="text-[16px] font-semibold text-slate-700 tabular-nums">{card.value}</p>
-              <p className="text-[12px] text-slate-400 mt-0.5">{card.label}</p>
+            <div key={card.label} className="admin-stage-mini">
+              <p className="admin-stage-mini-value">{card.value}</p>
+              <p className="admin-stage-mini-label">{card.label}</p>
             </div>
           ),
         )}
       </div>
+    </div>
+  )
+}
+
+function KpiTile({ label, value, note, strong }: { label: string; value: string; note?: string; strong?: boolean }) {
+  return (
+    <div className={`admin-kpi-card${strong ? ' admin-kpi-card--strong' : ''}`}>
+      <p className="admin-kpi-label">{label}</p>
+      <p className="admin-kpi-value">{value}</p>
+      {note && <p className="admin-kpi-note">{note}</p>}
     </div>
   )
 }
@@ -1667,9 +1677,6 @@ function AdminDashboardTab({
   companyUsers,
   policies,
   claims,
-  documents,
-  individualClients,
-  apiConnections,
 }: {
   companies: Company[]
   companyUsers: CompanyUser[]
@@ -1680,7 +1687,6 @@ function AdminDashboardTab({
   apiConnections: ApiConnection[]
 }) {
   const openClaims = claims.filter((c) => c.status !== 'paid' && c.status !== 'denied')
-  const connectedApis = apiConnections.filter((a) => a.status === 'connected').length
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getUTCFullYear())
   const [selectedMonth, setSelectedMonth] = useState<string>('')
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
@@ -1697,6 +1703,7 @@ function AdminDashboardTab({
   const [renewalRiskMinValue, setRenewalRiskMinValue] = useState<string>('')
   const [assigneeDraftByKey, setAssigneeDraftByKey] = useState<Record<string, string>>({})
   const [nextActionDraftByKey, setNextActionDraftByKey] = useState<Record<string, string>>({})
+  const [salesStats, setSalesStats] = useState<Awaited<ReturnType<typeof fetchSalesPipelineStats>> | null>(null)
 
   useEffect(() => {
     let active = true
@@ -1869,58 +1876,43 @@ function AdminDashboardTab({
   const selectedMonthDetails = financialData?.monthlyDetails.find((monthItem) => monthItem.month === drillMonthValue)
 
   return (
-    <div>
-      <h2 className="text-lg font-semibold text-navy-700 mb-4">Dashboard Administração</h2>
-
-      <SalesPipelineSummaryWidget />
-
-      <div className="bg-white rounded-[4px] border border-navy-200 p-4 mb-6">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <label className="text-sm text-navy-600">
-            <span className="block text-xs uppercase tracking-wide text-navy-500 mb-1">Ano</span>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
-            >
+    <div className="admin-dashboard">
+      {/* ROW A — page header + compact filter bar */}
+      <div className="admin-page-header">
+        <div>
+          <h1 className="admin-page-title">Dashboard</h1>
+          <p className="admin-page-subtitle">Your commercial and insurance operations workspace</p>
+        </div>
+        <div className="admin-filter-bar">
+          <label className="admin-filter-field">
+            <span>Year</span>
+            <select value={selectedYear} onChange={(e) => setSelectedYear(Number(e.target.value))}>
               {(financialData?.availableFilters.years ?? [selectedYear]).map((year) => (
                 <option key={year} value={year}>{year}</option>
               ))}
             </select>
           </label>
-          <label className="text-sm text-navy-600">
-            <span className="block text-xs uppercase tracking-wide text-navy-500 mb-1">Mês</span>
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
-            >
+          <label className="admin-filter-field">
+            <span>Month</span>
+            <select value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}>
               {monthSelectOptions.map((monthOption) => (
                 <option key={monthOption.value || 'all'} value={monthOption.value}>{monthOption.label}</option>
               ))}
             </select>
           </label>
-          <label className="text-sm text-navy-600">
-            <span className="block text-xs uppercase tracking-wide text-navy-500 mb-1">Empresa</span>
-            <select
-              value={selectedCompanyId}
-              onChange={(e) => setSelectedCompanyId(e.target.value)}
-              className="w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
-            >
-              <option value="">Todas</option>
+          <label className="admin-filter-field">
+            <span>Company</span>
+            <select value={selectedCompanyId} onChange={(e) => setSelectedCompanyId(e.target.value)}>
+              <option value="">All</option>
               {companies.map((company) => (
                 <option key={company.id} value={company.id}>{company.name}</option>
               ))}
             </select>
           </label>
-          <label className="text-sm text-navy-600">
-            <span className="block text-xs uppercase tracking-wide text-navy-500 mb-1">Seguradora</span>
-            <select
-              value={selectedInsurer}
-              onChange={(e) => setSelectedInsurer(e.target.value)}
-              className="w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
-            >
-              <option value="">Todas</option>
+          <label className="admin-filter-field">
+            <span>Insurer</span>
+            <select value={selectedInsurer} onChange={(e) => setSelectedInsurer(e.target.value)}>
+              <option value="">All</option>
               {(financialData?.availableFilters.insurers ?? []).map((insurer) => (
                 <option key={insurer} value={insurer}>{insurer}</option>
               ))}
@@ -1929,37 +1921,180 @@ function AdminDashboardTab({
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <MetricCard
-          label="Prémios Totais"
-          value={financialLoading || !financialData ? '...' : formatCurrency(financialData.summary.totalPremiums)}
-          help={selectedMonth ? 'Valor do mês selecionado' : 'Soma anual distribuída por fracionamento'}
-          momDeltaPct={financialData?.summary.comparisons.totalPremiums.momDeltaPct ?? null}
-          yoyDeltaPct={financialData?.summary.comparisons.totalPremiums.yoyDeltaPct ?? null}
+      {/* ROW B — KPI strip (existing metrics only, recomposed) */}
+      <div className="admin-kpi-grid">
+        <KpiTile
+          strong
+          label="Open pipeline"
+          value={salesStats ? formatCurrency(salesStats.openPipelinePremium) : '…'}
+          note={salesStats ? `${salesStats.openCount} open opportunities` : undefined}
         />
-        <MetricCard
-          label="Comissões Totais"
-          value={financialLoading || !financialData ? '...' : formatCurrency(financialData.summary.totalCommissions)}
-          help={selectedMonth ? 'Comissão distribuída no mês' : 'Comissões distribuídas no ano'}
-          momDeltaPct={financialData?.summary.comparisons.totalCommissions.momDeltaPct ?? null}
-          yoyDeltaPct={financialData?.summary.comparisons.totalCommissions.yoyDeltaPct ?? null}
+        <KpiTile
+          label="Expected revenue"
+          value={salesStats ? formatCurrency(salesStats.openPipelineRevenue) : '…'}
+          note={salesStats ? `${formatCurrency(salesStats.wonRevenueThisMonth)} won this month` : undefined}
         />
-        <MetricCard
-          label="Comissões Previstas"
-          value={financialLoading || !financialData ? '...' : formatCurrency(financialData.summary.projectedCommissions)}
-          help="Cashflow futuro com base no fracionamento"
-          momDeltaPct={financialData?.summary.comparisons.projectedCommissions.momDeltaPct ?? null}
-          yoyDeltaPct={financialData?.summary.comparisons.projectedCommissions.yoyDeltaPct ?? null}
+        <KpiTile
+          label="Written premium"
+          value={financialLoading || !financialData ? '…' : formatCurrency(financialData.summary.totalPremiums)}
+          note={financialData ? `MoM ${formatPct(financialData.summary.comparisons.totalPremiums.momDeltaPct)}` : undefined}
         />
-        <MetricCard
-          label="Apólices Ativas"
-          value={financialLoading || !financialData ? '...' : financialData.summary.activePolicies}
-          help="Ativas no período de referência"
-          momDeltaPct={financialData?.summary.comparisons.activePolicies.momDeltaPct ?? null}
-          yoyDeltaPct={financialData?.summary.comparisons.activePolicies.yoyDeltaPct ?? null}
+        <KpiTile
+          label="Active policies"
+          value={financialLoading || !financialData ? '…' : String(financialData.summary.activePolicies)}
+          note={financialData ? `YoY ${formatPct(financialData.summary.comparisons.activePolicies.yoyDeltaPct)}` : undefined}
+        />
+        <KpiTile
+          label="Renewals at risk"
+          value={renewalAlertsLoading || !renewalAlertsView ? '…' : formatCurrency(renewalAlertsView.summary.totalValueAtRisk)}
+          note={renewalAlertsView ? `${renewalIntelligence.pendingOrNegotiatingCount} pending` : undefined}
         />
       </div>
 
+      {/* ROW C — sales pipeline / tasks & follow-ups */}
+      <div className="admin-ops-grid admin-ops-grid--sales">
+        <SalesPipelineSummaryWidget onStats={setSalesStats} />
+
+        <div className="admin-panel">
+          <div className="admin-panel-head">
+            <h3 className="admin-panel-title">Tasks &amp; follow-ups</h3>
+            <Link to="/admin" search={{ tab: 'tasks' }} className="admin-panel-link">Open tasks →</Link>
+          </div>
+          {salesStats ? (
+            <div className="admin-task-summary">
+              <div className={`admin-task-row${salesStats.overdueFollowUpsCount > 0 ? ' admin-task-row--overdue' : ''}`}>
+                <span>Overdue follow-ups</span>
+                <strong>{salesStats.overdueFollowUpsCount}</strong>
+              </div>
+              <div className="admin-task-row">
+                <span>Due today</span>
+                <strong>{salesStats.dueTodayFollowUpsCount}</strong>
+              </div>
+              <div className="admin-task-row">
+                <span>New opportunities this month</span>
+                <strong>{salesStats.newThisMonthCount}</strong>
+              </div>
+              {salesStats.overdueFollowUpsCount > 0 && (
+                <Link to="/admin" search={{ tab: 'sales', overdue: true }} className="admin-panel-link admin-panel-link--block">
+                  Review overdue follow-ups →
+                </Link>
+              )}
+            </div>
+          ) : (
+            <p className="admin-muted-note">Loading…</p>
+          )}
+        </div>
+      </div>
+
+      {/* ROW D — insurance operations: renewals / portfolio */}
+      <div className="admin-ops-grid admin-ops-grid--insurance">
+        <div className="admin-panel">
+          <div className="admin-panel-head">
+            <h3 className="admin-panel-title">Renewals</h3>
+            <Link to="/admin" search={{ tab: 'alerts' }} className="admin-panel-link">Manage renewals →</Link>
+          </div>
+          {renewalAlertsLoading ? (
+            <p className="admin-muted-note">Loading renewal alerts…</p>
+          ) : renewalAlertsView && renewalAlertsView.total > 0 ? (
+            <div className="admin-renewals-summary">
+              <div className="admin-stat-row-grid">
+                <div className="admin-stat-block">
+                  <p className="admin-stat-block-label">Renewals due</p>
+                  <p className="admin-stat-block-value">{renewalAlertsView.summary.totalRenewals}</p>
+                </div>
+                <div className="admin-stat-block admin-stat-block--risk">
+                  <p className="admin-stat-block-label">Value at risk</p>
+                  <p className="admin-stat-block-value">{formatCurrency(renewalAlertsView.summary.totalValueAtRisk)}</p>
+                </div>
+                <div className="admin-stat-block">
+                  <p className="admin-stat-block-label">Renewal rate</p>
+                  <p className="admin-stat-block-value">{formatPctValue(renewalIntelligence.renewalRatePct)}</p>
+                </div>
+              </div>
+              <div className="admin-status-pill-row">
+                <span className="admin-status-pill">Pending {renewalAlertsView.summary.countsByStatus.pending}</span>
+                <span className="admin-status-pill">Negotiating {renewalAlertsView.summary.countsByStatus.negotiating}</span>
+                <span className="admin-status-pill admin-status-pill--ok">Renewed {renewalAlertsView.summary.countsByStatus.renewed}</span>
+              </div>
+              <div className="admin-urgency-bars">
+                {renewalIntelligence.valueAtRiskByPeriod.map((period) => {
+                  const maxValue = Math.max(1, ...renewalIntelligence.valueAtRiskByPeriod.map((p) => p.valueAtRisk))
+                  const widthPct = Math.round((period.valueAtRisk / maxValue) * 100)
+                  return (
+                    <div key={period.urgency} className="admin-urgency-bar-row">
+                      <span className="admin-urgency-bar-label">D-{period.urgency}</span>
+                      <div className="admin-urgency-bar-track">
+                        <div className="admin-urgency-bar-fill" style={{ width: `${widthPct}%` }} />
+                      </div>
+                      <span className="admin-urgency-bar-value">{formatCurrency(period.valueAtRisk)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <p className="admin-muted-note">No active renewal alerts for D-90, D-60 or D-30.</p>
+          )}
+        </div>
+
+        <div className="admin-panel">
+          <div className="admin-panel-head">
+            <h3 className="admin-panel-title">Portfolio</h3>
+          </div>
+          <div className="admin-portfolio-rows">
+            <div className="admin-portfolio-row">
+              <span>Total premiums</span>
+              <strong>{financialLoading || !financialData ? '…' : formatCurrency(financialData.summary.totalPremiums)}</strong>
+            </div>
+            <div className="admin-portfolio-row">
+              <span>Total commissions</span>
+              <strong>{financialLoading || !financialData ? '…' : formatCurrency(financialData.summary.totalCommissions)}</strong>
+            </div>
+            <div className="admin-portfolio-row">
+              <span>Projected commissions</span>
+              <strong>{financialLoading || !financialData ? '…' : formatCurrency(financialData.summary.projectedCommissions)}</strong>
+            </div>
+            <div className="admin-portfolio-row">
+              <span>Active policies</span>
+              <strong>{financialLoading || !financialData ? '…' : financialData.summary.activePolicies}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ROW E — attention strip (existing data only, omitted when empty) */}
+      {(salesStats?.overdueFollowUpsCount || openClaims.length || renewalIntelligence.pendingOrNegotiatingCount || salesStats?.newThisMonthCount) ? (
+        <div className="admin-panel admin-attention-panel">
+          <h3 className="admin-panel-title">Needs attention</h3>
+          <div className="admin-attention-row">
+            {!!salesStats?.overdueFollowUpsCount && (
+              <Link to="/admin" search={{ tab: 'sales', overdue: true }} className="admin-attention-item admin-attention-item--danger">
+                <strong>{salesStats.overdueFollowUpsCount}</strong> overdue follow-up{salesStats.overdueFollowUpsCount !== 1 ? 's' : ''}
+              </Link>
+            )}
+            {renewalIntelligence.pendingOrNegotiatingCount > 0 && (
+              <Link to="/admin" search={{ tab: 'alerts' }} className="admin-attention-item">
+                <strong>{renewalIntelligence.pendingOrNegotiatingCount}</strong> renewals still at risk
+              </Link>
+            )}
+            {openClaims.length > 0 && (
+              <Link to="/admin" search={{ tab: 'claims' }} className="admin-attention-item">
+                <strong>{openClaims.length}</strong> claims requiring attention
+              </Link>
+            )}
+            {!!salesStats?.newThisMonthCount && (
+              <Link to="/admin" search={{ tab: 'sales' }} className="admin-attention-item">
+                <strong>{salesStats.newThisMonthCount}</strong> new opportunities this month
+              </Link>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Advanced detail — unchanged data/behaviour, kept below the fold */}
+      <details className="admin-panel admin-collapsible">
+        <summary className="admin-collapsible-summary">Financial detail</summary>
+        <div className="admin-collapsible-body">
       <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <h3 className="text-sm font-semibold text-navy-700">Prémios vs Comissões (linha temporal mensal)</h3>
@@ -1998,7 +2133,6 @@ function AdminDashboardTab({
           <p className="text-sm text-navy-400">{financialLoading ? 'A calcular cashflow...' : 'Sem dados financeiros para os filtros selecionados.'}</p>
         )}
       </div>
-
       <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
         <h3 className="text-sm font-semibold text-navy-700 mb-3">Meses com Maior Receita Prevista</h3>
         {financialData?.projectionHighlights.length ? (
@@ -2021,7 +2155,6 @@ function AdminDashboardTab({
           <p className="text-sm text-navy-400">Não existem meses futuros com receita prevista para os filtros aplicados.</p>
         )}
       </div>
-
       <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-sm font-semibold text-navy-700">Drill-down por Mês (Apólices)</h3>
@@ -2078,78 +2211,82 @@ function AdminDashboardTab({
           </div>
         )}
       </div>
+        </div>
+      </details>
 
-      <div className="grid lg:grid-cols-2 gap-6">
+      <details className="admin-panel admin-collapsible">
+        <summary className="admin-collapsible-summary">Renewal pipeline board</summary>
+        <div className="admin-collapsible-body">
         <div className="bg-white rounded-[4px] border border-navy-200 p-5">
           <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
-            <h3 className="text-sm font-semibold text-navy-700">Pipeline de Renovações</h3>
+            <h3 className="text-sm font-semibold text-navy-700">Renewals pipeline</h3>
             <label className="text-xs text-navy-600">
-              <span className="block mb-1">Filtro por valor mínimo (€)</span>
+              <span className="block mb-1">Minimum value filter (€)</span>
               <input
                 type="number"
                 min={0}
                 step={100}
                 value={renewalRiskMinValue}
                 onChange={(event) => setRenewalRiskMinValue(event.target.value)}
-                placeholder="Top risco financeiro"
+                placeholder="Top financial risk"
                 className="w-44 px-2 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-gold-400"
               />
             </label>
           </div>
           {renewalAlertsLoading ? (
-            <p className="text-sm text-navy-400">A carregar alertas de renovação...</p>
+            <p className="text-sm text-navy-400">Loading renewal alerts...</p>
           ) : renewalAlertsView && renewalAlertsView.total > 0 ? (
             <div className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-2">
                 <div className="rounded border border-navy-200 bg-navy-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-navy-500">Número de renovações</p>
+                  <p className="text-[11px] uppercase tracking-wide text-navy-500">Number of renewals</p>
                   <p className="text-base font-semibold text-navy-700">{renewalAlertsView.summary.totalRenewals}</p>
                 </div>
                 <div className="rounded border border-red-200 bg-red-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-red-500">Valor total em risco</p>
+                  <p className="text-[11px] uppercase tracking-wide text-red-500">Total value at risk</p>
                   <p className="text-base font-semibold text-red-700">{formatCurrency(renewalAlertsView.summary.totalValueAtRisk)}</p>
                 </div>
               </div>
               <div className="grid xl:grid-cols-3 gap-2">
                 <div className="rounded border border-emerald-200 bg-emerald-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-emerald-600">Taxa de renovação</p>
+                  <p className="text-[11px] uppercase tracking-wide text-emerald-600">Renewal rate</p>
                   <p className="text-base font-semibold text-emerald-700">{formatPctValue(renewalIntelligence.renewalRatePct)}</p>
                   <p className="text-[11px] text-emerald-700/80">
-                    {renewalIntelligence.renewedCount} renovadas de {renewalIntelligence.totalAlerts}
+                    {renewalIntelligence.renewedCount} renewed of {renewalIntelligence.totalAlerts}
                   </p>
                 </div>
                 <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-amber-600">Tempo médio pending → renewed</p>
+                  <p className="text-[11px] uppercase tracking-wide text-amber-600">Avg. time pending → renewed</p>
                   <p className="text-base font-semibold text-amber-700">
                     {renewalIntelligence.avgDaysPendingToRenewed === null
                       ? 'n/d'
-                      : `${renewalIntelligence.avgDaysPendingToRenewed.toFixed(1)} dias`}
+                      : `${renewalIntelligence.avgDaysPendingToRenewed.toFixed(1)} days`}
                   </p>
                   <p className="text-[11px] text-amber-700/80">
-                    Base: {renewalIntelligence.avgDaysSampleSize} transições completas
+                    Base: {renewalIntelligence.avgDaysSampleSize} completed transitions
                   </p>
                 </div>
                 <div className="rounded border border-navy-200 bg-navy-50 px-3 py-2">
-                  <p className="text-[11px] uppercase tracking-wide text-navy-500">Casos em risco</p>
+                  <p className="text-[11px] uppercase tracking-wide text-navy-500">Cases at risk</p>
                   <p className="text-base font-semibold text-navy-700">{renewalIntelligence.pendingOrNegotiatingCount}</p>
-                  <p className="text-[11px] text-navy-600">Ainda não renovadas</p>
+                  <p className="text-[11px] text-navy-600">Not yet renewed</p>
                 </div>
               </div>
               <div className="grid xl:grid-cols-3 gap-2">
                 {renewalIntelligence.valueAtRiskByPeriod.map((period) => (
                   <div key={period.urgency} className="rounded border border-red-200 bg-red-50 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-red-500">Risco D-{period.urgency}</p>
+                    <p className="text-[11px] uppercase tracking-wide text-red-500">Risk D-{period.urgency}</p>
                     <p className="text-base font-semibold text-red-700">{formatCurrency(period.valueAtRisk)}</p>
-                    <p className="text-[11px] text-red-600/90">{period.alertsCount} apólices em risco</p>
+                    <p className="text-[11px] text-red-600/90">{period.alertsCount} policies at risk</p>
                   </div>
                 ))}
               </div>
               <div className="rounded border border-navy-200 bg-white px-3 py-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-navy-700 mb-2">
-                  Clientes com maior risco financeiro
+                  Clients with highest financial risk
                 </h4>
                 {renewalIntelligence.topRiskClients.length === 0 ? (
-                  <p className="text-[11px] text-navy-500">Sem clientes em risco no período atual.</p>
+                  <p className="text-[11px] text-navy-500">No clients at risk in the current period.</p>
                 ) : (
                   <div className="space-y-1.5">
                     {renewalIntelligence.topRiskClients.map((client, index) => (
@@ -2158,7 +2295,7 @@ function AdminDashboardTab({
                           <strong className="text-navy-700">#{index + 1}</strong> {client.client} <span className="text-navy-400">({client.company})</span>
                         </p>
                         <p className="font-semibold text-red-700">
-                          {formatCurrency(client.valueAtRisk)} · {client.policiesCount} apólices
+                          {formatCurrency(client.valueAtRisk)} · {client.policiesCount} policies
                         </p>
                       </div>
                     ))}
@@ -2167,7 +2304,7 @@ function AdminDashboardTab({
               </div>
               <div className="rounded border border-gold-200 bg-gold-50 px-3 py-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wide text-navy-700 mb-2">
-                  Insights automáticos
+                  Automatic insights
                 </h4>
                 <div className="space-y-1.5">
                   {renewalIntelligence.insights.map((insight, index) => (
@@ -2218,7 +2355,7 @@ function AdminDashboardTab({
 
                       {items.length === 0 ? (
                         <p className="text-[11px] text-navy-400 rounded border border-dashed border-navy-200 bg-white px-2 py-2">
-                          Sem apólices nesta coluna.
+                          No policies in this column.
                         </p>
                       ) : (
                         <div className="space-y-2">
@@ -2242,21 +2379,21 @@ function AdminDashboardTab({
                             const nextStatusActions: Array<{ label: string; status: RenewalAlertStatus; className: string }> = []
                             if (renewalColumnByStatus(alert.status) !== 'pending') {
                               nextStatusActions.push({
-                                label: 'Mover para pending',
+                                label: 'Move to Pending',
                                 status: 'pending',
                                 className: 'border-navy-200 text-navy-700 bg-white hover:bg-navy-50',
                               })
                             }
                             if (renewalColumnByStatus(alert.status) !== 'negotiating') {
                               nextStatusActions.push({
-                                label: 'Mover para negotiating',
+                                label: 'Move to Negotiating',
                                 status: 'negotiating',
                                 className: 'border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100',
                               })
                             }
                             if (renewalColumnByStatus(alert.status) !== 'renewed') {
                               nextStatusActions.push({
-                                label: 'Mover para renewed',
+                                label: 'Move to Renewed',
                                 status: 'renewed',
                                 className: 'border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100',
                               })
@@ -2292,7 +2429,7 @@ function AdminDashboardTab({
                                   {alert.insurer} · {formatCurrency(alert.value)}
                                 </p>
                                 <p className="text-navy-500 mt-0.5">
-                                  Apólice {alert.policyNumber} · Renovação em {alert.daysUntilRenewal} dias ({formatDate(alert.renewalDate)})
+                                  Policy {alert.policyNumber} · Renews in {alert.daysUntilRenewal} days ({formatDate(alert.renewalDate)})
                                 </p>
                                 <div className="flex flex-wrap gap-1.5 mt-2">
                                   {nextStatusActions.map((action) => (
@@ -2309,7 +2446,7 @@ function AdminDashboardTab({
                                 </div>
                                 <div className="mt-2 rounded border border-navy-100 bg-navy-50/60 p-2 space-y-2">
                                   <div>
-                                    <label className="text-[11px] text-navy-600">Responsável</label>
+                                    <label className="text-[11px] text-navy-600">Owner</label>
                                     <div className="flex gap-1.5 mt-1">
                                       <input
                                         list={`responsible_${alert.key}`}
@@ -2318,7 +2455,7 @@ function AdminDashboardTab({
                                           const value = event.target.value
                                           setAssigneeDraftByKey((current) => ({ ...current, [alert.key]: value }))
                                         }}
-                                        placeholder="Email do responsável"
+                                        placeholder="Owner's email"
                                         className="flex-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-gold-400"
                                       />
                                       <datalist id={`responsible_${alert.key}`}>
@@ -2334,28 +2471,28 @@ function AdminDashboardTab({
                                         onClick={() => handleRenewalAlertStatusUpdate(alert.key, { assignedTo: assigneeDraftByKey[alert.key] ?? alert.assignedTo ?? null })}
                                         className="px-2 py-1 text-[11px] rounded border border-navy-200 bg-white text-navy-700 hover:bg-navy-100 disabled:opacity-50"
                                       >
-                                        Guardar
+                                        Save
                                       </button>
                                     </div>
                                     <p className="text-[11px] text-navy-500 mt-1">
-                                      Atual: <strong>{alert.assignedTo ? (responsibleLabelMap.get(alert.assignedTo) ? `${responsibleLabelMap.get(alert.assignedTo)} (${alert.assignedTo})` : alert.assignedTo) : 'Sem responsável'}</strong>
+                                      Current: <strong>{alert.assignedTo ? (responsibleLabelMap.get(alert.assignedTo) ? `${responsibleLabelMap.get(alert.assignedTo)} (${alert.assignedTo})` : alert.assignedTo) : 'Unassigned'}</strong>
                                     </p>
                                   </div>
                                   <div>
-                                    <label className="text-[11px] text-navy-600">Próxima ação</label>
+                                    <label className="text-[11px] text-navy-600">Next action</label>
                                     <textarea
                                       value={nextActionDraftByKey[alert.key] ?? alert.nextAction ?? ''}
                                       onChange={(event) => {
                                         const value = event.target.value
                                         setNextActionDraftByKey((current) => ({ ...current, [alert.key]: value }))
                                       }}
-                                      placeholder="Definir próxima ação para a apólice"
+                                      placeholder="Set next action for this policy"
                                       rows={2}
                                       className="w-full mt-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-gold-400 resize-y"
                                     />
                                     <div className="flex items-center justify-between mt-1">
                                       <p className="text-[11px] text-navy-500">
-                                        Atual: <strong>{alert.nextAction || 'Sem ação definida'}</strong>
+                                        Current: <strong>{alert.nextAction || 'No action set'}</strong>
                                       </p>
                                       <button
                                         type="button"
@@ -2363,7 +2500,7 @@ function AdminDashboardTab({
                                         onClick={() => handleRenewalAlertStatusUpdate(alert.key, { nextAction: nextActionDraftByKey[alert.key] ?? alert.nextAction ?? null })}
                                         className="px-2 py-1 text-[11px] rounded border border-navy-200 bg-white text-navy-700 hover:bg-navy-100 disabled:opacity-50"
                                       >
-                                        Guardar ação
+                                        Save action
                                       </button>
                                     </div>
                                   </div>
@@ -2374,50 +2511,50 @@ function AdminDashboardTab({
                                     search={{ tab: 'policies' }}
                                     className="px-2 py-1 text-[11px] rounded border border-blue-200 text-blue-700 bg-blue-50 hover:bg-blue-100"
                                   >
-                                    Ver apólice
+                                    View policy
                                   </Link>
                                   {alert.contactEmail ? (
                                     <a
                                       href={`mailto:${alert.contactEmail}`}
                                       className="px-2 py-1 text-[11px] rounded border border-gold-300 text-navy-700 bg-gold-100 hover:bg-gold-200"
                                     >
-                                      Contactar cliente
+                                      Contact client
                                     </a>
                                   ) : alert.contactPhone ? (
                                     <a
                                       href={`tel:${alert.contactPhone}`}
                                       className="px-2 py-1 text-[11px] rounded border border-gold-300 text-navy-700 bg-gold-100 hover:bg-gold-200"
                                     >
-                                      Contactar cliente
+                                      Contact client
                                     </a>
                                   ) : (
                                     <span className="px-2 py-1 text-[11px] rounded border border-gray-200 text-gray-400 bg-gray-50">
-                                      Sem contacto
+                                      No contact
                                     </span>
                                   )}
                                 </div>
                                 <p className="text-[11px] text-navy-500 mt-2">
-                                  Estado atual: <strong>{RENEWAL_ALERT_STATUS_LABELS[alert.status]}</strong>
+                                  Current status: <strong>{RENEWAL_ALERT_STATUS_LABELS[alert.status]}</strong>
                                 </p>
                                 <details className="mt-2 rounded border border-navy-100 bg-navy-50 px-2 py-1.5">
                                   <summary className="text-[11px] font-semibold text-navy-700 cursor-pointer">
-                                    Histórico de alterações ({alert.history.length})
+                                    Change history ({alert.history.length})
                                   </summary>
                                   <div className="mt-2 space-y-1.5 max-h-40 overflow-y-auto">
                                     {alert.history.length === 0 ? (
-                                      <p className="text-[11px] text-navy-500">Sem histórico.</p>
+                                      <p className="text-[11px] text-navy-500">No history.</p>
                                     ) : (
                                       alert.history.map((entry) => (
                                         <div key={entry.id} className="text-[11px] text-navy-600 border-l-2 border-navy-200 pl-2 py-0.5">
                                           <p className="text-navy-700 font-medium">{formatDate(entry.changedAt)}</p>
                                           <p>
-                                            Estado: <strong>{entry.previousStatus ? RENEWAL_ALERT_STATUS_LABELS[entry.previousStatus] : '—'}</strong> → <strong>{RENEWAL_ALERT_STATUS_LABELS[entry.newStatus]}</strong>
+                                            Status: <strong>{entry.previousStatus ? RENEWAL_ALERT_STATUS_LABELS[entry.previousStatus] : '—'}</strong> → <strong>{RENEWAL_ALERT_STATUS_LABELS[entry.newStatus]}</strong>
                                           </p>
                                           <p>
-                                            Responsável: <strong>{entry.previousAssignedTo || '—'}</strong> → <strong>{entry.newAssignedTo || '—'}</strong>
+                                            Owner: <strong>{entry.previousAssignedTo || '—'}</strong> → <strong>{entry.newAssignedTo || '—'}</strong>
                                           </p>
                                           <p>
-                                            Próxima ação: <strong>{entry.previousNextAction || '—'}</strong> → <strong>{entry.newNextAction || '—'}</strong>
+                                            Next action: <strong>{entry.previousNextAction || '—'}</strong> → <strong>{entry.newNextAction || '—'}</strong>
                                           </p>
                                         </div>
                                       ))
@@ -2437,25 +2574,13 @@ function AdminDashboardTab({
           ) : (
             <p className="text-sm text-navy-400">
               {renewalRiskMinValue
-                ? 'Sem alertas para o filtro de valor aplicado.'
-                : 'Sem alertas ativos para D-90, D-60 ou D-30.'}
+                ? 'No alerts match the applied value filter.'
+                : 'No active alerts for D-90, D-60 or D-30.'}
             </p>
           )}
         </div>
-
-        <div className="bg-white rounded-[4px] border border-navy-200 p-5">
-          <h3 className="text-sm font-semibold text-navy-700 mb-3">Resumo Operacional</h3>
-          <div className="space-y-2 text-sm text-navy-600">
-            <p>Empresas registadas: <strong>{companies.length}</strong></p>
-            <p>Utilizadores empresariais: <strong>{companyUsers.length}</strong></p>
-            <p>Clientes individuais: <strong>{individualClients.length}</strong></p>
-            <p>Apólices totais: <strong>{policies.length}</strong></p>
-            <p>Sinistros em aberto: <strong>{openClaims.length}</strong></p>
-            <p>Ligações API ativas: <strong>{connectedApis}</strong> / {apiConnections.length}</p>
-            <p>Documentos registados: <strong>{documents.length}</strong></p>
-          </div>
         </div>
-      </div>
+      </details>
     </div>
   )
 }
@@ -2464,42 +2589,6 @@ function formatPct(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return 'n/d'
   const sign = value > 0 ? '+' : ''
   return `${sign}${value.toFixed(1)}%`
-}
-
-function deltaChipClass(value: number | null): string {
-  if (value === null || !Number.isFinite(value)) return 'bg-gray-100 text-gray-500 border border-gray-200'
-  if (value >= 0) return 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-  return 'bg-rose-50 text-rose-700 border border-rose-200'
-}
-
-function MetricCard({
-  label,
-  value,
-  help,
-  momDeltaPct,
-  yoyDeltaPct,
-}: {
-  label: string
-  value: number | string
-  help: string
-  momDeltaPct: number | null
-  yoyDeltaPct: number | null
-}) {
-  return (
-    <div className="bg-white rounded-[4px] border border-navy-200 p-5">
-      <p className="text-xs uppercase tracking-wide text-navy-500">{label}</p>
-      <p className="text-3xl font-bold text-navy-700 mt-2">{value}</p>
-      <p className="text-xs text-navy-500 mt-2">{help}</p>
-      <div className="flex flex-wrap gap-2 mt-3">
-        <span className={`inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold ${deltaChipClass(momDeltaPct)}`}>
-          MoM: {formatPct(momDeltaPct)}
-        </span>
-        <span className={`inline-flex items-center px-2 py-1 rounded text-[11px] font-semibold ${deltaChipClass(yoyDeltaPct)}`}>
-          YoY: {formatPct(yoyDeltaPct)}
-        </span>
-      </div>
-    </div>
-  )
 }
 
 function FinancialTimelineChart({
