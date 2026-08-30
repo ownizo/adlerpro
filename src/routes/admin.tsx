@@ -872,10 +872,10 @@ function AdminPage() {
                   />
                 )}
 
-                {individualClients.length > 0 && (
-                  <div className={`admin-selection-bar${selectedIndividualClientIds.size > 0 ? ' admin-selection-bar--active' : ''}`}>
+                {selectedIndividualClientIds.size > 0 && (
+                  <div className="admin-selection-bar admin-selection-bar--active">
                     <span>
-                      {individualClients.length} individual clients{selectedIndividualClientIds.size > 0 ? ` · ${selectedIndividualClientIds.size} selected` : ''}
+                      {selectedIndividualClientIds.size} selected
                     </span>
                     {selectedIndividualClientIds.size > 0 && (
                       <button
@@ -2291,42 +2291,58 @@ function AdminRenewalsPage({
                 </div>
               </div>
               <div className="grid xl:grid-cols-3 gap-2">
-                {renewalIntelligence.valueAtRiskByPeriod.map((period) => (
-                  <div key={period.urgency} className="rounded border border-red-200 bg-red-50 px-3 py-2">
-                    <p className="text-[11px] uppercase tracking-wide text-red-500">Risk D-{period.urgency}</p>
-                    <p className="text-base font-semibold text-red-700">{formatCurrency(period.valueAtRisk)}</p>
-                    <p className="text-[11px] text-red-600/90">{period.alertsCount} policies at risk</p>
-                  </div>
-                ))}
+                {renewalIntelligence.valueAtRiskByPeriod.map((period) => {
+                  // Red is reserved for genuine urgency — only D-30 gets it;
+                  // D-60/D-90 are neutral surfaces, not attention noise.
+                  const isUrgent = period.urgency === 30
+                  return (
+                    <div
+                      key={period.urgency}
+                      className={isUrgent ? 'rounded border border-red-200 bg-red-50 px-3 py-2' : 'rounded border border-navy-200 bg-white px-3 py-2'}
+                    >
+                      <p className={`text-[11px] uppercase tracking-wide ${isUrgent ? 'text-red-500' : 'text-navy-500'}`}>Risk D-{period.urgency}</p>
+                      <p className={`text-base font-semibold ${isUrgent ? 'text-red-700' : 'text-navy-700'}`}>{formatCurrency(period.valueAtRisk)}</p>
+                      <p className={`text-[11px] ${isUrgent ? 'text-red-600/90' : 'text-navy-500'}`}>{period.alertsCount} policies at risk</p>
+                    </div>
+                  )
+                })}
               </div>
-              <div className="rounded border border-navy-200 bg-white px-3 py-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-navy-700 mb-2">
+              <div className="rounded border border-navy-200 bg-white px-3 py-2.5">
+                <h4 className="text-[11px] font-semibold uppercase tracking-wide text-navy-500 mb-1.5">
                   Clients with highest financial risk
                 </h4>
                 {renewalIntelligence.topRiskClients.length === 0 ? (
                   <p className="text-[11px] text-navy-500">No clients at risk in the current period.</p>
                 ) : (
-                  <div className="space-y-1.5">
+                  <div className="divide-y divide-navy-100">
                     {renewalIntelligence.topRiskClients.map((client, index) => (
-                      <div key={`${client.client}_${client.company}`} className="flex items-center justify-between gap-2 text-[11px] text-navy-600">
-                        <p>
-                          <strong className="text-navy-700">#{index + 1}</strong> {client.client} <span className="text-navy-400">({client.company})</span>
-                        </p>
-                        <p className="font-semibold text-red-700">
-                          {formatCurrency(client.valueAtRisk)} · {client.policiesCount} policies
-                        </p>
+                      <div key={`${client.client}_${client.company}`} className="flex items-center justify-between gap-3 py-1.5">
+                        <div className="min-w-0">
+                          <p className="text-[12px] text-navy-700 truncate">
+                            <span className="text-navy-400 font-semibold mr-1">#{index + 1}</span>
+                            {client.client}
+                          </p>
+                          {client.company && (
+                            <p className="text-[11px] text-navy-400 truncate">{client.company}</p>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-[12px] font-semibold text-navy-800 tabular-nums">{formatCurrency(client.valueAtRisk)}</p>
+                          <p className="text-[10.5px] text-navy-400">{client.policiesCount} polic{client.policiesCount === 1 ? 'y' : 'ies'}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-              <div className="rounded border border-gold-200 bg-gold-50 px-3 py-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-navy-700 mb-2">
+              <div className="admin-panel" style={{ padding: '0.65rem 0.85rem' }}>
+                <h4 className="text-[11px] font-semibold uppercase tracking-wide text-navy-500 mb-1.5">
                   Automatic insights
                 </h4>
-                <div className="space-y-1.5">
-                  {renewalIntelligence.insights.map((insight, index) => (
-                    <p key={`insight_${index}`} className="text-[11px] text-navy-700">
+                <div className="space-y-1">
+                  {renewalIntelligence.insights.slice(0, 5).map((insight, index) => (
+                    <p key={`insight_${index}`} className="flex items-start gap-1.5 text-[11.5px] text-navy-600 leading-snug">
+                      <span className="mt-1 w-1 h-1 rounded-full bg-navy-300 shrink-0" />
                       {insight}
                     </p>
                   ))}
@@ -3948,7 +3964,7 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
                   setResetting(false)
                 }
               }}
-              className="admin-row-action"
+              className="admin-row-action admin-row-action--secondary"
             >
               {resetting ? '…' : 'Password access'}
             </button>
@@ -4031,7 +4047,7 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
                   setGrantingAccess(false)
                 }
               }}
-              className="admin-row-action"
+              className="admin-row-action admin-row-action--secondary"
             >
               {grantingAccess ? '…' : 'Password access'}
             </button>

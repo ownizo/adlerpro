@@ -62,17 +62,14 @@ export function SalesKanban({ opportunities, individualClients, companies, onOpe
               await onStageChange(droppedId, stage)
             }}
           >
-            <div className="admin-kanban-column-header flex items-center justify-between gap-2 px-3 py-2.5">
+            <div className="admin-kanban-column-header px-3 py-2.5">
               <div className="flex items-center gap-1.5 min-w-0">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${palette.dot}`} />
                 <h4 className="text-[13px] font-semibold text-slate-700 truncate">{SALES_OPPORTUNITY_STAGE_LABELS_EN[stage]}</h4>
-                <span className="text-[12px] text-slate-400 shrink-0">{items.length}</span>
               </div>
-              {columnPremium > 0 && (
-                <span className="text-[12px] text-slate-500 shrink-0" title="Total premium in this column">
-                  {formatCurrency(columnPremium)}
-                </span>
-              )}
+              <p className="text-[11.5px] text-slate-500 mt-0.5" title="Opportunities · total premium in this column">
+                {items.length} opportunit{items.length === 1 ? 'y' : 'ies'} · {formatCurrency(columnPremium)}
+              </p>
             </div>
 
             <div className="admin-kanban-column-body flex-1 p-2 space-y-2">

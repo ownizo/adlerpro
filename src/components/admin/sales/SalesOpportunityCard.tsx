@@ -21,11 +21,13 @@ function initials(text: string): string {
 
 /**
  * Compact, immediately scannable card — client/company front and centre,
- * product, premium AND revenue always labelled unambiguously (never a
- * generic "Value: €X" — see requirement "premium vs revenue"), a humanised
- * follow-up, and everything else as discreet metadata. Doesn't show
- * everything at once — prioritises scanability over completeness (full
- * detail lives in the drawer).
+ * product, a humanised follow-up, and a single metadata row (market ·
+ * source · premium · age). The premium figure is always labelled (never a
+ * generic "Value: €X" — see requirement "premium vs revenue") since it's
+ * shown alongside plain currency values elsewhere on the card; revenue's
+ * full premium/revenue breakdown stays in the drawer, not duplicated here.
+ * Doesn't show everything at once — prioritises scanability over
+ * completeness.
  */
 export function SalesOpportunityCard({ opportunity, owner, draggable, onDragStart, onDragEnd, onClick }: Props) {
   const palette = STAGE_PALETTE[opportunity.stage]
@@ -47,33 +49,23 @@ export function SalesOpportunityCard({ opportunity, owner, draggable, onDragStar
       </div>
       <p className="text-[13px] text-slate-500 mt-0.5 truncate">{opportunity.product ?? opportunity.title}</p>
 
-      {(opportunity.estimatedAnnualPremium || opportunity.estimatedRevenue) && (
-        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[13px]">
-          {opportunity.estimatedAnnualPremium != null && (
-            <span className="text-slate-600">
-              <span className="text-slate-400">Premium</span> {formatCurrency(opportunity.estimatedAnnualPremium)}
-            </span>
-          )}
-          {opportunity.estimatedRevenue != null && (
-            <span className="text-slate-600">
-              <span className="text-slate-400">Revenue</span> {formatCurrency(opportunity.estimatedRevenue)}
-            </span>
-          )}
-        </div>
-      )}
-
       {followUp.urgency !== 'none' && (
         <span className={`inline-flex items-center mt-2 px-1.5 py-0.5 rounded text-[12px] font-medium border ${FOLLOW_UP_URGENCY_STYLE[followUp.urgency]}`}>
           {followUp.label}
         </span>
       )}
 
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-100 text-[12px] text-slate-400">
+      <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-100 text-[12px] text-slate-400">
         <div className="flex items-center gap-1.5 min-w-0">
           {opportunity.market && <span className="admin-market-tag">{opportunity.market}</span>}
           <span className="truncate">{opportunity.source ?? '—'}</span>
         </div>
-        <span>{ageInDays(opportunity.createdAt)}d</span>
+        {opportunity.estimatedAnnualPremium != null && (
+          <span className="text-slate-600 font-medium shrink-0 tabular-nums">
+            <span className="text-slate-400 font-normal">Premium</span> {formatCurrency(opportunity.estimatedAnnualPremium)}
+          </span>
+        )}
+        <span className="shrink-0">{ageInDays(opportunity.createdAt)}d</span>
       </div>
     </article>
   )
