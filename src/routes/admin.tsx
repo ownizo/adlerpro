@@ -60,7 +60,7 @@ import type {
   ClaimOperationalData,
   SalesOpportunityStage,
 } from '@/lib/types'
-import { POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS } from '@/lib/types'
+import { POLICY_TYPE_LABELS_EN as POLICY_TYPE_LABELS, CLAIM_STATUS_LABELS_EN as CLAIM_STATUS_LABELS } from '@/lib/types'
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useIdentity } from '@/lib/identity-context'
 import { supabase } from '@/lib/supabase'
@@ -395,14 +395,6 @@ function AdminPage() {
   if (!user) return <Navigate to="/login" />
   if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
-  const expiringPolicies = policies.filter((p) => {
-    const endDate = new Date(p.endDate)
-    const now = new Date()
-    const diffTime = Math.abs(endDate.getTime() - now.getTime())
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays <= 60 && (p.status === 'active' || p.status === 'expiring')
-  })
-
   const metricsByUser = companyUsers.map((user) => {
     const events = userEvents.filter((event) => event.userId === user.id)
     const loginsThisMonth = events.filter((event) => {
@@ -444,42 +436,42 @@ function AdminPage() {
             {tab === 'companies' && (
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-navy-700">Empresas ({companies.length})</h2>
+                  <h2 className="text-lg font-semibold text-navy-700">Companies ({companies.length})</h2>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={async () => {
                         await exportToExcel(companies.map((c) => ({
-                          Nome: c.name,
+                          Name: c.name,
                           NIF: c.nif,
-                          Setor: c.sector,
-                          'Pessoa de Contacto': c.contactName,
+                          Sector: c.sector,
+                          'Contact Person': c.contactName,
                           Email: c.contactEmail,
-                          Telefone: c.contactPhone,
-                          Morada: c.address,
-                          'Email de Acesso': c.accessEmail || '',
-                          'Criado em': c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-PT') : '',
-                        })), 'empresas')
+                          Phone: c.contactPhone,
+                          Address: c.address,
+                          'Access Email': c.accessEmail || '',
+                          'Created At': c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '',
+                        })), 'companies')
                       }}
                       disabled={companies.length === 0}
                       className="px-4 py-2 border border-navy-300 text-navy-700 font-medium rounded-[2px] hover:bg-navy-50 transition-colors text-sm disabled:opacity-50"
                     >
-                      Exportar Excel
+                      Export Excel
                     </button>
                     <button
                       onClick={() => {
                         setEditingCompanyId(null)
                         setShowNewCompany(!showNewCompany)
                       }}
-                      className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm"
+                      className="admin-btn admin-btn-primary"
                   >
-                    {showNewCompany ? 'Cancelar' : 'Nova Empresa'}
+                    {showNewCompany ? 'Cancel' : 'New company'}
                   </button>
                   </div>
                 </div>
 
                 {showNewCompany && (
                   <CompanyForm
-                    title={editingCompanyId ? 'Editar Empresa' : 'Nova Empresa'}
+                    title={editingCompanyId ? 'Edit company' : 'New company'}
                     initial={editingCompanyId ? companies.find((c) => c.id === editingCompanyId) : undefined}
                     onSubmit={async (data) => {
                       if (editingCompanyId) {
@@ -507,39 +499,39 @@ function AdminPage() {
                             setSelectedCompanyIds(new Set())
                           }
                         }}
-                        className="w-4 h-4 accent-gold-400"
+                        className="w-4 h-4 accent-[#17243D]"
                       />
-                      Selecionar tudo
+                      Select all
                     </label>
                     <div className="flex items-center gap-3">
                       <span className="text-xs text-navy-500">
-                        {selectedCompanyIds.size} selecionada(s)
+                        {selectedCompanyIds.size} selected
                       </span>
                       <button
                         disabled={selectedCompanyIds.size === 0 || bulkDeletingCompanies}
                         onClick={async () => {
                           if (selectedCompanyIds.size === 0) return
-                          if (!confirm(`Eliminar ${selectedCompanyIds.size} empresa(s) e os respetivos dados? Esta ação não pode ser revertida.`)) return
+                          if (!confirm(`Delete ${selectedCompanyIds.size} compan${selectedCompanyIds.size === 1 ? 'y' : 'ies'} and their data? This action cannot be undone.`)) return
                           setBulkDeletingCompanies(true)
                           try {
                             const ids = Array.from(selectedCompanyIds)
                             const results = await Promise.allSettled(ids.map((id) => adminDeleteCompany({ data: id })))
                             const failed = results.filter((r) => r.status === 'rejected')
                             if (failed.length > 0) {
-                              alert(`Falha ao eliminar ${failed.length} de ${ids.length} empresa(s). Verifique e tente novamente.`)
+                              alert(`Failed to delete ${failed.length} of ${ids.length} compan${ids.length === 1 ? 'y' : 'ies'}. Please check and try again.`)
                             }
                             setSelectedCompanyIds(new Set())
                             setExpandedCompanyId(null)
                             await reload()
                           } catch (err) {
-                            alert(`Erro ao eliminar empresas: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                            alert(`Error deleting companies: ${err instanceof Error ? err.message : 'Unknown error'}`)
                           } finally {
                             setBulkDeletingCompanies(false)
                           }
                         }}
                         className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {bulkDeletingCompanies ? 'A eliminar...' : 'Eliminar selecionadas'}
+                        {bulkDeletingCompanies ? 'Deleting…' : 'Delete selected'}
                       </button>
                     </div>
                   </div>
@@ -569,7 +561,7 @@ function AdminPage() {
                                   return next
                                 })
                               }}
-                              className="w-4 h-4 accent-gold-400 cursor-pointer"
+                              className="w-4 h-4 accent-[#17243D] cursor-pointer"
                             />
                           </div>
                           <button
@@ -581,12 +573,12 @@ function AdminPage() {
                                 <h3 className="text-lg font-semibold text-navy-700">{company.name}</h3>
                                 <p className="text-sm text-navy-500 mt-1">NIF {company.nif} · {company.sector}</p>
                                 <p className="text-xs text-navy-400 mt-1">{company.address}</p>
-                                <p className="text-xs text-navy-500 mt-2">Acesso da empresa: {company.accessEmail || '-'}</p>
+                                <p className="text-xs text-navy-500 mt-2">Company access: {company.accessEmail || '-'}</p>
                               </div>
                               <div className="text-right">
-                                <p className="text-sm font-medium text-navy-700">{users.length} utilizadores</p>
-                                <p className="text-sm text-navy-500">{companyPolicies.length} apólices</p>
-                                <p className="text-sm text-navy-500">{companyDocs.length} documentos</p>
+                                <p className="text-sm font-medium text-navy-700">{users.length} users</p>
+                                <p className="text-sm text-navy-500">{companyPolicies.length} policies</p>
+                                <p className="text-sm text-navy-500">{companyDocs.length} documents</p>
                               </div>
                             </div>
                           </button>
@@ -598,11 +590,11 @@ function AdminPage() {
                               }}
                               className="px-3 py-1.5 text-xs border border-navy-300 rounded hover:bg-navy-50"
                             >
-                              Editar
+                              Edit
                             </button>
                             <button
                               onClick={async () => {
-                                if (!confirm(`Eliminar a empresa ${company.name} e os respetivos dados?`)) return
+                                if (!confirm(`Delete company ${company.name} and its data?`)) return
                                 try {
                                   await adminDeleteCompany({ data: company.id })
                                   setSelectedCompanyIds((prev) => {
@@ -613,12 +605,12 @@ function AdminPage() {
                                   if (expandedCompanyId === company.id) setExpandedCompanyId(null)
                                   await reload()
                                 } catch (err) {
-                                  alert(`Erro ao eliminar empresa: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                                  alert(`Error deleting company: ${err instanceof Error ? err.message : 'Unknown error'}`)
                                 }
                               }}
-                              className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+                              className="admin-row-action admin-row-action--danger"
                             >
-                              Eliminar
+                              Delete
                             </button>
                           </div>
                         </div>
@@ -626,10 +618,10 @@ function AdminPage() {
                         {isExpanded && (
                           <div className="border-t border-navy-100 bg-navy-50/50 p-6 space-y-6">
                             <div>
-                              <h4 className="text-sm font-semibold text-navy-700 mb-3">Dados de Contacto</h4>
+                              <h4 className="text-sm font-semibold text-navy-700 mb-3">Contact Details</h4>
                               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white rounded border border-navy-200 p-4">
                                 <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Pessoa de Contacto</p>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Contact Person</p>
                                   <p className="text-sm text-navy-700">{company.contactName || '—'}</p>
                                 </div>
                                 <div>
@@ -637,7 +629,7 @@ function AdminPage() {
                                   <p className="text-sm text-navy-700 break-all">{company.contactEmail || '—'}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Telefone</p>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Phone</p>
                                   <p className="text-sm text-navy-700">{company.contactPhone || '—'}</p>
                                 </div>
                                 <div>
@@ -645,15 +637,15 @@ function AdminPage() {
                                   <p className="text-sm text-navy-700">{company.nif || '—'}</p>
                                 </div>
                                 <div className="sm:col-span-2 lg:col-span-2">
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Morada</p>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Address</p>
                                   <p className="text-sm text-navy-700">{company.address || '—'}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Setor</p>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Sector</p>
                                   <p className="text-sm text-navy-700">{company.sector || '—'}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Email de Acesso</p>
+                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Access Email</p>
                                   <p className="text-sm text-navy-700 break-all">{company.accessEmail || '—'}</p>
                                 </div>
                               </div>
@@ -665,30 +657,30 @@ function AdminPage() {
                                   setEditingCompanyId(company.id)
                                   setShowNewCompany(true)
                                 }}
-                                className="px-3 py-1.5 text-xs bg-white border border-gray-300 rounded hover:bg-gray-50"
+                                className="admin-btn admin-btn-secondary admin-btn--sm"
                               >
-                                Editar Empresa
+                                Edit company
                               </button>
                               <button
                                 onClick={async () => {
-                                  if (!confirm(`Eliminar a empresa ${company.name} e os respetivos dados?`)) return
+                                  if (!confirm(`Delete company ${company.name} and its data?`)) return
                                   try {
                                     await adminDeleteCompany({ data: company.id })
                                     await reload()
                                     setExpandedCompanyId(null)
                                   } catch (err) {
-                                    alert(`Erro ao eliminar empresa: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                                    alert(`Error deleting company: ${err instanceof Error ? err.message : 'Unknown error'}`)
                                   }
                                 }}
-                                className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
+                                className="admin-btn admin-btn-danger admin-btn--sm"
                               >
-                                Eliminar Empresa
+                                Delete company
                               </button>
                               <button
                                 onClick={() => setShowUserFormForCompanyId(showUserFormForCompanyId === company.id ? null : company.id)}
-                                className="px-3 py-1.5 text-xs bg-gold-400 text-navy-700 border border-gold-500 rounded hover:bg-gold-300"
+                                className="admin-btn admin-btn-primary admin-btn--sm"
                               >
-                                {showUserFormForCompanyId === company.id ? 'Cancelar Novo Utilizador' : 'Adicionar Utilizador'}
+                                {showUserFormForCompanyId === company.id ? 'Cancel new user' : 'Add user'}
                               </button>
                             </div>
 
@@ -706,15 +698,15 @@ function AdminPage() {
 
                             <div className="grid lg:grid-cols-2 gap-6">
                               <div>
-                                <h4 className="text-sm font-semibold text-navy-700 mb-3">Utilizadores da Empresa</h4>
+                                <h4 className="text-sm font-semibold text-navy-700 mb-3">Company Users</h4>
                                 <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
                                   <table className="w-full">
                                     <thead>
                                       <tr className="bg-navy-50 border-b border-navy-200">
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Nome</th>
+                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Name</th>
                                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Email</th>
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Perfil</th>
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Ações</th>
+                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Role</th>
+                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Actions</th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-navy-100">
@@ -727,30 +719,30 @@ function AdminPage() {
                                             <div className="flex gap-1">
                                               <button
                                                 onClick={async () => {
-                                                  const newPassword = prompt('Nova password de acesso (Identity):')
+                                                  const newPassword = prompt('New access password (Identity):')
                                                   if (!newPassword) return
                                                   await adminUpdateCompanyUser({
                                                     data: { id: user.id, updates: { accessPassword: newPassword } },
                                                   })
                                                   await reload()
                                                 }}
-                                                className="px-2 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                                                className="admin-row-action"
                                               >
-                                                Reset Password
+                                                Reset password
                                               </button>
                                               <button
                                                 onClick={async () => {
-                                                  if (!confirm(`Eliminar utilizador ${user.name}?`)) return
+                                                  if (!confirm(`Delete user ${user.name}?`)) return
                                                   try {
                                                     await adminDeleteCompanyUser({ data: user.id })
                                                     await reload()
                                                   } catch (err) {
-                                                    alert(`Erro ao eliminar utilizador: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                                                    alert(`Error deleting user: ${err instanceof Error ? err.message : 'Unknown error'}`)
                                                   }
                                                 }}
-                                                className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                                className="admin-row-action admin-row-action--danger"
                                               >
-                                                Eliminar
+                                                Delete
                                               </button>
                                             </div>
                                           </td>
@@ -759,7 +751,7 @@ function AdminPage() {
                                       {users.length === 0 && (
                                         <tr>
                                           <td colSpan={4} className="px-4 py-4 text-sm text-navy-400 text-center">
-                                            Sem utilizadores registados para esta empresa.
+                                            No users registered for this company.
                                           </td>
                                         </tr>
                                       )}
@@ -769,7 +761,7 @@ function AdminPage() {
                               </div>
 
                               <div>
-                                <h4 className="text-sm font-semibold text-navy-700 mb-3">Métricas e Histórico</h4>
+                                <h4 className="text-sm font-semibold text-navy-700 mb-3">Metrics &amp; History</h4>
                                 <div className="space-y-3">
                                   {users.map((user) => {
                                     const events = userEvents.filter((event) => event.userId === user.id)
@@ -783,14 +775,14 @@ function AdminPage() {
                                     return (
                                       <div key={user.id} className="bg-white rounded-[4px] border border-navy-200 p-4">
                                         <p className="text-sm font-semibold text-navy-700">{user.name}</p>
-                                        <p className="text-xs text-navy-500">Último login: {user.lastLoginAt ? formatDate(user.lastLoginAt) : '-'}</p>
-                                        <p className="text-xs text-navy-500">Acessos no mês: {loginsThisMonth}</p>
-                                        <p className="text-xs text-navy-500">Eventos totais: {events.length}</p>
+                                        <p className="text-xs text-navy-500">Last login: {user.lastLoginAt ? formatDate(user.lastLoginAt) : '-'}</p>
+                                        <p className="text-xs text-navy-500">Logins this month: {loginsThisMonth}</p>
+                                        <p className="text-xs text-navy-500">Total events: {events.length}</p>
                                         <div className="mt-2 text-xs text-navy-500 space-y-1 max-h-24 overflow-y-auto">
                                           {events.slice(-5).reverse().map((event) => (
                                             <p key={event.id}>• {formatDate(event.timestamp)} · {event.description}</p>
                                           ))}
-                                          {events.length === 0 && <p>Sem histórico.</p>}
+                                          {events.length === 0 && <p>No history.</p>}
                                         </div>
                                       </div>
                                     )
@@ -800,9 +792,9 @@ function AdminPage() {
                             </div>
 
                             <div>
-                              <h4 className="text-sm font-semibold text-navy-700 mb-3">Apólices da Empresa ({companyPolicies.length})</h4>
+                              <h4 className="text-sm font-semibold text-navy-700 mb-3">Company Policies ({companyPolicies.length})</h4>
                               {companyPolicies.length === 0 ? (
-                                <p className="text-sm text-navy-400">Sem apólices associadas.</p>
+                                <p className="text-sm text-navy-400">No policies linked.</p>
                               ) : (
                                 <div className="grid gap-2">
                                   {companyPolicies.map((policy) => (
@@ -828,41 +820,44 @@ function AdminPage() {
 
             {tab === 'individual_clients' && (
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-navy-700">Clientes Individuais ({individualClients.length})</h2>
+                <div className="admin-page-header" style={{ marginBottom: '1rem' }}>
+                  <div>
+                    <h1 className="admin-page-title">People</h1>
+                    <p className="admin-page-subtitle">{individualClients.length} individual client{individualClients.length !== 1 ? 's' : ''}</p>
+                  </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={async () => {
                         await exportToExcel(individualClients.map((c) => ({
-                          Nome: c.fullName,
+                          Name: c.fullName,
                           NIF: c.nif || '',
                           Email: c.email || '',
-                          Telefone: c.phone || '',
-                          Morada: c.address || '',
-                          Estado: c.status === 'active' ? 'Ativo' : c.status,
-                          'Criado em': c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-PT') : '',
-                        })), 'clientes-individuais')
+                          Phone: c.phone || '',
+                          Address: c.address || '',
+                          Status: c.status === 'active' ? 'Active' : c.status,
+                          'Created At': c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '',
+                        })), 'people')
                       }}
                       disabled={individualClients.length === 0}
-                      className="px-4 py-2 border border-navy-300 text-navy-700 font-medium rounded-[2px] hover:bg-navy-50 transition-colors text-sm disabled:opacity-50"
+                      className="admin-btn admin-btn-secondary"
                     >
-                      Exportar Excel
+                      Export Excel
                     </button>
                     <button
                       onClick={() => {
                         setEditingIndividualClientId(null)
                         setShowNewIndividualClient(!showNewIndividualClient)
                       }}
-                      className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm"
+                      className="admin-btn admin-btn-primary"
                     >
-                      {showNewIndividualClient ? 'Cancelar' : 'Novo Cliente'}
+                      {showNewIndividualClient ? 'Cancel' : 'New person'}
                     </button>
                   </div>
                 </div>
 
                 {showNewIndividualClient && (
                   <IndividualClientForm
-                    title={editingIndividualClientId ? 'Editar Cliente' : 'Novo Cliente Individual'}
+                    title={editingIndividualClientId ? 'Edit person' : 'New person'}
                     initial={editingIndividualClientId ? individualClients.find((c) => c.id === editingIndividualClientId) : undefined}
                     onSubmit={async (data) => {
                       if (editingIndividualClientId) {
@@ -878,41 +873,43 @@ function AdminPage() {
                 )}
 
                 {individualClients.length > 0 && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3 px-3 py-2 bg-navy-50 border border-navy-200 rounded-[4px]">
-                    <span className="text-xs text-navy-500">
-                      {selectedIndividualClientIds.size} selecionado(s)
+                  <div className={`admin-selection-bar${selectedIndividualClientIds.size > 0 ? ' admin-selection-bar--active' : ''}`}>
+                    <span>
+                      {individualClients.length} individual clients{selectedIndividualClientIds.size > 0 ? ` · ${selectedIndividualClientIds.size} selected` : ''}
                     </span>
-                    <button
-                      disabled={selectedIndividualClientIds.size === 0 || bulkDeletingClients}
-                      onClick={async () => {
-                        if (selectedIndividualClientIds.size === 0) return
-                        if (!confirm(`Eliminar ${selectedIndividualClientIds.size} cliente(s)? Esta ação não pode ser revertida.`)) return
-                        setBulkDeletingClients(true)
-                        try {
-                          const ids = Array.from(selectedIndividualClientIds)
-                          const results = await Promise.allSettled(ids.map((id) => adminDeleteIndividualClient({ data: id })))
-                          const failed = results.filter((r) => r.status === 'rejected')
-                          if (failed.length > 0) {
-                            alert(`Falha ao eliminar ${failed.length} de ${ids.length} cliente(s). Verifique e tente novamente.`)
+                    {selectedIndividualClientIds.size > 0 && (
+                      <button
+                        disabled={bulkDeletingClients}
+                        onClick={async () => {
+                          if (selectedIndividualClientIds.size === 0) return
+                          if (!confirm(`Delete ${selectedIndividualClientIds.size} client(s)? This action cannot be undone.`)) return
+                          setBulkDeletingClients(true)
+                          try {
+                            const ids = Array.from(selectedIndividualClientIds)
+                            const results = await Promise.allSettled(ids.map((id) => adminDeleteIndividualClient({ data: id })))
+                            const failed = results.filter((r) => r.status === 'rejected')
+                            if (failed.length > 0) {
+                              alert(`Failed to delete ${failed.length} of ${ids.length} client(s). Please check and try again.`)
+                            }
+                            setSelectedIndividualClientIds(new Set())
+                            setExpandedIndividualClientId(null)
+                            await reload()
+                          } catch (err) {
+                            alert(`Error deleting clients: ${err instanceof Error ? err.message : 'Unknown error'}`)
+                          } finally {
+                            setBulkDeletingClients(false)
                           }
-                          setSelectedIndividualClientIds(new Set())
-                          setExpandedIndividualClientId(null)
-                          await reload()
-                        } catch (err) {
-                          alert(`Erro ao eliminar clientes: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
-                        } finally {
-                          setBulkDeletingClients(false)
-                        }
-                      }}
-                      className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {bulkDeletingClients ? 'A eliminar...' : 'Eliminar selecionados'}
-                    </button>
+                        }}
+                        className="admin-btn admin-btn-danger admin-btn--sm"
+                      >
+                        {bulkDeletingClients ? 'Deleting…' : 'Delete selected'}
+                      </button>
+                    )}
                   </div>
                 )}
 
-                <div className="bg-white rounded-[4px] border border-navy-200 overflow-x-auto">
-                  <table className="w-full min-w-[1100px]">
+                <div className="admin-table-wrap overflow-x-auto">
+                  <table className="admin-table w-full min-w-[1100px]">
                     <thead>
                       <tr className="bg-navy-50 border-b border-navy-200">
                         <th className="px-4 py-3 w-10">
@@ -926,17 +923,17 @@ function AdminPage() {
                                 setSelectedIndividualClientIds(new Set())
                               }
                             }}
-                            className="w-4 h-4 accent-gold-400 cursor-pointer"
+                            className="w-4 h-4 accent-[#17243D] cursor-pointer"
                           />
                         </th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Nome</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Name</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">NIF</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Email</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Telefone</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Estado</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Tipo</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Phone</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Status</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Type</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Portal</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Ações</th>
+                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-navy-100">
@@ -963,7 +960,7 @@ function AdminPage() {
                                       return next
                                     })
                                   }}
-                                  className="w-4 h-4 accent-gold-400 cursor-pointer"
+                                  className="w-4 h-4 accent-[#17243D] cursor-pointer"
                                 />
                               </td>
                               <td className="px-4 py-3 text-sm font-medium text-navy-700">
@@ -982,10 +979,8 @@ function AdminPage() {
                               <td className="px-4 py-3 text-sm text-navy-500">{client.email || '—'}</td>
                               <td className="px-4 py-3 text-sm text-navy-500">{client.phone || '—'}</td>
                               <td className="px-4 py-3">
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  client.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                                }`}>
-                                  {client.status === 'active' ? 'Ativo' : client.status}
+                                <span className={`admin-chip ${client.status === 'active' ? 'admin-chip--success' : 'admin-chip--neutral'}`}>
+                                  {client.status === 'active' ? 'Active' : client.status}
                                 </span>
                               </td>
                               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -995,20 +990,20 @@ function AdminPage() {
                                 <ActivateAdlerOneButton client={client} onSuccess={reload} />
                               </td>
                               <td className="px-4 py-3">
-                                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                                <div className="admin-row-actions" onClick={(e) => e.stopPropagation()}>
                                   <button
                                     onClick={() => {
                                       setEditingIndividualClientId(client.id)
                                       setShowNewIndividualClient(true)
                                       setExpandedIndividualClientId(null)
                                     }}
-                                    className="px-2 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50"
+                                    className="admin-row-action"
                                   >
-                                    Editar
+                                    Edit
                                   </button>
                                   <button
                                     onClick={async () => {
-                                      if (!confirm(`Eliminar cliente ${client.fullName}?`)) return
+                                      if (!confirm(`Delete client ${client.fullName}?`)) return
                                       try {
                                         await adminDeleteIndividualClient({ data: client.id })
                                         setSelectedIndividualClientIds((prev) => {
@@ -1019,12 +1014,12 @@ function AdminPage() {
                                         await reload()
                                         setExpandedIndividualClientId(null)
                                       } catch (err) {
-                                        alert(`Erro ao eliminar cliente: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                                        alert(`Error deleting client: ${err instanceof Error ? err.message : 'Unknown error'}`)
                                       }
                                     }}
-                                    className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50"
+                                    className="admin-row-action admin-row-action--danger"
                                   >
-                                    Eliminar
+                                    Delete
                                   </button>
                                 </div>
                               </td>
@@ -1038,7 +1033,7 @@ function AdminPage() {
                                       <p className="text-sm text-navy-700 break-all">{client.email || '—'}</p>
                                     </div>
                                     <div>
-                                      <p className="text-[11px] uppercase tracking-wide text-navy-400">Telefone</p>
+                                      <p className="text-[11px] uppercase tracking-wide text-navy-400">Phone</p>
                                       <p className="text-sm text-navy-700">{client.phone || '—'}</p>
                                     </div>
                                     <div>
@@ -1046,15 +1041,15 @@ function AdminPage() {
                                       <p className="text-sm text-navy-700">{client.nif || '—'}</p>
                                     </div>
                                     <div className="sm:col-span-2 lg:col-span-1">
-                                      <p className="text-[11px] uppercase tracking-wide text-navy-400">Morada</p>
+                                      <p className="text-[11px] uppercase tracking-wide text-navy-400">Address</p>
                                       <p className="text-sm text-navy-700">{client.address || '—'}</p>
                                     </div>
                                   </div>
                                   <h4 className="text-sm font-semibold text-navy-700 mb-3">
-                                    Apólices ({clientPolicies.length})
+                                    Policies ({clientPolicies.length})
                                   </h4>
                                   {clientPolicies.length === 0 ? (
-                                    <p className="text-sm text-navy-400">Sem apólices associadas.</p>
+                                    <p className="text-sm text-navy-400">No policies linked.</p>
                                   ) : (
                                     <div className="grid gap-2">
                                       {clientPolicies.map((p) => (
@@ -1077,7 +1072,7 @@ function AdminPage() {
                       {individualClients.length === 0 && (
                         <tr>
                           <td colSpan={9} className="px-4 py-8 text-sm text-navy-400 text-center">
-                            Sem clientes individuais registados.
+                            No individual clients registered.
                           </td>
                         </tr>
                       )}
@@ -1091,20 +1086,21 @@ function AdminPage() {
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
                   <div className="flex items-center gap-4">
-                    <h2 className="text-lg font-semibold text-navy-700">Filtrar por Cliente:</h2>
+                    <h1 className="admin-page-title" style={{ fontSize: "17px" }}>Policies</h1>
+                    <span className="text-sm text-navy-500">Filter by client:</span>
                     <select
                       value={selectedCompanyId}
                       onChange={(e) => setSelectedCompanyId(e.target.value)}
-                      className="px-4 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 min-w-48"
+                      className="px-4 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553] min-w-48"
                     >
-                      <option value="">Todos os Clientes</option>
+                      <option value="">All clients</option>
                       {companies.length > 0 && (
-                        <optgroup label="── Empresas ──">
+                        <optgroup label="── Companies ──">
                           {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </optgroup>
                       )}
                       {individualClients.length > 0 && (
-                        <optgroup label="── Clientes Individuais ──">
+                        <optgroup label="── Individual Clients ──">
                           {individualClients.map((c) => <option key={c.id} value={`ic:${c.id}`}>{c.fullName}</option>)}
                         </optgroup>
                       )}
@@ -1119,31 +1115,31 @@ function AdminPage() {
                           return p.companyId === selectedCompanyId
                         })
                         await exportToExcel(filtered.map((p) => ({
-                          'N.º Apólice': p.policyNumber,
-                          Tipo: POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type,
-                          Seguradora: p.insurer,
-                          Cliente: companies.find(c => c.id === p.companyId)?.name ?? individualClients.find(c => c.id === p.individualClientId)?.fullName ?? '',
-                          Descrição: p.description,
-                          'Data Início': p.startDate ? new Date(p.startDate).toLocaleDateString('pt-PT') : '',
-                          'Data Fim': p.endDate ? new Date(p.endDate).toLocaleDateString('pt-PT') : '',
-                          'Prémio Anual (€)': p.annualPremium ?? '',
-                          'Capital Segurado (€)': p.insuredValue ?? '',
-                          'Comissão (%)': p.commissionPercentage ?? '',
-                          'Comissão (€)': p.commissionValue ?? '',
-                          Estado: p.status === 'active' ? 'Ativa' : p.status === 'expiring' ? 'A Renovar' : p.status === 'expired' ? 'Expirada' : p.status === 'cancelled' ? 'Cancelada' : p.status,
-                          Fracionamento: p.paymentFrequency ?? '',
-                        })), 'apolices')
+                          'Policy No.': p.policyNumber,
+                          Type: POLICY_TYPE_LABELS[p.type as keyof typeof POLICY_TYPE_LABELS] ?? p.type,
+                          Insurer: p.insurer,
+                          Client: companies.find(c => c.id === p.companyId)?.name ?? individualClients.find(c => c.id === p.individualClientId)?.fullName ?? '',
+                          Description: p.description,
+                          'Start Date': p.startDate ? new Date(p.startDate).toLocaleDateString('en-GB') : '',
+                          'End Date': p.endDate ? new Date(p.endDate).toLocaleDateString('en-GB') : '',
+                          'Annual Premium (€)': p.annualPremium ?? '',
+                          'Insured Value (€)': p.insuredValue ?? '',
+                          'Commission (%)': p.commissionPercentage ?? '',
+                          'Commission (€)': p.commissionValue ?? '',
+                          Status: p.status === 'active' ? 'Active' : p.status === 'expiring' ? 'Renewing' : p.status === 'expired' ? 'Expired' : p.status === 'cancelled' ? 'Cancelled' : p.status,
+                          Frequency: p.paymentFrequency ?? '',
+                        })), 'policies')
                       }}
                       disabled={policies.length === 0}
-                      className="px-4 py-2 border border-navy-300 text-navy-700 font-medium rounded-[2px] hover:bg-navy-50 transition-colors text-sm whitespace-nowrap disabled:opacity-50"
+                      className="admin-btn admin-btn-secondary"
                     >
-                      Exportar Excel
+                      Export Excel
                     </button>
                     <button
                       onClick={() => setShowNewPolicy(!showNewPolicy)}
-                      className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm whitespace-nowrap"
+                      className="admin-btn admin-btn-primary"
                     >
-                      {showNewPolicy ? 'Cancelar' : 'Nova Apólice'}
+                      {showNewPolicy ? 'Cancel' : 'New policy'}
                     </button>
                   </div>
                 </div>
@@ -1158,7 +1154,7 @@ function AdminPage() {
                         await reload()
                         setShowNewPolicy(false)
                       } catch (err) {
-                        alert(`Erro ao criar apólice: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                        alert(`Error creating policy: ${err instanceof Error ? err.message : 'Unknown error'}`)
                       }
                     }}
                   />
@@ -1186,38 +1182,38 @@ function AdminPage() {
                             setSelectedPolicyIds(new Set())
                           }
                         }}
-                        className="w-4 h-4 accent-gold-400"
+                        className="w-4 h-4 accent-[#17243D]"
                       />
-                      Selecionar tudo
+                      Select all
                     </label>
                     <div className="flex items-center gap-3">
                       <span className="text-xs text-navy-500">
-                        {selectedPolicyIds.size} selecionada(s)
+                        {selectedPolicyIds.size} selected
                       </span>
                       <button
                         disabled={selectedPolicyIds.size === 0 || bulkDeletingPolicies}
                         onClick={async () => {
                           if (selectedPolicyIds.size === 0) return
-                          if (!confirm(`Eliminar ${selectedPolicyIds.size} apólice(s)? Esta ação não pode ser revertida.`)) return
+                          if (!confirm(`Delete ${selectedPolicyIds.size} polic${selectedPolicyIds.size === 1 ? 'y' : 'ies'}? This action cannot be undone.`)) return
                           setBulkDeletingPolicies(true)
                           try {
                             const ids = Array.from(selectedPolicyIds)
                             const results = await Promise.allSettled(ids.map((id) => deletePolicy({ data: id })))
                             const failed = results.filter((r) => r.status === 'rejected')
                             if (failed.length > 0) {
-                              alert(`Falha ao eliminar ${failed.length} de ${ids.length} apólice(s). Verifique e tente novamente.`)
+                              alert(`Failed to delete ${failed.length} of ${ids.length} polic${ids.length === 1 ? 'y' : 'ies'}. Please check and try again.`)
                             }
                             setSelectedPolicyIds(new Set())
                             await reload()
                           } catch (err) {
-                            alert(`Erro ao eliminar apólices: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                            alert(`Error deleting policies: ${err instanceof Error ? err.message : 'Unknown error'}`)
                           } finally {
                             setBulkDeletingPolicies(false)
                           }
                         }}
                         className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {bulkDeletingPolicies ? 'A eliminar...' : 'Eliminar selecionadas'}
+                        {bulkDeletingPolicies ? 'Deleting…' : 'Delete selected'}
                       </button>
                     </div>
                   </div>
@@ -1241,12 +1237,12 @@ function AdminPage() {
             {tab === 'claims' && (
               <div>
                 <div className="flex items-center justify-between gap-3 mb-4">
-                  <h2 className="text-lg font-semibold text-navy-700">Sinistros ({claims.length})</h2>
+                  <h2 className="text-lg font-semibold text-navy-700">Claims ({claims.length})</h2>
                   <button
                     onClick={() => setShowNewClaim((prev) => !prev)}
-                    className="px-4 py-2 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 transition-colors text-sm"
+                    className="admin-btn admin-btn-primary"
                   >
-                    {showNewClaim ? 'Cancelar' : 'Novo Sinistro'}
+                    {showNewClaim ? 'Cancel' : 'New claim'}
                   </button>
                 </div>
 
@@ -1277,14 +1273,14 @@ function AdminPage() {
                       await adminUpdateClaimStatus({ data: { claimId, status, notes } })
                       await reload()
                     } catch (err) {
-                      alert(`Erro ao atualizar estado do sinistro: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+                      alert(`Error updating claim status: ${err instanceof Error ? err.message : 'Unknown error'}`)
                     }
                   }}
                 />
 
                 {loadingClaimWorkspace ? (
                   <div className="mt-4 bg-white border border-navy-200 rounded-[4px] p-6 text-sm text-navy-500">
-                    A carregar detalhe do sinistro...
+                    Loading claim detail…
                   </div>
                 ) : claimWorkspace ? (
                   <AdminClaimWorkspace
@@ -1301,7 +1297,7 @@ function AdminPage() {
                   />
                 ) : (
                   <div className="mt-4 bg-white border border-navy-200 rounded-[4px] p-6 text-sm text-navy-500">
-                    Selecionar um sinistro para abrir o detalhe operacional.
+                    Select a claim to open its operational detail.
                   </div>
                 )}
               </div>
@@ -1309,8 +1305,8 @@ function AdminPage() {
 
             {tab === 'api' && (
               <div>
-                <h2 className="text-lg font-semibold text-navy-700 mb-2">API & Ligações</h2>
-                <p className="text-sm text-navy-500 mb-6">Serviços externos integrados na plataforma Os Meus Seguros. Todas as chaves são configuradas como variáveis de ambiente no Netlify.</p>
+                <h2 className="text-lg font-semibold text-navy-700 mb-2">Integrations</h2>
+                <p className="text-sm text-navy-500 mb-6">External services integrated into the platform. All keys are configured as environment variables in Netlify.</p>
                 <div className="grid gap-4 mb-6">
                   {apiConnections.map((api) => (
                     <div key={api.id} className="bg-white rounded-[4px] border border-navy-200 p-5">
@@ -1328,31 +1324,31 @@ function AdminPage() {
                             }}
                             className="px-2 py-1 text-xs border border-navy-200 rounded"
                           >
-                            <option value="connected">Ligado</option>
-                            <option value="degraded">Degradado</option>
-                            <option value="error">Erro</option>
+                            <option value="connected">Connected</option>
+                            <option value="degraded">Degraded</option>
+                            <option value="error">Error</option>
                           </select>
                           <button
                             onClick={async () => {
                               await adminRefreshApiConnection({ data: { id: api.id } })
                               await reload()
                             }}
-                            className="px-3 py-1.5 text-xs bg-gold-400 text-navy-700 rounded hover:bg-gold-300"
+                            className="admin-btn admin-btn-secondary admin-btn--sm"
                           >
-                            Atualizar Dados
+                            Refresh
                           </button>
                         </div>
                       </div>
                       <div className="mt-3 text-sm text-navy-600 grid sm:grid-cols-3 gap-2">
-                        <p><strong>Estado:</strong> {api.status}</p>
-                        <p><strong>Latência:</strong> {api.latency}</p>
-                        <p><strong>Última Sincronização:</strong> {formatDate(api.lastSync)}</p>
+                        <p><strong>Status:</strong> {api.status}</p>
+                        <p><strong>Latency:</strong> {api.latency}</p>
+                        <p><strong>Last Sync:</strong> {formatDate(api.lastSync)}</p>
                       </div>
                     </div>
                   ))}
                   {apiConnections.length === 0 && (
                     <div className="bg-white rounded-[4px] border border-navy-200 p-5 text-sm text-navy-500">
-                      Nenhuma ligação dinâmica encontrada em `api_connections`.
+                      No dynamic connections found in `api_connections`.
                     </div>
                   )}
                 </div>
@@ -1366,7 +1362,7 @@ function AdminPage() {
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex items-center gap-3">
                         <div style={{width:36,height:36,borderRadius:4,background:'#111',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-                          <span style={{color:'#C8961A',fontWeight:700,fontSize:13}}>AI</span>
+                          <span style={{color:'#fff',fontWeight:700,fontSize:13}}>AI</span>
                         </div>
                         <div>
                           <h3 className="font-bold text-navy-700">Anthropic Claude</h3>
@@ -1374,12 +1370,12 @@ function AdminPage() {
                         </div>
                       </div>
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Active
                       </span>
                     </div>
                     <div className="mt-3 text-xs text-navy-500 bg-navy-50 rounded p-3">
-                      <strong>Utilização:</strong> Extracção de dados de apólices por IA, comparativo de cotações, análise de risco de parceiros.<br/>
-                      <strong>Variável Netlify:</strong> <code className="bg-navy-100 px-1 rounded">ANTHROPIC_API_KEY</code>
+                      <strong>Usage:</strong> AI-powered policy data extraction, quote comparison, partner risk analysis.<br/>
+                      <strong>Netlify Variable:</strong> <code className="bg-navy-100 px-1 rounded">ANTHROPIC_API_KEY</code>
                     </div>
                   </div>
 
@@ -1391,17 +1387,17 @@ function AdminPage() {
                           <span style={{color:'#fff',fontWeight:700,fontSize:13}}>☁</span>
                         </div>
                         <div>
-                          <h3 className="font-bold text-navy-700">IPMA — Instituto Português do Mar e da Atmosfera</h3>
-                          <p className="text-xs text-navy-500">API pública gratuita · api.ipma.pt/open-data</p>
+                          <h3 className="font-bold text-navy-700">IPMA — Portuguese Sea and Atmosphere Institute</h3>
+                          <p className="text-xs text-navy-500">Free public API · api.ipma.pt/open-data</p>
                         </div>
                       </div>
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Active
                       </span>
                     </div>
                     <div className="mt-3 text-xs text-navy-500 bg-navy-50 rounded p-3">
-                      <strong>Utilização:</strong> Previsão meteorológica por localidade (36 cidades), avaliação de risco climático, certificados meteorológicos para sinistros.<br/>
-                      <strong>Variável Netlify:</strong> Nenhuma (API pública sem chave)
+                      <strong>Usage:</strong> Weather forecasts by location (36 cities), climate risk assessment, weather certificates for claims.<br/>
+                      <strong>Netlify Variable:</strong> None (public API, no key)
                     </div>
                   </div>
 
@@ -1409,21 +1405,21 @@ function AdminPage() {
                   <div className="bg-white rounded-[4px] border border-navy-200 p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <div style={{width:36,height:36,borderRadius:4,background:'#C8961A',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <div style={{width:36,height:36,borderRadius:4,background:'#223553',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                           <span style={{color:'#fff',fontWeight:700,fontSize:13}}>BZ</span>
                         </div>
                         <div>
-                          <h3 className="font-bold text-navy-700">BizAPIs — Dados Empresariais AT & Registo Comercial</h3>
-                          <p className="text-xs text-navy-500">nifName (AT) + CPRC (Registo Comercial) + Matrículas · apigwws.bizapis.com</p>
+                          <h3 className="font-bold text-navy-700">BizAPIs — Company Data (Tax Authority &amp; Commercial Registry)</h3>
+                          <p className="text-xs text-navy-500">nifName (Tax Authority) + CPRC (Commercial Registry) + Vehicle Plates · apigwws.bizapis.com</p>
                         </div>
                       </div>
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Active
                       </span>
                     </div>
                     <div className="mt-3 text-xs text-navy-500 bg-navy-50 rounded p-3">
-                      <strong>Utilização:</strong> Risco de Parceiros (validação NIF, sócios, capital, CAE, penhoras) e consulta de Matrículas (marca, modelo, ano, combustível).<br/>
-                      <strong>Variável Netlify:</strong> <code className="bg-navy-100 px-1 rounded">BIZAPIS_KEY</code>
+                      <strong>Usage:</strong> Partner Risk (NIF validation, shareholders, share capital, CAE, liens) and Vehicle Plate lookup (make, model, year, fuel type).<br/>
+                      <strong>Netlify Variable:</strong> <code className="bg-navy-100 px-1 rounded">BIZAPIS_KEY</code>
                     </div>
                   </div>
 
@@ -1435,17 +1431,17 @@ function AdminPage() {
                           <span style={{color:'#fff',fontWeight:700,fontSize:13}}>✉</span>
                         </div>
                         <div>
-                          <h3 className="font-bold text-navy-700">Resend — Email Transaccional</h3>
-                          <p className="text-xs text-navy-500">Remetente: noreply@adlerrochefort.com · api.resend.com/v1</p>
+                          <h3 className="font-bold text-navy-700">Resend — Transactional Email</h3>
+                          <p className="text-xs text-navy-500">Sender: noreply@adlerrochefort.com · api.resend.com/v1</p>
                         </div>
                       </div>
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Active
                       </span>
                     </div>
                     <div className="mt-3 text-xs text-navy-500 bg-navy-50 rounded p-3">
-                      <strong>Utilização:</strong> Alertas automáticos de renovação de apólices por email. Disparado a partir do painel Admin → Alertas.<br/>
-                      <strong>Variável Netlify:</strong> <code className="bg-navy-100 px-1 rounded">RESEND_API_KEY</code>
+                      <strong>Usage:</strong> Automatic policy renewal alerts by email. Triggered from the Admin → Renewals panel.<br/>
+                      <strong>Netlify Variable:</strong> <code className="bg-navy-100 px-1 rounded">RESEND_API_KEY</code>
                     </div>
                   </div>
 
@@ -1457,17 +1453,17 @@ function AdminPage() {
                           <span style={{color:'#fff',fontWeight:700,fontSize:13}}>SB</span>
                         </div>
                         <div>
-                          <h3 className="font-bold text-navy-700">Supabase — Base de Dados & Autenticação</h3>
+                          <h3 className="font-bold text-navy-700">Supabase — Database &amp; Authentication</h3>
                           <p className="text-xs text-navy-500">PostgreSQL + Auth + Storage · VITE_SUPABASE_URL</p>
                         </div>
                       </div>
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-50 text-green-700 border border-green-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Activo
+                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> Active
                       </span>
                     </div>
                     <div className="mt-3 text-xs text-navy-500 bg-navy-50 rounded p-3">
-                      <strong>Utilização:</strong> Toda a persistência de dados — empresas, utilizadores, apólices, sinistros, documentos, alertas.<br/>
-                      <strong>Variáveis Netlify:</strong> <code className="bg-navy-100 px-1 rounded">VITE_SUPABASE_URL</code> · <code className="bg-navy-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> · <code className="bg-navy-100 px-1 rounded">SUPABASE_SERVICE_ROLE_KEY</code>
+                      <strong>Usage:</strong> All data persistence — companies, users, policies, claims, documents, alerts.<br/>
+                      <strong>Netlify Variables:</strong> <code className="bg-navy-100 px-1 rounded">VITE_SUPABASE_URL</code> · <code className="bg-navy-100 px-1 rounded">VITE_SUPABASE_ANON_KEY</code> · <code className="bg-navy-100 px-1 rounded">SUPABASE_SERVICE_ROLE_KEY</code>
                     </div>
                   </div>
 
@@ -1477,17 +1473,17 @@ function AdminPage() {
 
             {tab === 'profiles' && (
               <div>
-                <h2 className="text-lg font-semibold text-navy-700 mb-4">Perfis e Métricas de Acesso</h2>
+                <h2 className="text-lg font-semibold text-navy-700 mb-4">Users &amp; Access Metrics</h2>
                 <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
                   <table className="w-full">
                     <thead>
                       <tr className="bg-navy-50 border-b border-navy-200">
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Utilizador</th>
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Empresa</th>
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Cargo</th>
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Último Acesso</th>
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Acessos (Mês)</th>
-                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Eventos</th>
+                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">User</th>
+                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Company</th>
+                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Role</th>
+                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Last Access</th>
+                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Logins (Month)</th>
+                        <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">Events</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-navy-100">
@@ -1517,39 +1513,7 @@ function AdminPage() {
             )}
 
             {tab === 'alerts' && (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-navy-700">Apólices a Terminar (60 dias)</h2>
-                  <SendRenewalAlertsButton />
-                </div>
-                {expiringPolicies.length === 0 ? (
-                  <p className="text-navy-500">Não existem apólices a terminar nos próximos 60 dias.</p>
-                ) : (
-                  <div className="grid gap-4">
-                    {expiringPolicies.map((p) => {
-                      const company = companies.find((c) => c.id === p.companyId)
-                      const endDate = new Date(p.endDate)
-                      const now = new Date()
-                      const diffTime = Math.abs(endDate.getTime() - now.getTime())
-                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-
-                      return (
-                        <div key={p.id} className="bg-white rounded-[4px] border border-red-200 p-6 flex items-start gap-4">
-                          <div className="w-10 h-10 rounded-full bg-red-100 flex flex-shrink-0 items-center justify-center text-red-600">!</div>
-                          <div>
-                            <h3 className="text-md font-bold text-navy-700">
-                              {company?.name || 'Cliente Desconhecido'} - {POLICY_TYPE_LABELS[p.type]}
-                            </h3>
-                            <p className="text-sm text-navy-600 mt-1">
-                              A apólice <strong>{p.policyNumber}</strong> da seguradora {p.insurer} expira em <strong>{diffDays} dias</strong> ({formatDate(p.endDate)}).
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+              <AdminRenewalsPage companies={companies} companyUsers={companyUsers} policies={policies} />
             )}
 
             {tab === 'marketing' && <AdminMarketingPanel />}
@@ -1674,7 +1638,6 @@ function KpiTile({ label, value, note, strong }: { label: string; value: string;
 
 function AdminDashboardTab({
   companies,
-  companyUsers,
   policies,
   claims,
 }: {
@@ -1697,12 +1660,6 @@ function AdminDashboardTab({
   const [financialLoading, setFinancialLoading] = useState(false)
   const [renewalAlerts, setRenewalAlerts] = useState<RenewalAlertsResponse | null>(null)
   const [renewalAlertsLoading, setRenewalAlertsLoading] = useState(false)
-  const [updatingRenewalAlertKey, setUpdatingRenewalAlertKey] = useState<string | null>(null)
-  const [draggingAlertKey, setDraggingAlertKey] = useState<string | null>(null)
-  const [activeDropColumn, setActiveDropColumn] = useState<RenewalKanbanColumnId | null>(null)
-  const [renewalRiskMinValue, setRenewalRiskMinValue] = useState<string>('')
-  const [assigneeDraftByKey, setAssigneeDraftByKey] = useState<Record<string, string>>({})
-  const [nextActionDraftByKey, setNextActionDraftByKey] = useState<Record<string, string>>({})
   const [salesStats, setSalesStats] = useState<Awaited<ReturnType<typeof fetchSalesPipelineStats>> | null>(null)
 
   useEffect(() => {
@@ -1762,109 +1719,30 @@ function AdminDashboardTab({
     }
   }, [policies])
 
-  const reloadRenewalAlerts = async () => {
-    setRenewalAlertsLoading(true)
-    try {
-      const result = await getRenewalAlerts()
-      setRenewalAlerts(result)
-    } catch (error) {
-      console.error('[AdminDashboardTab] reloadRenewalAlerts error:', error)
-      setRenewalAlerts(null)
-    } finally {
-      setRenewalAlertsLoading(false)
-    }
-  }
-
-  const handleRenewalAlertStatusUpdate = async (
-    key: string,
-    updates: { status?: RenewalAlertStatus; assignedTo?: string | null; nextAction?: string | null }
-  ) => {
-    setUpdatingRenewalAlertKey(key)
-    try {
-      await adminUpdateRenewalAlertStatus({ data: { key, ...updates } })
-      await reloadRenewalAlerts()
-    } catch (error) {
-      console.error('[AdminDashboardTab] adminUpdateRenewalAlertStatus error:', error)
-      alert('Não foi possível atualizar o estado do alerta.')
-      await reloadRenewalAlerts()
-    } finally {
-      setUpdatingRenewalAlertKey(null)
-    }
-  }
-
-  const renewalAlertsView = useMemo(() => {
-    if (!renewalAlerts) return null
-    const minValue = Number(renewalRiskMinValue)
-    if (!Number.isFinite(minValue) || minValue <= 0) return renewalAlerts
-
-    const filteredAlerts = renewalAlerts.alerts.filter((alert) => alert.value >= minValue)
-    const derived = buildRenewalAlertsView(filteredAlerts)
-    return {
-      ...renewalAlerts,
-      alerts: filteredAlerts,
-      byUrgency: derived.byUrgency,
-      total: derived.total,
-      summary: derived.summary,
-    }
-  }, [renewalAlerts, renewalRiskMinValue])
-
-  const renewalAlertsByColumn = useMemo(() => {
-    const grouped: Record<RenewalKanbanColumnId, RenewalAlertsResponse['alerts']> = {
-      pending: [],
-      negotiating: [],
-      renewed: [],
-    }
-
-    for (const alert of renewalAlertsView?.alerts ?? []) {
-      grouped[renewalColumnByStatus(alert.status)].push(alert)
-    }
-
-    for (const column of Object.keys(grouped) as RenewalKanbanColumnId[]) {
-      grouped[column].sort((a, b) => {
-        if (a.value !== b.value) return b.value - a.value
-        return a.daysUntilRenewal - b.daysUntilRenewal
-      })
-    }
-
-    return grouped
-  }, [renewalAlertsView])
+  // Unfiltered — the minimum-value risk filter lives only in the dedicated
+  // Renewals page (AdminRenewalsPage) now; this condensed dashboard summary
+  // always reflects the full alert set.
+  const renewalAlertsView = renewalAlerts
 
   const renewalIntelligence = useMemo(
     () => buildRenewalPipelineIntelligence(renewalAlertsView?.alerts ?? []),
     [renewalAlertsView]
   )
 
-  const responsibleOptions = useMemo(() => {
-    const unique = new Map<string, string>()
-    for (const user of companyUsers) {
-      const email = user.email?.trim()
-      if (!email) continue
-      if (!unique.has(email)) unique.set(email, user.name?.trim() || email)
-    }
-    return Array.from(unique.entries())
-      .map(([email, name]) => ({ email, name }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [companyUsers])
-
-  const responsibleLabelMap = useMemo(
-    () => new Map(responsibleOptions.map((item) => [item.email, item.name])),
-    [responsibleOptions]
-  )
-
   const monthSelectOptions = [
-    { value: '', label: 'Ano completo' },
-    { value: '1', label: 'Janeiro' },
-    { value: '2', label: 'Fevereiro' },
-    { value: '3', label: 'Março' },
-    { value: '4', label: 'Abril' },
-    { value: '5', label: 'Maio' },
-    { value: '6', label: 'Junho' },
-    { value: '7', label: 'Julho' },
-    { value: '8', label: 'Agosto' },
-    { value: '9', label: 'Setembro' },
-    { value: '10', label: 'Outubro' },
-    { value: '11', label: 'Novembro' },
-    { value: '12', label: 'Dezembro' },
+    { value: '', label: 'Full year' },
+    { value: '1', label: 'January' },
+    { value: '2', label: 'February' },
+    { value: '3', label: 'March' },
+    { value: '4', label: 'April' },
+    { value: '5', label: 'May' },
+    { value: '6', label: 'June' },
+    { value: '7', label: 'July' },
+    { value: '8', label: 'August' },
+    { value: '9', label: 'September' },
+    { value: '10', label: 'October' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'December' },
   ]
 
   const visibleTimeline = financialData
@@ -2097,21 +1975,21 @@ function AdminDashboardTab({
         <div className="admin-collapsible-body">
       <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-          <h3 className="text-sm font-semibold text-navy-700">Prémios vs Comissões (linha temporal mensal)</h3>
+          <h3 className="text-sm font-semibold text-navy-700">Premiums vs Commissions (monthly timeline)</h3>
           <div className="inline-flex rounded border border-navy-200 overflow-hidden text-xs">
             <button
               type="button"
               onClick={() => setTimelineMode('historical')}
               className={`px-3 py-1.5 ${timelineMode === 'historical' ? 'bg-navy-700 text-white' : 'bg-white text-navy-600 hover:bg-navy-50'}`}
             >
-              Histórico
+              Historical
             </button>
             <button
               type="button"
               onClick={() => setTimelineMode('projection')}
               className={`px-3 py-1.5 border-l border-navy-200 ${timelineMode === 'projection' ? 'bg-gold-400 text-navy-700 font-semibold' : 'bg-white text-navy-600 hover:bg-navy-50'}`}
             >
-              Projeção
+              Projection
             </button>
           </div>
         </div>
@@ -2125,8 +2003,8 @@ function AdminDashboardTab({
           ) : (
             <p className="text-sm text-navy-400">
               {timelineMode === 'historical'
-                ? 'Sem histórico para o período selecionado.'
-                : 'Sem projeção futura para o período selecionado.'}
+                ? 'No history for the selected period.'
+                : 'No future projection for the selected period.'}
             </p>
           )
         ) : (
@@ -2134,7 +2012,7 @@ function AdminDashboardTab({
         )}
       </div>
       <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
-        <h3 className="text-sm font-semibold text-navy-700 mb-3">Meses com Maior Receita Prevista</h3>
+        <h3 className="text-sm font-semibold text-navy-700 mb-3">Months with Highest Projected Revenue</h3>
         {financialData?.projectionHighlights.length ? (
           <div className="grid sm:grid-cols-3 gap-3">
             {financialData.projectionHighlights.map((monthItem, index) => (
@@ -2146,49 +2024,49 @@ function AdminDashboardTab({
               >
                 <p className="text-xs text-amber-700 uppercase tracking-wide">Top {index + 1}</p>
                 <p className="text-sm font-semibold text-navy-700 mt-1">{monthItem.label} {selectedYear}</p>
-                <p className="text-xs text-navy-600 mt-1">Comissões: {formatCurrency(monthItem.commissions)}</p>
-                <p className="text-xs text-navy-500">Prémios: {formatCurrency(monthItem.premiums)}</p>
+                <p className="text-xs text-navy-600 mt-1">Commissions: {formatCurrency(monthItem.commissions)}</p>
+                <p className="text-xs text-navy-500">Premiums: {formatCurrency(monthItem.premiums)}</p>
               </button>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-navy-400">Não existem meses futuros com receita prevista para os filtros aplicados.</p>
+          <p className="text-sm text-navy-400">No future months with projected revenue for the applied filters.</p>
         )}
       </div>
       <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
         <div className="flex items-center justify-between gap-2 mb-3">
-          <h3 className="text-sm font-semibold text-navy-700">Drill-down por Mês (Apólices)</h3>
+          <h3 className="text-sm font-semibold text-navy-700">Drill-down by Month (Policies)</h3>
           <select
             value={drillMonthValue ?? ''}
             onChange={(e) => setDrillDownMonth(e.target.value ? Number(e.target.value) : null)}
-            className="px-3 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-gold-400"
+            className="px-3 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-[#223553]"
           >
-            <option value="">Selecionar mês</option>
+            <option value="">Select month</option>
             {monthSelectOptions.filter((item) => item.value).map((item) => (
               <option key={`drill_${item.value}`} value={item.value}>{item.label}</option>
             ))}
           </select>
         </div>
         {!selectedMonthDetails ? (
-          <p className="text-sm text-navy-400">Selecione um mês para ver o detalhe de apólices distribuídas.</p>
+          <p className="text-sm text-navy-400">Select a month to see the detail of allocated policies.</p>
         ) : selectedMonthDetails.policies.length === 0 ? (
-          <p className="text-sm text-navy-400">Sem apólices com movimento financeiro em {selectedMonthDetails.label}.</p>
+          <p className="text-sm text-navy-400">No policies with financial activity in {selectedMonthDetails.label}.</p>
         ) : (
           <div className="space-y-3">
             <div className="bg-navy-50 border border-navy-100 rounded px-3 py-2 text-xs text-navy-600">
-              <p><strong>{selectedMonthDetails.label} {selectedYear}</strong> · {selectedMonthDetails.policiesCount} apólices</p>
-              <p>Prémios distribuídos: {formatCurrency(selectedMonthDetails.premiums)} · Comissões distribuídas: {formatCurrency(selectedMonthDetails.commissions)}</p>
+              <p><strong>{selectedMonthDetails.label} {selectedYear}</strong> · {selectedMonthDetails.policiesCount} policies</p>
+              <p>Premiums allocated: {formatCurrency(selectedMonthDetails.premiums)} · Commissions allocated: {formatCurrency(selectedMonthDetails.commissions)}</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="bg-navy-50 border-b border-navy-200">
-                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Apólice</th>
-                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Seguradora</th>
-                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Cliente</th>
-                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Fracionamento</th>
-                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Prémio</th>
-                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Comissão</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Policy</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Insurer</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Client</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Frequency</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Premium</th>
+                    <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Commission</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-navy-100">
@@ -2200,7 +2078,7 @@ function AdminDashboardTab({
                       </td>
                       <td className="px-3 py-2 text-xs text-navy-600">{policyItem.insurer}</td>
                       <td className="px-3 py-2 text-xs text-navy-600">{companies.find((company) => company.id === policyItem.companyId)?.name ?? '—'}</td>
-                      <td className="px-3 py-2 text-xs text-navy-600">{policyItem.paymentFrequency || 'anual'}</td>
+                      <td className="px-3 py-2 text-xs text-navy-600">{policyItem.paymentFrequency || 'annual'}</td>
                       <td className="px-3 py-2 text-xs text-navy-600">{formatCurrency(policyItem.premium)}</td>
                       <td className="px-3 py-2 text-xs font-semibold text-navy-700">{formatCurrency(policyItem.commission)}</td>
                     </tr>
@@ -2214,9 +2092,149 @@ function AdminDashboardTab({
         </div>
       </details>
 
-      <details className="admin-panel admin-collapsible">
-        <summary className="admin-collapsible-summary">Renewal pipeline board</summary>
-        <div className="admin-collapsible-body">
+    </div>
+  )
+}
+
+function AdminRenewalsPage({
+  companyUsers,
+  policies,
+}: {
+  companies: Company[]
+  companyUsers: CompanyUser[]
+  policies: Policy[]
+}) {
+  const [renewalAlerts, setRenewalAlerts] = useState<RenewalAlertsResponse | null>(null)
+  const [renewalAlertsLoading, setRenewalAlertsLoading] = useState(false)
+  const [updatingRenewalAlertKey, setUpdatingRenewalAlertKey] = useState<string | null>(null)
+  const [draggingAlertKey, setDraggingAlertKey] = useState<string | null>(null)
+  const [activeDropColumn, setActiveDropColumn] = useState<RenewalKanbanColumnId | null>(null)
+  const [renewalRiskMinValue, setRenewalRiskMinValue] = useState<string>('')
+  const [assigneeDraftByKey, setAssigneeDraftByKey] = useState<Record<string, string>>({})
+  const [nextActionDraftByKey, setNextActionDraftByKey] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    let active = true
+    setRenewalAlertsLoading(true)
+    getRenewalAlerts()
+      .then((result) => {
+        if (!active) return
+        setRenewalAlerts(result)
+      })
+      .catch((error) => {
+        console.error('[AdminRenewalsPage] getRenewalAlerts error:', error)
+        if (!active) return
+        setRenewalAlerts(null)
+      })
+      .finally(() => {
+        if (!active) return
+        setRenewalAlertsLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [policies])
+
+  const reloadRenewalAlerts = async () => {
+    setRenewalAlertsLoading(true)
+    try {
+      const result = await getRenewalAlerts()
+      setRenewalAlerts(result)
+    } catch (error) {
+      console.error('[AdminRenewalsPage] reloadRenewalAlerts error:', error)
+      setRenewalAlerts(null)
+    } finally {
+      setRenewalAlertsLoading(false)
+    }
+  }
+
+  const handleRenewalAlertStatusUpdate = async (
+    key: string,
+    updates: { status?: RenewalAlertStatus; assignedTo?: string | null; nextAction?: string | null }
+  ) => {
+    setUpdatingRenewalAlertKey(key)
+    try {
+      await adminUpdateRenewalAlertStatus({ data: { key, ...updates } })
+      await reloadRenewalAlerts()
+    } catch (error) {
+      console.error('[AdminRenewalsPage] adminUpdateRenewalAlertStatus error:', error)
+      alert('Could not update the alert status.')
+      await reloadRenewalAlerts()
+    } finally {
+      setUpdatingRenewalAlertKey(null)
+    }
+  }
+
+  const renewalAlertsView = useMemo(() => {
+    if (!renewalAlerts) return null
+    const minValue = Number(renewalRiskMinValue)
+    if (!Number.isFinite(minValue) || minValue <= 0) return renewalAlerts
+
+    const filteredAlerts = renewalAlerts.alerts.filter((alert) => alert.value >= minValue)
+    const derived = buildRenewalAlertsView(filteredAlerts)
+    return {
+      ...renewalAlerts,
+      alerts: filteredAlerts,
+      byUrgency: derived.byUrgency,
+      total: derived.total,
+      summary: derived.summary,
+    }
+  }, [renewalAlerts, renewalRiskMinValue])
+
+  const renewalAlertsByColumn = useMemo(() => {
+    const grouped: Record<RenewalKanbanColumnId, RenewalAlertsResponse['alerts']> = {
+      pending: [],
+      negotiating: [],
+      renewed: [],
+    }
+
+    for (const alert of renewalAlertsView?.alerts ?? []) {
+      grouped[renewalColumnByStatus(alert.status)].push(alert)
+    }
+
+    for (const column of Object.keys(grouped) as RenewalKanbanColumnId[]) {
+      grouped[column].sort((a, b) => {
+        if (a.value !== b.value) return b.value - a.value
+        return a.daysUntilRenewal - b.daysUntilRenewal
+      })
+    }
+
+    return grouped
+  }, [renewalAlertsView])
+
+  const renewalIntelligence = useMemo(
+    () => buildRenewalPipelineIntelligence(renewalAlertsView?.alerts ?? []),
+    [renewalAlertsView]
+  )
+
+  const responsibleOptions = useMemo(() => {
+    const unique = new Map<string, string>()
+    for (const user of companyUsers) {
+      const email = user.email?.trim()
+      if (!email) continue
+      if (!unique.has(email)) unique.set(email, user.name?.trim() || email)
+    }
+    return Array.from(unique.entries())
+      .map(([email, name]) => ({ email, name }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [companyUsers])
+
+  const responsibleLabelMap = useMemo(
+    () => new Map(responsibleOptions.map((item) => [item.email, item.name])),
+    [responsibleOptions]
+  )
+
+  return (
+    <div>
+      <div className="admin-page-header" style={{ marginBottom: '1rem' }}>
+        <div>
+          <h1 className="admin-page-title">Renewals</h1>
+          <p className="admin-page-subtitle">Policies renewing within 90 days, tracked through Pending → Negotiating → Renewed.</p>
+        </div>
+        <SendRenewalAlertsButton />
+      </div>
+
         <div className="bg-white rounded-[4px] border border-navy-200 p-5">
           <div className="flex flex-wrap items-end justify-between gap-3 mb-3">
             <h3 className="text-sm font-semibold text-navy-700">Renewals pipeline</h3>
@@ -2229,7 +2247,7 @@ function AdminDashboardTab({
                 value={renewalRiskMinValue}
                 onChange={(event) => setRenewalRiskMinValue(event.target.value)}
                 placeholder="Top financial risk"
-                className="w-44 px-2 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-gold-400"
+                className="w-44 px-2 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-[#223553]"
               />
             </label>
           </div>
@@ -2456,7 +2474,7 @@ function AdminDashboardTab({
                                           setAssigneeDraftByKey((current) => ({ ...current, [alert.key]: value }))
                                         }}
                                         placeholder="Owner's email"
-                                        className="flex-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-gold-400"
+                                        className="flex-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-[#223553]"
                                       />
                                       <datalist id={`responsible_${alert.key}`}>
                                         {responsibleOptions.map((option) => (
@@ -2488,7 +2506,7 @@ function AdminDashboardTab({
                                       }}
                                       placeholder="Set next action for this policy"
                                       rows={2}
-                                      className="w-full mt-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-gold-400 resize-y"
+                                      className="w-full mt-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-[#223553] resize-y"
                                     />
                                     <div className="flex items-center justify-between mt-1">
                                       <p className="text-[11px] text-navy-500">
@@ -2579,8 +2597,6 @@ function AdminDashboardTab({
             </p>
           )}
         </div>
-        </div>
-      </details>
     </div>
   )
 }
@@ -2601,7 +2617,7 @@ function FinancialTimelineChart({
   selectedMonth: number | null
 }) {
   if (timeline.length === 0) {
-    return <p className="text-sm text-navy-400">Sem movimentos financeiros para o período selecionado.</p>
+    return <p className="text-sm text-navy-400">No financial activity for the selected period.</p>
   }
 
   const width = 960
@@ -2630,11 +2646,11 @@ function FinancialTimelineChart({
   return (
     <div>
       <div className="flex flex-wrap items-center gap-5 text-xs text-navy-500 mb-3">
-        <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-navy-700 inline-block" /> Prémios</span>
-        <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-gold-400 inline-block" /> Comissões</span>
+        <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-navy-700 inline-block" /> Premiums</span>
+        <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-[#223553] inline-block" /> Commissions</span>
       </div>
       <div className="overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[760px]" role="img" aria-label="Gráfico mensal de prémios e comissões">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[760px]" role="img" aria-label="Monthly premiums and commissions chart">
           {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
             const yPos = paddingTop + plotHeight * fraction
             return (
@@ -2649,8 +2665,8 @@ function FinancialTimelineChart({
               />
             )
           })}
-          <polyline fill="none" stroke="#0B1E3A" strokeWidth="3" points={premiumPath} />
-          <polyline fill="none" stroke="#C8961A" strokeWidth="3" points={commissionPath} />
+          <polyline fill="none" stroke="#17243D" strokeWidth="3" points={premiumPath} />
+          <polyline fill="none" stroke="#223553" strokeWidth="3" points={commissionPath} />
           {timeline.map((point, index) => (
             <g
               key={point.monthKey}
@@ -2665,8 +2681,8 @@ function FinancialTimelineChart({
                 }
               }}
             >
-              <circle cx={x(index)} cy={y(point.premiums)} r={selectedMonth === point.month ? '5' : '3.5'} fill="#0B1E3A" />
-              <circle cx={x(index)} cy={y(point.commissions)} r={selectedMonth === point.month ? '5' : '3.5'} fill="#C8961A" />
+              <circle cx={x(index)} cy={y(point.premiums)} r={selectedMonth === point.month ? '5' : '3.5'} fill="#17243D" />
+              <circle cx={x(index)} cy={y(point.commissions)} r={selectedMonth === point.month ? '5' : '3.5'} fill="#223553" />
               <text x={x(index)} y={height - 10} textAnchor="middle" fontSize="10" fill="#6B7280">
                 {point.label}
               </text>
@@ -2683,8 +2699,8 @@ function FinancialTimelineChart({
             className={`text-left rounded px-3 py-2 text-xs border ${selectedMonth === point.month ? 'bg-amber-50 border-amber-200' : 'bg-navy-50 border-transparent'} text-navy-600`}
           >
             <p className="font-semibold text-navy-700">{point.label}</p>
-            <p>Prémios: {formatCurrency(point.premiums)}</p>
-            <p>Comissões: {formatCurrency(point.commissions)}</p>
+            <p>Premiums: {formatCurrency(point.premiums)}</p>
+            <p>Commissions: {formatCurrency(point.commissions)}</p>
           </button>
         ))}
       </div>
@@ -2702,7 +2718,7 @@ function InvoiceExpressStatus({ apiConnections }: { apiConnections: ApiConnectio
     return (
       <div className="bg-white rounded-[4px] border border-emerald-200 p-5">
         <h3 className="text-sm font-semibold text-emerald-700 mb-2">Invoice Express</h3>
-        <p className="text-sm text-navy-600 mb-3">Foram encontradas ligações de faturação no estado dinâmico de `api_connections`.</p>
+        <p className="text-sm text-navy-600 mb-3">Billing connections were found in the dynamic `api_connections` state.</p>
         <div className="space-y-2 text-sm">
           {invoiceExpressConnections.map((api) => (
             <p key={api.id} className="text-navy-600">
@@ -2718,8 +2734,8 @@ function InvoiceExpressStatus({ apiConnections }: { apiConnections: ApiConnectio
     <div className="bg-white rounded-[4px] border border-amber-200 p-5">
       <h3 className="text-sm font-semibold text-amber-700 mb-2">Invoice Express</h3>
       <p className="text-sm text-navy-600">
-        Não foi encontrado código de integração Invoice Express neste repositório nem entradas dedicadas em `api_connections`.
-        O módulo foi deixado em modo stub para reintegração futura sem simular integrações inexistentes.
+        No Invoice Express integration code was found in this repository, nor dedicated entries in `api_connections`.
+        The module was left as a stub for future re-integration, without simulating integrations that don't exist.
       </p>
     </div>
   )
@@ -2731,7 +2747,7 @@ function SendRenewalAlertsButton() {
   const [error, setError] = useState<string | null>(null)
 
   const handleSend = async () => {
-    if (!confirm('Enviar alertas de renovação por email a todos os clientes com apólices a expirar nos próximos 90 dias?')) return
+    if (!confirm('Send renewal alerts by email to all clients with policies expiring within the next 90 days?')) return
     setSending(true); setResult(null); setError(null)
     try {
       const data = await adminTriggerRenewalAlerts()
@@ -2750,18 +2766,18 @@ function SendRenewalAlertsButton() {
         disabled={sending}
         style={{
           fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem',
-          padding: '0.55rem 1rem', background: sending ? '#cccccc' : '#C8961A',
+          padding: '0.55rem 1rem', background: sending ? '#cccccc' : '#17243D',
           color: '#ffffff', border: 'none', borderRadius: '4px',
           cursor: sending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
         }}
       >
         {sending
-          ? <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />A enviar...</>
-          : <>✉️ Enviar Alertas por Email</>}
+          ? <><span style={{ display: 'inline-block', width: '12px', height: '12px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Sending…</>
+          : <>✉️ Send Alerts by Email</>}
       </button>
       {result && (
         <span style={{ fontFamily: "'Montserrat', sans-serif", fontSize: '0.75rem', color: '#166534', background: '#EAF3DE', padding: '0.25rem 0.6rem', borderRadius: '4px' }}>
-          ✓ {result.sent} email{result.sent !== 1 ? 's' : ''} enviado{result.sent !== 1 ? 's' : ''} para {result.companies} empresa{result.companies !== 1 ? 's' : ''}
+          ✓ {result.sent} email{result.sent !== 1 ? 's' : ''} sent to {result.companies} compan{result.companies !== 1 ? 'ies' : 'y'}
         </span>
       )}
       {error && (
@@ -2803,7 +2819,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
       })
       setDocs(data as PolicyDocFile[])
     } catch (e: any) {
-      setError(e?.message ?? 'Erro ao carregar documentos')
+      setError(e?.message ?? 'Error loading documents')
     } finally {
       setLoading(false)
     }
@@ -2890,7 +2906,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
         <p className="text-xs font-semibold text-navy-500 uppercase tracking-wide">
           Documentos {docs.length > 0 ? `(${docs.length})` : ''}
         </p>
-        <label className={`text-xs font-semibold px-2.5 py-1 rounded inline-flex items-center gap-1 ${uploading ? 'bg-navy-100 text-navy-400 cursor-not-allowed' : 'bg-gold-400 text-navy-700 hover:bg-gold-300 cursor-pointer'}`}>
+        <label className={`text-xs font-semibold px-2.5 py-1 rounded-[6px] inline-flex items-center gap-1 ${uploading ? 'bg-navy-100 text-navy-400 cursor-not-allowed' : 'bg-[#17243D] text-white hover:bg-[#223553] cursor-pointer'}`}>
           {uploading ? 'A carregar…' : '+ Carregar'}
           <input
             ref={inputRef}
@@ -2911,9 +2927,9 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
         </div>
       )}
       {loading ? (
-        <p className="text-xs text-navy-400">A carregar documentos…</p>
+        <p className="text-xs text-navy-400">Loading documents…</p>
       ) : docs.length === 0 ? (
-        <p className="text-xs text-navy-400">Sem documentos. Carregue um ficheiro para começar.</p>
+        <p className="text-xs text-navy-400">No documents. Upload a file to get started.</p>
       ) : (
         <div className="space-y-1.5">
           {docs.map((doc) => {
@@ -2928,21 +2944,21 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
                 </div>
                 <button
                   onClick={() => handlePreview(doc)}
-                  title="Pré-visualizar"
+                  title="Preview"
                   className="px-2 py-1 text-[11px] font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100"
                 >
                   Ver
                 </button>
                 <button
                   onClick={() => handleDownload(doc)}
-                  title="Descarregar"
+                  title="Download"
                   className="px-2 py-1 text-[11px] font-semibold bg-navy-50 text-navy-700 border border-navy-200 rounded hover:bg-navy-100"
                 >
                   ↓
                 </button>
                 <button
                   onClick={() => handleDelete(doc)}
-                  title="Eliminar"
+                  title="Delete"
                   className="px-2 py-1 text-[11px] font-semibold bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100"
                 >
                   ✕
@@ -2970,7 +2986,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
                   rel="noreferrer"
                   className="px-2 py-1 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded"
                 >
-                  Abrir em nova janela
+                  Open in new window
                 </a>
                 <button onClick={() => setPreviewUrl(null)} className="text-navy-500 text-xl leading-none">×</button>
               </div>
@@ -3006,11 +3022,11 @@ function PolicyExpandableCard({ policy, defaultOpen = false }: { policy: Policy;
             {' — '}{policy.insurer}
           </p>
           <p className="text-xs text-navy-500">
-            Apólice {policy.policyNumber} · {policy.startDate} → {policy.endDate}
+            Policy {policy.policyNumber} · {policy.startDate} → {policy.endDate}
           </p>
         </div>
         <div className="text-right">
-          <p className="text-sm font-semibold text-navy-700">{formatCurrency(policy.annualPremium)}/ano</p>
+          <p className="text-sm font-semibold text-navy-700">{formatCurrency(policy.annualPremium)}/yr</p>
           <span className={`text-xs px-2 py-0.5 rounded-full ${
             policy.status === 'active' ? 'bg-green-100 text-green-700' :
             policy.status === 'expiring' ? 'bg-yellow-100 text-yellow-700' :
@@ -3062,15 +3078,15 @@ function CompanyForm({
     <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
       <h3 className="text-lg font-semibold text-navy-700 mb-4">{title}</h3>
       <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-4">
-        <FormField label="Nome" value={form.name} onChange={(v) => update('name', v)} required />
+        <FormField label="Name" value={form.name} onChange={(v) => update('name', v)} required />
         <FormField label="NIF" value={form.nif} onChange={(v) => update('nif', v)} required />
-        <FormField label="Setor" value={form.sector} onChange={(v) => update('sector', v)} required />
-        <FormField label="Nome do Contacto" value={form.contactName} onChange={(v) => update('contactName', v)} required />
-        <FormField label="Email do Contacto" value={form.contactEmail} onChange={(v) => update('contactEmail', v)} type="email" required />
-        <FormField label="Telefone" value={form.contactPhone} onChange={(v) => update('contactPhone', v)} required />
-        <FormField label="Email de Acesso da Empresa" value={form.accessEmail} onChange={(v) => update('accessEmail', v)} type="email" required />
+        <FormField label="Sector" value={form.sector} onChange={(v) => update('sector', v)} required />
+        <FormField label="Contact Name" value={form.contactName} onChange={(v) => update('contactName', v)} required />
+        <FormField label="Contact Email" value={form.contactEmail} onChange={(v) => update('contactEmail', v)} type="email" required />
+        <FormField label="Phone" value={form.contactPhone} onChange={(v) => update('contactPhone', v)} required />
+        <FormField label="Company Access Email" value={form.accessEmail} onChange={(v) => update('accessEmail', v)} type="email" required />
         <div className="sm:col-span-2">
-          <FormField label="Morada" value={form.address} onChange={(v) => update('address', v)} required />
+          <FormField label="Address" value={form.address} onChange={(v) => update('address', v)} required />
         </div>
         <div className="sm:col-span-2">
           <label className="flex items-start gap-3 cursor-pointer select-none">
@@ -3078,19 +3094,19 @@ function CompanyForm({
               type="checkbox"
               checked={form.marketingOptOut}
               onChange={(e) => setForm((f) => ({ ...f, marketingOptOut: e.target.checked }))}
-              className="mt-0.5 w-4 h-4 accent-gold-400"
+              className="mt-0.5 w-4 h-4 accent-[#17243D]"
             />
             <div>
-              <span className="text-sm font-medium text-navy-700">Não enviar comunicações de marketing</span>
+              <span className="text-sm font-medium text-navy-700">Do not send marketing communications</span>
               <p className="text-xs text-navy-400 mt-0.5">
-                Quando ativo, esta empresa não recebe campanhas de marketing. Marque quando o cliente pedir para ser removido (resposta "Remover").
+                When enabled, this company does not receive marketing campaigns. Check this when a client asks to be removed (reply "Remove").
               </p>
             </div>
           </label>
         </div>
         <div className="sm:col-span-2">
-          <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 text-sm">
-            {submitting ? 'A guardar...' : 'Guardar Empresa'}
+          <button type="submit" disabled={submitting} className="admin-btn admin-btn-primary">
+            {submitting ? 'Saving…' : 'Save company'}
           </button>
         </div>
       </form>
@@ -3135,12 +3151,12 @@ function CompanyUserForm({
         value={companyName}
         readOnly
         className="px-3 py-2 border border-navy-200 rounded text-sm bg-navy-50 text-navy-600"
-        aria-label="Empresa associada"
+        aria-label="Associated company"
       />
       <input
         value={form.name}
         onChange={(e) => setForm((old) => ({ ...old, name: e.target.value }))}
-        placeholder="Nome"
+        placeholder="Name"
         className="px-3 py-2 border border-navy-200 rounded text-sm"
         required
       />
@@ -3148,7 +3164,7 @@ function CompanyUserForm({
         type="email"
         value={form.email}
         onChange={(e) => setForm((old) => ({ ...old, email: e.target.value }))}
-        placeholder="email@empresa.pt"
+        placeholder="email@company.com"
         className="px-3 py-2 border border-navy-200 rounded text-sm"
         required
       />
@@ -3165,14 +3181,14 @@ function CompanyUserForm({
         type="password"
         value={form.accessPassword}
         onChange={(e) => setForm((old) => ({ ...old, accessPassword: e.target.value }))}
-        placeholder="Password inicial"
+        placeholder="Initial password"
         className="px-3 py-2 border border-navy-200 rounded text-sm"
         required
         minLength={6}
       />
       <div className="md:col-span-5">
-        <button type="submit" disabled={submitting} className="px-4 py-2 bg-navy-700 text-white rounded text-sm disabled:opacity-50">
-          {submitting ? 'A criar...' : 'Criar Utilizador de Empresa'}
+        <button type="submit" disabled={submitting} className="admin-btn admin-btn-primary">
+          {submitting ? 'Creating…' : 'Create company user'}
         </button>
       </div>
     </form>
@@ -3242,7 +3258,7 @@ function NewAdminClaimForm({
       setIncidentDate('')
       setEstimatedValue('')
     } catch (err) {
-      setError(`Erro ao criar sinistro: ${err instanceof Error ? err.message : 'Erro desconhecido'}`)
+      setError(`Error creating claim: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
       setSubmitting(false)
     }
@@ -3251,36 +3267,36 @@ function NewAdminClaimForm({
   return (
     <form onSubmit={handleSubmit} className="bg-white border border-navy-200 rounded-[4px] p-5 mb-4 grid md:grid-cols-2 gap-4">
       <div>
-        <label className="block text-sm text-navy-600 mb-1">Tipo de cliente</label>
+        <label className="block text-sm text-navy-600 mb-1">Client type</label>
         <select value={targetType} onChange={(e) => setTargetType(e.target.value as 'company' | 'individual')} className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
-          <option value="company">Empresa</option>
-          <option value="individual">Cliente individual</option>
+          <option value="company">Company</option>
+          <option value="individual">Individual client</option>
         </select>
       </div>
 
       {targetType === 'company' ? (
         <div>
-          <label className="block text-sm text-navy-600 mb-1">Empresa</label>
+          <label className="block text-sm text-navy-600 mb-1">Company</label>
           <select value={companyId} onChange={(e) => { setCompanyId(e.target.value); setPolicyId('') }} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
-            <option value="">Selecionar...</option>
+            <option value="">Select…</option>
             {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
           </select>
         </div>
       ) : (
         <div>
-          <label className="block text-sm text-navy-600 mb-1">Cliente individual</label>
+          <label className="block text-sm text-navy-600 mb-1">Individual client</label>
           <select value={individualClientId} onChange={(e) => { setIndividualClientId(e.target.value); setPolicyId('') }} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
-            <option value="">Selecionar...</option>
+            <option value="">Select…</option>
             {individualClients.map((client) => <option key={client.id} value={client.id}>{client.fullName}</option>)}
           </select>
         </div>
       )}
 
       <div>
-        <label className="block text-sm text-navy-600 mb-1">Utilizador/cliente associado</label>
+        <label className="block text-sm text-navy-600 mb-1">Associated user/client</label>
         {targetType === 'company' ? (
           <select value={clientUserId} onChange={(e) => setClientUserId(e.target.value)} className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
-            <option value="">Sem responsável inicial</option>
+            <option value="">No initial owner</option>
             {availableUsers.map((user) => <option key={user.id} value={user.id}>{user.name} ({user.email})</option>)}
           </select>
         ) : (
@@ -3289,9 +3305,9 @@ function NewAdminClaimForm({
       </div>
 
       <div>
-        <label className="block text-sm text-navy-600 mb-1">Apólice associada</label>
+        <label className="block text-sm text-navy-600 mb-1">Associated policy</label>
         <select value={policyId} onChange={(e) => setPolicyId(e.target.value)} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
-          <option value="">Selecionar...</option>
+          <option value="">Select…</option>
           {availablePolicies.map((policy) => (
             <option key={policy.id} value={policy.id}>
               {policy.policyNumber} · {POLICY_TYPE_LABELS[policy.type] ?? policy.type}
@@ -3301,22 +3317,22 @@ function NewAdminClaimForm({
       </div>
 
       <div>
-        <label className="block text-sm text-navy-600 mb-1">Tipo de sinistro</label>
-        <input value={type} onChange={(e) => setType(e.target.value)} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm" placeholder="Ex: Inundação" />
+        <label className="block text-sm text-navy-600 mb-1">Claim type</label>
+        <input value={type} onChange={(e) => setType(e.target.value)} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm" placeholder="e.g. Flood damage" />
       </div>
 
       <div>
-        <label className="block text-sm text-navy-600 mb-1">Data do sinistro</label>
+        <label className="block text-sm text-navy-600 mb-1">Incident date</label>
         <input type="date" value={incidentDate} onChange={(e) => setIncidentDate(e.target.value)} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm" />
       </div>
 
       <div>
-        <label className="block text-sm text-navy-600 mb-1">Valor estimado (opcional)</label>
+        <label className="block text-sm text-navy-600 mb-1">Estimated amount (optional)</label>
         <input type="number" min="0" step="0.01" value={estimatedValue} onChange={(e) => setEstimatedValue(e.target.value)} className="w-full px-3 py-2 border border-navy-200 rounded text-sm" placeholder="0.00" />
       </div>
 
       <div className="md:col-span-2">
-        <label className="block text-sm text-navy-600 mb-1">Descrição inicial</label>
+        <label className="block text-sm text-navy-600 mb-1">Initial description</label>
         <textarea value={description} onChange={(e) => setDescription(e.target.value)} required rows={3} className="w-full px-3 py-2 border border-navy-200 rounded text-sm" />
       </div>
 
@@ -3327,8 +3343,8 @@ function NewAdminClaimForm({
       )}
 
       <div className="md:col-span-2">
-        <button disabled={submitting} className="px-4 py-2 bg-navy-700 text-white rounded text-sm disabled:opacity-50">
-          {submitting ? 'A criar...' : 'Criar sinistro'}
+        <button disabled={submitting} className="admin-btn admin-btn-primary">
+          {submitting ? 'Creating…' : 'Create claim'}
         </button>
       </div>
     </form>
@@ -3357,7 +3373,7 @@ function AdminClaimsBoard({
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   if (claims.length === 0) {
-    return <div className="bg-white border border-navy-200 rounded-[4px] p-5 text-sm text-navy-500">Sem sinistros registados.</div>
+    return <div className="bg-white border border-navy-200 rounded-[4px] p-5 text-sm text-navy-500">No claims registered.</div>
   }
 
   return (
@@ -3365,13 +3381,13 @@ function AdminClaimsBoard({
       <table className="min-w-full text-sm">
         <thead className="bg-navy-50 text-navy-600">
           <tr>
-            <th className="text-left px-3 py-2">Cliente/Empresa</th>
-            <th className="text-left px-3 py-2">Apólice</th>
-            <th className="text-left px-3 py-2">Tipo</th>
-            <th className="text-left px-3 py-2">Data</th>
-            <th className="text-left px-3 py-2">Estado</th>
-            <th className="text-left px-3 py-2">Valor</th>
-            <th className="text-left px-3 py-2">Responsável</th>
+            <th className="text-left px-3 py-2">Client/Company</th>
+            <th className="text-left px-3 py-2">Policy</th>
+            <th className="text-left px-3 py-2">Type</th>
+            <th className="text-left px-3 py-2">Date</th>
+            <th className="text-left px-3 py-2">Status</th>
+            <th className="text-left px-3 py-2">Amount</th>
+            <th className="text-left px-3 py-2">Owner</th>
           </tr>
         </thead>
         <tbody>
@@ -3398,7 +3414,7 @@ function AdminClaimsBoard({
                     onChange={async (e) => {
                       const status = e.target.value
                       setUpdatingId(claim.id)
-                      await onQuickStatusUpdate(claim.id, status, 'Atualização rápida')
+                      await onQuickStatusUpdate(claim.id, status, 'Quick update')
                       setUpdatingId(null)
                     }}
                     className="px-2 py-1 border border-navy-200 rounded text-xs"
@@ -3474,8 +3490,8 @@ function AdminClaimWorkspace({
       <div className="flex flex-wrap justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-navy-700">{claim.title}</h3>
-          <p className="text-sm text-navy-500">{company?.name || individualClient?.fullName || '—'} · {policy?.policyNumber || 'Sem apólice'}</p>
-          <p className="text-xs text-navy-400 mt-1">Data do sinistro: {formatDate(claim.incidentDate)} · Valor estimado: {formatCurrency(claim.estimatedValue || 0)}</p>
+          <p className="text-sm text-navy-500">{company?.name || individualClient?.fullName || '—'} · {policy?.policyNumber || 'No policy'}</p>
+          <p className="text-xs text-navy-400 mt-1">Incident date: {formatDate(claim.incidentDate)} · Estimated amount: {formatCurrency(claim.estimatedValue || 0)}</p>
         </div>
         <div className="text-right">
           <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${getStatusColor(claim.status)}`}>
@@ -3486,10 +3502,10 @@ function AdminClaimWorkspace({
 
       <div className="grid md:grid-cols-2 gap-4">
         <div className="border border-navy-100 rounded p-3">
-          <p className="text-xs uppercase tracking-wide text-navy-500 mb-2">Responsável</p>
+          <p className="text-xs uppercase tracking-wide text-navy-500 mb-2">Owner</p>
           <div className="flex gap-2">
             <select value={selectedResponsible} onChange={(e) => setSelectedResponsible(e.target.value)} className="flex-1 px-2 py-2 border border-navy-200 rounded text-sm">
-              <option value="">Sem responsável</option>
+              <option value="">No owner</option>
               {responsibleCandidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
             </select>
             <button
@@ -3506,17 +3522,17 @@ function AdminClaimWorkspace({
                 await onUpdated()
                 setSaving(false)
               }}
-              className="px-3 py-2 bg-navy-700 text-white rounded text-sm disabled:opacity-50"
+              className="admin-btn admin-btn-primary admin-btn--sm"
             >
-              Guardar
+              Save
             </button>
           </div>
         </div>
 
         <div className="border border-navy-100 rounded p-3">
           <p className="text-xs uppercase tracking-wide text-navy-500 mb-2">Links</p>
-          <p className="text-sm text-navy-600">Apólice: {policy ? `${policy.policyNumber} (${POLICY_TYPE_LABELS[policy.type] ?? policy.type})` : '—'}</p>
-          <p className="text-sm text-navy-600">Cliente/Empresa: {company?.name || individualClient?.fullName || '—'}</p>
+          <p className="text-sm text-navy-600">Policy: {policy ? `${policy.policyNumber} (${POLICY_TYPE_LABELS[policy.type] ?? policy.type})` : '—'}</p>
+          <p className="text-sm text-navy-600">Client/Company: {company?.name || individualClient?.fullName || '—'}</p>
         </div>
       </div>
 
@@ -3524,7 +3540,7 @@ function AdminClaimWorkspace({
         <div className="border border-navy-100 rounded p-3">
           <p className="text-xs uppercase tracking-wide text-navy-500 mb-3">Timeline</p>
           <div className="max-h-56 overflow-auto space-y-2">
-            {operations.timeline.length === 0 ? <p className="text-sm text-navy-400">Sem eventos.</p> : operations.timeline.slice().reverse().map((event) => (
+            {operations.timeline.length === 0 ? <p className="text-sm text-navy-400">No events.</p> : operations.timeline.slice().reverse().map((event) => (
               <div key={event.id} className="text-sm border border-navy-100 rounded p-2">
                 <p className="text-navy-700">{event.message}</p>
                 <p className="text-xs text-navy-400 mt-1">{event.actorName} · {formatDateTime(event.createdAt)}</p>
@@ -3534,9 +3550,9 @@ function AdminClaimWorkspace({
         </div>
 
         <div className="border border-navy-100 rounded p-3">
-          <p className="text-xs uppercase tracking-wide text-navy-500 mb-3">Notas da equipa</p>
+          <p className="text-xs uppercase tracking-wide text-navy-500 mb-3">Team notes</p>
           <div className="max-h-40 overflow-auto space-y-2 mb-3">
-            {operations.teamNotes.length === 0 ? <p className="text-sm text-navy-400">Sem notas.</p> : operations.teamNotes.slice().reverse().map((note) => (
+            {operations.teamNotes.length === 0 ? <p className="text-sm text-navy-400">No notes.</p> : operations.teamNotes.slice().reverse().map((note) => (
               <div key={note.id} className="text-sm border border-navy-100 rounded p-2">
                 <p>{note.note}</p>
                 <p className="text-xs text-navy-400 mt-1">{note.authorName} · {formatDateTime(note.createdAt)}</p>
@@ -3544,7 +3560,7 @@ function AdminClaimWorkspace({
             ))}
           </div>
           <div className="flex gap-2">
-            <input value={newNote} onChange={(e) => setNewNote(e.target.value)} className="flex-1 px-2 py-2 border border-navy-200 rounded text-sm" placeholder="Adicionar nota interna..." />
+            <input value={newNote} onChange={(e) => setNewNote(e.target.value)} className="flex-1 px-2 py-2 border border-navy-200 rounded text-sm" placeholder="Add an internal note…" />
             <button
               onClick={async () => {
                 if (!newNote.trim()) return
@@ -3552,9 +3568,9 @@ function AdminClaimWorkspace({
                 setNewNote('')
                 await onUpdated()
               }}
-              className="px-3 py-2 bg-navy-700 text-white rounded text-sm"
+              className="admin-btn admin-btn-primary admin-btn--sm"
             >
-              Adicionar
+              Add
             </button>
           </div>
         </div>
@@ -3562,14 +3578,14 @@ function AdminClaimWorkspace({
 
       <div className="border border-navy-100 rounded p-3">
         <div className="flex items-center justify-between mb-3">
-          <p className="text-xs uppercase tracking-wide text-navy-500">Documentos</p>
-          <label className="px-3 py-1.5 bg-navy-700 text-white rounded text-xs cursor-pointer">
-            {uploading ? 'A carregar...' : 'Upload'}
+          <p className="text-xs uppercase tracking-wide text-navy-500">Documents</p>
+          <label className="admin-btn admin-btn-primary admin-btn--sm cursor-pointer">
+            {uploading ? 'Uploading…' : 'Upload'}
             <input type="file" className="hidden" onChange={handleUploadDocument} />
           </label>
         </div>
         <div className="space-y-2">
-          {operations.documents.length === 0 ? <p className="text-sm text-navy-400">Sem ficheiros.</p> : operations.documents.map((doc) => (
+          {operations.documents.length === 0 ? <p className="text-sm text-navy-400">No files.</p> : operations.documents.map((doc) => (
             <div key={doc.id} className="border border-navy-100 rounded p-2 flex flex-wrap items-center gap-2 justify-between">
               <div>
                 <p className="text-sm text-navy-700">{doc.name}</p>
@@ -3595,7 +3611,7 @@ function AdminClaimWorkspace({
                   }}
                   className="px-2 py-1 border border-red-200 text-red-600 rounded text-xs"
                 >
-                  Remover
+                  Remove
                 </button>
               </div>
             </div>
@@ -3604,17 +3620,17 @@ function AdminClaimWorkspace({
       </div>
 
       <div className="border border-navy-100 rounded p-3">
-        <p className="text-xs uppercase tracking-wide text-navy-500 mb-3">Mensagens (ticket)</p>
+        <p className="text-xs uppercase tracking-wide text-navy-500 mb-3">Messages (ticket)</p>
         <div className="max-h-60 overflow-auto space-y-2 mb-3">
-          {operations.messages.length === 0 ? <p className="text-sm text-navy-400">Sem mensagens.</p> : operations.messages.map((message) => (
-            <div key={message.id} className={`rounded p-2 text-sm ${message.senderRole === 'admin' ? 'bg-navy-50 border border-navy-100' : 'bg-gold-50 border border-gold-100'}`}>
+          {operations.messages.length === 0 ? <p className="text-sm text-navy-400">No messages.</p> : operations.messages.map((message) => (
+            <div key={message.id} className={`rounded p-2 text-sm ${message.senderRole === 'admin' ? 'bg-navy-50 border border-navy-100' : 'bg-[#EEF2F7] border border-[#DCE6F0]'}`}>
               <p className="text-navy-700">{message.body}</p>
               <p className="text-xs text-navy-400 mt-1">{message.senderName} · {formatDateTime(message.createdAt)}</p>
             </div>
           ))}
         </div>
         <div className="flex gap-2">
-          <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 px-2 py-2 border border-navy-200 rounded text-sm" placeholder="Responder ao cliente..." />
+          <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 px-2 py-2 border border-navy-200 rounded text-sm" placeholder="Reply to the client…" />
           <button
             onClick={async () => {
               if (!newMessage.trim()) return
@@ -3622,9 +3638,9 @@ function AdminClaimWorkspace({
               setNewMessage('')
               await onUpdated()
             }}
-            className="px-3 py-2 bg-gold-400 text-navy-700 font-semibold rounded text-sm"
+            className="admin-btn admin-btn-primary"
           >
-            Enviar
+            Send
           </button>
         </div>
       </div>
@@ -3713,7 +3729,7 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
         commissionValue: form.commissionValue ? Number(form.commissionValue) : undefined,
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar apólice')
+      setError(err instanceof Error ? err.message : 'Error creating policy')
     } finally {
       setSubmitting(false)
     }
@@ -3721,76 +3737,76 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
 
   return (
     <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
-      <h3 className="text-lg font-semibold text-navy-700 mb-4">Nova Apólice</h3>
+      <h3 className="text-lg font-semibold text-navy-700 mb-4">New Policy</h3>
       <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-4">
         <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-navy-600 mb-1">Tipo de Cliente</label>
+          <label className="block text-sm font-medium text-navy-600 mb-1">Client Type</label>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setClientType('company')}
               className={`px-4 py-2 rounded-[2px] text-sm font-medium border transition-colors ${clientType === 'company' ? 'bg-navy-700 text-white border-navy-700' : 'bg-white text-navy-600 border-navy-200 hover:border-navy-400'}`}
             >
-              Empresa
+              Company
             </button>
             <button
               type="button"
               onClick={() => setClientType('individual')}
               className={`px-4 py-2 rounded-[2px] text-sm font-medium border transition-colors ${clientType === 'individual' ? 'bg-navy-700 text-white border-navy-700' : 'bg-white text-navy-600 border-navy-200 hover:border-navy-400'}`}
             >
-              Cliente Individual
+              Individual Client
             </button>
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium text-navy-600 mb-1">{clientType === 'company' ? 'Empresa' : 'Cliente Individual'}</label>
+          <label className="block text-sm font-medium text-navy-600 mb-1">{clientType === 'company' ? 'Company' : 'Individual Client'}</label>
           {clientType === 'company' ? (
-            <select value={form.companyId} onChange={(e) => update('companyId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400" required>
-              <option value="">Selecionar empresa</option>
+            <select value={form.companyId} onChange={(e) => update('companyId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]" required>
+              <option value="">Select company</option>
               {companies.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </select>
           ) : (
-            <select value={form.individualClientId} onChange={(e) => update('individualClientId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400" required>
-              <option value="">Selecionar cliente</option>
+            <select value={form.individualClientId} onChange={(e) => update('individualClientId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]" required>
+              <option value="">Select client</option>
               {individualClients.map((c) => (<option key={c.id} value={c.id}>{c.fullName}{c.nif ? ` · ${c.nif}` : ''}</option>))}
             </select>
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium text-navy-600 mb-1">Tipo</label>
-          <select value={form.type} onChange={(e) => update('type', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400" required>
-            <option value="">Selecionar</option>
+          <label className="block text-sm font-medium text-navy-600 mb-1">Type</label>
+          <select value={form.type} onChange={(e) => update('type', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]" required>
+            <option value="">Select…</option>
             {Object.entries(POLICY_TYPE_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
           </select>
         </div>
-        <FormField label="Seguradora" value={form.insurer} onChange={(v) => update('insurer', v)} required />
-        <FormField label="N.º Apólice" value={form.policyNumber} onChange={(v) => update('policyNumber', v)} required />
+        <FormField label="Insurer" value={form.insurer} onChange={(v) => update('insurer', v)} required />
+        <FormField label="Policy No." value={form.policyNumber} onChange={(v) => update('policyNumber', v)} required />
         <div className="sm:col-span-2">
-          <FormField label="Descrição" value={form.description} onChange={(v) => update('description', v)} required />
+          <FormField label="Description" value={form.description} onChange={(v) => update('description', v)} required />
         </div>
-        <FormField label="Data Início" value={form.startDate} onChange={(v) => update('startDate', v)} type="date" required />
-        <FormField label="Data Fim" value={form.endDate} onChange={(v) => update('endDate', v)} type="date" required />
-        <FormField label="Prémio Anual (EUR)" value={form.annualPremium} onChange={(v) => updatePremium(v)} type="number" required />
-        <FormField label="Capital Segurado (EUR)" value={form.insuredValue} onChange={(v) => update('insuredValue', v)} type="number" required />
+        <FormField label="Start Date" value={form.startDate} onChange={(v) => update('startDate', v)} type="date" required />
+        <FormField label="End Date" value={form.endDate} onChange={(v) => update('endDate', v)} type="date" required />
+        <FormField label="Annual Premium (EUR)" value={form.annualPremium} onChange={(v) => updatePremium(v)} type="number" required />
+        <FormField label="Insured Value (EUR)" value={form.insuredValue} onChange={(v) => update('insuredValue', v)} type="number" required />
         <div>
-          <label className="block text-sm font-medium text-navy-600 mb-1">Fracionamento</label>
+          <label className="block text-sm font-medium text-navy-600 mb-1">Payment Frequency</label>
           <select
             value={form.paymentFrequency}
             onChange={(e) => update('paymentFrequency', e.target.value)}
-            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]"
           >
-            <option value="mensal">Mensal</option>
-            <option value="trimestral">Trimestral</option>
-            <option value="semestral">Semestral</option>
-            <option value="anual">Anual</option>
+            <option value="mensal">Monthly</option>
+            <option value="trimestral">Quarterly</option>
+            <option value="semestral">Half-yearly</option>
+            <option value="anual">Yearly</option>
           </select>
         </div>
-        <FormField label="Comissão (%)" value={form.commissionPercentage} onChange={(v) => updateCommissionPercentage(v)} type="number" />
-        <FormField label="Comissão (€)" value={form.commissionValue} onChange={(v) => updateCommissionValue(v)} type="number" />
+        <FormField label="Commission (%)" value={form.commissionPercentage} onChange={(v) => updateCommissionPercentage(v)} type="number" />
+        <FormField label="Commission (€)" value={form.commissionValue} onChange={(v) => updateCommissionValue(v)} type="number" />
         <div className="sm:col-span-2">
           {error && <p className="text-sm text-red-600 mb-2">{error}</p>}
-          <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 text-sm">
-            {submitting ? 'A criar...' : 'Criar Apólice'}
+          <button type="submit" disabled={submitting} className="admin-btn admin-btn-primary">
+            {submitting ? 'Creating…' : 'Create policy'}
           </button>
         </div>
       </form>
@@ -3806,15 +3822,15 @@ function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClien
     e.target.value = 'individual' // reset immediately
 
     const hasPolicies = true // we don't have the count here, warn generically
-    const authWarning = client.authUserId ? '\n⚠️ Este cliente tem acesso ao Os Meus Seguros — o acesso será desligado.' : ''
-    if (!confirm(`Converter "${client.fullName}" para Empresa?\n\nIsso irá:\n• Criar um registo de Empresa\n• Mover as apólices associadas\n• Apagar o registo de cliente individual${authWarning}`)) return
+    const authWarning = client.authUserId ? '\n⚠️ This client has portal access — access will be disabled.' : ''
+    if (!confirm(`Convert "${client.fullName}" to a company?\n\nThis will:\n• Create a company record\n• Move the linked policies\n• Delete the individual client record${authWarning}`)) return
 
     setPromoting(true)
     try {
       await adminPromoteToCompany({ data: { clientId: client.id } })
       await onSuccess()
     } catch (err: any) {
-      alert(`Erro ao converter: ${err?.message ?? 'falha desconhecida'}`)
+      alert(`Error converting: ${err?.message ?? 'unknown failure'}`)
     } finally {
       setPromoting(false)
     }
@@ -3825,30 +3841,30 @@ function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClien
       value="individual"
       onChange={handleChange}
       disabled={promoting}
-      className="text-xs border border-navy-200 rounded px-1.5 py-1 bg-white text-navy-700 focus:outline-none focus:ring-1 focus:ring-gold-400 disabled:opacity-50"
+      className="text-xs border border-navy-200 rounded px-1.5 py-1 bg-white text-navy-700 focus:outline-none focus:ring-1 focus:ring-[#223553] disabled:opacity-50"
     >
       <option value="individual">Individual</option>
-      <option value="company">→ Empresa</option>
+      <option value="company">→ Company</option>
     </select>
   )
 }
 
 function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClient; onSuccess: () => Promise<void> }) {
-  // Estado do fluxo de convite (existente, inalterado)
+  // Invite flow state (existing, unchanged)
   const [activating,        setActivating]        = useState(false)
   const [message,           setMessage]           = useState<string | null>(null)
 
-  // Estado do novo fluxo de password gerada — isolado para não interferir com o convite
+  // Generated-password flow state — isolated so it doesn't interfere with invite
   const [grantingAccess,    setGrantingAccess]    = useState(false)
   const [generatedPassword, setGeneratedPassword] = useState<string | null>(null)
   const [grantError,        setGrantError]        = useState<string | null>(null)
 
-  // Estado do fluxo de reset de password
+  // Password reset flow state
   const [resetting,         setResetting]         = useState(false)
   const [resetError,        setResetError]        = useState<string | null>(null)
   const [passwordContext,   setPasswordContext]   = useState<'grant' | 'reset'>('grant')
 
-  // Estado do fluxo de revogação de acesso
+  // Access revocation flow state
   const [revoking,          setRevoking]          = useState(false)
   const [revokeError,       setRevokeError]       = useState<string | null>(null)
 
@@ -3861,7 +3877,7 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
 
   return (
     <>
-      {/* Overlay partilhado — fluxo grant e reset */}
+      {/* Shared overlay — grant and reset flows */}
       {generatedPassword && (
         <div
           style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
@@ -3872,13 +3888,13 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
             onClick={(e) => e.stopPropagation()}
           >
             <p style={{ fontWeight: 700, fontSize: '1rem', color: '#0A1628', margin: '0 0 0.3rem' }}>
-              {passwordContext === 'reset' ? 'Password reposta' : 'Acesso criado'} — {client.fullName}
+              {passwordContext === 'reset' ? 'Password reset' : 'Access created'} — {client.fullName}
             </p>
             <p style={{ fontSize: '0.78rem', color: '#64748B', margin: '0 0 0.85rem' }}>
               {client.email}
             </p>
             <p style={{ fontSize: '0.82rem', color: '#B91C1C', fontWeight: 600, margin: '0 0 0.85rem' }}>
-              ⚠ Guarde esta password agora — não será mostrada novamente.
+              ⚠ Save this password now — it will not be shown again.
             </p>
             <div style={{ background: '#F1F5F9', borderRadius: 6, padding: '0.75rem 1rem', display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
               <code style={{ flex: 1, fontFamily: 'monospace', fontSize: '1.05rem', letterSpacing: '0.08em', color: '#0A1628', wordBreak: 'break-all' }}>
@@ -3888,38 +3904,38 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
                 onClick={() => navigator.clipboard.writeText(generatedPassword)}
                 style={{ flexShrink: 0, padding: '0.35rem 0.75rem', background: '#0A1628', color: '#fff', border: 'none', borderRadius: 4, fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Montserrat', sans-serif" }}
               >
-                Copiar
+                Copy
               </button>
             </div>
             <p style={{ fontSize: '0.74rem', color: '#64748B', margin: '0 0 1.25rem', lineHeight: 1.5 }}>
-              Entregar ao cliente por canal seguro (telefone ou mensagem direta).<br />
+              Hand it to the client over a secure channel (phone or direct message).<br />
               {passwordContext === 'reset'
-                ? 'O cliente pode usar esta password imediatamente em Os Meus Seguros.'
-                : <><strong>Os Meus Seguros → Perfil</strong> permite alterar a password após o primeiro acesso.</>}
+                ? 'The client can use this password immediately.'
+                : <><strong>Portal → Profile</strong> lets them change the password after first login.</>}
             </p>
             <button
               onClick={handleClosePassword}
               style={{ width: '100%', padding: '0.6rem', background: '#F1F5F9', color: '#0A1628', border: '1px solid #E2E8F0', borderRadius: 6, fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer', fontFamily: "'Montserrat', sans-serif" }}
             >
-              Fechar
+              Close
             </button>
           </div>
         </div>
       )}
 
-      {/* Estado 1: cliente já tem acesso → badge verde + repor password + revogar */}
+      {/* State 1: client already has access → green badge + reset password + revoke */}
       {client.authUserId && (
         <>
           {resetError && <p className="text-xs text-red-600 mb-1">{resetError}</p>}
           {revokeError && <p className="text-xs text-red-600 mb-1">{revokeError}</p>}
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-              Os Meus Seguros ✓
+            <span className="admin-chip admin-chip--success">
+              Portal access ✓
             </span>
             <button
               disabled={resetting || revoking}
               onClick={async () => {
-                if (!confirm(`Gerar nova password para ${client.fullName}?`)) return
+                if (!confirm(`Generate a new password for ${client.fullName}?`)) return
                 setResetting(true)
                 setResetError(null)
                 try {
@@ -3927,46 +3943,46 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
                   setPasswordContext('reset')
                   setGeneratedPassword(result.password)
                 } catch (e: any) {
-                  setResetError(`Erro: ${e?.message ?? 'falha ao repor password'}`)
+                  setResetError(`Error: ${e?.message ?? 'failed to reset password'}`)
                 } finally {
                   setResetting(false)
                 }
               }}
-              className="px-2 py-1 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50 whitespace-nowrap"
+              className="admin-row-action"
             >
-              {resetting ? '...' : 'Repor password'}
+              {resetting ? '…' : 'Password access'}
             </button>
             <button
               disabled={resetting || revoking}
               onClick={async () => {
-                if (!confirm(`Revogar o acesso de ${client.fullName} ao portal Os Meus Seguros?\n\nO cliente deixa de poder entrar. A ficha (apólices, documentos, etc.) mantém-se e pode receber acesso novamente.`)) return
+                if (!confirm(`Revoke ${client.fullName}'s portal access?\n\nThe client will no longer be able to sign in. Their record (policies, documents, etc.) is kept and access can be granted again later.`)) return
                 setRevoking(true)
                 setRevokeError(null)
                 try {
                   await adminRevokeIndividualClientAccess({ data: { clientId: client.id } })
                   await onSuccess()
                 } catch (e: any) {
-                  setRevokeError(`Erro: ${e?.message ?? 'falha ao revogar acesso'}`)
+                  setRevokeError(`Error: ${e?.message ?? 'failed to revoke access'}`)
                 } finally {
                   setRevoking(false)
                 }
               }}
-              className="px-2 py-1 text-xs border border-red-300 text-red-600 rounded hover:bg-red-50 disabled:opacity-50 whitespace-nowrap"
+              className="admin-row-action admin-row-action--danger"
             >
-              {revoking ? '...' : 'Revogar acesso'}
+              {revoking ? '…' : 'Revoke'}
             </button>
           </div>
         </>
       )}
 
-      {/* Estado 2: sem email → desativado */}
+      {/* State 2: no email → disabled */}
       {!client.authUserId && !client.email && (
-        <span title="Sem email — edite o cliente primeiro" className="inline-block px-2 py-1 text-xs text-navy-400 border border-navy-200 rounded cursor-default">
-          Sem email
+        <span title="No email — edit the client first" className="admin-chip admin-chip--neutral">
+          No email
         </span>
       )}
 
-      {/* Estado 3: tem email, sem acesso → dois botões */}
+      {/* State 3: has email, no access → two buttons */}
       {!client.authUserId && client.email && (
         <>
           {message && (
@@ -3979,29 +3995,29 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
             <button
               disabled={activating || grantingAccess}
               onClick={async () => {
-                if (!confirm(`Enviar convite Os Meus Seguros para ${client.email}?`)) return
+                if (!confirm(`Send a portal invite to ${client.email}?`)) return
                 setActivating(true)
                 setMessage(null)
                 setGrantError(null)
                 try {
                   await adminActivateAdlerOne({ data: { clientId: client.id, email: client.email!, fullName: client.fullName } })
-                  setMessage(`Convite enviado para ${client.email}`)
+                  setMessage(`Invite sent to ${client.email}`)
                   await onSuccess()
                 } catch (e: any) {
-                  setMessage(`Erro: ${e?.message ?? 'falha ao enviar convite'}`)
+                  setMessage(`Error: ${e?.message ?? 'failed to send invite'}`)
                 } finally {
                   setActivating(false)
                 }
               }}
-              className="px-2 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 disabled:opacity-50 whitespace-nowrap"
+              className="admin-row-action"
             >
-              {activating ? '...' : 'Activar por convite'}
+              {activating ? '…' : 'Invite'}
             </button>
 
             <button
               disabled={activating || grantingAccess}
               onClick={async () => {
-                if (!confirm(`Criar acesso ao portal Os Meus Seguros para ${client.fullName} (${client.email})?\n\nSerá gerada uma password pelo sistema para entregar ao cliente.`)) return
+                if (!confirm(`Create portal access for ${client.fullName} (${client.email})?\n\nThe system will generate a password to hand to the client.`)) return
                 setGrantingAccess(true)
                 setGrantError(null)
                 setMessage(null)
@@ -4010,14 +4026,14 @@ function ActivateAdlerOneButton({ client, onSuccess }: { client: IndividualClien
                   setPasswordContext('grant')
                   setGeneratedPassword(result.password)
                 } catch (e: any) {
-                  setGrantError(`Erro: ${e?.message ?? 'falha ao criar acesso'}`)
+                  setGrantError(`Error: ${e?.message ?? 'failed to create access'}`)
                 } finally {
                   setGrantingAccess(false)
                 }
               }}
-              className="px-2 py-1 text-xs bg-gold-400 text-navy-700 font-semibold rounded hover:bg-gold-300 disabled:opacity-50 whitespace-nowrap"
+              className="admin-row-action"
             >
-              {grantingAccess ? '...' : 'Criar acesso com password'}
+              {grantingAccess ? '…' : 'Password access'}
             </button>
           </div>
         </>
@@ -4059,22 +4075,22 @@ function IndividualClientForm({
     <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
       <h3 className="text-lg font-semibold text-navy-700 mb-4">{title}</h3>
       <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-4">
-        <FormField label="Nome Completo" value={form.fullName} onChange={(v) => update('fullName', v)} required />
+        <FormField label="Full Name" value={form.fullName} onChange={(v) => update('fullName', v)} required />
         <FormField label="NIF" value={form.nif} onChange={(v) => update('nif', v)} />
         <FormField label="Email" value={form.email} onChange={(v) => update('email', v)} type="email" />
-        <FormField label="Telefone" value={form.phone} onChange={(v) => update('phone', v)} />
+        <FormField label="Phone" value={form.phone} onChange={(v) => update('phone', v)} />
         <div className="sm:col-span-2">
-          <FormField label="Morada" value={form.address} onChange={(v) => update('address', v)} />
+          <FormField label="Address" value={form.address} onChange={(v) => update('address', v)} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-navy-600 mb-1">Estado</label>
+          <label className="block text-sm font-medium text-navy-600 mb-1">Status</label>
           <select
             value={form.status}
             onChange={(e) => update('status', e.target.value)}
-            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]"
           >
-            <option value="active">Ativo</option>
-            <option value="inactive">Inativo</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
           </select>
         </div>
         <div className="sm:col-span-2">
@@ -4083,19 +4099,19 @@ function IndividualClientForm({
               type="checkbox"
               checked={form.marketingOptOut}
               onChange={(e) => setForm((f) => ({ ...f, marketingOptOut: e.target.checked }))}
-              className="mt-0.5 w-4 h-4 accent-gold-400"
+              className="mt-0.5 w-4 h-4 accent-[#17243D]"
             />
             <div>
-              <span className="text-sm font-medium text-navy-700">Não enviar comunicações de marketing</span>
+              <span className="text-sm font-medium text-navy-700">Do not send marketing communications</span>
               <p className="text-xs text-navy-400 mt-0.5">
-                Quando ativo, este cliente não recebe campanhas de marketing. Marque quando o cliente pedir para ser removido (resposta "Remover").
+                When enabled, this client does not receive marketing campaigns. Check this when the client asks to be removed (reply "Remove").
               </p>
             </div>
           </label>
         </div>
         <div className="sm:col-span-2">
-          <button type="submit" disabled={submitting} className="px-6 py-2.5 bg-gold-400 text-navy-700 font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50 text-sm">
-            {submitting ? 'A guardar...' : 'Guardar Cliente'}
+          <button type="submit" disabled={submitting} className="admin-btn admin-btn-primary">
+            {submitting ? 'Saving…' : 'Save client'}
           </button>
         </div>
       </form>
@@ -4106,10 +4122,10 @@ function IndividualClientForm({
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const POLICY_STATUS_LABEL: Record<string, string> = {
-  active: 'Ativa', ativa: 'Ativa',
-  expiring: 'A Renovar',
-  expired: 'Expirada', expirada: 'Expirada',
-  cancelled: 'Cancelada', cancelada: 'Cancelada',
+  active: 'Active', ativa: 'Active',
+  expiring: 'Renewing',
+  expired: 'Expired', expirada: 'Expired',
+  cancelled: 'Cancelled', cancelada: 'Cancelled',
 }
 const POLICY_STATUS_CLASS: Record<string, string> = {
   active: 'bg-green-100 text-green-700', ativa: 'bg-green-100 text-green-700',
@@ -4131,7 +4147,7 @@ function AdminPolicyList({ policies, companies, individualClients, onReload, sel
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
-  if (policies.length === 0) return <p className="text-navy-500 text-sm">Sem apólices para o filtro selecionado.</p>
+  if (policies.length === 0) return <p className="text-navy-500 text-sm">No policies for the selected filter.</p>
 
   return (
     <div className="flex flex-col gap-3">
@@ -4158,7 +4174,7 @@ function AdminPolicyList({ policies, companies, individualClients, onReload, sel
                     return next
                   })
                 }}
-                className="w-4 h-4 accent-gold-400 cursor-pointer"
+                className="w-4 h-4 accent-[#17243D] cursor-pointer"
               />
               <button onClick={() => setExpandedId(isExpanded ? null : policy.id)} className="text-navy-400 hover:text-navy-600 text-xs">
                 {isExpanded ? '▾' : '▸'}
@@ -4172,13 +4188,13 @@ function AdminPolicyList({ policies, companies, individualClients, onReload, sel
                   <span className="text-xs text-navy-500">{clientName}</span>
                   <span className="text-xs text-navy-400">{policy.insurer} · {policy.policyNumber}</span>
                 </div>
-                <p className="text-xs text-navy-400 mt-0.5">{formatCurrency(policy.annualPremium)}/ano · {formatDate(policy.endDate)}</p>
+                <p className="text-xs text-navy-400 mt-0.5">{formatCurrency(policy.annualPremium)}/yr · {formatDate(policy.endDate)}</p>
               </div>
               <button
                 onClick={() => setEditingId(isEditing ? null : policy.id)}
-                className="px-2.5 py-1 text-xs border border-navy-300 rounded hover:bg-navy-50 whitespace-nowrap"
+                className="admin-row-action"
               >
-                {isEditing ? 'Cancelar' : 'Editar'}
+                {isEditing ? 'Cancel' : 'Edit'}
               </button>
             </div>
 
@@ -4217,7 +4233,7 @@ function AdminPolicyList({ policies, companies, individualClients, onReload, sel
 
 
 const DEFAULT_MESSAGE =
-  'Junto envia-se o documento referente à sua apólice. Caso necessite de qualquer esclarecimento, não hesite em contactar-nos. Com os melhores cumprimentos, Adler & Rochefort.'
+  'Please find attached the document related to your policy. Should you require any clarification, do not hesitate to contact us. Best regards, Adler & Rochefort.'
 
 function SendDocumentModal({
   policyId,
@@ -4264,10 +4280,10 @@ function SendDocumentModal({
       const res = await adminSendPolicyDocument({
         data: { policyId, storagePath, filename, recipients, message },
       })
-      setResult({ ok: true, msg: `Documento enviado para ${res.sent} destinatário(s).` })
+      setResult({ ok: true, msg: `Document sent to ${res.sent} recipient(s).` })
       setTimeout(onClose, 2000)
     } catch (e: any) {
-      setResult({ ok: false, msg: e?.message ?? 'Erro ao enviar documento.' })
+      setResult({ ok: false, msg: e?.message ?? 'Error sending document.' })
     } finally {
       setSending(false)
     }
@@ -4278,12 +4294,12 @@ function SendDocumentModal({
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)' }} onClick={onClose} />
       <div style={{ position: 'relative', background: '#fff', borderRadius: 8, width: '95%', maxWidth: 520, padding: '1.75rem', fontFamily: 'Arial, sans-serif', boxShadow: '0 4px 24px rgba(0,0,0,0.18)', maxHeight: '90vh', overflowY: 'auto' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700, margin: '0 0 1.25rem', color: '#1B2B4B' }}>
-          Enviar Documento ao Cliente
+          Send Document to Client
         </h3>
 
         {/* Referência readonly */}
-        <div style={{ background: '#F4F6F9', borderLeft: '3px solid #C9A84C', borderRadius: 3, padding: '10px 14px', marginBottom: '1.25rem' }}>
-          <p style={{ margin: '0 0 2px', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Apólice</p>
+        <div style={{ background: '#F4F6F9', borderLeft: '3px solid #223553', borderRadius: 3, padding: '10px 14px', marginBottom: '1.25rem' }}>
+          <p style={{ margin: '0 0 2px', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Policy</p>
           <p style={{ margin: '0 0 2px', fontSize: '0.95rem', fontWeight: 700, color: '#1B2B4B', fontFamily: 'Courier New, monospace', letterSpacing: '0.08em' }}>{policyNumber}</p>
           <p style={{ margin: '0 0 4px', fontSize: '0.78rem', color: '#555' }}>{insurer}</p>
           <p style={{ margin: 0, fontSize: '0.75rem', color: '#888' }}>📄 {filename}</p>
@@ -4292,7 +4308,7 @@ function SendDocumentModal({
         {/* Destinatários */}
         <div style={{ marginBottom: '1rem' }}>
           <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#555', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Destinatários *
+            Recipients *
           </label>
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
             <input
@@ -4300,7 +4316,7 @@ function SendDocumentModal({
               value={inputEmail}
               onChange={(e) => setInputEmail(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="email@exemplo.com"
+              placeholder="email@example.com"
               style={{ flex: 1, padding: '0.45rem 0.75rem', border: '1px solid #ddd', borderRadius: 4, fontSize: '0.85rem' }}
             />
             <button
@@ -4308,7 +4324,7 @@ function SendDocumentModal({
               onClick={addRecipient}
               style={{ padding: '0.45rem 0.9rem', background: '#1B2B4B', color: '#fff', border: 'none', borderRadius: 4, fontSize: '0.8rem', cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
-              Adicionar
+              Add
             </button>
           </div>
           {recipients.length > 0 && (
@@ -4326,7 +4342,7 @@ function SendDocumentModal({
         {/* Mensagem de acompanhamento */}
         <div style={{ marginBottom: '1rem' }}>
           <label style={{ display: 'block', fontSize: '0.7rem', fontWeight: 600, color: '#555', marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-            Mensagem de acompanhamento
+            Accompanying message
           </label>
           <textarea
             value={message}
@@ -4338,7 +4354,7 @@ function SendDocumentModal({
 
         {/* Aviso BCC */}
         <p style={{ fontSize: '0.72rem', color: '#999', margin: '0 0 1.25rem' }}>
-          Uma cópia será arquivada em insurance@adlerrochefort.com (BCC automático).
+          A copy will be archived to insurance@adlerrochefort.com (automatic BCC).
         </p>
 
         {/* Feedback */}
@@ -4354,14 +4370,14 @@ function SendDocumentModal({
             onClick={onClose}
             style={{ padding: '0.5rem 1.1rem', background: 'none', border: '1px solid #ccc', borderRadius: 4, fontSize: '0.83rem', cursor: 'pointer', color: '#555' }}
           >
-            Cancelar
+            Cancel
           </button>
           <button
             onClick={handleSend}
             disabled={sending || !recipients.length}
-            style={{ padding: '0.5rem 1.3rem', background: recipients.length ? '#C9A84C' : '#ddd', border: 'none', borderRadius: 4, fontSize: '0.83rem', fontWeight: 700, cursor: recipients.length ? 'pointer' : 'not-allowed', color: recipients.length ? '#1B2B4B' : '#999' }}
+            style={{ padding: '0.5rem 1.3rem', background: recipients.length ? '#17243D' : '#ddd', border: 'none', borderRadius: 4, fontSize: '0.83rem', fontWeight: 700, cursor: recipients.length ? 'pointer' : 'not-allowed', color: recipients.length ? '#fff' : '#999' }}
           >
-            {sending ? 'A enviar...' : 'Enviar documento'}
+            {sending ? 'Sending…' : 'Send document'}
           </button>
         </div>
       </div>
@@ -4420,7 +4436,7 @@ function PolicyDocumentButtons({
           disabled={loading}
           onClick={() => setShowSendModal(true)}
           className="px-1.5 py-0.5 text-xs border border-navy-200 rounded hover:bg-navy-50 disabled:opacity-50"
-          title="Enviar ao cliente"
+          title="Send to client"
         >
           📧
         </button>
@@ -4473,7 +4489,7 @@ function PolicyDocumentUpload({ policyId, companyId, individualClientId, onUploa
       })
       await onUploaded()
     } catch (err: any) {
-      setError(err?.message ?? 'Erro no upload')
+      setError(err?.message ?? 'Upload error')
     } finally {
       setUploading(false)
       if (ref.current) ref.current.value = ''
@@ -4486,9 +4502,9 @@ function PolicyDocumentUpload({ policyId, companyId, individualClientId, onUploa
       <button
         onClick={() => ref.current?.click()}
         disabled={uploading}
-        className="px-2.5 py-1 text-xs bg-navy-700 text-white rounded hover:bg-navy-600 disabled:opacity-50 whitespace-nowrap"
+        className="admin-btn admin-btn-primary admin-btn--sm"
       >
-        {uploading ? 'A carregar...' : '↑ Fazer Upload'}
+        {uploading ? 'Uploading…' : '↑ Upload'}
       </button>
       <input ref={ref} type="file" accept="application/pdf,image/*" className="hidden" onChange={handleFile} />
     </div>
@@ -4509,7 +4525,7 @@ function AdminPolicyStorageDocs({ policy, clientEmail, onReload }: { policy: Pol
       })
       setDocs(data as PolicyDocFile[])
     } catch (e: any) {
-      setError(e?.message ?? 'Erro ao carregar documentos')
+      setError(e?.message ?? 'Error loading documents')
     } finally {
       setLoading(false)
     }
@@ -4525,7 +4541,7 @@ function AdminPolicyStorageDocs({ policy, clientEmail, onReload }: { policy: Pol
   return (
     <div className="border-t border-navy-100 bg-navy-50/30 p-4">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide">Documentos associados</p>
+        <p className="text-xs font-semibold text-navy-600 uppercase tracking-wide">Linked Documents</p>
         <PolicyDocumentUpload
           policyId={policy.id}
           companyId={policy.companyId}
@@ -4533,10 +4549,10 @@ function AdminPolicyStorageDocs({ policy, clientEmail, onReload }: { policy: Pol
           onUploaded={handleUploaded}
         />
       </div>
-      {loading && <p className="text-xs text-navy-400">A carregar...</p>}
+      {loading && <p className="text-xs text-navy-400">Loading…</p>}
       {error && <p className="text-xs text-red-500">{error}</p>}
       {!loading && !error && docs.length === 0 && (
-        <p className="text-xs text-navy-400 mb-3">Nenhum documento associado.</p>
+        <p className="text-xs text-navy-400 mb-3">No documents linked.</p>
       )}
       {!loading && docs.length > 0 && (
         <ul className="mb-3 space-y-1.5">
@@ -4628,28 +4644,28 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
     setSaving(false)
   }
 
-  const inp = 'w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-1 focus:ring-gold-400'
+  const inp = 'w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-1 focus:ring-[#223553]'
   const lbl = 'block text-xs font-semibold text-navy-500 uppercase tracking-wide mb-1'
 
   return (
     <div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
         <div>
-          <label className={lbl}>Tipo</label>
+          <label className={lbl}>Type</label>
           <select value={form.type} onChange={e => u('type', e.target.value)} className={inp}>
             {Object.entries(POLICY_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         </div>
         <div>
-          <label className={lbl}>Seguradora</label>
+          <label className={lbl}>Insurer</label>
           <input className={inp} value={form.insurer} onChange={e => u('insurer', e.target.value)} />
         </div>
         <div>
-          <label className={lbl}>N.º Apólice</label>
+          <label className={lbl}>Policy No.</label>
           <input className={inp} value={form.policyNumber} onChange={e => u('policyNumber', e.target.value)} />
         </div>
         <div>
-          <label className={lbl}>Estado</label>
+          <label className={lbl}>Status</label>
           <select value={form.status} onChange={e => u('status', e.target.value)} className={inp}>
             {Object.entries(POLICY_STATUS_LABEL)
               .filter(([k]) => ['active','expiring','expired','cancelled'].includes(k))
@@ -4657,55 +4673,55 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
           </select>
         </div>
         <div>
-          <label className={lbl}>Início</label>
+          <label className={lbl}>Start Date</label>
           <input type="date" className={inp} value={form.startDate} onChange={e => u('startDate', e.target.value)} />
         </div>
         <div>
-          <label className={lbl}>Fim</label>
+          <label className={lbl}>End Date</label>
           <input type="date" className={inp} value={form.endDate} onChange={e => u('endDate', e.target.value)} />
         </div>
         <div>
-          <label className={lbl}>Data Renovação</label>
+          <label className={lbl}>Renewal Date</label>
           <input type="date" className={inp} value={form.renewalDate} onChange={e => u('renewalDate', e.target.value)} />
         </div>
         <div>
-          <label className={lbl}>Prémio Anual (€)</label>
+          <label className={lbl}>Annual Premium (€)</label>
           <input type="number" className={inp} value={form.annualPremium} onChange={e => updateEditPremium(e.target.value)} />
         </div>
         <div>
-          <label className={lbl}>Periodicidade</label>
-          <input className={inp} value={form.paymentFrequency} onChange={e => u('paymentFrequency', e.target.value)} placeholder="Mensal, Anual..." />
+          <label className={lbl}>Payment Frequency</label>
+          <input className={inp} value={form.paymentFrequency} onChange={e => u('paymentFrequency', e.target.value)} placeholder="Monthly, Yearly…" />
         </div>
         <div className="sm:col-span-2 lg:col-span-3">
-          <label className={lbl}>Descrição (visível no portal)</label>
+          <label className={lbl}>Description (visible in portal)</label>
           <input className={inp} value={form.description} onChange={e => u('description', e.target.value)} />
         </div>
         <div className="sm:col-span-2 lg:col-span-3">
-          <label className={lbl}>Contactos de Emergência (visível no portal)</label>
-          <input className={inp} value={form.emergencyContacts} onChange={e => u('emergencyContacts', e.target.value)} placeholder="Linha de Assistência: 800 XXX XXX" />
+          <label className={lbl}>Emergency Contacts (visible in portal)</label>
+          <input className={inp} value={form.emergencyContacts} onChange={e => u('emergencyContacts', e.target.value)} placeholder="Assistance Line: 800 XXX XXX" />
         </div>
         <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
-          <input type="checkbox" id={`vp-${policy.id}`} checked={form.visiblePortal} onChange={e => u('visiblePortal', e.target.checked)} className="accent-gold-400" />
-          <label htmlFor={`vp-${policy.id}`} className="text-sm text-navy-600 cursor-pointer">Visível no Os Meus Seguros</label>
+          <input type="checkbox" id={`vp-${policy.id}`} checked={form.visiblePortal} onChange={e => u('visiblePortal', e.target.checked)} className="accent-[#17243D]" />
+          <label htmlFor={`vp-${policy.id}`} className="text-sm text-navy-600 cursor-pointer">Visible in customer portal</label>
         </div>
       </div>
 
-      <p className="text-xs font-semibold text-navy-400 uppercase tracking-wide mb-2 mt-1">Campos Internos (só admin)</p>
+      <p className="text-xs font-semibold text-navy-400 uppercase tracking-wide mb-2 mt-1">Internal Fields (admin only)</p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4">
         <div>
-          <label className={lbl}>Comissão %</label>
+          <label className={lbl}>Commission %</label>
           <input type="number" className={inp} value={form.commissionPercentage} onChange={e => updateCommissionPct(e.target.value)} />
         </div>
         <div>
-          <label className={lbl}>Comissão €</label>
+          <label className={lbl}>Commission €</label>
           <input type="number" className={inp} value={form.commissionValue} onChange={e => updateCommissionVal(e.target.value)} />
         </div>
         <div>
-          <label className={lbl}>Franquia (€)</label>
+          <label className={lbl}>Deductible (€)</label>
           <input type="number" className={inp} value={form.deductible} onChange={e => u('deductible', e.target.value)} />
         </div>
         <div className="sm:col-span-2 lg:col-span-3">
-          <label className={lbl}>Notas Internas</label>
+          <label className={lbl}>Internal Notes</label>
           <textarea className={inp + ' resize-y'} rows={3} value={form.notesInternal} onChange={e => u('notesInternal', e.target.value)} />
         </div>
       </div>
@@ -4713,9 +4729,9 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
       <button
         onClick={handleSave}
         disabled={saving}
-        className="px-5 py-2 bg-gold-400 text-navy-700 text-sm font-semibold rounded-[2px] hover:bg-gold-300 disabled:opacity-50"
+        className="admin-btn admin-btn-primary"
       >
-        {saving ? 'A guardar...' : 'Guardar Alterações'}
+        {saving ? 'Saving…' : 'Save changes'}
       </button>
     </div>
   )
@@ -4741,7 +4757,7 @@ function FormField({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-gold-400"
+        className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]"
         required={required}
       />
     </div>

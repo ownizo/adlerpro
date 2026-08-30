@@ -29,7 +29,7 @@ export function WebsiteLeads({ individualClientId }: Props) {
         if (!cancelled) setLeads(result)
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Erro ao carregar pedidos do website')
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Error loading website requests')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -41,14 +41,14 @@ export function WebsiteLeads({ individualClientId }: Props) {
 
   return (
     <div>
-      <h4 className="text-sm font-semibold text-navy-700 mb-3">Pedidos do Website</h4>
+      <h4 className="text-sm font-semibold text-navy-700 mb-3">Website Requests</h4>
 
       {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
       {loading ? (
-        <p className="text-sm text-navy-400">A carregar…</p>
+        <p className="text-sm text-navy-400">Loading…</p>
       ) : leads.length === 0 ? (
-        <p className="text-sm text-navy-400">Sem pedidos registados a partir do site.</p>
+        <p className="text-sm text-navy-400">No requests registered from the website.</p>
       ) : (
         <div className="grid gap-2">
           {leads.map((lead) => (
@@ -61,7 +61,7 @@ export function WebsiteLeads({ individualClientId }: Props) {
                 <span className="text-xs text-navy-400">{formatDate(lead.receivedAt)}</span>
               </div>
               <p className="text-xs text-navy-500 mt-1">
-                Formulário: {lead.formName}
+                Form: {lead.formName}
                 {lead.sourceUrl && (
                   <>
                     {' · '}

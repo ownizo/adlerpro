@@ -119,6 +119,58 @@ code {
   --admin-red-dark: #872733;
   background: var(--admin-page);
   color: var(--admin-ink);
+
+  /* ----------------------------------------------------------------
+     Legacy-token remap, scoped to /admin only.
+     Every `.text-navy-*` / `.bg-navy-*` / `.border-navy-*` class still
+     used throughout the untouched admin CRUD tabs (companies, people,
+     policies, claims, api, profiles, and their shared form components)
+     compiles to `var(--color-navy-*)` etc. — Tailwind v4 emits a CSS
+     variable reference, not a baked-in hex (verified in the build
+     output). The customer portal (contact/alerts/profile/claims
+     routes) uses the SAME `navy-*`/`amber-*` utility classes, so the
+     root-level tokens in the `@theme` block above can't change — but
+     redeclaring them here, scoped under `.admin-backoffice-shell`,
+     retints every existing admin className without touching a single
+     component file or the tokens customer routes depend on.
+     `gold-*`/`amber-*` are remapped to inert navy/neutral tones as a
+     safety net for anything not already replaced by an explicit
+     `.admin-btn-*` class below — never bright gold/amber in /admin.
+     ---------------------------------------------------------------- */
+  --color-navy-50: #F6F7F9;
+  --color-navy-100: #ECEFF3;
+  --color-navy-200: #E3E7EC;
+  --color-navy-300: #C7CDD6;
+  --color-navy-400: #98A2B3;
+  --color-navy-500: #667085;
+  --color-navy-600: #475467;
+  --color-navy-700: #172033;
+  --color-navy-800: #17243D;
+  --color-navy-900: #17243D;
+  --color-navy-950: #0D1420;
+
+  --color-gold: #17243D;
+  --color-gold-50: #EEF1F5;
+  --color-gold-100: #E3E7EC;
+  --color-gold-200: #D7DDE4;
+  --color-gold-300: #C7CDD6;
+  --color-gold-400: #E3E7EC;
+  --color-gold-500: #C7CDD6;
+  --color-gold-600: #98A2B3;
+  --color-gold-700: #667085;
+  --color-gold-800: #475467;
+  --color-gold-900: #172033;
+
+  --color-amber-50: #EEF2F7;
+  --color-amber-100: #E1E7EF;
+  --color-amber-200: #C7D2E0;
+  --color-amber-300: #A9B8CC;
+  --color-amber-400: #8496AF;
+  --color-amber-500: #64758F;
+  --color-amber-600: #475467;
+  --color-amber-700: #223553;
+  --color-amber-800: #172033;
+  --color-amber-900: #101828;
 }
 
 .admin-backoffice-shell,
@@ -1260,6 +1312,182 @@ code {
 
 .admin-table tbody tr:hover {
   background: var(--admin-page);
+}
+
+.admin-table-wrap {
+  background: var(--admin-card);
+  border: 1px solid var(--admin-border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.admin-table thead th {
+  background: #F8FAFC;
+}
+
+/* ---------- Button system ---------- */
+
+.admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 36px;
+  padding: 0 0.9rem;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.admin-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.admin-btn--sm {
+  height: 32px;
+  padding: 0 0.65rem;
+  font-size: 12.5px;
+}
+
+.admin-btn-primary {
+  background: var(--admin-navy);
+  color: #FFFFFF;
+  border-color: var(--admin-navy);
+}
+
+.admin-btn-primary:hover:not(:disabled) {
+  background: var(--admin-navy-light);
+  border-color: var(--admin-navy-light);
+}
+
+.admin-btn-secondary {
+  background: var(--admin-card);
+  color: var(--admin-ink);
+  border-color: var(--admin-border);
+}
+
+.admin-btn-secondary:hover:not(:disabled) {
+  background: var(--admin-page);
+  border-color: #C7CDD6;
+}
+
+.admin-btn-danger {
+  background: #FBF3F4;
+  color: var(--admin-red-dark);
+  border-color: #EFD8DB;
+}
+
+.admin-btn-danger:hover:not(:disabled) {
+  background: #F3D6D9;
+  border-color: #E5B8BE;
+}
+
+.admin-btn-ghost {
+  background: transparent;
+  color: var(--admin-muted);
+  border-color: transparent;
+}
+
+.admin-btn-ghost:hover:not(:disabled) {
+  background: var(--admin-page);
+  color: var(--admin-ink);
+}
+
+/* ---------- Status chips ---------- */
+
+.admin-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 0.55rem;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.admin-chip--neutral {
+  background: var(--admin-page);
+  color: var(--admin-muted);
+  border: 1px solid var(--admin-border);
+}
+
+.admin-chip--success {
+  background: #EAF3DE;
+  color: #3B6D11;
+}
+
+.admin-chip--info {
+  background: #EEF2F7;
+  color: var(--admin-navy-light);
+}
+
+.admin-chip--danger {
+  background: #FBF3F4;
+  color: var(--admin-red-dark);
+}
+
+/* Compact per-row portal/quick actions (People/Companies tables) */
+.admin-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+}
+
+.admin-row-action {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 0.55rem;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-card);
+  color: var(--admin-ink);
+  cursor: pointer;
+}
+
+.admin-row-action:hover {
+  background: var(--admin-page);
+}
+
+.admin-row-action--danger {
+  color: var(--admin-red-dark);
+  border-color: #EFD8DB;
+}
+
+.admin-row-action--danger:hover {
+  background: #FBF3F4;
+}
+
+/* Bulk-selection bar: quiet by default, only draws attention once rows
+   are actually selected — see requirement "selection bar". */
+.admin-selection-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.65rem;
+  margin-bottom: 0.65rem;
+  border-radius: 7px;
+  font-size: 12.5px;
+  color: var(--admin-muted);
+}
+
+.admin-selection-bar--active {
+  background: #EEF2F7;
+  border: 1px solid #D7E0EC;
+  color: var(--admin-ink);
 }
 
 /* ---------- Mobile ---------- */

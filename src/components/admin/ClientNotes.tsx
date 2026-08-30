@@ -25,7 +25,7 @@ export function ClientNotes({ companyId, individualClientId }: Props) {
         if (!cancelled) setNotes(result)
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Erro ao carregar notas')
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Error loading notes')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -60,14 +60,14 @@ export function ClientNotes({ companyId, individualClientId }: Props) {
     } catch (err) {
       setNotes((prev) => prev.filter((n) => n.id !== tempId))
       setBody(trimmed)
-      setError(err instanceof Error ? err.message : 'Erro ao guardar nota')
+      setError(err instanceof Error ? err.message : 'Error saving note')
     } finally {
       setSaving(false)
     }
   }
 
   async function handleDelete(noteId: string) {
-    if (!window.confirm('Apagar esta nota?')) return
+    if (!window.confirm('Delete this note?')) return
 
     const snapshot = notes
     setNotes((prev) => prev.filter((n) => n.id !== noteId))
@@ -77,7 +77,7 @@ export function ClientNotes({ companyId, individualClientId }: Props) {
       await adminDeleteClientNote({ data: noteId })
     } catch (err) {
       setNotes(snapshot)
-      setError(err instanceof Error ? err.message : 'Erro ao apagar nota')
+      setError(err instanceof Error ? err.message : 'Error deleting note')
     }
   }
 
@@ -85,14 +85,14 @@ export function ClientNotes({ companyId, individualClientId }: Props) {
 
   return (
     <div>
-      <h4 className="text-sm font-semibold text-navy-700 mb-3">Notas</h4>
+      <h4 className="text-sm font-semibold text-navy-700 mb-3">Notes</h4>
 
-      {/* Adicionar nota */}
+      {/* Add note */}
       <div className="mb-4 space-y-2">
         <textarea
-          className="w-full rounded-[4px] border border-navy-200 px-3 py-2 text-sm text-navy-700 placeholder:text-navy-400 focus:outline-none focus:ring-1 focus:ring-gold-400 resize-none"
+          className="w-full rounded-[4px] border border-navy-200 px-3 py-2 text-sm text-navy-700 placeholder:text-navy-400 focus:outline-none focus:ring-1 focus:ring-[#223553] resize-none"
           rows={3}
-          placeholder="Escrever nota…"
+          placeholder="Write a note…"
           value={body}
           onChange={(e) => setBody(e.target.value)}
           disabled={saving}
@@ -103,7 +103,7 @@ export function ClientNotes({ companyId, individualClientId }: Props) {
             onClick={handleAdd}
             disabled={!canAdd}
           >
-            {saving ? 'A guardar…' : 'Adicionar nota'}
+            {saving ? 'Saving…' : 'Add note'}
           </button>
         </div>
       </div>
@@ -111,9 +111,9 @@ export function ClientNotes({ companyId, individualClientId }: Props) {
       {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
       {loading ? (
-        <p className="text-sm text-navy-400">A carregar…</p>
+        <p className="text-sm text-navy-400">Loading…</p>
       ) : notes.length === 0 ? (
-        <p className="text-sm text-navy-400">Sem notas.</p>
+        <p className="text-sm text-navy-400">No notes.</p>
       ) : (
         <div className="grid gap-2">
           {notes.map((note) => (
@@ -132,7 +132,7 @@ export function ClientNotes({ companyId, individualClientId }: Props) {
                   className="flex-shrink-0 text-xs text-red-400 hover:text-red-600"
                   onClick={() => handleDelete(note.id)}
                 >
-                  Apagar
+                  Delete
                 </button>
               )}
             </div>

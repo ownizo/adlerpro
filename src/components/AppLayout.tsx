@@ -134,6 +134,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const adminTabParam = new URLSearchParams(location.searchStr).get('tab')
   const activeAdminTab: AdminTab = isAdminTabValue(adminTabParam) ? adminTabParam : 'dashboard'
 
+  // The backoffice is English-only, but a handful of admin components
+  // (BillingTab) still read copy through the shared i18next instance rather
+  // than hardcoded strings. i18n is a singleton shared with the customer
+  // portal, so if an admin had switched the customer-facing language to PT
+  // earlier in the same session, those components would render in
+  // Portuguese. Force English for the duration of /admin, and restore the
+  // customer's chosen language the moment they navigate back out — this
+  // never touches localStorage/setLang, so the customer portal's own
+  // language preference is untouched.
+  useEffect(() => {
+    i18n.changeLanguage(isAdminRoute ? 'en' : lang)
+  }, [isAdminRoute, lang, i18n])
+
   useEffect(() => {
     if (!isAdmin || !ready) return
     getAdminNavBadgeCounts()
