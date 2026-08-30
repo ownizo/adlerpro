@@ -103,6 +103,21 @@ const RENEWAL_KANBAN_TARGET_STATUS: Record<RenewalKanbanColumnId, RenewalAlertSt
   renewed: 'renewed',
 }
 
+// Presentation-only mapping for the handful of Portuguese fallback labels
+// getRenewalAlerts() (server-fns.ts) returns when a policy has no linked
+// company record — server functions are off-limits to edit under the admin
+// isolation rules, so this maps the known constant strings to English right
+// where they're rendered. Nothing else is touched: real client/company
+// names (in whatever language they were entered) pass through unchanged,
+// and no stored value or business logic is affected.
+const RENEWAL_FALLBACK_LABEL_EN: Record<string, string> = {
+  'Cliente individual': 'Individual client',
+  'Cliente não identificado': 'Unidentified client',
+}
+function renewalDisplayLabel(value: string): string {
+  return RENEWAL_FALLBACK_LABEL_EN[value] ?? value
+}
+
 function renewalColumnByStatus(status: RenewalAlertStatus): RenewalKanbanColumnId {
   if (status === 'negotiating') return 'negotiating'
   if (status === 'renewed') return 'renewed'
@@ -225,8 +240,8 @@ function buildRenewalPipelineIntelligence(alerts: RenewalAlertItem[]): RenewalPi
       current.policiesCount += 1
     } else {
       riskByClient.set(key, {
-        client: alert.client,
-        company: alert.company,
+        client: renewalDisplayLabel(alert.client),
+        company: renewalDisplayLabel(alert.company),
         policiesCount: 1,
         valueAtRisk: alert.value,
       })
@@ -2451,13 +2466,13 @@ function AdminRenewalsPage({
                                 }`}
                               >
                                 <div className="flex items-center justify-between gap-2">
-                                  <p className="font-semibold">{alert.client}</p>
+                                  <p className="font-semibold">{renewalDisplayLabel(alert.client)}</p>
                                   <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${urgencyPalette.badge}`}>
                                     D-{alert.urgency}
                                   </span>
                                 </div>
                                 <p className="text-navy-600 mt-0.5">
-                                  {alert.company} · {POLICY_TYPE_LABELS[alert.policyType]}
+                                  {renewalDisplayLabel(alert.company)} · {POLICY_TYPE_LABELS[alert.policyType]}
                                 </p>
                                 <p className="text-navy-600 mt-0.5">
                                   {alert.insurer} · {formatCurrency(alert.value)}
