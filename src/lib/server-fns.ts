@@ -2763,25 +2763,20 @@ export const adminPromoteToCompany = createServerFn({ method: 'POST' })
       if (companyErr) throw new Error(companyErr.message)
     }
 
-    // Move policies
-    await supabaseAdmin
-      .from('policies')
-      .update({ company_id: companyId!, individual_client_id: null })
-      .eq('individual_client_id', data.clientId)
+    // Re-parent every child record (policies, claims, documents,
+    // client_notes, client_tasks, sales_opportunities, website_leads) from
+    // the individual client to the destination company, and only then
+    // delete the individual_clients row — all inside a single atomic
+    // transaction. See migrations/20260830_fix_promote_client_to_company.sql
+    // for why this replaced a previous update/update/delete sequence here
+    // that lost CRM history (claims, notes, tasks, opportunities, website
+    // leads were CASCADE-deleted by the individual_clients DELETE below,
+    // and documents ended up with both company_id and individual_client_id
+    // populated).
+    const relationsMoved = await db.promoteIndividualClientToCompanyRelations(data.clientId, companyId!)
+    console.log('promoted individual_client to company:', data.clientId, '->', companyId!, relationsMoved)
 
-    // Move documents (best-effort)
-    await supabaseAdmin
-      .from('documents')
-      .update({ company_id: companyId! })
-      .eq('individual_client_id', data.clientId)
-
-    // Delete individual client — throw on error
-    const { error: delErr } = await supabaseAdmin
-      .from('individual_clients').delete().eq('id', data.clientId)
-    if (delErr) throw new Error(`Erro ao apagar individual_client: ${delErr.message}`)
-    console.log('deleted individual_client:', data.clientId)
-
-    return { success: true, companyId: companyId!, alreadyExisted }
+    return { success: true, companyId: companyId!, alreadyExisted, relationsMoved }
   })
 
 export const adminUpdateApiConnection = createServerFn({ method: 'POST' })

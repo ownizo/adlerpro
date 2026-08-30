@@ -581,6 +581,62 @@ export async function deleteIndividualClientRelations(clientId: string): Promise
   if (errors.length > 0) throw new Error(`deleteIndividualClientRelations: ${errors.join('; ')}`)
 }
 
+export interface PromoteIndividualClientToCompanyRelationsResult {
+  policies: number
+  claims: number
+  documents: number
+  clientNotes: number
+  clientTasks: number
+  salesOpportunities: number
+  websiteLeads: number
+}
+
+/**
+ * Re-parenta TUDO o que pertence a um individual_client para uma company e
+ * só depois apaga o individual_client — atomicamente, dentro da mesma
+ * transação implícita de uma única chamada RPC (ver
+ * promote_individual_client_to_company_relations em
+ * migrations/20260830_fix_promote_client_to_company.sql). Se qualquer passo
+ * falhar, o Postgres reverte tudo — nunca fica uma promoção parcial.
+ *
+ * NÃO usar deleteIndividualClientRelations aqui: essa função apaga
+ * definitivamente claims/policies (e as suas dependências), o que é o
+ * comportamento certo para "apagar cliente" mas destruiria o histórico de
+ * CRM (claims, notas, tarefas, oportunidades, website leads) numa promoção,
+ * que é uma operação de re-parenting, não de delete — ver bug corrigido
+ * nesta migration.
+ */
+export async function promoteIndividualClientToCompanyRelations(
+  clientId: string,
+  companyId: string,
+): Promise<PromoteIndividualClientToCompanyRelationsResult> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await (sb.rpc as any)('promote_individual_client_to_company_relations', {
+    p_client_id: clientId,
+    p_company_id: companyId,
+  }).single()
+  if (error) throw new Error(`promoteIndividualClientToCompanyRelations: ${error.message}`)
+  if (!data) throw new Error('promoteIndividualClientToCompanyRelations: sem resultado da RPC')
+  const row = data as {
+    policies: number
+    claims: number
+    documents: number
+    client_notes: number
+    client_tasks: number
+    sales_opportunities: number
+    website_leads: number
+  }
+  return {
+    policies: row.policies,
+    claims: row.claims,
+    documents: row.documents,
+    clientNotes: row.client_notes,
+    clientTasks: row.client_tasks,
+    salesOpportunities: row.sales_opportunities,
+    websiteLeads: row.website_leads,
+  }
+}
+
 // ============================================================
 // Website Leads — intake do site público (adlerrochefort.com)
 // ============================================================
@@ -661,13 +717,39 @@ export async function getWebsiteLeadsByIndividualClientId(individualClientId: st
   return rowsToCamel<WebsiteLead>(data ?? [])
 }
 
+/**
+ * Website leads de uma company — só populado depois de um
+ * individual_client com histórico de pedidos ser promovido a company
+ * (ver adminPromoteToCompany / promote_individual_client_to_company_relations
+ * em migrations/20260830_fix_promote_client_to_company.sql). Nenhum lead é
+ * criado diretamente com company_id hoje (o intake endpoint só serve
+ * pessoas singulares — ver 20260829_website_leads.sql).
+ */
+export async function getWebsiteLeadsByCompanyId(companyId: string): Promise<WebsiteLead[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('website_leads')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('received_at', { ascending: false })
+  if (error) { console.error('getWebsiteLeadsByCompanyId error:', error); return [] }
+  return rowsToCamel<WebsiteLead>(data ?? [])
+}
+
 /** IDs de clientes com pelo menos um website_lead — usado só para mostrar o
- * indicador "Origem: Website" na listagem de clientes individuais do admin. */
+ * indicador "Origem: Website" na listagem de clientes individuais do admin.
+ * individual_client_id pode ser NULL desde que website_leads passou a
+ * suportar company_id (promoção a company) — filtrado aqui para nunca
+ * incluir `null` no Set. */
 export async function getWebsiteLeadIndividualClientIds(): Promise<Set<string>> {
   const sb = getSupabaseAdmin()
   const { data, error } = await sb.from('website_leads').select('individual_client_id')
   if (error) { console.error('getWebsiteLeadIndividualClientIds error:', error); return new Set() }
-  return new Set((data ?? []).map((r: { individual_client_id: string }) => r.individual_client_id))
+  return new Set(
+    (data ?? [])
+      .map((r: { individual_client_id: string | null }) => r.individual_client_id)
+      .filter((id): id is string => id != null),
+  )
 }
 
 // ============================================================
