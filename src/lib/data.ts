@@ -32,6 +32,10 @@ import type {
   ExternalClientIdentity,
   ExternalPolicyIdentity,
   Json,
+  CarrierIndividualCandidateSummary,
+  CarrierCompanyCandidateSummary,
+  CarrierPolicyCandidateSummary,
+  CarrierImportRecordReview,
 } from './types'
 import {
   buildWebsiteLeadOpportunityPayload,
@@ -1401,6 +1405,85 @@ export async function getCarrierImportRecord(recordId: string): Promise<CarrierI
   const { data, error } = await sb.from('carrier_import_records').select('*').eq('id', recordId).single()
   if (error) return undefined
   return objectToCamel(data) as unknown as CarrierImportRecord
+}
+
+/**
+ * Resolves a carrier_import_record's matched_individual_client_id/
+ * matched_company_id/matched_policy_id into review-safe summaries — see
+ * CarrierImportRecordReview in types.ts for exactly which fields are
+ * exposed and why. Never invents a candidate: if a matched_*_id is absent,
+ * or the row it points at no longer exists, that candidate is simply
+ * omitted (`undefined`), never fabricated from partial data.
+ *
+ * Only ever reads individual_clients/companies/policies (via the existing
+ * getIndividualClient/getCompany/getPolicy) — no notes/tasks/opportunities/
+ * claims/documents table is touched here, and nothing from those tables
+ * could leak into the summary even if a caller tried, since the return
+ * shape is fixed to CarrierIndividualCandidateSummary/
+ * CarrierCompanyCandidateSummary/CarrierPolicyCandidateSummary.
+ */
+export async function getCarrierImportRecordReview(recordId: string): Promise<CarrierImportRecordReview | undefined> {
+  const record = await getCarrierImportRecord(recordId)
+  if (!record) return undefined
+
+  let individualCandidate: CarrierIndividualCandidateSummary | undefined
+  if (record.matchedIndividualClientId) {
+    const client = await getIndividualClient(record.matchedIndividualClientId)
+    if (client) {
+      individualCandidate = {
+        id: client.id,
+        fullName: client.fullName,
+        email: client.email,
+        phone: client.phone,
+        nif: client.nif,
+        address: client.address,
+      }
+    }
+  }
+
+  let companyCandidate: CarrierCompanyCandidateSummary | undefined
+  if (record.matchedCompanyId) {
+    const company = await getCompany(record.matchedCompanyId)
+    if (company) {
+      companyCandidate = {
+        id: company.id,
+        name: company.name,
+        nif: company.nif,
+        contactName: company.contactName,
+        contactEmail: company.contactEmail,
+        contactPhone: company.contactPhone,
+        address: company.address,
+      }
+    }
+  }
+
+  let policyCandidate: CarrierPolicyCandidateSummary | undefined
+  if (record.matchedPolicyId) {
+    const policy = await getPolicy(record.matchedPolicyId)
+    if (policy) {
+      // Owner label is one cheap extra lookup by an id already on the
+      // policy row — never a guess, and never touches notes/tasks/
+      // opportunities/claims for that owner.
+      let ownerLabel: string | undefined
+      if (policy.companyId) {
+        ownerLabel = (await getCompany(policy.companyId))?.name
+      } else if (policy.individualClientId) {
+        ownerLabel = (await getIndividualClient(policy.individualClientId))?.fullName
+      }
+      policyCandidate = {
+        id: policy.id,
+        policyNumber: policy.policyNumber,
+        insurer: policy.insurer,
+        policyType: policy.type,
+        startDate: policy.startDate,
+        endDate: policy.endDate,
+        annualPremium: policy.annualPremium,
+        ownerLabel,
+      }
+    }
+  }
+
+  return { record, individualCandidate, companyCandidate, policyCandidate }
 }
 
 // ── External identities (lookup) ────────────────────────────

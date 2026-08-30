@@ -3866,6 +3866,15 @@ export const adminGetCarrierImportRecord = createServerFn({ method: 'GET' })
   .inputValidator((recordId: string) => recordId)
   .handler(async ({ data: recordId }) => db.getCarrierImportRecord(recordId))
 
+// Resolves matched_individual_client_id/matched_company_id/matched_policy_id
+// into review-safe summaries server-side — the route must never query
+// Supabase directly from the browser (see db.getCarrierImportRecordReview
+// for exactly which fields are exposed).
+export const adminGetCarrierImportRecordReview = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((recordId: string) => recordId)
+  .handler(async ({ data: recordId }) => db.getCarrierImportRecordReview(recordId))
+
 // ── Link external identities — a separate, deliberate Admin action; never
 // triggered automatically by Accept (see adminAcceptCarrierImportDecision
 // below and the "Do NOT automatically link when Accept is clicked" requirement) ──

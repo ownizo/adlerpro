@@ -1,4 +1,4 @@
-import { createFileRoute, Navigate, Link, Outlet, useRouterState } from '@tanstack/react-router'
+import { createFileRoute, Navigate, Link, Outlet, useRouterState, useNavigate } from '@tanstack/react-router'
 import { BillingTab } from '@/components/billing/BillingTab'
 import { AppLayout } from '@/components/AppLayout'
 import {
@@ -340,6 +340,7 @@ function AdminPage() {
 
 function AdminDashboardContent() {
   const { user, ready } = useIdentity()
+  const navigate = useNavigate()
   const { tab: searchTab, stage: searchStage, overdue: searchOverdue } = Route.useSearch()
   const tab: AdminTab = searchTab ?? 'dashboard'
   const [companies, setCompanies] = useState<Company[]>([])
@@ -1274,7 +1275,29 @@ function AdminDashboardContent() {
                 {pendingPolicyCreate && (
                   <DuplicateWarningDialog
                     warnings={pendingPolicyCreate.warnings}
+                    reviewLabel="Review existing policy"
                     onCancel={() => setPendingPolicyCreate(null)}
+                    onReviewCandidates={(candidateIds) => {
+                      // Reuses the Policies tab's own existing owner filter
+                      // (selectedCompanyId) — never invents a policy-detail
+                      // view, and never arbitrarily picks one candidate as
+                      // "the" match when several were returned: if every
+                      // candidate shares the same owner, pre-filter to that
+                      // owner so the (possibly several) real rows are easy
+                      // to compare by policy number; otherwise leave the
+                      // list unfiltered so nothing is hidden or guessed.
+                      setPendingPolicyCreate(null)
+                      setShowNewPolicy(false)
+                      const owners = new Set(
+                        candidateIds
+                          .map((candidateId) => policies.find((p) => p.id === candidateId))
+                          .filter((p): p is Policy => !!p)
+                          .map((p) => (p.companyId ? p.companyId : p.individualClientId ? `ic:${p.individualClientId}` : ''))
+                          .filter((owner) => owner !== ''),
+                      )
+                      setSelectedCompanyId(owners.size === 1 ? Array.from(owners)[0]! : '')
+                      navigate({ to: '/admin', search: { tab: 'policies' } })
+                    }}
                     onContinue={async () => {
                       const data = pendingPolicyCreate.data
                       setPendingPolicyCreate(null)
@@ -4921,11 +4944,22 @@ function DuplicateWarningDialog({
   onCancel,
   onContinue,
   onReview,
+  onReviewCandidates,
+  reviewLabel = 'Review existing record',
 }: {
   warnings: DuplicateWarning[]
   onCancel: () => void
   onContinue: () => void
+  // Person/Company: jump straight to ONE existing record (their own
+  // matching rules only ever need the first shared candidate — see
+  // ClientProfilePanel-style expand). Left exactly as it was.
   onReview?: (candidateId: string) => void
+  // Policy: hands back EVERY candidate id for a warning, never just the
+  // first — a policy_number match can legitimately point at more than one
+  // existing policy, and picking one arbitrarily would be exactly the
+  // "silently reduced to the first one" problem this exists to avoid.
+  onReviewCandidates?: (candidateIds: string[]) => void
+  reviewLabel?: string
 }) {
   return (
     <div
@@ -4959,6 +4993,16 @@ function DuplicateWarningDialog({
                   onClick={() => onReview(warning.candidateIds[0]!)}
                 >
                   Review existing record
+                </button>
+              )}
+              {onReviewCandidates && warning.candidateIds.length > 0 && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-ghost admin-btn--sm"
+                  style={{ marginLeft: '0.4rem' }}
+                  onClick={() => onReviewCandidates(warning.candidateIds)}
+                >
+                  {reviewLabel}
                 </button>
               )}
             </div>

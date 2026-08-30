@@ -740,3 +740,56 @@ export interface ExternalPolicyIdentity {
   createdAt: string
   updatedAt: string
 }
+
+// ── CRM3 Block 2 — review-safe candidate summaries ──────────────────────
+//
+// A carrier_import_record's matched_*_id columns are internal ids only —
+// exposing them alone to an admin doing manual reconciliation isn't enough
+// to safely confirm a match. These summaries carry ONLY the fields already
+// shown elsewhere in the ordinary admin People/Companies/Policies views —
+// never notes, tasks, opportunities, claims, documents, auth metadata, or
+// anything resembling medical information. See
+// getCarrierImportRecordReview in src/lib/data.ts, which builds these by
+// resolving matched_individual_client_id/matched_company_id/
+// matched_policy_id server-side and picking only these fields — nothing
+// else about the matched record ever crosses into this summary.
+
+export interface CarrierIndividualCandidateSummary {
+  id: string
+  fullName: string
+  email?: string
+  phone?: string
+  nif?: string
+  address?: string
+}
+
+export interface CarrierCompanyCandidateSummary {
+  id: string
+  name: string
+  nif: string
+  contactName: string
+  contactEmail: string
+  contactPhone: string
+  address?: string
+}
+
+export interface CarrierPolicyCandidateSummary {
+  id: string
+  policyNumber: string
+  insurer: string
+  policyType?: string
+  startDate?: string
+  endDate?: string
+  annualPremium?: number
+  /** Owner's display name (company name or individual client full name) —
+   * resolved because it's cheap (one extra lookup by an id already on the
+   * policy row), never a second-hand guess. */
+  ownerLabel?: string
+}
+
+export interface CarrierImportRecordReview {
+  record: CarrierImportRecord
+  individualCandidate?: CarrierIndividualCandidateSummary
+  companyCandidate?: CarrierCompanyCandidateSummary
+  policyCandidate?: CarrierPolicyCandidateSummary
+}

@@ -5,14 +5,15 @@ import { useIdentity } from '@/lib/identity-context'
 import {
   adminGetCarrierSyncRun,
   adminListCarrierImportRecords,
+  adminGetCarrierImportRecordReview,
   adminAcceptCarrierImportDecision,
   adminRejectCarrierImportDecision,
   adminIgnoreCarrierImportDecision,
   adminLinkCarrierClientIdentity,
   adminLinkCarrierPolicyIdentity,
 } from '@/lib/server-fns'
-import { formatDate } from '@/lib/utils'
-import type { CarrierImportRecord, CarrierSyncRun } from '@/lib/types'
+import { formatCurrency, formatDate } from '@/lib/utils'
+import type { CarrierImportRecord, CarrierImportRecordReview, CarrierSyncRun } from '@/lib/types'
 
 /**
  * /admin/carrier-integrations/runs/$id — review a single reconciliation
@@ -211,6 +212,20 @@ function ImportRecordReviewPanel({
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [review, setReview] = useState<CarrierImportRecordReview | undefined>(undefined)
+  const [reviewLoading, setReviewLoading] = useState(true)
+
+  // Server-side candidate resolution only — this route never queries
+  // Supabase directly from the browser (see adminGetCarrierImportRecordReview).
+  useEffect(() => {
+    let cancelled = false
+    setReviewLoading(true)
+    adminGetCarrierImportRecordReview({ data: record.id })
+      .then((data) => { if (!cancelled) setReview(data) })
+      .catch((err: unknown) => console.error('adminGetCarrierImportRecordReview error:', err))
+      .finally(() => { if (!cancelled) setReviewLoading(false) })
+    return () => { cancelled = true }
+  }, [record.id])
 
   const canLinkClient =
     (record.customerMatchStatus === 'exact' || record.customerMatchStatus === 'probable') &&
@@ -276,16 +291,71 @@ function ImportRecordReviewPanel({
           </div>
         </section>
 
-        {/* 2. CRM candidate summary */}
+        {/* 2. CRM candidate summary — human-readable, resolved server-side
+            (adminGetCarrierImportRecordReview). Never infers missing
+            fields: a candidate simply omits whatever it doesn't have. */}
         <section style={{ marginBottom: '1rem' }}>
           <h3 className="text-xs font-semibold uppercase text-navy-400" style={{ marginBottom: '0.4rem' }}>CRM candidate</h3>
-          <div className="grid grid-cols-2 gap-2 text-sm">
+          <div className="grid grid-cols-2 gap-2 text-sm" style={{ marginBottom: '0.5rem' }}>
             <div><span className="text-navy-400">Customer match: </span><MatchChip status={record.customerMatchStatus} /></div>
             <div><span className="text-navy-400">Policy match: </span><MatchChip status={record.policyMatchStatus} /></div>
-            <div><span className="text-navy-400">Matched individual client: </span>{record.matchedIndividualClientId ?? '—'}</div>
-            <div><span className="text-navy-400">Matched company: </span>{record.matchedCompanyId ?? '—'}</div>
-            <div><span className="text-navy-400">Matched policy: </span>{record.matchedPolicyId ?? '—'}</div>
           </div>
+
+          {reviewLoading ? (
+            <p className="text-sm text-navy-400">Loading candidate details…</p>
+          ) : (
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="border border-navy-100 rounded-[4px] p-3">
+                <p className="text-xs font-semibold text-navy-500" style={{ marginBottom: '0.3rem' }}>CRM customer</p>
+                {review?.individualCandidate ? (
+                  <div className="text-sm text-navy-700">
+                    <p className="font-medium">{review.individualCandidate.fullName}</p>
+                    {review.individualCandidate.nif && <p className="text-navy-500">NIF: {review.individualCandidate.nif}</p>}
+                    {review.individualCandidate.email && <p className="text-navy-500">{review.individualCandidate.email}</p>}
+                    {review.individualCandidate.phone && <p className="text-navy-500">{review.individualCandidate.phone}</p>}
+                    {review.individualCandidate.address && <p className="text-navy-400 text-xs" style={{ marginTop: '0.2rem' }}>{review.individualCandidate.address}</p>}
+                    <p className="text-navy-300 text-xs" style={{ marginTop: '0.3rem' }}>ID: {review.individualCandidate.id}</p>
+                  </div>
+                ) : review?.companyCandidate ? (
+                  <div className="text-sm text-navy-700">
+                    <p className="font-medium">{review.companyCandidate.name}</p>
+                    <p className="text-navy-500">NIF: {review.companyCandidate.nif}</p>
+                    <p className="text-navy-500">{review.companyCandidate.contactName}</p>
+                    <p className="text-navy-500">{review.companyCandidate.contactEmail}</p>
+                    <p className="text-navy-500">{review.companyCandidate.contactPhone}</p>
+                    {review.companyCandidate.address && <p className="text-navy-400 text-xs" style={{ marginTop: '0.2rem' }}>{review.companyCandidate.address}</p>}
+                    <p className="text-navy-300 text-xs" style={{ marginTop: '0.3rem' }}>ID: {review.companyCandidate.id}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-navy-400">No CRM candidate linked.</p>
+                )}
+              </div>
+
+              <div className="border border-navy-100 rounded-[4px] p-3">
+                <p className="text-xs font-semibold text-navy-500" style={{ marginBottom: '0.3rem' }}>CRM policy</p>
+                {review?.policyCandidate ? (
+                  <div className="text-sm text-navy-700">
+                    <p className="font-medium">{review.policyCandidate.insurer} · {review.policyCandidate.policyNumber}</p>
+                    {review.policyCandidate.policyType && <p className="text-navy-500">{review.policyCandidate.policyType}</p>}
+                    {(review.policyCandidate.startDate || review.policyCandidate.endDate) && (
+                      <p className="text-navy-500">
+                        {review.policyCandidate.startDate ? formatDate(review.policyCandidate.startDate) : '—'}
+                        {' → '}
+                        {review.policyCandidate.endDate ? formatDate(review.policyCandidate.endDate) : '—'}
+                      </p>
+                    )}
+                    {review.policyCandidate.annualPremium != null && (
+                      <p className="text-navy-500">{formatCurrency(review.policyCandidate.annualPremium)}/year</p>
+                    )}
+                    {review.policyCandidate.ownerLabel && <p className="text-navy-500">Owner: {review.policyCandidate.ownerLabel}</p>}
+                    <p className="text-navy-300 text-xs" style={{ marginTop: '0.3rem' }}>ID: {review.policyCandidate.id}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-navy-400">No CRM candidate linked.</p>
+                )}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* 3. Matching reasons/signals */}
