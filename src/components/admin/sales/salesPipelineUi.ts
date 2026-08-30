@@ -43,8 +43,8 @@ export function buildOwnerLookup(
 ): OwnerLookup {
   if (opportunity.individualClientId) {
     const client = individualClients.find((c) => c.id === opportunity.individualClientId)
-    return { name: client?.fullName ?? 'Cliente removido', email: client?.email, kind: 'individual' }
+    return { name: client?.fullName ?? 'Removed client', email: client?.email, kind: 'individual' }
   }
   const company = companies.find((c) => c.id === opportunity.companyId)
-  return { name: company?.name ?? 'Empresa removida', email: company?.contactEmail, kind: 'company' }
+  return { name: company?.name ?? 'Removed company', email: company?.contactEmail, kind: 'company' }
 }

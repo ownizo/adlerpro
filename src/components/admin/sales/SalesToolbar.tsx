@@ -1,43 +1,60 @@
 interface Props {
   view: 'kanban' | 'list'
   onViewChange: (view: 'kanban' | 'list') => void
+  status: 'all' | 'open' | 'won' | 'lost'
+  onStatusChange: (status: 'all' | 'open' | 'won' | 'lost') => void
   onCreate: () => void
 }
 
+const STATUS_OPTIONS: Array<{ value: 'open' | 'won' | 'lost'; label: string }> = [
+  { value: 'open', label: 'All open' },
+  { value: 'won', label: 'Won' },
+  { value: 'lost', label: 'Lost' },
+]
+
 /**
- * Cabeçalho do workspace comercial — título + ação primária + alternância
- * Kanban/Lista. O Comercial deixa de parecer "um componente inserido ao
- * fundo de uma página de admin" e passa a ter a mesma estrutura de página
- * que qualquer workspace de CRM a sério — ver requisito "pipeline header".
+ * Pipeline header — title + primary action, then a second row with the
+ * open/won/lost status switch on the left and the Kanban/List view toggle
+ * on the right. Pipeline stops being "a component tucked at the bottom of
+ * an admin page" and gets the same page structure as any real CRM
+ * workspace — see requirement "pipeline header".
  */
-export function SalesToolbar({ view, onViewChange, onCreate }: Props) {
+export function SalesToolbar({ view, onViewChange, status, onStatusChange, onCreate }: Props) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-      <div>
-        <h1 className="text-[26px] font-semibold text-slate-800 tracking-tight">Comercial</h1>
-        <p className="text-[14px] text-slate-500 mt-0.5">Gerir oportunidades de venda e follow-ups</p>
+    <div className="mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="admin-page-title">Pipeline</h1>
+        <button onClick={onCreate} className="admin-create-button">
+          + Create opportunity
+        </button>
       </div>
-      <div className="flex items-center gap-2">
-        <div className="flex bg-slate-100 rounded-md p-0.5">
+
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-3">
+        <div className="admin-segmented">
+          {STATUS_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => onStatusChange(status === option.value ? 'all' : option.value)}
+              className={`admin-segmented-btn${status === option.value ? ' admin-segmented-btn--active' : ''}`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <div className="admin-segmented">
           <button
             onClick={() => onViewChange('kanban')}
-            className={`px-3 py-1.5 text-[13px] font-medium rounded ${view === 'kanban' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`admin-segmented-btn${view === 'kanban' ? ' admin-segmented-btn--active' : ''}`}
           >
             Kanban
           </button>
           <button
             onClick={() => onViewChange('list')}
-            className={`px-3 py-1.5 text-[13px] font-medium rounded ${view === 'list' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            className={`admin-segmented-btn${view === 'list' ? ' admin-segmented-btn--active' : ''}`}
           >
-            Lista
+            List
           </button>
         </div>
-        <button
-          onClick={onCreate}
-          className="px-3.5 py-2 text-[14px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md"
-        >
-          + Oportunidade
-        </button>
       </div>
     </div>
   )

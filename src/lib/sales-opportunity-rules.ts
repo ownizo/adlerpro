@@ -88,6 +88,24 @@ export const SALES_OPPORTUNITY_SOURCE_LABELS_PT: Record<SalesOpportunitySource, 
   other: 'Outro',
 }
 
+// English variant, additive alongside SALES_OPPORTUNITY_SOURCE_LABELS_PT —
+// same reasoning as SALES_OPPORTUNITY_STAGE_LABELS_EN above (admin backoffice
+// is now English-only; the PT dict stays untouched for anything not yet
+// migrated).
+export const SALES_OPPORTUNITY_SOURCE_LABELS_EN: Record<SalesOpportunitySource, string> = {
+  website: 'Website',
+  referral: 'Referral',
+  phone: 'Phone',
+  email: 'Email',
+  whatsapp: 'WhatsApp',
+  google: 'Google',
+  meta: 'Meta (Facebook/Instagram)',
+  partner: 'Partner',
+  existing_client: 'Existing client',
+  manual: 'Manual',
+  other: 'Other',
+}
+
 // product IDs reutilizados tal como já existem no sistema (ver
 // adlerrochefort/netlify/functions/lib/lead-classification.mjs) — nenhuma
 // taxonomia nova é criada aqui. Só um rótulo PT para o título/UI; um product
@@ -119,8 +137,40 @@ const PRODUCT_LABELS_PT: Record<string, string> = {
   other: 'Outro',
 }
 
+// English equivalent of PRODUCT_LABELS_PT for the admin backoffice UI.
+const PRODUCT_LABELS_EN: Record<string, string> = {
+  health: 'Health Insurance',
+  home: 'Home Insurance',
+  auto: 'Auto Insurance',
+  tvde: 'TVDE Insurance',
+  life: 'Life Insurance',
+  'mortgage-protection': 'Mortgage Protection',
+  landlord: 'Landlord Insurance',
+  'short-term-rental': 'Short-Term Rental Insurance',
+  'private-clients': 'Private Clients',
+  'professional-liability': 'Professional Liability',
+  'event-liability': 'Event Liability',
+  'business-multirisk': 'Business Multirisk',
+  fleet: 'Fleet Insurance',
+  condominium: 'Condominium Insurance',
+  cyber: 'Cyber Risks',
+  'workers-comp': 'Workers Compensation',
+  contact: 'General Contact',
+  relocation: 'Relocation Services',
+  'fiscal-representation': 'Fiscal Representation',
+  'mediator-change': 'Broker Change',
+  'insurance-review': 'Insurance Review',
+  valuables: 'Collections & Valuables',
+  general: 'General Request',
+  other: 'Other',
+}
+
 // Exportado para popular o <select> de produto na UI (com opção "Outro" +
 // campo livre) sem criar uma segunda lista desincronizada da primeira.
+export const SALES_OPPORTUNITY_PRODUCT_OPTIONS_EN: Array<{ id: string; label: string }> = Object.entries(
+  PRODUCT_LABELS_EN,
+).map(([id, label]) => ({ id, label }))
+
 export const SALES_OPPORTUNITY_PRODUCT_OPTIONS: Array<{ id: string; label: string }> = Object.entries(
   PRODUCT_LABELS_PT,
 ).map(([id, label]) => ({ id, label }))
@@ -427,6 +477,30 @@ export function formatFollowUpLabel(dueDateIso: string | undefined, now: Date = 
   if (diffDays === 0) return { label: 'Hoje', urgency: 'today' }
   if (diffDays === 1) return { label: 'Amanhã', urgency: 'tomorrow' }
   return { label: `${due.getDate()} ${PT_MONTHS_SHORT[due.getMonth()]}`, urgency: 'upcoming' }
+}
+
+const EN_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * English sibling of formatFollowUpLabel, added rather than translating the
+ * original in place — formatFollowUpLabel's PT output is pinned by
+ * sales-opportunity-rules.test.ts, and the admin backoffice UI is the only
+ * consumer that needs English copy. Same date logic, English labels only.
+ */
+export function formatFollowUpLabelEn(dueDateIso: string | undefined, now: Date = new Date()): FollowUpDisplay {
+  if (!dueDateIso) return { label: '—', urgency: 'none' }
+
+  const due = startOfDay(new Date(dueDateIso))
+  const today = startOfDay(now)
+  const diffDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+  if (diffDays < 0) {
+    const days = Math.abs(diffDays)
+    return { label: days === 1 ? 'Overdue by 1 day' : `Overdue by ${days} days`, urgency: 'overdue' }
+  }
+  if (diffDays === 0) return { label: 'Today', urgency: 'today' }
+  if (diffDays === 1) return { label: 'Tomorrow', urgency: 'tomorrow' }
+  return { label: `${due.getDate()} ${EN_MONTHS_SHORT[due.getMonth()]}`, urgency: 'upcoming' }
 }
 
 /** Idade da oportunidade em dias — usada no card do Kanban. */

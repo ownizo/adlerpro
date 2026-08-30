@@ -196,7 +196,7 @@ export function BillingTab() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
           {[
             { label: t('billing.summary.totalDocuments'), value: String(summary.total), color: '#111' },
-            { label: t('billing.summary.totalValue'), value: formatCurrency(summary.totalValue), color: '#C8961A' },
+            { label: t('billing.summary.totalValue'), value: formatCurrency(summary.totalValue), color: '#17243D' },
             { label: t('billing.summary.pending'), value: String(summary.pending), color: '#92400E' },
             { label: t('billing.summary.finalized'), value: String(summary.finalized), color: '#065F46' },
           ].map((kpi) => (
@@ -218,10 +218,10 @@ export function BillingTab() {
               fontFamily: font,
               fontSize: '0.72rem',
               fontWeight: tab === t_ ? 700 : 500,
-              color: tab === t_ ? '#C8961A' : '#666',
+              color: tab === t_ ? '#17243D' : '#666',
               background: 'none',
               border: 'none',
-              borderBottom: tab === t_ ? '2px solid #C8961A' : '2px solid transparent',
+              borderBottom: tab === t_ ? '2px solid #17243D' : '2px solid transparent',
               padding: '0.6rem 0.9rem',
               cursor: 'pointer',
               transition: 'all 0.15s',
@@ -359,7 +359,7 @@ export function BillingTab() {
                     <td style={tdStyle}>{c.city || '—'}</td>
                     <td style={tdStyle}>{c.country || '—'}</td>
                     <td style={tdStyle}>
-                      <ActionBtn label={t('billing.actions.edit')} color="#C8961A" onClick={() => setShowClientModal(c)} />
+                      <ActionBtn label={t('billing.actions.edit')} color="#17243D" onClick={() => setShowClientModal(c)} />
                     </td>
                   </tr>
                 ))}
@@ -388,7 +388,7 @@ export function BillingTab() {
                     <td style={tdStyle}>{item.unit || '—'}</td>
                     <td style={tdStyle}>{item.tax?.name || '—'}</td>
                     <td style={tdStyle}>
-                      <ActionBtn label={t('billing.actions.edit')} color="#C8961A" onClick={() => setShowItemModal(item)} />
+                      <ActionBtn label={t('billing.actions.edit')} color="#17243D" onClick={() => setShowItemModal(item)} />
                     </td>
                   </tr>
                 ))}

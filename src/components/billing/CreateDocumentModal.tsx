@@ -236,18 +236,18 @@ export function CreateDocumentModal({
               <select value={form.payment_mechanism} onChange={(e) => set('payment_mechanism', e.target.value)} style={inputStyle}>
                 <option value="">—</option>
                 <option value="MB">Multibanco</option>
-                <option value="CC">Cartão de Crédito</option>
-                <option value="CD">Cartão de Débito</option>
+                <option value="CC">Credit Card</option>
+                <option value="CD">Debit Card</option>
                 <option value="CH">Cheque</option>
-                <option value="CO">Cobrança</option>
-                <option value="CS">Compensação de saldos</option>
-                <option value="DE">Dinheiro Eletrónico</option>
-                <option value="LC">Letra Comercial</option>
-                <option value="NU">Numerário</option>
-                <option value="OU">Outros</option>
-                <option value="PR">Permuta</option>
-                <option value="TB">Transferência Bancária</option>
-                <option value="TR">Ticket Restaurante</option>
+                <option value="CO">Collection</option>
+                <option value="CS">Balance Compensation</option>
+                <option value="DE">Electronic Money</option>
+                <option value="LC">Commercial Bill</option>
+                <option value="NU">Cash</option>
+                <option value="OU">Other</option>
+                <option value="PR">Barter</option>
+                <option value="TB">Bank Transfer</option>
+                <option value="TR">Meal Voucher</option>
               </select>
             </div>
           </div>

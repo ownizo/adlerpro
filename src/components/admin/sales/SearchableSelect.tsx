@@ -69,7 +69,7 @@ export function SearchableSelect({ options, value, onChange, placeholder }: Prop
       )}
       {open && filtered.length === 0 && (
         <div className="absolute z-20 mt-1 w-full bg-white border border-slate-200 rounded-md shadow-lg px-3 py-2 text-[13px] text-slate-400">
-          Sem resultados.
+          No results.
         </div>
       )}
     </div>

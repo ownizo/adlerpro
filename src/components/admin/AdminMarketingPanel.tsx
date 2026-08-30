@@ -57,43 +57,43 @@ type SendResult = { totalRecipients: number; sent: number; errors: number }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const AUDIENCE_OPTS: { value: MarketingAudience; label: string; desc: string }[] = [
-  { value: 'companies',          label: 'Empresas',                desc: 'Contactos principais das empresas com email registado' },
-  { value: 'company_users',      label: 'Utilizadores de empresa', desc: 'Utilizadores registados associados a empresas' },
-  { value: 'individual_clients', label: 'Clientes particulares',   desc: 'Clientes individuais com email válido' },
-  { value: 'all',                label: 'Todos',                   desc: 'União de todas as audiências acima' },
+  { value: 'companies',          label: 'Companies',        desc: 'Main company contacts with a registered email' },
+  { value: 'company_users',      label: 'Company Users',    desc: 'Registered users linked to companies' },
+  { value: 'individual_clients', label: 'Individual Clients', desc: 'Individual clients with a valid email' },
+  { value: 'all',                label: 'All',               desc: 'Union of all the audiences above' },
 ]
 
 const TEMPLATE_OPTS: { value: MarketingTemplateKey; label: string; desc: string }[] = [
-  { value: 'feedback',     label: 'Avaliação Google',        desc: 'Pede ao destinatário que deixe uma avaliação no Google' },
-  { value: 'renewal',      label: 'Renovação',               desc: 'Lembra o cliente de renovar a sua apólice' },
-  { value: 'presentation', label: 'Apresentação de serviço', desc: 'Apresenta os serviços da Adler & Rochefort' },
-  { value: 'seasonal',     label: 'Sazonal / Newsletter',    desc: 'Mensagem sazonal ou boletim informativo' },
+  { value: 'feedback',     label: 'Google Review',      desc: 'Asks the recipient to leave a Google review' },
+  { value: 'renewal',      label: 'Renewal',            desc: 'Reminds the client to renew their policy' },
+  { value: 'presentation', label: 'Service Overview',   desc: 'Presents Adler & Rochefort\'s services' },
+  { value: 'seasonal',     label: 'Seasonal / Newsletter', desc: 'Seasonal message or newsletter' },
 ]
 
 const AUDIENCE_LABELS: Record<string, string> = {
-  companies: 'Empresas', company_users: 'Utilizadores de empresa',
-  individual_clients: 'Clientes particulares', all: 'Todos',
+  companies: 'Companies', company_users: 'Company Users',
+  individual_clients: 'Individual Clients', all: 'All',
 }
 
 const TEMPLATE_LABELS: Record<string, string> = {
-  feedback: 'Avaliação Google', renewal: 'Renovação',
-  presentation: 'Apresentação', seasonal: 'Sazonal',
+  feedback: 'Google Review', renewal: 'Renewal',
+  presentation: 'Service Overview', seasonal: 'Seasonal',
 }
 
 const DEFAULT_BULLETS = [
-  'Multirriscos Empresarial e Habitação',
-  'Automóvel e Frotas',
-  'Vida e Saúde',
-  'Responsabilidade Civil',
-  'Acidentes de Trabalho',
-  'Cyber, Directors & Officers e Ramos Técnicos',
+  'Business & Home Multirisk',
+  'Auto & Fleet',
+  'Life & Health',
+  'Liability',
+  'Workers Compensation',
+  'Cyber, Directors & Officers and Technical Lines',
 ]
 
-const STEP_TITLES = ['Definir', 'Modelo', 'Conteúdo', 'Pré-visualizar Audiência', 'Confirmar e Enviar']
+const STEP_TITLES = ['Set Up', 'Template', 'Content', 'Preview Audience', 'Confirm & Send']
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtDate(iso: string) {
-  return new Date(iso).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function buildTemplateVars(key: MarketingTemplateKey, v: WizardVars): Record<string, unknown> | undefined {
@@ -115,10 +115,10 @@ function buildTemplateVars(key: MarketingTemplateKey, v: WizardVars): Record<str
 // ─── Badge sub-components ─────────────────────────────────────────────────────
 function CampaignStatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { label: string; cls: string }> = {
-    draft:     { label: 'Rascunho',  cls: 'bg-navy-100 text-navy-500' },
-    sending:   { label: 'A enviar…', cls: 'bg-amber-100 text-amber-700 animate-pulse' },
-    sent:      { label: 'Enviada',   cls: 'bg-green-100 text-green-700' },
-    cancelled: { label: 'Cancelada', cls: 'bg-red-100 text-red-600' },
+    draft:     { label: 'Draft',    cls: 'bg-navy-100 text-navy-500' },
+    sending:   { label: 'Sending…', cls: 'bg-[#EEF2F7] text-[#223553] animate-pulse' },
+    sent:      { label: 'Sent',     cls: 'bg-green-100 text-green-700' },
+    cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-600' },
   }
   const { label, cls } = cfg[status] ?? { label: status, cls: 'bg-navy-100 text-navy-500' }
   return <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${cls}`}>{label}</span>
@@ -126,10 +126,10 @@ function CampaignStatusBadge({ status }: { status: string }) {
 
 function SendStatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { label: string; cls: string }> = {
-    pending: { label: 'Pendente', cls: 'bg-navy-100 text-navy-500' },
-    sent:    { label: 'Enviado',  cls: 'bg-green-100 text-green-700' },
-    error:   { label: 'Erro',     cls: 'bg-red-100 text-red-600' },
-    skipped: { label: 'Ignorado', cls: 'bg-gray-100 text-gray-500' },
+    pending: { label: 'Pending', cls: 'bg-navy-100 text-navy-500' },
+    sent:    { label: 'Sent',    cls: 'bg-green-100 text-green-700' },
+    error:   { label: 'Error',   cls: 'bg-red-100 text-red-600' },
+    skipped: { label: 'Skipped', cls: 'bg-gray-100 text-gray-500' },
   }
   const { label, cls } = cfg[status] ?? { label: status, cls: 'bg-navy-100 text-navy-500' }
   return <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${cls}`}>{label}</span>
@@ -215,7 +215,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
       })
       setPreview(r)
     } catch (err: unknown) {
-      setPreviewError(err instanceof Error ? err.message : 'Erro ao pré-visualizar audiência')
+      setPreviewError(err instanceof Error ? err.message : 'Error previewing audience')
     } finally {
       setPreviewLoading(false)
     }
@@ -243,7 +243,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
       const result = await adminTriggerMarketingSend({ data: { campaignId } })
       setSendResult(result)
     } catch (err: unknown) {
-      setSendError(err instanceof Error ? err.message : 'Erro ao enviar campanha')
+      setSendError(err instanceof Error ? err.message : 'Error sending campaign')
       setIsSending(false)
     }
   }
@@ -277,16 +277,16 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
       return (
         <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
           <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-green-600 text-2xl font-bold">✓</div>
-          <p className="text-lg font-semibold text-navy-700">Campanha enviada!</p>
+          <p className="text-lg font-semibold text-navy-700">Campaign sent!</p>
           <p className="text-sm text-navy-500">
-            Enviados: <span className="font-semibold text-green-700">{sendResult.sent}</span>
-            {sendResult.errors > 0 && <> · Erros: <span className="font-semibold text-red-600">{sendResult.errors}</span></>}
+            Sent: <span className="font-semibold text-green-700">{sendResult.sent}</span>
+            {sendResult.errors > 0 && <> · Errors: <span className="font-semibold text-red-600">{sendResult.errors}</span></>}
           </p>
           <button
-            className="mt-4 px-5 py-2 bg-navy-700 text-white rounded-[4px] text-sm font-medium hover:bg-navy-800"
+            className="mt-4 admin-btn admin-btn-primary"
             onClick={onSuccess}
           >
-            Fechar
+            Close
           </button>
         </div>
       )
@@ -297,11 +297,11 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
       const n = preview?.afterDedup ?? 1
       return (
         <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
-          <div className="w-10 h-10 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
+          <div className="w-10 h-10 border-4 border-[#17243D] border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-medium text-navy-700">
-            A enviar para {n} destinatário{n === 1 ? '' : 's'}…
+            Sending to {n} recipient{n === 1 ? '' : 's'}…
           </p>
-          <p className="text-xs text-navy-400">Pode demorar até 2 minutos. Não feche esta janela.</p>
+          <p className="text-xs text-navy-400">This can take up to 2 minutes. Don't close this window.</p>
         </div>
       )
     }
@@ -312,18 +312,18 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
         return (
           <div className="flex flex-col gap-5">
             <div>
-              <label className="block text-xs font-semibold text-navy-600 mb-1">Título interno *</label>
+              <label className="block text-xs font-semibold text-navy-600 mb-1">Internal title *</label>
               <input className={inp} value={title} onChange={(e) => setTitle(e.target.value)}
-                placeholder="ex: Newsletter Junho 2026" maxLength={150} />
-              <p className="text-xs text-navy-400 mt-1">Identificação interna — não aparece no email enviado.</p>
+                placeholder="e.g. Newsletter June 2026" maxLength={150} />
+              <p className="text-xs text-navy-400 mt-1">Internal identification — does not appear in the sent email.</p>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-navy-600 mb-1">Assunto do email *</label>
+              <label className="block text-xs font-semibold text-navy-600 mb-1">Email subject *</label>
               <input className={inp} value={subject} onChange={(e) => setSubject(e.target.value)}
-                placeholder="ex: Proteja o que mais importa — fale connosco" maxLength={200} />
+                placeholder="e.g. Protect what matters most — talk to us" maxLength={200} />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-navy-600 mb-2">Destinatários *</label>
+              <label className="block text-xs font-semibold text-navy-600 mb-2">Recipients *</label>
 
               {/* Mode toggle */}
               <div className="flex gap-1 p-1 bg-navy-100 rounded-[4px] mb-3">
@@ -331,13 +331,13 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                   className={`flex-1 text-xs font-semibold py-1.5 rounded-[4px] transition-colors ${!singleMode ? 'bg-white text-navy-700 shadow-sm' : 'text-navy-500 hover:text-navy-700'}`}
                   onClick={() => { setSingleMode(false); setSingleSelected(null); setSingleSearch(''); setSingleResults([]) }}
                 >
-                  Audiência de grupo
+                  Group audience
                 </button>
                 <button type="button"
                   className={`flex-1 text-xs font-semibold py-1.5 rounded-[4px] transition-colors ${singleMode ? 'bg-white text-navy-700 shadow-sm' : 'text-navy-500 hover:text-navy-700'}`}
                   onClick={() => { setSingleMode(true); setAudience('') }}
                 >
-                  Cliente específico
+                  Specific client
                 </button>
               </div>
 
@@ -348,7 +348,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                     <button key={opt.value} type="button"
                       className={`text-left px-3 py-2.5 rounded-[4px] border transition-colors ${
                         audience === opt.value
-                          ? 'border-[#C9A84C] bg-amber-50 ring-1 ring-[#C9A84C]'
+                          ? 'border-[#223553] bg-[#EEF2F7] ring-1 ring-[#223553]'
                           : 'border-navy-200 hover:border-navy-400'
                       }`}
                       onClick={() => setAudience(opt.value)}
@@ -364,7 +364,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
               {singleMode && (
                 <div className="flex flex-col gap-2">
                   {singleSelected ? (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-[#C9A84C] rounded-[4px]">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[#EEF2F7] border border-[#223553] rounded-[4px]">
                       <span className="text-green-600 font-bold flex-shrink-0">✓</span>
                       <span className="text-sm text-navy-700 flex-1 min-w-0 truncate">
                         {singleSelected.fullName && <span className="font-semibold">{singleSelected.fullName} </span>}
@@ -373,7 +373,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                       <button type="button"
                         className="text-navy-400 hover:text-red-500 text-sm flex-shrink-0 leading-none"
                         onClick={() => { setSingleSelected(null); setSingleSearch(''); setSingleResults([]) }}
-                        title="Limpar seleção"
+                        title="Clear selection"
                       >✕</button>
                     </div>
                   ) : (
@@ -381,12 +381,12 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                       <div className="relative">
                         <input className={inp} value={singleSearch}
                           onChange={(e) => setSingleSearch(e.target.value)}
-                          placeholder="Pesquisar por nome ou email…"
+                          placeholder="Search by name or email…"
                           autoComplete="off"
                         />
                         {singleSearching && (
                           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <div className="w-4 h-4 border-2 border-gold-400 border-t-transparent rounded-full animate-spin" />
+                            <div className="w-4 h-4 border-2 border-[#17243D] border-t-transparent rounded-full animate-spin" />
                           </div>
                         )}
                       </div>
@@ -404,7 +404,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                         </div>
                       )}
                       {!singleSearching && singleSearch.trim().length >= 2 && singleResults.length === 0 && (
-                        <p className="text-xs text-navy-400 px-1">Nenhum cliente encontrado.</p>
+                        <p className="text-xs text-navy-400 px-1">No client found.</p>
                       )}
                     </>
                   )}
@@ -418,12 +418,12 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
       case 2:
         return (
           <div className="flex flex-col gap-3">
-            <p className="text-xs font-semibold text-navy-600 mb-1">Escolha o modelo de email *</p>
+            <p className="text-xs font-semibold text-navy-600 mb-1">Choose the email template *</p>
             {TEMPLATE_OPTS.map((opt) => (
               <button key={opt.value} type="button"
                 className={`text-left px-4 py-3 rounded-[4px] border transition-colors ${
                   templateKey === opt.value
-                    ? 'border-[#C9A84C] bg-amber-50 ring-1 ring-[#C9A84C]'
+                    ? 'border-[#223553] bg-[#EEF2F7] ring-1 ring-[#223553]'
                     : 'border-navy-200 hover:border-navy-400'
                 }`}
                 onClick={() => handleSelectTemplate(opt.value)}
@@ -439,39 +439,39 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
       case 3:
         return (
           <div className="flex flex-col gap-4">
-            <p className="text-xs text-navy-400">Todos os campos são opcionais — em branco usa o texto padrão mostrado como sugestão.</p>
+            <p className="text-xs text-navy-400">All fields are optional — leaving them blank uses the default text shown as a suggestion.</p>
 
             {templateKey === 'feedback' && (<>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Introdução</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Introduction</label>
                 <textarea className={ta} value={vars.intro ?? ''} onChange={(e) => setVars((v) => ({ ...v, intro: e.target.value }))}
-                  placeholder="Texto de introdução antes do botão de avaliação" />
+                  placeholder="Introductory text before the review button" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">URL Google Review</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Google Review URL</label>
                 <input className={inp} value={vars.googleUrl ?? 'https://g.page/r/CXBg1laCXvghEBM/review'}
                   onChange={(e) => setVars((v) => ({ ...v, googleUrl: e.target.value }))} />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Texto do botão</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Button text</label>
                 <input className={inp} value={vars.ctaLabel ?? ''} onChange={(e) => setVars((v) => ({ ...v, ctaLabel: e.target.value }))}
-                  placeholder="Deixar avaliação" />
+                  placeholder="Leave a review" />
               </div>
             </>)}
 
             {templateKey === 'renewal' && (<>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Introdução</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Introduction</label>
                 <textarea className={ta} value={vars.intro ?? ''} onChange={(e) => setVars((v) => ({ ...v, intro: e.target.value }))}
-                  placeholder="Texto sobre a renovação da apólice" />
+                  placeholder="Text about the policy renewal" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Texto do botão</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Button text</label>
                 <input className={inp} value={vars.ctaLabel ?? ''} onChange={(e) => setVars((v) => ({ ...v, ctaLabel: e.target.value }))}
-                  placeholder="Falar connosco" />
+                  placeholder="Talk to us" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">URL do botão</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Button URL</label>
                 <input className={inp} value={vars.ctaUrl ?? ''} onChange={(e) => setVars((v) => ({ ...v, ctaUrl: e.target.value }))}
                   placeholder="mailto:insurance@adlerrochefort.com" />
               </div>
@@ -479,32 +479,32 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
 
             {templateKey === 'presentation' && (<>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Introdução</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Introduction</label>
                 <textarea className={ta} value={vars.intro ?? ''} onChange={(e) => setVars((v) => ({ ...v, intro: e.target.value }))}
-                  placeholder="Texto de apresentação da empresa" />
+                  placeholder="Company introduction text" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Lista de serviços</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Services list</label>
                 {(vars.bullets ?? DEFAULT_BULLETS).map((b, i) => (
                   <div key={i} className="flex gap-2 mb-1.5">
                     <input className={`${inp} flex-1`} value={b} onChange={(e) => setBullet(i, e.target.value)}
-                      placeholder={`Serviço ${i + 1}`} />
+                      placeholder={`Service ${i + 1}`} />
                     <button type="button" onClick={() => removeBullet(i)}
-                      className="px-2 text-red-400 hover:text-red-600 text-lg leading-none flex-shrink-0" title="Remover">−</button>
+                      className="px-2 text-red-400 hover:text-red-600 text-lg leading-none flex-shrink-0" title="Remove">−</button>
                   </div>
                 ))}
                 <button type="button" onClick={addBullet}
                   className="mt-1 text-xs text-navy-600 border border-navy-200 px-2 py-1 rounded-[4px] hover:border-navy-400">
-                  + Adicionar serviço
+                  + Add service
                 </button>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Texto do botão</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Button text</label>
                 <input className={inp} value={vars.ctaLabel ?? ''} onChange={(e) => setVars((v) => ({ ...v, ctaLabel: e.target.value }))}
-                  placeholder="Conhecer os nossos serviços" />
+                  placeholder="Discover our services" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">URL do botão</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Button URL</label>
                 <input className={inp} value={vars.ctaUrl ?? ''} onChange={(e) => setVars((v) => ({ ...v, ctaUrl: e.target.value }))}
                   placeholder="https://adlerrochefort.com" />
               </div>
@@ -512,18 +512,18 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
 
             {templateKey === 'seasonal' && (<>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Título do banner</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Banner title</label>
                 <input className={inp} value={vars.headline ?? ''} onChange={(e) => setVars((v) => ({ ...v, headline: e.target.value }))}
-                  placeholder="ex: Boas Festas da Adler & Rochefort" />
+                  placeholder="e.g. Happy Holidays from Adler & Rochefort" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Corpo (HTML aceite)</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Body (HTML accepted)</label>
                 <textarea className={`${inp} resize-y min-h-[120px]`} value={vars.body ?? ''}
                   onChange={(e) => setVars((v) => ({ ...v, body: e.target.value }))}
-                  placeholder="Conteúdo principal da newsletter…" />
+                  placeholder="Main newsletter content…" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Cor do banner</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Banner colour</label>
                 <div className="flex items-center gap-2">
                   <input type="color" value={vars.bannerColor ?? '#1B2B4B'}
                     onChange={(e) => setVars((v) => ({ ...v, bannerColor: e.target.value }))}
@@ -534,12 +534,12 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">Texto do botão (opcional)</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Button text (optional)</label>
                 <input className={inp} value={vars.ctaLabel ?? ''} onChange={(e) => setVars((v) => ({ ...v, ctaLabel: e.target.value }))}
-                  placeholder="ex: Visitar o nosso site" />
+                  placeholder="e.g. Visit our website" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-navy-600 mb-1">URL do botão (opcional)</label>
+                <label className="block text-xs font-semibold text-navy-600 mb-1">Button URL (optional)</label>
                 <input className={inp} value={vars.ctaUrl ?? ''} onChange={(e) => setVars((v) => ({ ...v, ctaUrl: e.target.value }))}
                   placeholder="https://adlerrochefort.com" />
               </div>
@@ -553,7 +553,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
           <div className="flex flex-col gap-4">
             {previewLoading && (
               <div className="flex items-center justify-center py-10">
-                <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-4 border-[#17243D] border-t-transparent rounded-full animate-spin" />
               </div>
             )}
             {previewError && (
@@ -561,22 +561,22 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                 <p className="text-sm text-red-500 text-center">{previewError}</p>
                 <button onClick={loadPreview}
                   className="text-xs border border-navy-300 px-3 py-1.5 rounded-[4px] text-navy-600 hover:border-navy-500">
-                  Tentar novamente
+                  Try again
                 </button>
               </div>
             )}
             {preview && (<>
               <div className="bg-white border border-navy-200 rounded-[4px] p-4 flex flex-col gap-1.5 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-navy-500">Total com email válido</span>
+                  <span className="text-navy-500">Total with valid email</span>
                   <span className="font-semibold text-navy-700">{preview.totalRaw}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-navy-500">Excluídos por opt-out</span>
+                  <span className="text-navy-500">Excluded by opt-out</span>
                   <span className="font-semibold text-navy-700">{preview.totalRaw - preview.afterOptOut}</span>
                 </div>
                 <div className="flex justify-between border-t border-navy-100 pt-1.5 mt-0.5">
-                  <span className="text-navy-600 font-semibold">Após remover duplicados</span>
+                  <span className="text-navy-600 font-semibold">After removing duplicates</span>
                   <span className="font-bold text-navy-800">{preview.afterDedup}</span>
                 </div>
               </div>
@@ -584,19 +584,19 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
               {preview.afterDedup === 0 ? (
                 <div className="bg-red-50 border border-red-200 rounded-[4px] p-3 text-sm text-red-700">
                   {singleMode
-                    ? 'Este cliente tem opt-out de marketing activo ou não foi encontrado. Volte ao Passo 1 e selecione outro destinatário.'
-                    : 'Não existem destinatários válidos para esta audiência. Volte ao Passo 1 e escolha outra audiência.'}
+                    ? 'This client has an active marketing opt-out or could not be found. Go back to Step 1 and select another recipient.'
+                    : 'There are no valid recipients for this audience. Go back to Step 1 and choose another audience.'}
                 </div>
               ) : (
-                <div className="bg-amber-50 border border-amber-200 rounded-[4px] p-3 text-sm text-amber-800">
-                  ⚠️ Vai enviar emails REAIS para <strong>{preview.afterDedup} destinatários</strong>. Confirme antes de continuar.
+                <div className="bg-[#EEF2F7] border border-[#D7E0EC] rounded-[4px] p-3 text-sm text-[#223553]">
+                  ⚠️ You are about to send REAL emails to <strong>{preview.afterDedup} recipients</strong>. Confirm before continuing.
                 </div>
               )}
 
               {preview.sample.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-navy-500 uppercase tracking-wide mb-1.5">
-                    Amostra (primeiros {preview.sample.length})
+                    Sample (first {preview.sample.length})
                   </p>
                   <div className="bg-white border border-navy-200 rounded-[4px] divide-y divide-navy-100">
                     {preview.sample.map((email) => (
@@ -614,12 +614,12 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
         const z = preview?.afterDedup ?? 0
         const canSend = confirmText === title && !isSending
         const summaryRows: [string, string][] = [
-          ['Título', title],
-          ['Assunto', subject],
+          ['Title', title],
+          ['Subject', subject],
           singleMode && singleSelected
-            ? ['Destinatário único', singleSelected.fullName ? `${singleSelected.fullName} <${singleSelected.email}>` : singleSelected.email]
-            : ['Audiência', AUDIENCE_LABELS[audience] ?? audience],
-          ['Modelo', TEMPLATE_LABELS[templateKey] ?? templateKey],
+            ? ['Single recipient', singleSelected.fullName ? `${singleSelected.fullName} <${singleSelected.email}>` : singleSelected.email]
+            : ['Audience', AUDIENCE_LABELS[audience] ?? audience],
+          ['Template', TEMPLATE_LABELS[templateKey] ?? templateKey],
         ]
         return (
           <div className="flex flex-col gap-5">
@@ -631,7 +631,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                 </div>
               ))}
               <div className="flex justify-between gap-4 border-t border-navy-100 pt-2 mt-0.5">
-                <span className="text-navy-600 font-semibold flex-shrink-0">Destinatários</span>
+                <span className="text-navy-600 font-semibold flex-shrink-0">Recipients</span>
                 <span className="font-bold text-navy-800">{z}</span>
               </div>
             </div>
@@ -639,18 +639,18 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
             {sendError && (
               <div className="bg-red-50 border border-red-200 rounded-[4px] p-3 text-sm text-red-700">
                 {sendError}
-                <p className="text-xs mt-1 text-red-500">A campanha pode ter ficado como rascunho — verifique o histórico.</p>
+                <p className="text-xs mt-1 text-red-500">The campaign may have been left as a draft — check the history.</p>
               </div>
             )}
 
             <div>
               <label className="block text-xs font-semibold text-navy-600 mb-1">
-                Para confirmar, escreva o título da campanha exatamente:
+                To confirm, type the campaign title exactly:
               </label>
               <input className={inp} value={confirmText} onChange={(e) => setConfirmText(e.target.value)}
                 placeholder={title} disabled={isSending} autoComplete="off" />
               {confirmText.length > 0 && confirmText !== title && (
-                <p className="text-xs text-red-500 mt-1">O texto não coincide com o título.</p>
+                <p className="text-xs text-red-500 mt-1">The text doesn't match the title.</p>
               )}
             </div>
 
@@ -661,7 +661,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
               disabled={!canSend}
               onClick={handleSend}
             >
-              Enviar campanha para {z} destinatários
+              Send campaign to {z} recipients
             </button>
           </div>
         )
@@ -682,19 +682,19 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-navy-100 flex-shrink-0">
           <div>
-            <p className="text-xs text-navy-400 mb-0.5">Nova Campanha · Passo {step}/5</p>
+            <p className="text-xs text-navy-400 mb-0.5">New Campaign · Step {step}/5</p>
             <h2 className="text-base font-semibold text-navy-700">{STEP_TITLES[step - 1]}</h2>
           </div>
           <button
             className="text-navy-400 hover:text-navy-700 text-xl leading-none disabled:opacity-30 disabled:cursor-not-allowed"
-            onClick={onClose} disabled={isSending} title="Cancelar"
+            onClick={onClose} disabled={isSending} title="Cancel"
           >✕</button>
         </div>
 
         {/* Progress bar */}
         <div className="flex h-1 bg-navy-100 flex-shrink-0">
           {[1, 2, 3, 4, 5].map((s) => (
-            <div key={s} className={`flex-1 transition-colors duration-300 ${s <= step ? 'bg-[#C9A84C]' : ''}`} />
+            <div key={s} className={`flex-1 transition-colors duration-300 ${s <= step ? 'bg-[#223553]' : ''}`} />
           ))}
         </div>
 
@@ -708,7 +708,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
               className="text-sm text-navy-500 hover:text-navy-700"
               onClick={() => (step > 1 ? setStep((s) => s - 1) : onClose())}
             >
-              {step === 1 ? 'Cancelar' : '← Anterior'}
+              {step === 1 ? 'Cancel' : '← Back'}
             </button>
             {step < 5 && (
               <button
@@ -718,7 +718,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                 disabled={!canAdvance()}
                 onClick={() => { if (canAdvance()) setStep((s) => s + 1) }}
               >
-                Seguinte →
+                Next →
               </button>
             )}
           </div>
@@ -748,7 +748,7 @@ export function AdminMarketingPanel() {
       const result = await fetchMarketingCampaigns()
       setCampaigns(result)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao carregar campanhas')
+      setError(err instanceof Error ? err.message : 'Error loading campaigns')
     } finally {
       setLoading(false)
     }
@@ -766,7 +766,7 @@ export function AdminMarketingPanel() {
       const result = await fetchMarketingSends({ data: { campaignId: id } })
       setSends(result)
     } catch (err: unknown) {
-      setSendsError(err instanceof Error ? err.message : 'Erro ao carregar destinatários')
+      setSendsError(err instanceof Error ? err.message : 'Error loading recipients')
     } finally {
       setSendsLoading(false)
     }
@@ -782,7 +782,7 @@ export function AdminMarketingPanel() {
       className={`rounded-[4px] text-sm font-medium bg-navy-700 text-white hover:bg-navy-800 transition-colors ${small ? 'px-3 py-1.5' : 'px-4 py-2'}`}
       onClick={() => setWizardOpen(true)}
     >
-      + Nova Campanha
+      + New Campaign
     </button>
   )
 
@@ -791,7 +791,7 @@ export function AdminMarketingPanel() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-semibold text-navy-700">
-          Campanhas de Email
+          Email Campaigns
           {!loading && campaigns.length > 0 && (
             <span className="ml-2 text-navy-500 font-normal text-base">({campaigns.length})</span>
           )}
@@ -803,13 +803,13 @@ export function AdminMarketingPanel() {
 
       {loading && (
         <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#17243D] border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
       {!loading && campaigns.length === 0 && !error && (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <p className="text-navy-500">Ainda não existem campanhas.</p>
+          <p className="text-navy-500">No campaigns yet.</p>
           {newBtn()}
         </div>
       )}
@@ -849,22 +849,22 @@ export function AdminMarketingPanel() {
                 {isExpanded && (
                   <div className="border-t border-navy-100 bg-navy-50 px-4 py-4">
                     <div className="flex flex-wrap gap-x-6 gap-y-1 mb-3 text-xs text-navy-500">
-                      <span><strong>Audiência:</strong> {AUDIENCE_LABELS[c.audience] ?? c.audience}</span>
-                      <span><strong>Modelo:</strong> {TEMPLATE_LABELS[c.template_key] ?? c.template_key}</span>
-                      {c.total_recipients != null && <span><strong>Destinatários:</strong> {c.total_recipients}</span>}
-                      {c.sent_at && <span><strong>Enviada em:</strong> {fmtDate(c.sent_at)}</span>}
+                      <span><strong>Audience:</strong> {AUDIENCE_LABELS[c.audience] ?? c.audience}</span>
+                      <span><strong>Template:</strong> {TEMPLATE_LABELS[c.template_key] ?? c.template_key}</span>
+                      {c.total_recipients != null && <span><strong>Recipients:</strong> {c.total_recipients}</span>}
+                      {c.sent_at && <span><strong>Sent on:</strong> {fmtDate(c.sent_at)}</span>}
                     </div>
                     {sendsLoading ? (
                       <div className="flex items-center justify-center py-6">
-                        <div className="w-6 h-6 border-4 border-gold-400 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-6 h-6 border-4 border-[#17243D] border-t-transparent rounded-full animate-spin" />
                       </div>
                     ) : sendsError ? (
                       <p className="text-sm text-red-500">{sendsError}</p>
                     ) : sends.length === 0 ? (
-                      <p className="text-sm text-navy-400">Sem destinatários registados.</p>
+                      <p className="text-sm text-navy-400">No recipients registered.</p>
                     ) : (
                       <div>
-                        <p className="text-xs font-semibold text-navy-500 uppercase tracking-wide mb-2">Destinatários ({sends.length})</p>
+                        <p className="text-xs font-semibold text-navy-500 uppercase tracking-wide mb-2">Recipients ({sends.length})</p>
                         <div className="rounded border border-navy-200 bg-white overflow-hidden divide-y divide-navy-100">
                           {sends.map((s, i) => (
                             <div key={i} className="px-3 py-2 flex items-center gap-3 text-sm">

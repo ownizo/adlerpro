@@ -97,6 +97,23 @@ export const POLICY_TYPE_LABELS: Record<PolicyType, string> = {
   other: 'Outro',
 }
 
+// English variant used only by the /admin backoffice (English-only UI) —
+// additive alongside POLICY_TYPE_LABELS, which stays untouched because the
+// customer portal (policies.tsx, dashboard.tsx, claims.tsx) reads it in
+// Portuguese.
+export const POLICY_TYPE_LABELS_EN: Record<PolicyType, string> = {
+  property: 'Property',
+  liability: 'Liability',
+  workers_comp: 'Workers Compensation',
+  auto: 'Auto',
+  health: 'Health',
+  life: 'Life',
+  cyber: 'Cyber Risk',
+  directors_officers: 'D&O',
+  business_interruption: 'Business Interruption',
+  other: 'Other',
+}
+
 export interface Claim {
   id: string
   policyId: string
@@ -129,6 +146,18 @@ export const CLAIM_STATUS_LABELS: Record<ClaimStatus, string> = {
   approved: 'Aprovado',
   denied: 'Recusado',
   paid: 'Pago',
+}
+
+// English variant for /admin only — see POLICY_TYPE_LABELS_EN above for why
+// this is additive rather than a rename of CLAIM_STATUS_LABELS.
+export const CLAIM_STATUS_LABELS_EN: Record<ClaimStatus, string> = {
+  submitted: 'Submitted',
+  under_review: 'Under Review',
+  documentation: 'Documentation',
+  assessment: 'Assessment',
+  approved: 'Approved',
+  denied: 'Denied',
+  paid: 'Paid',
 }
 
 export const CLAIM_STATUS_ORDER: ClaimStatus[] = [

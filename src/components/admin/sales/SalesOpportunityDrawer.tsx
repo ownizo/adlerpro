@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import type { SalesOpportunity } from '@/lib/types'
 import {
-  SALES_OPPORTUNITY_STAGE_LABELS_PT,
+  SALES_OPPORTUNITY_STAGE_LABELS_EN,
   SALES_OPPORTUNITY_SOURCES,
-  SALES_OPPORTUNITY_SOURCE_LABELS_PT,
-  formatFollowUpLabel,
+  SALES_OPPORTUNITY_SOURCE_LABELS_EN,
+  formatFollowUpLabelEn,
   isClosedStage,
   suggestedNextStages,
 } from '@/lib/sales-opportunity-rules'
@@ -76,9 +76,9 @@ function InlineField({
         <dd
           onClick={() => setEditing(true)}
           className={`text-[14px] text-slate-700 cursor-text px-1.5 py-0.5 rounded hover:bg-slate-50 ${saving ? 'opacity-50' : ''}`}
-          title="Clique para editar"
+          title="Click to edit"
         >
-          {display || <span className="text-slate-300">definir</span>}
+          {display || <span className="text-slate-300">set…</span>}
         </dd>
       )}
     </div>
@@ -158,7 +158,7 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
       await adminUpdateSalesOpportunity({ data: { id: opportunity.id, updates } })
       onChanged()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível guardar a alteração.')
+      setError(err instanceof Error ? err.message : 'Could not save the change.')
     }
   }
 
@@ -171,25 +171,25 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
       })
       onChanged()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível mudar o stage.')
+      setError(err instanceof Error ? err.message : 'Could not change the stage.')
     } finally {
       setStageSaving(false)
     }
   }
 
   const palette = STAGE_PALETTE[opportunity.stage]
-  const followUp = formatFollowUpLabel(opportunity.nextFollowUpAt)
+  const followUp = formatFollowUpLabelEn(opportunity.nextFollowUpAt)
   const nextStages = suggestedNextStages(opportunity.stage)
 
-  // Atividade honesta: só eventos que existem mesmo nos dados (sem fabricar
-  // histórico de mudanças de stage, que não é guardado ainda) — ver
-  // requisito "activity/timeline".
+  // Honest activity: only events that genuinely exist in the data (no
+  // fabricated stage-change history, which isn't stored yet) — see
+  // requirement "activity/timeline".
   const activity: Array<{ label: string; at: string }> = [
-    { label: 'Oportunidade criada', at: opportunity.createdAt },
+    { label: 'Opportunity created', at: opportunity.createdAt },
   ]
-  if (websiteLeadContext) activity.push({ label: 'Pedido recebido do website', at: websiteLeadContext.receivedAt })
+  if (websiteLeadContext) activity.push({ label: 'Request received from website', at: websiteLeadContext.receivedAt })
   if (opportunity.closedAt) {
-    activity.push({ label: `Marcada como ${SALES_OPPORTUNITY_STAGE_LABELS_PT[opportunity.stage]}`, at: opportunity.closedAt })
+    activity.push({ label: `Marked as ${SALES_OPPORTUNITY_STAGE_LABELS_EN[opportunity.stage]}`, at: opportunity.closedAt })
   }
   activity.sort((a, b) => a.at.localeCompare(b.at))
 
@@ -212,23 +212,23 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
                       search={{ tab: owner.kind === 'individual' ? 'individual_clients' : 'companies' }}
                       className="text-indigo-600 hover:text-indigo-700 font-medium"
                     >
-                      Ver cliente →
+                      View client →
                     </Link>
                   </>
                 )}
               </p>
             </div>
-            <button onClick={onClose} className="shrink-0 text-slate-400 hover:text-slate-700 p-1" aria-label="Fechar">✕</button>
+            <button onClick={onClose} className="shrink-0 text-slate-400 hover:text-slate-700 p-1" aria-label="Close">✕</button>
           </div>
 
           <div className="flex items-center gap-2 mt-3">
             <span className={`inline-flex px-2 py-1 rounded-full text-[12px] font-semibold ${palette.badgeBg} ${palette.badgeText}`}>
-              {SALES_OPPORTUNITY_STAGE_LABELS_PT[opportunity.stage]}
+              {SALES_OPPORTUNITY_STAGE_LABELS_EN[opportunity.stage]}
             </span>
             <span className="text-[13px] text-slate-500">{opportunity.product ?? opportunity.title}</span>
           </div>
 
-          {/* Ações rápidas de stage — não obriga a drag&drop nem ao seletor completo */}
+          {/* Quick stage actions — no need for drag&drop or the full selector */}
           {!isClosedStage(opportunity.stage) && nextStages.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3">
               {nextStages.map((stage) => (
@@ -242,7 +242,7 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
                     : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
                   }`}
                 >
-                  {stage === 'won' ? 'Marcar ganho' : stage === 'lost' ? 'Marcar perdido' : `Mover para ${SALES_OPPORTUNITY_STAGE_LABELS_PT[stage]}`}
+                  {stage === 'won' ? 'Mark won' : stage === 'lost' ? 'Mark lost' : `Move to ${SALES_OPPORTUNITY_STAGE_LABELS_EN[stage]}`}
                 </button>
               ))}
             </div>
@@ -254,27 +254,27 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
           {/* SUMMARY */}
           <section>
-            <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Resumo</p>
+            <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Summary</p>
             <dl className="divide-y divide-slate-50">
               <div className="flex items-center justify-between py-1.5">
-                <dt className="text-[13px] text-slate-500">Mercado</dt>
+                <dt className="text-[13px] text-slate-500">Market</dt>
                 <dd className="text-[14px] text-slate-700">{opportunity.market ?? '—'}</dd>
               </div>
               <InlineSelect
-                label="Origem"
+                label="Source"
                 value={opportunity.source as (typeof SALES_OPPORTUNITY_SOURCES)[number] | undefined}
                 options={SALES_OPPORTUNITY_SOURCES}
-                labels={SALES_OPPORTUNITY_SOURCE_LABELS_PT}
+                labels={SALES_OPPORTUNITY_SOURCE_LABELS_EN}
                 onSave={(source) => save({ source })}
               />
               <InlineField
-                label="Responsável"
+                label="Owner"
                 value={opportunity.assignedTo ?? ''}
                 display={opportunity.assignedTo ?? ''}
                 onSave={(assignedTo) => save({ assignedTo })}
               />
               <div className="flex items-center justify-between py-1.5">
-                <dt className="text-[13px] text-slate-500">Criada em</dt>
+                <dt className="text-[13px] text-slate-500">Created on</dt>
                 <dd className="text-[14px] text-slate-700">{formatDate(opportunity.createdAt)}</dd>
               </div>
             </dl>
@@ -282,36 +282,36 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
 
           {/* VALUES */}
           <section>
-            <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Valores</p>
+            <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Values</p>
             <dl className="divide-y divide-slate-50">
               <InlineField
-                label="Prémio anual estimado"
+                label="Estimated annual premium"
                 type="number"
                 value={String(opportunity.estimatedAnnualPremium ?? '')}
                 display={opportunity.estimatedAnnualPremium ? formatCurrency(opportunity.estimatedAnnualPremium) : ''}
                 onSave={(v) => save({ estimatedAnnualPremium: v ? Number(v) : null })}
               />
               <InlineField
-                label="Receita estimada (Adler)"
+                label="Estimated revenue (Adler)"
                 type="number"
                 value={String(opportunity.estimatedRevenue ?? '')}
                 display={opportunity.estimatedRevenue ? formatCurrency(opportunity.estimatedRevenue) : ''}
                 onSave={(v) => save({ estimatedRevenue: v ? Number(v) : null })}
               />
               <InlineField
-                label="Fecho esperado"
+                label="Expected close date"
                 type="date"
                 value={opportunity.expectedCloseDate ?? ''}
                 display={opportunity.expectedCloseDate ? formatDate(opportunity.expectedCloseDate) : ''}
                 onSave={(v) => save({ expectedCloseDate: v || null })}
               />
             </dl>
-            <p className="text-[12px] text-slate-400 mt-1.5">Prémio é o que o cliente paga à seguradora; receita é o que fica para a Adler — nunca a mesma coisa.</p>
+            <p className="text-[12px] text-slate-400 mt-1.5">Premium is what the client pays the insurer; revenue is what stays with Adler — never the same thing.</p>
           </section>
 
           {/* NEXT ACTION */}
           <section>
-            <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Próxima ação</p>
+            <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Next action</p>
             <div className="flex items-center justify-between py-1.5">
               <dt className="text-[13px] text-slate-500">Follow-up</dt>
               {followUp.urgency !== 'none' && (
@@ -330,33 +330,33 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
                     const result = await adminCreateOpportunityFollowUpTask({
                       data: { opportunityId: opportunity.id, title: `Follow-up — ${opportunity.title}`, dueDate: followUpDate },
                     })
-                    setFollowUpMsg(result.created ? 'Tarefa criada.' : 'Tarefa existente atualizada.')
+                    setFollowUpMsg(result.created ? 'Task created.' : 'Existing task updated.')
                     onChanged()
                   } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Não foi possível definir o follow-up.')
+                    setError(err instanceof Error ? err.message : 'Could not set the follow-up.')
                   }
                 }}
                 className="px-3 py-1.5 text-[13px] font-medium border border-slate-200 rounded-md hover:bg-slate-50 disabled:opacity-40"
               >
-                Definir
+                Set
               </button>
             </div>
-            {followUpMsg && <p className="text-[12px] text-slate-500 mt-1">{followUpMsg} Task ligada em Tarefas.</p>}
+            {followUpMsg && <p className="text-[12px] text-slate-500 mt-1">{followUpMsg} Linked task in Tasks.</p>}
           </section>
 
           {/* SOURCE (website leads) */}
           {opportunity.websiteLeadId && (
             <section>
-              <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Origem do pedido</p>
+              <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Request source</p>
               {websiteLeadContext ? (
                 <dl className="divide-y divide-slate-50">
                   <div className="flex items-center justify-between py-1.5">
-                    <dt className="text-[13px] text-slate-500">Formulário</dt>
+                    <dt className="text-[13px] text-slate-500">Form</dt>
                     <dd className="text-[14px] text-slate-700">{websiteLeadContext.formName}</dd>
                   </div>
                   {websiteLeadContext.sourceUrl && (
                     <div className="flex items-center justify-between py-1.5 gap-3">
-                      <dt className="text-[13px] text-slate-500 shrink-0">Página</dt>
+                      <dt className="text-[13px] text-slate-500 shrink-0">Page</dt>
                       <dd className="text-[14px] text-right truncate">
                         <a href={websiteLeadContext.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700">
                           {websiteLeadContext.sourceUrl}
@@ -371,19 +371,19 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
                     </div>
                   )}
                   <div className="flex items-center justify-between py-1.5">
-                    <dt className="text-[13px] text-slate-500">Recebido em</dt>
+                    <dt className="text-[13px] text-slate-500">Received on</dt>
                     <dd className="text-[14px] text-slate-700">{formatDate(websiteLeadContext.receivedAt)}</dd>
                   </div>
                 </dl>
               ) : (
-                <p className="text-[13px] text-slate-400">A carregar…</p>
+                <p className="text-[13px] text-slate-400">Loading…</p>
               )}
             </section>
           )}
 
           {/* ACTIVITY */}
           <section>
-            <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Atividade</p>
+            <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Activity</p>
             <ul className="space-y-2">
               {activity.map((event, i) => (
                 <li key={i} className="flex items-center gap-2 text-[13px]">
@@ -397,7 +397,7 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
 
           {opportunity.stage === 'lost' && (
             <section>
-              <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Motivo de perda</p>
+              <p className="text-[12px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Loss reason</p>
               <div className="flex gap-1.5">
                 <input
                   value={lostReason}
@@ -405,7 +405,7 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
                   className="flex-1 px-2.5 py-1.5 text-[14px] border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200"
                 />
                 <button onClick={() => save({ lostReason })} className="px-3 py-1.5 text-[13px] font-medium border border-slate-200 rounded-md hover:bg-slate-50">
-                  Guardar
+                  Save
                 </button>
               </div>
             </section>
@@ -415,18 +415,18 @@ export function SalesOpportunityDrawer({ opportunity, owner, onClose, onChanged 
         <div className="px-5 py-3 border-t border-slate-100 flex justify-end">
           <button
             onClick={async () => {
-              if (!window.confirm('Eliminar esta oportunidade? Esta ação não pode ser desfeita.')) return
+              if (!window.confirm('Delete this opportunity? This action cannot be undone.')) return
               try {
                 await adminDeleteSalesOpportunity({ data: opportunity.id })
                 onClose()
                 onChanged()
               } catch (err) {
-                setError(err instanceof Error ? err.message : 'Não foi possível eliminar.')
+                setError(err instanceof Error ? err.message : 'Could not delete.')
               }
             }}
             className="px-3 py-1.5 text-[13px] font-medium text-rose-600 hover:bg-rose-50 rounded-md"
           >
-            Eliminar oportunidade
+            Delete opportunity
           </button>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import type { Company, Policy, Claim, Document as DocType, IndividualClient } from '@/lib/types'
-import { CLAIM_STATUS_LABELS, POLICY_TYPE_LABELS } from '@/lib/types'
+import { CLAIM_STATUS_LABELS_EN as CLAIM_STATUS_LABELS, POLICY_TYPE_LABELS_EN as POLICY_TYPE_LABELS } from '@/lib/types'
 import { formatDate } from '@/lib/utils'
 import { ClientNotes } from './ClientNotes'
 import { ClientTasks } from './ClientTasks'
@@ -32,17 +32,17 @@ function buildClientTimeline(
   const entries: TimelineEntry[] = [
     ...subjectPolicies.map((p) => ({
       date: p.createdAt,
-      label: `Apólice criada — ${POLICY_TYPE_LABELS[p.type] ?? p.type} · ${p.policyNumber}`,
+      label: `Policy created — ${POLICY_TYPE_LABELS[p.type] ?? p.type} · ${p.policyNumber}`,
       kind: 'policy' as const,
     })),
     ...subjectClaims.map((c) => ({
       date: c.createdAt,
-      label: `Sinistro — ${c.title}`,
+      label: `Claim — ${c.title}`,
       kind: 'claim' as const,
     })),
     ...subjectDocs.map((d) => ({
       date: d.uploadedAt,
-      label: `Documento — ${d.name} (${d.category})`,
+      label: `Document — ${d.name} (${d.category})`,
       kind: 'document' as const,
     })),
   ]
@@ -52,7 +52,7 @@ function buildClientTimeline(
 const KIND_DOT: Record<TimelineEntry['kind'], string> = {
   policy: 'bg-blue-400',
   claim: 'bg-red-400',
-  document: 'bg-gold-400',
+  document: 'bg-[#223553]',
 }
 
 export function ClientProfilePanel({ subject, policies, claims, documents }: Props) {
@@ -81,18 +81,18 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
       {/* Resumo rápido — "o que é preciso saber já", sem repetir os detalhes
           que já aparecem nas secções abaixo. Ver requisito "client summary". */}
       <div className="flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-navy-500">
-        <span><strong className="text-navy-700 font-semibold">{activePolicies}</strong> apólices ativas</span>
-        <span><strong className="text-navy-700 font-semibold">{openClaims}</strong> sinistros abertos</span>
-        <span><strong className="text-navy-700 font-semibold">{subjectDocs.length}</strong> documentos</span>
+        <span><strong className="text-navy-700 font-semibold">{activePolicies}</strong> active policies</span>
+        <span><strong className="text-navy-700 font-semibold">{openClaims}</strong> open claims</span>
+        <span><strong className="text-navy-700 font-semibold">{subjectDocs.length}</strong> documents</span>
       </div>
 
-      {/* Sinistros */}
+      {/* Claims */}
       <div>
         <h4 className="text-sm font-semibold text-navy-700 mb-3">
-          Sinistros do cliente ({subjectClaims.length})
+          Client claims ({subjectClaims.length})
         </h4>
         {subjectClaims.length === 0 ? (
-          <p className="text-sm text-navy-400">Sem sinistros registados.</p>
+          <p className="text-sm text-navy-400">No claims registered.</p>
         ) : (
           <div className="grid gap-2">
             {subjectClaims.map((c) => (
@@ -113,13 +113,13 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
         )}
       </div>
 
-      {/* Documentos */}
+      {/* Documents */}
       <div>
         <h4 className="text-sm font-semibold text-navy-700 mb-3">
-          Documentos do cliente ({subjectDocs.length})
+          Client documents ({subjectDocs.length})
         </h4>
         {subjectDocs.length === 0 ? (
-          <p className="text-sm text-navy-400">Sem documentos carregados.</p>
+          <p className="text-sm text-navy-400">No documents uploaded.</p>
         ) : (
           <div className="grid gap-2">
             {subjectDocs.map((d) => (
@@ -139,7 +139,7 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
                     window.open(url, '_blank', 'noopener,noreferrer')
                   }}
                 >
-                  Abrir
+                  Open
                 </button>
               </div>
             ))}
@@ -147,13 +147,13 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
         )}
       </div>
 
-      {/* Cronologia (fontes Postgres) */}
+      {/* Timeline (Postgres sources) */}
       <div>
         <h4 className="text-sm font-semibold text-navy-700 mb-3">
-          Cronologia ({timeline.length} eventos)
+          Timeline ({timeline.length} events)
         </h4>
         {timeline.length === 0 ? (
-          <p className="text-sm text-navy-400">Sem eventos registados.</p>
+          <p className="text-sm text-navy-400">No events registered.</p>
         ) : (
           <div className="relative pl-4 space-y-2">
             {timeline.map((entry, i) => (
@@ -169,23 +169,23 @@ export function ClientProfilePanel({ subject, policies, claims, documents }: Pro
         )}
       </div>
 
-      {/* Pedidos do Website — só para clientes particulares (é a origem deste histórico) */}
+      {/* Website requests — individual clients only (this is where that history comes from) */}
       {subject.kind === 'individual' && <WebsiteLeads individualClientId={subject.client.id} />}
 
-      {/* Oportunidades — CRM comercial (backoffice only) */}
+      {/* Opportunities — commercial CRM (backoffice only) */}
       <SalesOpportunitiesSection
         companyId={subject.kind === 'company' ? subject.company.id : undefined}
         individualClientId={subject.kind === 'individual' ? subject.client.id : undefined}
         clientName={subject.kind === 'company' ? subject.company.name : subject.client.fullName}
       />
 
-      {/* Tarefas */}
+      {/* Tasks */}
       <ClientTasks
         companyId={subject.kind === 'company' ? subject.company.id : undefined}
         individualClientId={subject.kind === 'individual' ? subject.client.id : undefined}
       />
 
-      {/* Notas */}
+      {/* Notes */}
       <ClientNotes
         companyId={subject.kind === 'company' ? subject.company.id : undefined}
         individualClientId={subject.kind === 'individual' ? subject.client.id : undefined}

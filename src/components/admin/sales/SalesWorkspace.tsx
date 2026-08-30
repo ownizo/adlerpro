@@ -46,7 +46,7 @@ export function SalesWorkspace({ individualClients, companies, initialStage, ini
       const result = await fetchSalesOpportunities({ data: {} })
       setOpportunities(result)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Não foi possível carregar as oportunidades.')
+      setError(err instanceof Error ? err.message : 'Could not load opportunities.')
     } finally {
       setLoading(false)
     }
@@ -103,7 +103,7 @@ export function SalesWorkspace({ individualClients, companies, initialStage, ini
       await reload()
     } catch (err) {
       setOpportunities(previous)
-      setError(err instanceof Error ? err.message : 'Não foi possível mover a oportunidade.')
+      setError(err instanceof Error ? err.message : 'Could not move the opportunity.')
     }
   }
 
@@ -111,7 +111,13 @@ export function SalesWorkspace({ individualClients, companies, initialStage, ini
 
   return (
     <div>
-      <SalesToolbar view={view} onViewChange={setView} onCreate={() => setShowCreate(true)} />
+      <SalesToolbar
+        view={view}
+        onViewChange={setView}
+        status={filters.status}
+        onStatusChange={(status) => setFilters({ ...filters, status })}
+        onCreate={() => setShowCreate(true)}
+      />
 
       <SalesFilters
         filters={filters}
@@ -131,13 +137,13 @@ export function SalesWorkspace({ individualClients, companies, initialStage, ini
           <SalesWorkspaceSkeleton view={view} />
         ) : opportunities.length === 0 ? (
           <EmptyState
-            title="Ainda não há oportunidades comerciais"
-            description="Criadas automaticamente a partir de pedidos do website, ou manualmente aqui."
-            actionLabel="Criar oportunidade"
+            title="No sales opportunities yet"
+            description="Created automatically from website requests, or manually here."
+            actionLabel="Create opportunity"
             onAction={() => setShowCreate(true)}
           />
         ) : filtered.length === 0 ? (
-          <EmptyState title="Sem oportunidades para estes filtros" description="Tenta limpar ou ajustar os filtros ativos." />
+          <EmptyState title="No opportunities for these filters" description="Try clearing or adjusting the active filters." />
         ) : view === 'kanban' ? (
           <SalesKanban
             opportunities={filtered}
@@ -145,6 +151,7 @@ export function SalesWorkspace({ individualClients, companies, initialStage, ini
             companies={companies}
             onOpen={setSelectedId}
             onStageChange={handleStageChange}
+            onCreate={() => setShowCreate(true)}
           />
         ) : (
           <SalesOpportunityList
@@ -210,7 +217,7 @@ function EmptyState({
       <p className="text-[15px] font-medium text-slate-600">{title}</p>
       <p className="text-[13px] text-slate-400 mt-1">{description}</p>
       {actionLabel && onAction && (
-        <button onClick={onAction} className="mt-4 px-4 py-2 text-[14px] font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md">
+        <button onClick={onAction} className="admin-create-button mt-4">
           {actionLabel}
         </button>
       )}
