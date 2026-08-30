@@ -40,11 +40,23 @@ const ADMIN_ICONS: Record<AdminTab, string> = {
   profiles: 'M3 3v18h18M8 17V9m4 8V5m4 12v-6',
 }
 
+// Same outline-SVG convention, for the one `to`-based (non-tab) nav item —
+// a simple link/chain glyph for "external system connection".
+const CARRIER_INTEGRATIONS_ICON = 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244'
+
+// A nav item is either one of the existing /admin?tab=X tabs, or (CRM3
+// Block 2) a genuinely separate route — `to` is a real path, never a tab.
+// Kept as a union rather than folding carrier-integrations into AdminTab:
+// that page is its own route/component, not another case inside the giant
+// /admin tab switch — see admin.tsx's AdminPage/AdminDashboardContent split.
+type AdminNavItem = { label: string; tab: AdminTab } | { label: string; to: '/admin/carrier-integrations' }
+
 // Backoffice information architecture — flat groups, no collapsible parent
 // level (that extra "Administration" toggle added a click for no benefit
 // once /admin has its own dedicated shell). Same underlying tabs/search
-// values as before; this is navigation/UI only, no new routes.
-const ADMIN_NAV_GROUPS: Array<{ label: string; items: Array<{ label: string; tab: AdminTab }> }> = [
+// values as before, plus one real route (Carrier Integrations) — this is
+// still additive navigation, no reordering of unrelated groups/items.
+const ADMIN_NAV_GROUPS: Array<{ label: string; items: AdminNavItem[] }> = [
   { label: 'Overview', items: [{ label: 'Dashboard', tab: 'dashboard' }] },
   { label: 'Sales', items: [
     { label: 'Pipeline', tab: 'sales' },
@@ -63,6 +75,7 @@ const ADMIN_NAV_GROUPS: Array<{ label: string; items: Array<{ label: string; tab
   { label: 'System', items: [
     { label: 'Billing', tab: 'billing' },
     { label: 'Integrations', tab: 'api' },
+    { label: 'Carrier Integrations', to: '/admin/carrier-integrations' },
     { label: 'Users & Metrics', tab: 'profiles' },
   ] },
 ]
@@ -231,6 +244,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <p className="admin-nav-group-label">{group.label}</p>
                 <div className="admin-nav-group-items">
                   {group.items.map((item) => {
+                    // CRM3 Block 2: Carrier Integrations is a real route, not
+                    // another /admin?tab= value — see AdminNavItem above.
+                    if ('to' in item) {
+                      return (
+                        <Link
+                          key={item.to}
+                          to={item.to}
+                          className="admin-nav-item"
+                          activeProps={{ className: 'admin-nav-item admin-nav-item-active' }}
+                          onClick={() => setSidebarOpen(false)}
+                        >
+                          <svg className="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d={CARRIER_INTEGRATIONS_ICON} />
+                          </svg>
+                          <span className="admin-nav-item-label">{item.label}</span>
+                        </Link>
+                      )
+                    }
                     const badge = item.tab === 'tasks' ? navBadges.tasks : item.tab === 'alerts' ? navBadges.alerts : 0
                     return (
                       <Link
