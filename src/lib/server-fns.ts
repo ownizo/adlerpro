@@ -31,6 +31,7 @@ import type {
   ClientTask,
   SalesOpportunityStage,
   SalesOpportunityEditableUpdate,
+  Json,
 } from './types'
 import { buildOpportunityTitle, pickWebsiteLeadContextFields } from './sales-opportunity-rules'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
@@ -3829,4 +3830,96 @@ export const adminSendPolicyDocument = createServerFn({ method: 'POST' })
     if (sendErr) throw new Error(`Falha no envio: ${sendErr.message}`)
 
     return { ok: true as const, sent: data.recipients.length, emailId: sent?.id }
+  })
+
+// ============================================================
+// CRM3 — Identity & Reconciliation (Block 2)
+//
+// Todas admin-only (requireAuthMiddleware + requireRoleMiddleware('admin')),
+// nenhuma escrita fora de carrier_import_records/external_*_identities.
+// Nenhuma cria/atualiza/apaga um individual_client/company/policy, nenhuma
+// faz merge, nenhuma sincroniza campos de seguradora, nenhuma aceita
+// automaticamente um match probable/ambiguous — ver requisito explícito da
+// Block 2. Nenhuma chama uma API de seguradora nem lida com credenciais.
+// ============================================================
+
+export const adminListCarrierSyncRuns = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: db.CarrierSyncRunFilters = {}) => d)
+  .handler(async ({ data }) => db.listCarrierSyncRuns(data))
+
+export const adminGetCarrierSyncRun = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((runId: string) => runId)
+  .handler(async ({ data: runId }) => db.getCarrierSyncRun(runId))
+
+export const adminListCarrierImportRecords = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { runId: string } & db.CarrierImportRecordFilters) => d)
+  .handler(async ({ data }) => {
+    const { runId, ...filters } = data
+    return db.listCarrierImportRecords(runId, filters)
+  })
+
+export const adminGetCarrierImportRecord = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((recordId: string) => recordId)
+  .handler(async ({ data: recordId }) => db.getCarrierImportRecord(recordId))
+
+// ── Link external identities — a separate, deliberate Admin action; never
+// triggered automatically by Accept (see adminAcceptCarrierImportDecision
+// below and the "Do NOT automatically link when Accept is clicked" requirement) ──
+
+export const adminLinkCarrierClientIdentity = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: {
+    individualClientId?: string
+    companyId?: string
+    provider: string
+    externalClientId: string
+    externalClientNumber?: string
+    taxCountry?: string
+    taxIdType?: string
+    taxIdRaw?: string
+    taxIdNormalized?: string
+    metadata?: Record<string, Json>
+  }) => d)
+  .handler(async ({ data }) => db.createExternalClientIdentity(data))
+
+export const adminLinkCarrierPolicyIdentity = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: {
+    policyId: string
+    provider: string
+    externalPolicyNumber: string
+    externalPolicyId?: string
+    externalPolicyNumberNormalized?: string
+    metadata?: Record<string, Json>
+  }) => d)
+  .handler(async ({ data }) => db.createExternalPolicyIdentity(data))
+
+// ── Import decisions — only ever update the staging record itself ──
+
+export const adminAcceptCarrierImportDecision = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { recordId: string; decisionNote?: string }) => d)
+  .handler(async ({ data }) => {
+    await db.updateCarrierImportDecision(data.recordId, { decisionStatus: 'accepted', decisionNote: data.decisionNote })
+    return { success: true }
+  })
+
+export const adminRejectCarrierImportDecision = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { recordId: string; decisionNote?: string }) => d)
+  .handler(async ({ data }) => {
+    await db.updateCarrierImportDecision(data.recordId, { decisionStatus: 'rejected', decisionNote: data.decisionNote })
+    return { success: true }
+  })
+
+export const adminIgnoreCarrierImportDecision = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { recordId: string; decisionNote?: string }) => d)
+  .handler(async ({ data }) => {
+    await db.updateCarrierImportDecision(data.recordId, { decisionStatus: 'ignored', decisionNote: data.decisionNote })
+    return { success: true }
   })

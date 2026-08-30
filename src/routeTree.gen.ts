@@ -31,6 +31,8 @@ import { Route as OneLoginRouteImport } from './routes/one/login'
 import { Route as OneDocumentsRouteImport } from './routes/one/documents'
 import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
 import { Route as OneClaimsRouteImport } from './routes/one/claims'
+import { Route as AdminCarrierIntegrationsRouteImport } from './routes/admin.carrier-integrations'
+import { Route as AdminCarrierIntegrationsRunsIdRouteImport } from './routes/admin.carrier-integrations.runs.$id'
 
 const TermsAndConditionsRoute = TermsAndConditionsRouteImport.update({
   id: '/terms-and-conditions',
@@ -142,10 +144,22 @@ const OneClaimsRoute = OneClaimsRouteImport.update({
   path: '/one/claims',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminCarrierIntegrationsRoute =
+  AdminCarrierIntegrationsRouteImport.update({
+    id: '/carrier-integrations',
+    path: '/carrier-integrations',
+    getParentRoute: () => AdminRoute,
+  } as any)
+const AdminCarrierIntegrationsRunsIdRoute =
+  AdminCarrierIntegrationsRunsIdRouteImport.update({
+    id: '/runs/$id',
+    path: '/runs/$id',
+    getParentRoute: () => AdminCarrierIntegrationsRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/alerts': typeof AlertsRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
@@ -157,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
+  '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -166,10 +181,11 @@ export interface FileRoutesByFullPath {
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
   '/one/': typeof OneIndexRoute
+  '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/alerts': typeof AlertsRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
@@ -181,6 +197,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
+  '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -190,11 +207,12 @@ export interface FileRoutesByTo {
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
   '/one': typeof OneIndexRoute
+  '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/admin': typeof AdminRoute
+  '/admin': typeof AdminRouteWithChildren
   '/alerts': typeof AlertsRoute
   '/claims': typeof ClaimsRoute
   '/contact': typeof ContactRoute
@@ -206,6 +224,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
+  '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -215,6 +234,7 @@ export interface FileRoutesById {
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
   '/one/': typeof OneIndexRoute
+  '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -232,6 +252,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/quotes-comparison'
     | '/terms-and-conditions'
+    | '/admin/carrier-integrations'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -241,6 +262,7 @@ export interface FileRouteTypes {
     | '/one/reset-password'
     | '/one/terms'
     | '/one/'
+    | '/admin/carrier-integrations/runs/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -256,6 +278,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/quotes-comparison'
     | '/terms-and-conditions'
+    | '/admin/carrier-integrations'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -265,6 +288,7 @@ export interface FileRouteTypes {
     | '/one/reset-password'
     | '/one/terms'
     | '/one'
+    | '/admin/carrier-integrations/runs/$id'
   id:
     | '__root__'
     | '/'
@@ -280,6 +304,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/quotes-comparison'
     | '/terms-and-conditions'
+    | '/admin/carrier-integrations'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -289,11 +314,12 @@ export interface FileRouteTypes {
     | '/one/reset-password'
     | '/one/terms'
     | '/one/'
+    | '/admin/carrier-integrations/runs/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AdminRoute: typeof AdminRoute
+  AdminRoute: typeof AdminRouteWithChildren
   AlertsRoute: typeof AlertsRoute
   ClaimsRoute: typeof ClaimsRoute
   ContactRoute: typeof ContactRoute
@@ -472,12 +498,50 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OneClaimsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/carrier-integrations': {
+      id: '/admin/carrier-integrations'
+      path: '/carrier-integrations'
+      fullPath: '/admin/carrier-integrations'
+      preLoaderRoute: typeof AdminCarrierIntegrationsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/carrier-integrations/runs/$id': {
+      id: '/admin/carrier-integrations/runs/$id'
+      path: '/runs/$id'
+      fullPath: '/admin/carrier-integrations/runs/$id'
+      preLoaderRoute: typeof AdminCarrierIntegrationsRunsIdRouteImport
+      parentRoute: typeof AdminCarrierIntegrationsRoute
+    }
   }
 }
 
+interface AdminCarrierIntegrationsRouteChildren {
+  AdminCarrierIntegrationsRunsIdRoute: typeof AdminCarrierIntegrationsRunsIdRoute
+}
+
+const AdminCarrierIntegrationsRouteChildren: AdminCarrierIntegrationsRouteChildren =
+  {
+    AdminCarrierIntegrationsRunsIdRoute: AdminCarrierIntegrationsRunsIdRoute,
+  }
+
+const AdminCarrierIntegrationsRouteWithChildren =
+  AdminCarrierIntegrationsRoute._addFileChildren(
+    AdminCarrierIntegrationsRouteChildren,
+  )
+
+interface AdminRouteChildren {
+  AdminCarrierIntegrationsRoute: typeof AdminCarrierIntegrationsRouteWithChildren
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminCarrierIntegrationsRoute: AdminCarrierIntegrationsRouteWithChildren,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AdminRoute: AdminRoute,
+  AdminRoute: AdminRouteWithChildren,
   AlertsRoute: AlertsRoute,
   ClaimsRoute: ClaimsRoute,
   ContactRoute: ContactRoute,

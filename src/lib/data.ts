@@ -24,6 +24,14 @@ import type {
   SalesOpportunity,
   SalesOpportunityStage,
   SalesPipelineStats,
+  CarrierSyncRun,
+  CarrierSyncStatus,
+  CarrierImportRecord,
+  CarrierMatchStatus,
+  CarrierDecisionStatus,
+  ExternalClientIdentity,
+  ExternalPolicyIdentity,
+  Json,
 } from './types'
 import {
   buildWebsiteLeadOpportunityPayload,
@@ -1319,4 +1327,320 @@ export async function resolveMarketingRecipients(
   }
 
   return { recipients, totalRaw, afterOptOut, afterDedup: recipients.length }
+}
+
+// ============================================================
+// CRM3 — Identity & Reconciliation (Block 2)
+//
+// Camada de acesso às 4 tabelas de
+// migrations/20260830_crm3_identity_reconciliation.sql. Segue exatamente o
+// mesmo padrão service-role de todo este ficheiro. NUNCA cria/atualiza/apaga
+// um individual_client/company/policy a partir de dados de staging, nunca
+// faz merge, nunca sincroniza campos de seguradora para policies, e nunca
+// aceita automaticamente um match probable/ambiguous — ver requisito
+// explícito da Block 2 "The data layer must NOT...".
+// ============================================================
+
+function isUniqueViolationOn(error: { code?: string | null; message?: string | null }, constraintName: string): boolean {
+  if (error.code !== '23505') return false
+  return (error.message ?? '').toLowerCase().includes(constraintName.toLowerCase())
+}
+
+// ── Carrier sync runs ────────────────────────────────────────
+
+export interface CarrierSyncRunFilters {
+  provider?: string
+  status?: CarrierSyncStatus
+}
+
+export async function listCarrierSyncRuns(options: CarrierSyncRunFilters = {}): Promise<CarrierSyncRun[]> {
+  const sb = getSupabaseAdmin()
+  let query = sb.from('carrier_sync_runs').select('*').order('created_at', { ascending: false })
+  if (options.provider) query = query.eq('provider', options.provider)
+  if (options.status) query = query.eq('status', options.status)
+  const { data, error } = await query
+  if (error) { console.error('listCarrierSyncRuns error:', error); return [] }
+  return rowsToCamel<CarrierSyncRun>(data ?? [])
+}
+
+export async function getCarrierSyncRun(runId: string): Promise<CarrierSyncRun | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('carrier_sync_runs').select('*').eq('id', runId).single()
+  if (error) return undefined
+  return objectToCamel(data) as unknown as CarrierSyncRun
+}
+
+// ── Carrier import records (staging) ────────────────────────
+
+export interface CarrierImportRecordFilters {
+  customerMatchStatus?: CarrierMatchStatus
+  policyMatchStatus?: CarrierMatchStatus
+  decisionStatus?: CarrierDecisionStatus
+}
+
+export async function listCarrierImportRecords(
+  runId: string,
+  options: CarrierImportRecordFilters = {},
+): Promise<CarrierImportRecord[]> {
+  const sb = getSupabaseAdmin()
+  let query = sb
+    .from('carrier_import_records')
+    .select('*')
+    .eq('sync_run_id', runId)
+    .order('created_at', { ascending: true })
+  if (options.customerMatchStatus) query = query.eq('customer_match_status', options.customerMatchStatus)
+  if (options.policyMatchStatus) query = query.eq('policy_match_status', options.policyMatchStatus)
+  if (options.decisionStatus) query = query.eq('decision_status', options.decisionStatus)
+  const { data, error } = await query
+  if (error) { console.error('listCarrierImportRecords error:', error); return [] }
+  return rowsToCamel<CarrierImportRecord>(data ?? [])
+}
+
+export async function getCarrierImportRecord(recordId: string): Promise<CarrierImportRecord | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('carrier_import_records').select('*').eq('id', recordId).single()
+  if (error) return undefined
+  return objectToCamel(data) as unknown as CarrierImportRecord
+}
+
+// ── External identities (lookup) ────────────────────────────
+
+export async function findExternalClientIdentity(
+  provider: string,
+  externalClientId: string,
+): Promise<ExternalClientIdentity | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('external_client_identities')
+    .select('*')
+    .eq('provider', provider)
+    .eq('external_client_id', externalClientId)
+    .maybeSingle()
+  if (error || !data) return undefined
+  return objectToCamel(data) as unknown as ExternalClientIdentity
+}
+
+export async function findExternalPolicyIdentity(
+  provider: string,
+  externalPolicyId: string,
+): Promise<ExternalPolicyIdentity | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('external_policy_identities')
+    .select('*')
+    .eq('provider', provider)
+    .eq('external_policy_id', externalPolicyId)
+    .maybeSingle()
+  if (error || !data) return undefined
+  return objectToCamel(data) as unknown as ExternalPolicyIdentity
+}
+
+// ── External identities (link/create) ───────────────────────
+
+export interface CreateExternalClientIdentityInput {
+  individualClientId?: string
+  companyId?: string
+  provider: string
+  externalClientId: string
+  externalClientNumber?: string
+  taxCountry?: string
+  taxIdType?: string
+  taxIdRaw?: string
+  taxIdNormalized?: string
+  metadata?: Record<string, Json>
+}
+
+export type CreateExternalClientIdentityResult =
+  | { status: 'created'; identity: ExternalClientIdentity }
+  // (provider, externalClientId) já existia e já apontava para o MESMO
+  // dono — sucesso idempotente, nada é alterado.
+  | { status: 'already_linked'; identity: ExternalClientIdentity }
+  // (provider, externalClientId) já existia mas apontava para um dono
+  // DIFERENTE — nunca move uma identidade existente de um dono para outro
+  // silenciosamente (ver requisito "Do not silently move an existing
+  // identity from one CRM owner to another").
+  | { status: 'conflict'; identity: ExternalClientIdentity }
+
+/**
+ * Liga (ou cria a ligação de) um cliente de seguradora a exatamente um
+ * individual_client OU company — nunca aos dois, nunca a nenhum (XOR
+ * validado aqui, antes de tocar na BD; o CHECK da migration é a rede de
+ * segurança final). A uniqueness real é a da BD — UNIQUE(provider,
+ * external_client_id) — este código nunca decide "já existe" só por uma
+ * leitura prévia sem proteção: se o INSERT ainda assim colidir (corrida
+ * entre duas chamadas concorrentes), volta a consultar em vez de assumir.
+ */
+export async function createExternalClientIdentity(
+  input: CreateExternalClientIdentityInput,
+): Promise<CreateExternalClientIdentityResult> {
+  const hasIndividual = !!input.individualClientId && input.individualClientId.trim() !== ''
+  const hasCompany = !!input.companyId && input.companyId.trim() !== ''
+  if (hasIndividual === hasCompany) {
+    throw new Error('createExternalClientIdentity: exactly one of individualClientId or companyId is required')
+  }
+  if (!input.provider || !input.externalClientId) {
+    throw new Error('createExternalClientIdentity: provider and externalClientId are required')
+  }
+
+  const sameOwnerAs = (identity: ExternalClientIdentity): boolean =>
+    hasIndividual ? identity.individualClientId === input.individualClientId : identity.companyId === input.companyId
+
+  const existing = await findExternalClientIdentity(input.provider, input.externalClientId)
+  if (existing) {
+    return { status: sameOwnerAs(existing) ? 'already_linked' : 'conflict', identity: existing }
+  }
+
+  const sb = getSupabaseAdmin()
+  const now = new Date().toISOString()
+  const payload = {
+    id: crypto.randomUUID(),
+    individualClientId: input.individualClientId,
+    companyId: input.companyId,
+    provider: input.provider,
+    externalClientId: input.externalClientId,
+    externalClientNumber: input.externalClientNumber,
+    taxCountry: input.taxCountry,
+    taxIdType: input.taxIdType,
+    taxIdRaw: input.taxIdRaw,
+    taxIdNormalized: input.taxIdNormalized,
+    metadata: input.metadata ?? {},
+    firstSeenAt: now,
+    lastSeenAt: now,
+    createdAt: now,
+    updatedAt: now,
+  }
+  const { data, error } = await sb
+    .from('external_client_identities')
+    .insert(objectToSnake(payload as unknown as Record<string, unknown>) as any)
+    .select('*')
+    .single()
+
+  if (error) {
+    if (isUniqueViolationOn(error, 'external_client_identities_provider_external_id_uidx')) {
+      const raced = await findExternalClientIdentity(input.provider, input.externalClientId)
+      if (raced) return { status: sameOwnerAs(raced) ? 'already_linked' : 'conflict', identity: raced }
+    }
+    throw new Error(`createExternalClientIdentity: ${error.message}`)
+  }
+  return { status: 'created', identity: objectToCamel(data) as unknown as ExternalClientIdentity }
+}
+
+export interface CreateExternalPolicyIdentityInput {
+  policyId: string
+  provider: string
+  externalPolicyNumber: string
+  externalPolicyId?: string
+  externalPolicyNumberNormalized?: string
+  metadata?: Record<string, Json>
+}
+
+export type CreateExternalPolicyIdentityResult =
+  | { status: 'created'; identity: ExternalPolicyIdentity }
+  | { status: 'already_linked'; identity: ExternalPolicyIdentity }
+  // (provider, externalPolicyId) já pertence a OUTRA policy interna.
+  | { status: 'conflict'; identity: ExternalPolicyIdentity }
+
+/**
+ * Liga (ou cria a ligação de) uma apólice de seguradora a uma policy
+ * interna. O número de apólice NUNCA é, por si só, tratado como identidade
+ * autoritativa (ver requisito "Do not use policy number alone as
+ * authoritative identity") — a verificação de conflito só acontece quando
+ * externalPolicyId está presente, exatamente como a UNIQUE parcial
+ * (provider, external_policy_id) WHERE external_policy_id IS NOT NULL na
+ * migration.
+ */
+export async function createExternalPolicyIdentity(
+  input: CreateExternalPolicyIdentityInput,
+): Promise<CreateExternalPolicyIdentityResult> {
+  if (!input.policyId || !input.provider || !input.externalPolicyNumber) {
+    throw new Error('createExternalPolicyIdentity: policyId, provider and externalPolicyNumber are required')
+  }
+
+  if (input.externalPolicyId) {
+    const existing = await findExternalPolicyIdentity(input.provider, input.externalPolicyId)
+    if (existing) {
+      return { status: existing.policyId === input.policyId ? 'already_linked' : 'conflict', identity: existing }
+    }
+  }
+
+  const sb = getSupabaseAdmin()
+  const now = new Date().toISOString()
+  const payload = {
+    id: crypto.randomUUID(),
+    policyId: input.policyId,
+    provider: input.provider,
+    externalPolicyId: input.externalPolicyId,
+    externalPolicyNumber: input.externalPolicyNumber,
+    externalPolicyNumberNormalized: input.externalPolicyNumberNormalized,
+    metadata: input.metadata ?? {},
+    firstSeenAt: now,
+    lastSeenAt: now,
+    createdAt: now,
+    updatedAt: now,
+  }
+  const { data, error } = await sb
+    .from('external_policy_identities')
+    .insert(objectToSnake(payload as unknown as Record<string, unknown>) as any)
+    .select('*')
+    .single()
+
+  if (error) {
+    if (input.externalPolicyId && isUniqueViolationOn(error, 'external_policy_identities_provider_external_id_uidx')) {
+      const raced = await findExternalPolicyIdentity(input.provider, input.externalPolicyId)
+      if (raced) return { status: raced.policyId === input.policyId ? 'already_linked' : 'conflict', identity: raced }
+    }
+    throw new Error(`createExternalPolicyIdentity: ${error.message}`)
+  }
+  return { status: 'created', identity: objectToCamel(data) as unknown as ExternalPolicyIdentity }
+}
+
+// ── Import decisions (staging record only — never touches CRM data) ─
+
+const UNRESOLVED_CARRIER_MATCH_STATUSES: readonly CarrierMatchStatus[] = ['unmatched', 'probable', 'ambiguous', 'new']
+
+export interface UpdateCarrierImportDecisionInput {
+  decisionStatus: CarrierDecisionStatus
+  decisionNote?: string
+}
+
+/**
+ * Atualiza SÓ os campos de decisão do carrier_import_record — nunca cria,
+ * atualiza ou apaga um individual_client/company/policy, nunca faz merge,
+ * nunca sobrepõe campos do CRM (ver requisito '"Accept" at this stage does
+ * NOT create a client/company/policy, does not merge anything, does not
+ * overwrite CRM fields — it only records that an Admin accepted the
+ * reconciliation decision').
+ *
+ *   accepted -> decision_status='accepted', decided_at=now()
+ *   rejected -> decision_status='rejected' (decided_at fica por preencher —
+ *     rejeitar não é uma decisão "tomada" sobre o registo no mesmo sentido)
+ *   ignored  -> decision_status='ignored'; customer_match_status/
+ *     policy_match_status também passam a 'ignored', mas SÓ se ainda
+ *     estavam por resolver (unmatched/probable/ambiguous/new) — nunca
+ *     apaga um 'exact'/'linked' já confirmado só porque a decisão de
+ *     revisão foi ignorada.
+ */
+export async function updateCarrierImportDecision(
+  recordId: string,
+  input: UpdateCarrierImportDecisionInput,
+): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const now = new Date().toISOString()
+  const updates: Record<string, unknown> = {
+    decision_status: input.decisionStatus,
+    updated_at: now,
+  }
+  if (input.decisionNote !== undefined) updates.decision_note = input.decisionNote
+  if (input.decisionStatus === 'accepted') updates.decided_at = now
+
+  if (input.decisionStatus === 'ignored') {
+    const record = await getCarrierImportRecord(recordId)
+    if (record) {
+      if (UNRESOLVED_CARRIER_MATCH_STATUSES.includes(record.customerMatchStatus)) updates.customer_match_status = 'ignored'
+      if (UNRESOLVED_CARRIER_MATCH_STATUSES.includes(record.policyMatchStatus)) updates.policy_match_status = 'ignored'
+    }
+  }
+
+  const { error } = await (sb.from('carrier_import_records') as any).update(updates).eq('id', recordId)
+  if (error) throw new Error(`updateCarrierImportDecision: ${error.message}`)
 }

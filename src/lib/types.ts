@@ -606,3 +606,137 @@ export interface SalesPipelineStats {
   /** Oportunidades abertas com next_follow_up_at hoje. */
   dueTodayFollowUpsCount: number
 }
+
+// =============================================================
+// CRM3 — Identity & Reconciliation (Block 2)
+//
+// Tipos para as 4 tabelas de migrations/20260830_crm3_identity_reconciliation.sql.
+// Nomes de campo tal como na BD (camelCase), sem nada de credenciais/
+// secrets aqui — ver reconciliation-authority.ts para a config de campos
+// autoritativos e client-reconciliation.ts/policy-reconciliation.ts para os
+// motores puros que produzem os match statuses.
+// =============================================================
+
+// JSON-safe value — used for jsonb columns (metadata/raw_payload/summary)
+// instead of Record<string, unknown>: server functions round-trip their
+// return value through JSON, and `unknown` isn't assignable to the
+// JSON-value bound that inference expects there, which otherwise breaks
+// type-checking on every admin*/fetch* fn touching one of these fields.
+export type Json = string | number | boolean | null | Json[] | { [key: string]: Json }
+
+export type CarrierSyncMode = 'dry_run' | 'import'
+
+export type CarrierSyncStatus = 'pending' | 'processing' | 'completed' | 'failed'
+
+/** Estado de reconciliação de um registo de import — cliente OU apólice,
+ * mesmo vocabulário para os dois (ver carrier_import_records.customer_match_status
+ * / policy_match_status na migration). */
+export type CarrierMatchStatus =
+  | 'unmatched'
+  | 'exact'
+  | 'probable'
+  | 'ambiguous'
+  | 'new'
+  | 'linked'
+  | 'ignored'
+  | 'error'
+
+/** Decisão de um Admin sobre um carrier_import_record — nunca cria/apaga/
+ * funde nada por si só (ver requisito "Accept... does NOT create/merge"). */
+export type CarrierDecisionStatus = 'pending' | 'accepted' | 'rejected' | 'ignored'
+
+export interface CarrierSyncRun {
+  id: string
+  provider: string
+  mode: CarrierSyncMode
+  status: CarrierSyncStatus
+  startedAt?: string
+  completedAt?: string
+  recordsReceived: number
+  recordsExactMatch: number
+  recordsReview: number
+  recordsNew: number
+  recordsError: number
+  summary: Record<string, Json>
+  errorMessage?: string
+  createdAt: string
+}
+
+export interface CarrierImportRecord {
+  id: string
+  syncRunId: string
+  provider: string
+
+  externalRecordId?: string
+  externalClientId?: string
+  externalPolicyId?: string
+  externalPolicyNumber?: string
+
+  market?: string
+
+  /** Nunca mostrado por omissão na UI — ver requisito "Never dump the full
+   * raw_payload by default" em admin/carrier-integrations. */
+  rawPayload: Record<string, Json>
+
+  customerMatchStatus: CarrierMatchStatus
+  policyMatchStatus: CarrierMatchStatus
+
+  matchedIndividualClientId?: string
+  matchedCompanyId?: string
+  matchedPolicyId?: string
+
+  customerMatchReason?: string
+  policyMatchReason?: string
+
+  decisionStatus: CarrierDecisionStatus
+  decisionNote?: string
+  decidedAt?: string
+
+  createdAt: string
+  updatedAt: string
+}
+
+/** Liga um individual_client OU company (XOR, nunca os dois) ao cliente de
+ * uma seguradora — ver external_client_identities na migration. */
+export interface ExternalClientIdentity {
+  id: string
+  individualClientId?: string
+  companyId?: string
+
+  provider: string
+  externalClientId: string
+  externalClientNumber?: string
+
+  taxCountry?: string
+  taxIdType?: string
+  taxIdRaw?: string
+  taxIdNormalized?: string
+
+  metadata: Record<string, Json>
+
+  firstSeenAt: string
+  lastSeenAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Liga uma policy interna ao registo de apólice de uma seguradora — ver
+ * external_policy_identities na migration. Número de apólice sozinho nunca é
+ * a identidade autoritativa (ver requisito "Do not use policy number alone
+ * as authoritative identity"). */
+export interface ExternalPolicyIdentity {
+  id: string
+  policyId: string
+
+  provider: string
+  externalPolicyId?: string
+  externalPolicyNumber: string
+  externalPolicyNumberNormalized?: string
+
+  metadata: Record<string, Json>
+
+  firstSeenAt: string
+  lastSeenAt: string
+  createdAt: string
+  updatedAt: string
+}

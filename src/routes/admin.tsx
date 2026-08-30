@@ -1,4 +1,4 @@
-import { createFileRoute, Navigate, Link } from '@tanstack/react-router'
+import { createFileRoute, Navigate, Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { BillingTab } from '@/components/billing/BillingTab'
 import { AppLayout } from '@/components/AppLayout'
 import {
@@ -69,6 +69,12 @@ import { AdminTasksPanel } from '@/components/admin/AdminTasksPanel'
 import { AdminMarketingPanel } from '@/components/admin/AdminMarketingPanel'
 import { SalesWorkspace } from '@/components/admin/sales/SalesWorkspace'
 import { SALES_OPPORTUNITY_STAGES } from '@/lib/sales-opportunity-rules'
+import {
+  getCompanyDuplicateWarnings,
+  getPersonDuplicateWarnings,
+  getPolicyDuplicateWarnings,
+  type DuplicateWarning,
+} from '@/lib/duplicate-warning'
 async function exportToExcel(data: Record<string, unknown>[], filename: string) {
   const XLSX = await import('xlsx')
   const ws = XLSX.utils.json_to_sheet(data)
@@ -317,7 +323,22 @@ export const Route = createFileRoute('/admin')({
   head: () => ({ meta: [{ title: 'Os Meus Seguros · Admin' }] }),
 })
 
+// AdminPage stays a thin wrapper so /admin's existing behaviour (the giant
+// tab-based dashboard below, now in AdminDashboardContent) is untouched byte
+// for byte. It only exists to let genuinely separate admin pages — like
+// /admin/carrier-integrations (CRM3, Block 2) — be their own real routes
+// nested under /admin in the file-router tree without also rendering the
+// dashboard's own content: TanStack Router always renders an ancestor route's
+// component for any of its descendants, so /admin needs an <Outlet/> for
+// those descendants to show at all. At the exact "/admin" path (any ?tab=),
+// there is no matched child route, so this never affects the dashboard.
 function AdminPage() {
+  const location = useRouterState({ select: (state) => state.location })
+  if (location.pathname !== '/admin') return <Outlet />
+  return <AdminDashboardContent />
+}
+
+function AdminDashboardContent() {
   const { user, ready } = useIdentity()
   const { tab: searchTab, stage: searchStage, overdue: searchOverdue } = Route.useSearch()
   const tab: AdminTab = searchTab ?? 'dashboard'
@@ -335,6 +356,11 @@ function AdminPage() {
   const [showNewCompany, setShowNewCompany] = useState(false)
   const [showNewPolicy, setShowNewPolicy] = useState(false)
   const [showNewIndividualClient, setShowNewIndividualClient] = useState(false)
+  // CRM3 Block 2 — pending create payload while a duplicate-warning
+  // confirmation panel is shown; never a block, just a pause for a choice.
+  const [pendingCompanyCreate, setPendingCompanyCreate] = useState<{ data: any; warnings: DuplicateWarning[] } | null>(null)
+  const [pendingIndividualClientCreate, setPendingIndividualClientCreate] = useState<{ data: any; warnings: DuplicateWarning[] } | null>(null)
+  const [pendingPolicyCreate, setPendingPolicyCreate] = useState<{ data: any; warnings: DuplicateWarning[] } | null>(null)
   const [editingIndividualClientId, setEditingIndividualClientId] = useState<string | null>(null)
   const [expandedIndividualClientId, setExpandedIndividualClientId] = useState<string | null>(null)
   const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null)
@@ -491,9 +517,40 @@ function AdminPage() {
                     onSubmit={async (data) => {
                       if (editingCompanyId) {
                         await adminUpdateCompany({ data: { id: editingCompanyId, updates: data } })
-                      } else {
-                        await adminCreateCompany({ data })
+                        await reload()
+                        setShowNewCompany(false)
+                        setEditingCompanyId(null)
+                        return
                       }
+                      const warnings = getCompanyDuplicateWarnings(
+                        { nif: data.nif, name: data.name, contactEmail: data.contactEmail, contactPhone: data.contactPhone },
+                        companies.map((c) => ({ id: c.id, nif: c.nif, name: c.name, contactEmail: c.contactEmail, contactPhone: c.contactPhone })),
+                      )
+                      if (warnings.length > 0) {
+                        setPendingCompanyCreate({ data, warnings })
+                        return
+                      }
+                      await adminCreateCompany({ data })
+                      await reload()
+                      setShowNewCompany(false)
+                      setEditingCompanyId(null)
+                    }}
+                  />
+                )}
+
+                {pendingCompanyCreate && (
+                  <DuplicateWarningDialog
+                    warnings={pendingCompanyCreate.warnings}
+                    onCancel={() => setPendingCompanyCreate(null)}
+                    onReview={(id) => {
+                      setPendingCompanyCreate(null)
+                      setShowNewCompany(false)
+                      setExpandedCompanyId(id)
+                    }}
+                    onContinue={async () => {
+                      const data = pendingCompanyCreate.data
+                      setPendingCompanyCreate(null)
+                      await adminCreateCompany({ data })
                       await reload()
                       setShowNewCompany(false)
                       setEditingCompanyId(null)
@@ -877,9 +934,40 @@ function AdminPage() {
                     onSubmit={async (data) => {
                       if (editingIndividualClientId) {
                         await adminUpdateIndividualClient({ data: { id: editingIndividualClientId, updates: data } })
-                      } else {
-                        await adminCreateIndividualClient({ data })
+                        await reload()
+                        setShowNewIndividualClient(false)
+                        setEditingIndividualClientId(null)
+                        return
                       }
+                      const warnings = getPersonDuplicateWarnings(
+                        { nif: data.nif, email: data.email, phone: data.phone },
+                        individualClients.map((c) => ({ id: c.id, nif: c.nif, email: c.email, phone: c.phone })),
+                      )
+                      if (warnings.length > 0) {
+                        setPendingIndividualClientCreate({ data, warnings })
+                        return
+                      }
+                      await adminCreateIndividualClient({ data })
+                      await reload()
+                      setShowNewIndividualClient(false)
+                      setEditingIndividualClientId(null)
+                    }}
+                  />
+                )}
+
+                {pendingIndividualClientCreate && (
+                  <DuplicateWarningDialog
+                    warnings={pendingIndividualClientCreate.warnings}
+                    onCancel={() => setPendingIndividualClientCreate(null)}
+                    onReview={(id) => {
+                      setPendingIndividualClientCreate(null)
+                      setShowNewIndividualClient(false)
+                      setExpandedIndividualClientId(id)
+                    }}
+                    onContinue={async () => {
+                      const data = pendingIndividualClientCreate.data
+                      setPendingIndividualClientCreate(null)
+                      await adminCreateIndividualClient({ data })
                       await reload()
                       setShowNewIndividualClient(false)
                       setEditingIndividualClientId(null)
@@ -1164,6 +1252,32 @@ function AdminPage() {
                     companies={companies}
                     individualClients={individualClients}
                     onSubmit={async (data) => {
+                      try {
+                        const warnings = getPolicyDuplicateWarnings(
+                          { insurer: data.insurer, policyNumber: data.policyNumber },
+                          policies.map((p) => ({ id: p.id, insurer: p.insurer, policyNumber: p.policyNumber })),
+                        )
+                        if (warnings.length > 0) {
+                          setPendingPolicyCreate({ data, warnings })
+                          return
+                        }
+                        await adminCreatePolicy({ data })
+                        await reload()
+                        setShowNewPolicy(false)
+                      } catch (err) {
+                        alert(`Error creating policy: ${err instanceof Error ? err.message : 'Unknown error'}`)
+                      }
+                    }}
+                  />
+                )}
+
+                {pendingPolicyCreate && (
+                  <DuplicateWarningDialog
+                    warnings={pendingPolicyCreate.warnings}
+                    onCancel={() => setPendingPolicyCreate(null)}
+                    onContinue={async () => {
+                      const data = pendingPolicyCreate.data
+                      setPendingPolicyCreate(null)
                       try {
                         await adminCreatePolicy({ data })
                         await reload()
@@ -4791,6 +4905,70 @@ function FormField({
         className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]"
         required={required}
       />
+    </div>
+  )
+}
+
+/**
+ * CRM3 Block 2 — duplicate-warning confirmation panel for New Person/
+ * Company/Policy. Never blocks creation: "Continue anyway" always proceeds
+ * with the exact same create call that would have run without this panel.
+ * "Review existing record" only closes the create form and (when a jump
+ * target is provided) opens the existing candidate — it never mutates it.
+ */
+function DuplicateWarningDialog({
+  warnings,
+  onCancel,
+  onContinue,
+  onReview,
+}: {
+  warnings: DuplicateWarning[]
+  onCancel: () => void
+  onContinue: () => void
+  onReview?: (candidateId: string) => void
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.45)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: '1rem',
+      }}
+    >
+      <div className="admin-panel" style={{ maxWidth: '480px', width: '100%', padding: '1.25rem' }}>
+        <h3 className="admin-panel-title" style={{ marginBottom: '0.5rem' }}>Possible existing record</h3>
+        <p className="text-xs text-navy-400" style={{ marginBottom: '0.75rem' }}>
+          This does not block creation — review the details below, then choose how to proceed.
+        </p>
+        <div style={{ marginBottom: '1rem' }}>
+          {warnings.map((warning, i) => (
+            <div key={i} className="text-sm text-navy-700" style={{ marginBottom: '0.5rem' }}>
+              <span
+                className={`admin-chip ${warning.severity === 'strong' ? 'admin-chip--danger' : 'admin-chip--info'}`}
+                style={{ marginRight: '0.4rem' }}
+              >
+                {warning.severity}
+              </span>
+              {warning.message}
+              {onReview && warning.candidateIds[0] && (
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-ghost admin-btn--sm"
+                  style={{ marginLeft: '0.4rem' }}
+                  onClick={() => onReview(warning.candidateIds[0]!)}
+                >
+                  Review existing record
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center justify-end gap-2">
+          <button type="button" className="admin-btn admin-btn-secondary admin-btn--sm" onClick={onCancel}>Cancel</button>
+          <button type="button" className="admin-btn admin-btn-primary admin-btn--sm" onClick={onContinue}>Continue anyway</button>
+        </div>
+      </div>
     </div>
   )
 }
