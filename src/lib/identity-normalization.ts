@@ -77,6 +77,36 @@ export function normalizeTaxId(value?: string | null, country?: string | null): 
   return collapsed === '' ? null : collapsed
 }
 
+const PT_TAX_ID_DIGITS_RE = /^[0-9]{9}$/
+
+/**
+ * Valida o dígito de controlo de um NIF/NIPC português (algoritmo módulo
+ * 11 standard). Normaliza como português primeiro (normalizeTaxId(value,
+ * 'PT')) e exige EXATAMENTE 9 dígitos ASCII — um valor normalizado que
+ * ainda contenha letras (ver normalizeTaxId: preserva letras num valor
+ * malformado) falha aqui, não antes.
+ *
+ * Isto é só um sinal de confiança de identidade para o motor de
+ * reconciliação (ver requisito "identity-confidence helper") — NUNCA
+ * rejeita nem altera dados guardados no CRM; um cliente com um NIF
+ * inválido continua a existir tal como está, esta função só decide se
+ * esse NIF pode contribuir para uma correspondência EXACT.
+ */
+export function isValidPortugueseTaxId(value?: string | null): boolean {
+  const normalized = normalizeTaxId(value, 'PT')
+  if (normalized === null || !PT_TAX_ID_DIGITS_RE.test(normalized)) return false
+
+  const digits = normalized.split('').map(Number)
+  let sum = 0
+  for (let i = 0; i < 8; i++) {
+    sum += digits[i]! * (9 - i)
+  }
+  let check = 11 - (sum % 11)
+  if (check >= 10) check = 0
+
+  return check === digits[8]
+}
+
 /** Uma normalização de número de apólice específica de uma seguradora —
  * preparação para quando integrações concretas precisarem de regras
  * próprias (ex.: uma seguradora que usa sempre maiúsculas mas mantém

@@ -142,10 +142,78 @@ test('external identity claimed by more than one candidate => ambiguous, not the
 
 test('company candidates are matched the same way and candidateType is reported correctly', () => {
   const result = reconcileClient(
-    external({ provider: 'zurich', taxId: '500123456', taxCountry: 'PT' }),
-    [candidate({ id: 'cmp_1', type: 'company', taxId: '500123456', taxCountry: 'PT' })],
+    external({ provider: 'zurich', taxId: '500000000', taxCountry: 'PT' }),
+    [candidate({ id: 'cmp_1', type: 'company', taxId: '500000000', taxCountry: 'PT' })],
   )
   assert.equal(result.status, 'exact')
   assert.equal(result.candidateType, 'company')
   assert.equal(result.candidateId, 'cmp_1')
+})
+
+// ── hardened tax-id matching (rule 2) ────────────────────────────────────
+// Jurisdiction must be explicitly known on BOTH sides and equal, tax ids
+// must be equal after normalization, and for PT specifically both raw
+// values must pass the NIF/NIPC checksum — see matchByTaxId in
+// client-reconciliation.ts.
+
+test('HARDENING: same tax id with both jurisdictions missing => NOT exact', () => {
+  const result = reconcileClient(
+    external({ provider: 'zurich', taxId: '123456789' }), // no taxCountry
+    [candidate({ id: 'ind_1', type: 'individual', taxId: '123456789' })], // no taxCountry either
+  )
+  assert.notEqual(result.status, 'exact')
+})
+
+test('HARDENING: external jurisdiction is PT but candidate jurisdiction is missing => NOT exact', () => {
+  const result = reconcileClient(
+    external({ provider: 'zurich', taxId: '123456789', taxCountry: 'PT' }),
+    [candidate({ id: 'ind_1', type: 'individual', taxId: '123456789' })], // taxCountry missing
+  )
+  assert.notEqual(result.status, 'exact')
+})
+
+test('HARDENING: valid formatted PT NIF vs the same valid PT NIF unformatted => exact', () => {
+  const result = reconcileClient(
+    external({ provider: 'zurich', taxId: '123.456.789', taxCountry: 'PT' }),
+    [candidate({ id: 'ind_1', type: 'individual', taxId: '123456789', taxCountry: 'PT' })],
+  )
+  assert.equal(result.status, 'exact')
+  assert.equal(result.candidateId, 'ind_1')
+})
+
+test('HARDENING: same invalid-checksum PT NIF on both sides => NOT exact (textual equality is not enough for PT)', () => {
+  const result = reconcileClient(
+    external({ provider: 'zurich', taxId: '500123456', taxCountry: 'PT' }), // invalid checksum
+    [candidate({ id: 'ind_1', type: 'individual', taxId: '500123456', taxCountry: 'PT' })],
+  )
+  assert.notEqual(result.status, 'exact')
+})
+
+test('HARDENING: explicit same foreign jurisdiction + identical normalized tax id can still exact-match (no PT checksum required)', () => {
+  const result = reconcileClient(
+    external({ provider: 'zurich', taxId: 'B-12345678', taxCountry: 'ES' }),
+    [candidate({ id: 'ind_1', type: 'individual', taxId: 'B-12345678', taxCountry: 'ES' })],
+  )
+  assert.equal(result.status, 'exact')
+  assert.equal(result.candidateId, 'ind_1')
+})
+
+test('HARDENING: explicit different (foreign) jurisdictions never exact-match, even with the same raw tax id', () => {
+  const result = reconcileClient(
+    external({ provider: 'zurich', taxId: 'AB123456', taxCountry: 'FR' }),
+    [candidate({ id: 'ind_1', type: 'individual', taxId: 'AB123456', taxCountry: 'DE' })],
+  )
+  assert.notEqual(result.status, 'exact')
+})
+
+test('HARDENING: 9-digit tax id is never inferred to be Portuguese just because of its length', () => {
+  // No taxCountry anywhere — even though '123456789' looks like a valid
+  // NIF, jurisdiction must come from an explicit field, never be guessed.
+  const result = reconcileClient(
+    external({ provider: 'zurich', taxId: '123456789', taxCountry: 'DE' }),
+    [candidate({ id: 'ind_1', type: 'individual', taxId: '123456789', taxCountry: 'DE' })],
+  )
+  // Same explicit non-PT jurisdiction on both sides + equal normalized id
+  // => still allowed to exact-match (this is NOT a PT check-digit case).
+  assert.equal(result.status, 'exact')
 })

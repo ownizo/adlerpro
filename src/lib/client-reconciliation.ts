@@ -11,7 +11,10 @@
  *
  * ORDEM ESTRITA das regras (parar na primeira que produzir uma decisão):
  *   1. external identity exata (provider + externalClientId)
- *   2. NIF normalizado + mesma jurisdição
+ *   2. NIF normalizado + mesma jurisdição EXPLÍCITA em ambos os lados (ver
+ *      matchByTaxId abaixo — endurecido para nunca tratar "jurisdição
+ *      desconhecida" como uma correspondência, e para exigir NIF português
+ *      validamente formado nos dois lados quando a jurisdição é PT)
  *   3-5. sinais de PROBABLE (email+nome, telefone+nome, nome/morada sozinhos)
  *      — juntos numa só "pool" (ver nota antes de buildProbablePool)
  *   6. nenhum sinal significativo => NEW
@@ -22,7 +25,13 @@
  * bater".
  */
 
-import { normalizeEmail, normalizePhone, normalizeTaxCountry, normalizeTaxId } from './identity-normalization.ts'
+import {
+  isValidPortugueseTaxId,
+  normalizeEmail,
+  normalizePhone,
+  normalizeTaxCountry,
+  normalizeTaxId,
+} from './identity-normalization.ts'
 
 export type ClientCandidateType = 'individual' | 'company'
 
@@ -108,21 +117,46 @@ function matchByExternalIdentity(external: ExternalClientInput, candidates: Clie
   )
 }
 
-// ── regra 2: NIF normalizado + mesma jurisdição ─────────────────────────
-
+// ── regra 2: NIF normalizado + mesma jurisdição (endurecida) ────────────
+//
+// Uma correspondência EXACT por NIF só é permitida quando, simultaneamente:
+//   A) a jurisdição é explicitamente conhecida DOS DOIS LADOS — duas
+//      jurisdições "desconhecidas" já NÃO contam como iguais entre si (ao
+//      contrário da primeira versão desta regra: sem saber o país de
+//      nenhum dos dois lados, não há como confirmar que é a mesma
+//      jurisdição, só porque nenhum dos dois a indicou);
+//   B) as jurisdições normalizadas são iguais;
+//   C) os NIFs normalizados são iguais;
+//   D) para jurisdição PT especificamente: os NIFs ORIGINAIS (antes de
+//      normalizar) têm de passar isValidPortugueseTaxId() nos dois lados —
+//      dois valores PT textualmente iguais mas com dígito de controlo
+//      inválido nunca produzem EXACT (podem, no máximo, ficar por resolver
+//      manualmente numa fase futura; esta função não inventa aqui uma nova
+//      regra fuzzy/"probable" para esse caso).
+// Nunca infere Portugal só porque um valor tem 9 dígitos — a jurisdição
+// vem sempre do campo taxCountry explícito, nunca do formato do NIF.
 function matchByTaxId(external: ExternalClientInput, candidates: ClientCandidate[]): ClientCandidate[] {
+  const externalJurisdiction = normalizeTaxCountry(external.taxCountry)
+  if (externalJurisdiction === null) return [] // A) jurisdição desconhecida do lado externo
+
   const externalTaxId = normalizeTaxId(external.taxId, external.taxCountry)
   if (externalTaxId === null) return []
-  const externalJurisdiction = normalizeTaxCountry(external.taxCountry)
 
   return candidates.filter((candidate) => {
+    const candidateJurisdiction = normalizeTaxCountry(candidate.taxCountry)
+    if (candidateJurisdiction === null) return false // A) jurisdição desconhecida do lado do candidato
+    if (candidateJurisdiction !== externalJurisdiction) return false // B)
+
     const candidateTaxId = normalizeTaxId(candidate.taxId, candidate.taxCountry)
-    if (candidateTaxId === null || candidateTaxId !== externalTaxId) return false
-    // Mesma jurisdição — nunca comparar NIFs de países diferentes como
-    // EXACT (ver cabeçalho do ficheiro). Duas jurisdições "desconhecidas"
-    // (ambas null) são tratadas como iguais entre si — não é possível
-    // provar que são diferentes com a informação disponível.
-    return normalizeTaxCountry(candidate.taxCountry) === externalJurisdiction
+    if (candidateTaxId === null || candidateTaxId !== externalTaxId) return false // C)
+
+    if (externalJurisdiction === 'PT') {
+      // D) ambos os NIFs têm de ser validamente formados (dígito de
+      // controlo correto) — não basta serem textualmente iguais.
+      return isValidPortugueseTaxId(external.taxId) && isValidPortugueseTaxId(candidate.taxId)
+    }
+
+    return true
   })
 }
 

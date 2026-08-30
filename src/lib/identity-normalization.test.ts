@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  isValidPortugueseTaxId,
   normalizeEmail,
   normalizePhone,
   normalizePolicyNumber,
@@ -126,4 +127,36 @@ test('normalizePolicyNumber: uses a provider-specific normalizer when one is reg
   } finally {
     delete providerPolicyNormalizers['__test_provider__']
   }
+})
+
+// ── isValidPortugueseTaxId (NIF/NIPC modulus-11 check digit) ────────────
+
+test('isValidPortugueseTaxId: accepts a valid checksum, formatting ignored', () => {
+  assert.equal(isValidPortugueseTaxId('123456789'), true)
+  assert.equal(isValidPortugueseTaxId('500000000'), true)
+  // Same digits, formatted with dots/spaces/hyphens — normalized first.
+  assert.equal(isValidPortugueseTaxId('123.456.789'), true)
+  assert.equal(isValidPortugueseTaxId('123 456 789'), true)
+  assert.equal(isValidPortugueseTaxId('123-456-789'), true)
+})
+
+test('isValidPortugueseTaxId: rejects an incorrect checksum', () => {
+  assert.equal(isValidPortugueseTaxId('111111111'), false)
+  assert.equal(isValidPortugueseTaxId('500123456'), false)
+})
+
+test('isValidPortugueseTaxId: rejects anything that is not exactly 9 ASCII digits after normalization', () => {
+  assert.equal(isValidPortugueseTaxId('12345678'), false) // 8 digits
+  assert.equal(isValidPortugueseTaxId('1234567890'), false) // 10 digits
+  assert.equal(isValidPortugueseTaxId('12345678A'), false) // contains a letter
+  assert.equal(isValidPortugueseTaxId(''), false)
+  assert.equal(isValidPortugueseTaxId('   '), false)
+  assert.equal(isValidPortugueseTaxId(undefined), false)
+  assert.equal(isValidPortugueseTaxId(null), false)
+})
+
+test('isValidPortugueseTaxId: is a confidence check only — never throws, never mutates its input', () => {
+  const input = ' 123.456.789 '
+  assert.doesNotThrow(() => isValidPortugueseTaxId(input))
+  assert.equal(input, ' 123.456.789 ')
 })
