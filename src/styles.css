@@ -97,3 +97,326 @@ code {
 ::-webkit-scrollbar-thumb:hover {
   background: #999999;
 }
+
+/* ============================================================
+   ADLER & ROCHEFORT — INTERNAL BACKOFFICE
+   Visual system scoped exclusively to /admin.
+   Does not affect Adler One, My Cover Vault or Adler Pro.
+   ============================================================ */
+
+.admin-backoffice-shell {
+  --admin-navy: #17243D;
+  --admin-navy-light: #223553;
+  --admin-slate: #526984;
+  --admin-red: #B8323E;
+  --admin-burgundy: #872733;
+  --admin-ivory: #F5F1E8;
+  --admin-page: #F4F3F0;
+  --admin-card: #FFFFFF;
+  --admin-border: #DDE1E7;
+  --admin-ink: #111927;
+  --admin-muted: #687386;
+  background: var(--admin-page) !important;
+  color: var(--admin-ink);
+}
+
+.admin-backoffice-shell,
+.admin-backoffice-shell * {
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+/* ---------- Sidebar ---------- */
+
+.admin-backoffice-sidebar {
+  width: 288px !important;
+  background: var(--admin-navy) !important;
+  border-right: 0 !important;
+  box-shadow: 14px 0 36px rgba(17, 25, 39, 0.08);
+}
+
+.admin-backoffice-sidebar > div:first-child {
+  min-height: 108px;
+  padding: 1.65rem 1.4rem 1.35rem !important;
+  border-bottom: 1px solid rgba(255,255,255,0.10) !important;
+  display: flex;
+  align-items: center;
+}
+
+.admin-backoffice-sidebar > div:first-child a {
+  align-items: flex-start !important;
+  gap: 0.35rem !important;
+}
+
+.admin-backoffice-sidebar > div:first-child span {
+  color: #FFFFFF !important;
+}
+
+.admin-backoffice-sidebar > div:first-child span:first-child {
+  letter-spacing: 0.055em !important;
+}
+
+.admin-backoffice-sidebar > div:first-child span:last-child {
+  color: rgba(255,255,255,0.54) !important;
+}
+
+.admin-backoffice-sidebar nav {
+  padding: 1.25rem 0.85rem 1.5rem !important;
+}
+
+.admin-backoffice-sidebar nav > div:first-of-type p,
+.admin-backoffice-sidebar nav > div p {
+  color: rgba(255,255,255,0.38) !important;
+}
+
+.admin-backoffice-sidebar nav > div:first-of-type p {
+  color: #D88991 !important;
+}
+
+.admin-backoffice-sidebar nav button,
+.admin-backoffice-sidebar nav a {
+  color: rgba(255,255,255,0.68) !important;
+  border-radius: 9px !important;
+}
+
+.admin-backoffice-sidebar nav button:hover,
+.admin-backoffice-sidebar nav a:hover {
+  color: #FFFFFF !important;
+  background: rgba(255,255,255,0.07) !important;
+}
+
+.admin-backoffice-sidebar nav a[aria-current="page"],
+.admin-backoffice-sidebar nav a[data-status="active"],
+.admin-backoffice-sidebar nav a[style*="background"] {
+  color: #FFFFFF !important;
+}
+
+.admin-backoffice-sidebar nav a[aria-current="page"] {
+  background: rgba(255,255,255,0.11) !important;
+  box-shadow: inset 3px 0 0 var(--admin-red);
+}
+
+.admin-backoffice-sidebar svg {
+  opacity: 0.82;
+}
+
+.admin-backoffice-sidebar > div:last-of-type {
+  border-top: 1px solid rgba(255,255,255,0.10) !important;
+  padding: 1rem 1.1rem 1.2rem !important;
+}
+
+.admin-backoffice-sidebar > div:last-of-type p {
+  color: rgba(255,255,255,0.72) !important;
+}
+
+.admin-backoffice-sidebar > div:last-of-type p + p {
+  color: rgba(255,255,255,0.42) !important;
+}
+
+.admin-backoffice-sidebar > div:last-of-type button {
+  background: rgba(255,255,255,0.06) !important;
+  border-color: rgba(255,255,255,0.11) !important;
+  color: rgba(255,255,255,0.76) !important;
+}
+
+/* ---------- Header ---------- */
+
+.admin-backoffice-header {
+  height: 68px !important;
+  background: rgba(255,255,255,0.94) !important;
+  border-bottom: 1px solid #E3E6EA !important;
+  box-shadow: 0 1px 0 rgba(17,25,39,0.02);
+}
+
+.admin-backoffice-header > img {
+  display: none !important;
+}
+
+.admin-backoffice-header > div:last-child {
+  gap: 0.8rem !important;
+}
+
+.admin-backoffice-header > div:last-child > div:first-child {
+  border-color: #D8DDE4 !important;
+  border-radius: 8px !important;
+}
+
+.admin-backoffice-header > div:last-child > div:first-child button {
+  min-width: 38px;
+  min-height: 30px;
+}
+
+/* ---------- Main workspace ---------- */
+
+.admin-backoffice-main {
+  background:
+    linear-gradient(180deg, #F7F6F3 0, #F4F3F0 240px) !important;
+  padding: 2rem 2.2rem 3.5rem !important;
+}
+
+.admin-backoffice-main > * {
+  max-width: 1500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.admin-backoffice-main h1 {
+  color: var(--admin-ink) !important;
+  font-size: clamp(1.85rem, 2.2vw, 2.55rem) !important;
+  line-height: 1.08 !important;
+  letter-spacing: -0.035em !important;
+  font-weight: 720 !important;
+}
+
+.admin-backoffice-main h2 {
+  color: var(--admin-ink) !important;
+  letter-spacing: -0.018em !important;
+}
+
+.admin-backoffice-main h3 {
+  color: var(--admin-ink) !important;
+}
+
+.admin-backoffice-main .text-gray-500,
+.admin-backoffice-main .text-gray-600,
+.admin-backoffice-main .text-slate-400,
+.admin-backoffice-main .text-slate-500 {
+  color: var(--admin-muted) !important;
+}
+
+/* ---------- Surfaces ---------- */
+
+.admin-backoffice-main .bg-white {
+  background: var(--admin-card) !important;
+}
+
+.admin-backoffice-main .border,
+.admin-backoffice-main .border-slate-100,
+.admin-backoffice-main .border-slate-200,
+.admin-backoffice-main .border-gray-100,
+.admin-backoffice-main .border-gray-200 {
+  border-color: var(--admin-border) !important;
+}
+
+.admin-backoffice-main .rounded,
+.admin-backoffice-main .rounded-md,
+.admin-backoffice-main .rounded-lg,
+.admin-backoffice-main .rounded-xl {
+  border-radius: 12px !important;
+}
+
+.admin-backoffice-main .bg-white.border,
+.admin-backoffice-main .bg-white[class*="border"] {
+  box-shadow:
+    0 1px 2px rgba(17,25,39,0.025),
+    0 8px 24px rgba(17,25,39,0.035);
+}
+
+/* ---------- KPI cards ---------- */
+
+.admin-backoffice-main .grid > .bg-white {
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .admin-backoffice-main .grid > .bg-white:hover {
+    border-color: #C9CFD8 !important;
+    box-shadow:
+      0 1px 2px rgba(17,25,39,0.03),
+      0 12px 32px rgba(17,25,39,0.065);
+    transform: translateY(-1px);
+  }
+}
+
+.admin-backoffice-main .grid .text-2xl,
+.admin-backoffice-main .grid .text-3xl {
+  color: var(--admin-ink) !important;
+  letter-spacing: -0.035em !important;
+}
+
+/* ---------- Inputs / filters ---------- */
+
+.admin-backoffice-main input,
+.admin-backoffice-main select,
+.admin-backoffice-main textarea {
+  border-color: #D7DCE3 !important;
+  background: #FFFFFF !important;
+  color: var(--admin-ink) !important;
+  border-radius: 9px !important;
+  min-height: 40px;
+}
+
+.admin-backoffice-main input:focus,
+.admin-backoffice-main select:focus,
+.admin-backoffice-main textarea:focus {
+  border-color: var(--admin-slate) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(82,105,132,0.12) !important;
+}
+
+/* ---------- Primary actions ---------- */
+
+.admin-backoffice-main .bg-indigo-600,
+.admin-backoffice-main .bg-indigo-700 {
+  background: var(--admin-red) !important;
+}
+
+.admin-backoffice-main .hover\:bg-indigo-700:hover,
+.admin-backoffice-main .hover\:bg-indigo-800:hover {
+  background: var(--admin-burgundy) !important;
+}
+
+.admin-backoffice-main .text-indigo-600,
+.admin-backoffice-main .text-indigo-700 {
+  color: var(--admin-red) !important;
+}
+
+.admin-backoffice-main button {
+  border-radius: 9px;
+}
+
+.admin-backoffice-main button,
+.admin-backoffice-main a {
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+/* ---------- Commercial / Pipeline ---------- */
+
+.admin-backoffice-main [class*="rose-"] {
+  --tw-ring-color: rgba(184,50,62,0.20);
+}
+
+.admin-backoffice-main .text-rose-700 {
+  color: var(--admin-burgundy) !important;
+}
+
+.admin-backoffice-main .bg-rose-50 {
+  background: #FBF3F4 !important;
+}
+
+.admin-backoffice-main .border-rose-100 {
+  border-color: #EFD8DB !important;
+}
+
+/* ---------- Mobile ---------- */
+
+@media (max-width: 1023px) {
+  .admin-backoffice-sidebar {
+    width: min(86vw, 300px) !important;
+  }
+
+  .admin-backoffice-main {
+    padding: 1.25rem 1rem 5rem !important;
+  }
+
+  .admin-backoffice-header {
+    height: 60px !important;
+  }
+}
