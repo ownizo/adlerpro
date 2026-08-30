@@ -13,6 +13,7 @@ import {
   adminLinkCarrierPolicyIdentity,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { redactSensitivePayload } from '@/lib/carrier-payload-redaction'
 import type { CarrierImportRecord, CarrierImportRecordReview, CarrierSyncRun } from '@/lib/types'
 
 /**
@@ -253,11 +254,10 @@ function ImportRecordReviewPanel({
   // Fields that could plausibly carry sensitive medical detail from a
   // health-insurance carrier feed — never rendered even inside the
   // collapsed "Technical details" view (requirement "do not intentionally
-  // surface medical information").
-  const SENSITIVE_PAYLOAD_KEY_RE = /health|medical|diagnos|clinic|condition|treatment/i
-  const safePayloadEntries = Object.entries(record.rawPayload ?? {}).filter(
-    ([key]) => !SENSITIVE_PAYLOAD_KEY_RE.test(key),
-  )
+  // surface medical information"). Recursive: a nested medical key must be
+  // redacted just as reliably as a top-level one — see
+  // src/lib/carrier-payload-redaction.ts.
+  const redactedPayload = redactSensitivePayload(record.rawPayload ?? {})
 
   return (
     <div
@@ -379,7 +379,7 @@ function ImportRecordReviewPanel({
         <details style={{ marginBottom: '1rem' }}>
           <summary className="text-xs font-semibold uppercase text-navy-400 cursor-pointer">Technical details</summary>
           <pre className="text-xs bg-navy-50 rounded p-2 overflow-x-auto" style={{ marginTop: '0.5rem' }}>
-            {JSON.stringify(Object.fromEntries(safePayloadEntries), null, 2)}
+            {JSON.stringify(redactedPayload, null, 2)}
           </pre>
         </details>
 
