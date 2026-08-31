@@ -30,6 +30,17 @@ GRANT SELECT, INSERT, UPDATE ON public.policy_participants TO service_role;
 -- Extend the existing action allowlist without changing any stored rows.
 ALTER TABLE public.carrier_import_records DROP CONSTRAINT IF EXISTS carrier_import_records_customer_apply_action_check;
 ALTER TABLE public.carrier_import_records ADD CONSTRAINT carrier_import_records_customer_apply_action_check CHECK (customer_apply_action IS NULL OR customer_apply_action IN ('link_existing_individual', 'link_existing_company', 'create_individual', 'create_company', 'add_policyholder_to_existing_client', 'no_customer_change));
+ALTER TABLE public.carrier_import_records ADD COLUMN IF NOT EXISTS selected_policyholder_mode text NULL;
+ALTER TABLE public.carrier_import_records ADD COLUMN IF NOT EXISTS selected_policyholder_individual_client_id uuid NULL REFERENCES public.individual_clients(id) ON DELETE SET NULL;
+ALTER TABLE public.carrier_import_records ADD COLUMN IF NOT EXISTS selected_policyholder_company_id text NULL REFERENCES public.companies(id) ON DELETE SET NULL;
+ALTER TABLE public.carrier_import_records DROP CONSTRAINT IF EXISTS carrier_import_records_policyholder_mode_check;
+ALTER TABLE public.carrier_import_records ADD CONSTRAINT carrier_import_records_policyholder_mode_check CHECK (
+  selected_policyholder_mode IS NULL OR selected_policyholder_mode IN ('existing_individual', 'existing_company', 'create_individual', 'create_company')
+);
+ALTER TABLE public.carrier_import_records DROP CONSTRAINT IF EXISTS carrier_import_records_selected_policyholder_owner_check;
+ALTER TABLE public.carrier_import_records ADD CONSTRAINT carrier_import_records_selected_policyholder_owner_check CHECK (
+  selected_policyholder_individual_client_id IS NULL OR selected_policyholder_company_id IS NULL
+);
 
 -- Same signature as Block 4. The complete replacement keeps all row locking,
 -- explicit action, owner, approved-field, identity, and applied-row safeguards.
@@ -42,6 +53,7 @@ LANGUAGE plpgsql AS $$
 DECLARE
   r public.carrier_import_records%ROWTYPE; p public.policies%ROWTYPE;
   owner_ind uuid; owner_company text; participant_ind uuid; participant_company text; pid text;
+  normalized_external_client_id text;
   new_ind boolean := false; new_company boolean := false; new_policy boolean := false;
 BEGIN
   SELECT * INTO r FROM public.carrier_import_records WHERE id = p_record_id FOR UPDATE;
@@ -52,8 +64,6 @@ BEGIN
   IF r.decision_status <> 'accepted' THEN RAISE EXCEPTION 'apply_carrier_import_record: record % is not accepted (decision_status=%)', p_record_id, r.decision_status; END IF;
   IF r.customer_apply_action IS NULL OR r.policy_apply_action IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: record % is missing an explicit apply action', p_record_id; END IF;
 
-  -- Delegate every existing Block 4 action to the original function so
-  -- its safeguards and identity behavior remain byte-for-byte authoritative.
   IF r.customer_apply_action <> 'add_policyholder_to_existing_client' THEN
     RETURN QUERY SELECT * FROM public.apply_carrier_import_record_block4(
       p_record_id, p_new_individual, p_new_company, p_new_policy,
@@ -65,29 +75,48 @@ BEGIN
   IF r.customer_apply_action = 'add_policyholder_to_existing_client' THEN
     pid := r.selected_policy_id;
     IF pid IS NULL OR r.policy_apply_action NOT IN ('link_existing_policy','update_existing_policy') THEN RAISE EXCEPTION 'apply_carrier_import_record: add_policyholder_to_existing_client requires an existing policy'; END IF;
-    IF r.selected_individual_client_id IS NOT NULL AND r.selected_company_id IS NOT NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: participant owner must be exactly one of individual/company'; END IF;
-    IF r.selected_individual_client_id IS NOT NULL THEN
-      IF NOT EXISTS (SELECT 1 FROM public.individual_clients WHERE id = r.selected_individual_client_id) THEN RAISE EXCEPTION 'apply_carrier_import_record: selected policyholder does not exist'; END IF;
-      participant_ind := r.selected_individual_client_id;
-    ELSIF r.selected_company_id IS NOT NULL THEN
-      IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id = r.selected_company_id) THEN RAISE EXCEPTION 'apply_carrier_import_record: selected policyholder does not exist'; END IF;
-      participant_company := r.selected_company_id;
-    ELSE
-      INSERT INTO public.individual_clients (id, full_name, nif, email, phone, address, status, created_at)
-      VALUES (gen_random_uuid(), NULLIF(btrim(p_new_individual->>'fullName'), ''), NULLIF(p_new_individual->>'nif', ''), NULLIF(p_new_individual->>'email', ''), NULLIF(p_new_individual->>'phone', ''), NULLIF(p_new_individual->>'address', ''), 'active', now())
-      RETURNING id INTO participant_ind;
-    END IF;
-  ELSE
-    CASE r.customer_apply_action
-      WHEN 'link_existing_individual' THEN owner_ind := r.selected_individual_client_id;
-      WHEN 'link_existing_company' THEN owner_company := r.selected_company_id;
-      WHEN 'no_customer_change' THEN owner_ind := r.selected_individual_client_id; owner_company := r.selected_company_id;
+    IF r.selected_policyholder_mode IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: add_policyholder_to_existing_client requires an explicit selected_policyholder_mode'; END IF;
+
+    CASE r.selected_policyholder_mode
+      WHEN 'existing_individual' THEN
+        IF r.selected_policyholder_individual_client_id IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: existing_individual policyholder requires selected_policyholder_individual_client_id'; END IF;
+        IF NOT EXISTS (SELECT 1 FROM public.individual_clients WHERE id = r.selected_policyholder_individual_client_id) THEN RAISE EXCEPTION 'apply_carrier_import_record: selected policyholder does not exist'; END IF;
+        participant_ind := r.selected_policyholder_individual_client_id;
+      WHEN 'existing_company' THEN
+        IF r.selected_policyholder_company_id IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: existing_company policyholder requires selected_policyholder_company_id'; END IF;
+        IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id = r.selected_policyholder_company_id) THEN RAISE EXCEPTION 'apply_carrier_import_record: selected policyholder does not exist'; END IF;
+        participant_company := r.selected_policyholder_company_id;
       WHEN 'create_individual' THEN
-        INSERT INTO public.individual_clients (id, full_name, nif, email, phone, address, status, created_at) VALUES (gen_random_uuid(), NULLIF(btrim(p_new_individual->>'fullName'),''), NULLIF(p_new_individual->>'nif',''), NULLIF(p_new_individual->>'email',''), NULLIF(p_new_individual->>'phone',''), NULLIF(p_new_individual->>'address',''), 'active', now()) RETURNING id INTO owner_ind; new_ind := true;
+        IF NULLIF(btrim(COALESCE(p_new_individual->>'fullName','')), '') IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: create_individual requires a full name'; END IF;
+        INSERT INTO public.individual_clients (id, full_name, nif, email, phone, address, status, created_at)
+        VALUES (
+          gen_random_uuid(),
+          NULLIF(btrim(COALESCE(p_new_individual->>'fullName', '')), ''),
+          NULLIF(btrim(COALESCE(p_new_individual->>'nif', '')), ''),
+          NULLIF(btrim(COALESCE(p_new_individual->>'email', '')), ''),
+          NULLIF(btrim(COALESCE(p_new_individual->>'phone', '')), ''),
+          NULLIF(btrim(COALESCE(p_new_individual->>'address', '')), ''),
+          'active', now()
+        )
+        RETURNING id INTO participant_ind;
       WHEN 'create_company' THEN
-        owner_company := 'comp_' || replace(gen_random_uuid()::text,'-','');
-        INSERT INTO public.companies (id,name,nif,contact_name,contact_email,contact_phone,address,created_at) VALUES (owner_company, NULLIF(btrim(p_new_company->>'name'),''), NULLIF(btrim(p_new_company->>'nif'),''), COALESCE(NULLIF(p_new_company->>'contactName',''),p_new_company->>'name'), COALESCE(p_new_company->>'contactEmail',''), COALESCE(p_new_company->>'contactPhone',''), NULLIF(p_new_company->>'address',''), now()); new_company := true;
-      ELSE RAISE EXCEPTION 'apply_carrier_import_record: unknown customer_apply_action %', r.customer_apply_action;
+        IF NULLIF(btrim(COALESCE(p_new_company->>'name', '')), '') IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: create_company requires a name'; END IF;
+        IF NULLIF(btrim(COALESCE(p_new_company->>'nif', '')), '') IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: create_company requires a NIF'; END IF;
+        participant_company := 'comp_' || replace(gen_random_uuid()::text, '-', '');
+        INSERT INTO public.companies (id, name, nif, sector, contact_name, contact_email, contact_phone, address, created_at)
+        VALUES (
+          participant_company,
+          NULLIF(btrim(COALESCE(p_new_company->>'name', '')), ''),
+          NULLIF(btrim(COALESCE(p_new_company->>'nif', '')), ''),
+          COALESCE(NULLIF(p_new_company->>'sector', ''), ''),
+          COALESCE(NULLIF(p_new_company->>'contactName', ''), NULLIF(btrim(COALESCE(p_new_company->>'name', '')), '')),
+          COALESCE(NULLIF(p_new_company->>'contactEmail', ''), ''),
+          COALESCE(NULLIF(p_new_company->>'contactPhone', ''), ''),
+          COALESCE(NULLIF(p_new_company->>'address', ''), ''),
+          now()
+        );
+      ELSE
+        RAISE EXCEPTION 'apply_carrier_import_record: unsupported policyholder participant mode %', r.selected_policyholder_mode;
     END CASE;
   END IF;
 
@@ -103,6 +132,9 @@ BEGIN
       ELSIF owner_company IS NOT NULL THEN
         IF NULLIF(BTRIM(p.company_id),'') IS DISTINCT FROM owner_company OR p.individual_client_id IS NOT NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: owner mismatch — policy % does not belong to the selected customer', pid; END IF;
       ELSIF p.individual_client_id IS NOT NULL OR NULLIF(BTRIM(p.company_id),'') IS NOT NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: owner mismatch — policy % does not belong to the selected customer', pid; END IF;
+    ELSE
+      owner_ind := p.individual_client_id;
+      owner_company := NULLIF(BTRIM(p.company_id), '');
     END IF;
     IF r.policy_apply_action = 'update_existing_policy' THEN
       IF r.approved_policy_changes IS NULL OR r.approved_policy_changes = '{}'::jsonb THEN RAISE EXCEPTION 'apply_carrier_import_record: update_existing_policy requires approved_policy_changes'; END IF;
@@ -110,25 +142,49 @@ BEGIN
       UPDATE public.policies SET policy_number=COALESCE(NULLIF(r.approved_policy_changes->>'policyNumber',''),policy_number), start_date=COALESCE(NULLIF(r.approved_policy_changes->>'startDate','')::date,start_date), end_date=COALESCE(NULLIF(r.approved_policy_changes->>'endDate','')::date,end_date), annual_premium=COALESCE((r.approved_policy_changes->>'annualPremium')::numeric,annual_premium), status=COALESCE(NULLIF(r.approved_policy_changes->>'status',''),status) WHERE id=pid;
     END IF;
   ELSIF r.policy_apply_action = 'no_policy_change' THEN pid := r.selected_policy_id;
+    SELECT * INTO p FROM public.policies WHERE id = pid FOR UPDATE;
+    owner_ind := p.individual_client_id;
+    owner_company := NULLIF(BTRIM(p.company_id), '');
   ELSE RAISE EXCEPTION 'apply_carrier_import_record: unknown policy_apply_action %', r.policy_apply_action;
   END IF;
 
   IF r.customer_apply_action = 'add_policyholder_to_existing_client' THEN
-    IF EXISTS (SELECT 1 FROM public.external_client_identities e WHERE e.provider = r.provider AND e.external_client_id = r.external_client_id
-      AND NOT ((participant_ind IS NOT NULL AND e.individual_client_id = participant_ind) OR (participant_company IS NOT NULL AND e.company_id = participant_company))) THEN
-      RAISE EXCEPTION 'apply_carrier_import_record: external client identity %/% is already linked to a different CRM customer', r.provider, r.external_client_id;
+    normalized_external_client_id := NULLIF(BTRIM(r.external_client_id), '');
+    IF normalized_external_client_id IS NOT NULL THEN
+      IF EXISTS (
+        SELECT 1 FROM public.external_client_identities e
+        WHERE e.provider = r.provider AND NULLIF(BTRIM(e.external_client_id), '') = normalized_external_client_id
+          AND NOT ((participant_ind IS NOT NULL AND e.individual_client_id = participant_ind) OR (participant_company IS NOT NULL AND e.company_id = participant_company))
+      ) THEN
+        RAISE EXCEPTION 'apply_carrier_import_record: external client identity %/% is already linked to a different CRM customer', r.provider, normalized_external_client_id;
+      END IF;
     END IF;
+
     INSERT INTO public.policy_participants (policy_id, individual_client_id, company_id, role, provider, external_client_id, source)
-    VALUES (pid, participant_ind, participant_company, 'policyholder', r.provider, NULLIF(BTRIM(r.external_client_id),''), 'carrier_import')
+    VALUES (pid, participant_ind, participant_company, 'policyholder', r.provider, normalized_external_client_id, 'carrier_import')
     ON CONFLICT DO NOTHING;
-    IF NULLIF(BTRIM(r.external_client_id), '') IS NOT NULL THEN
+
+    IF normalized_external_client_id IS NOT NULL THEN
       INSERT INTO public.external_client_identities (id, individual_client_id, company_id, provider, external_client_id, first_seen_at, last_seen_at, created_at, updated_at)
-      VALUES (gen_random_uuid(), participant_ind, participant_company, r.provider, r.external_client_id, now(), now(), now(), now())
+      VALUES (gen_random_uuid(), participant_ind, participant_company, r.provider, normalized_external_client_id, now(), now(), now(), now())
       ON CONFLICT (provider, external_client_id) DO UPDATE SET last_seen_at = now(), updated_at = now()
       WHERE (public.external_client_identities.individual_client_id = EXCLUDED.individual_client_id OR public.external_client_identities.company_id = EXCLUDED.company_id);
     END IF;
   END IF;
-  UPDATE public.carrier_import_records SET selected_individual_client_id=COALESCE(owner_ind,selected_individual_client_id), selected_company_id=COALESCE(owner_company,selected_company_id), selected_policy_id=pid, apply_status='applied', apply_error=NULL, applied_at=now(), updated_at=now() WHERE id=p_record_id;
+
+  UPDATE public.carrier_import_records
+  SET selected_individual_client_id = COALESCE(owner_ind, selected_individual_client_id),
+      selected_company_id = COALESCE(owner_company, selected_company_id),
+      selected_policy_id = pid,
+      selected_policyholder_mode = r.selected_policyholder_mode,
+      selected_policyholder_individual_client_id = r.selected_policyholder_individual_client_id,
+      selected_policyholder_company_id = r.selected_policyholder_company_id,
+      apply_status = 'applied',
+      apply_error = NULL,
+      applied_at = now(),
+      updated_at = now()
+  WHERE id = p_record_id;
+
   RETURN QUERY SELECT 'applied'::text, owner_ind, owner_company, pid, false, false, NULL::text;
 END; $$;
 REVOKE ALL ON FUNCTION public.apply_carrier_import_record(uuid,jsonb,jsonb,jsonb,text) FROM PUBLIC, anon, authenticated;

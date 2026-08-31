@@ -464,7 +464,7 @@ function ImportRecordReviewPanel({
   // whatever is already persisted on the record (so re-opening the panel
   // shows the previously-saved choice), never inferred from match status.
   const [customerAction, setCustomerAction] = useState<CustomerApplyAction | ''>(record.customerApplyAction ?? '')
-  const [participantResolution, setParticipantResolution] = useState<'existing' | 'new'>('existing')
+  const [participantResolution, setParticipantResolution] = useState<'existing_individual' | 'existing_company' | 'create_individual' | 'create_company'>('existing_individual')
   const [policyAction, setPolicyAction] = useState<PolicyApplyAction | ''>(record.policyApplyAction ?? '')
   const [approvedFields, setApprovedFields] = useState<Set<PolicyProposalField>>(new Set())
   const [applyActionSaving, setApplyActionSaving] = useState(false)
@@ -524,11 +524,19 @@ function ImportRecordReviewPanel({
     setApplyActionSaved(false)
     try {
       const selectedIndividualClientId =
-        customerAction === 'link_existing_individual' || (customerAction === 'add_policyholder_to_existing_client' && participantResolution === 'existing')
-          ? review?.individualCandidate?.id : undefined
+        customerAction === 'link_existing_individual' ? review?.individualCandidate?.id : undefined
       const selectedCompanyId =
-        customerAction === 'link_existing_company' || (customerAction === 'add_policyholder_to_existing_client' && participantResolution === 'existing')
-          ? review?.companyCandidate?.id : undefined
+        customerAction === 'link_existing_company' ? review?.companyCandidate?.id : undefined
+      const selectedPolicyholderMode =
+        customerAction === 'add_policyholder_to_existing_client' ? participantResolution : undefined
+      const selectedPolicyholderIndividualClientId =
+        customerAction === 'add_policyholder_to_existing_client' && participantResolution === 'existing_individual'
+          ? review?.individualCandidate?.id
+          : undefined
+      const selectedPolicyholderCompanyId =
+        customerAction === 'add_policyholder_to_existing_client' && participantResolution === 'existing_company'
+          ? review?.companyCandidate?.id
+          : undefined
       const selectedPolicyId =
         policyAction === 'link_existing_policy' || policyAction === 'update_existing_policy'
           ? review?.policyCandidate?.id
@@ -546,6 +554,9 @@ function ImportRecordReviewPanel({
           selectedIndividualClientId,
           selectedCompanyId,
           selectedPolicyId,
+          selectedPolicyholderMode,
+          selectedPolicyholderIndividualClientId,
+          selectedPolicyholderCompanyId,
           approvedPolicyChanges,
         },
       })
@@ -728,10 +739,12 @@ function ImportRecordReviewPanel({
                     <select
                       className="w-full px-2 py-1.5 border border-navy-200 rounded-[2px] text-sm"
                       value={participantResolution}
-                      onChange={(e) => setParticipantResolution(e.target.value as 'existing' | 'new')}
+                      onChange={(e) => setParticipantResolution(e.target.value as 'existing_individual' | 'existing_company' | 'create_individual' | 'create_company')}
                     >
-                      <option value="existing">Use existing person/company</option>
-                      <option value="new">Create new person/company</option>
+                      <option value="existing_individual">Use existing person</option>
+                      <option value="existing_company">Use existing company</option>
+                      <option value="create_individual">Create new person</option>
+                      <option value="create_company">Create new company</option>
                     </select>
                   </label>
                 )}

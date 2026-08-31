@@ -660,6 +660,12 @@ export type CustomerApplyAction =
   | 'add_policyholder_to_existing_client'
   | 'no_customer_change'
 
+export type PolicyholderParticipantMode =
+  | 'existing_individual'
+  | 'existing_company'
+  | 'create_individual'
+  | 'create_company'
+
 export type PolicyApplyAction =
   | 'link_existing_policy'
   | 'create_policy'
@@ -741,6 +747,10 @@ export interface CarrierImportRecord {
   selectedIndividualClientId?: string
   selectedCompanyId?: string
   selectedPolicyId?: string
+  /** Explicit participant mode for an add_policyholder_to_existing_client
+   * action. This is distinct from the commercial owner selection and must
+   * never be inferred from missing owner ids. */
+  selectedPolicyholderMode?: PolicyholderParticipantMode
   /** Participant identity when customerApplyAction adds the imported
    * tomador as a policyholder without changing the policy owner. */
   selectedPolicyholderIndividualId?: string

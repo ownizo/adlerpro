@@ -28,6 +28,9 @@ function baseState(overrides: Partial<ApplyActionRowState> = {}): ApplyActionRow
     selectedIndividualClientId: null,
     selectedCompanyId: null,
     selectedPolicyId: null,
+    participantMode: null,
+    selectedPolicyholderIndividualClientId: null,
+    selectedPolicyholderCompanyId: null,
     approvedPolicyChanges: null,
     ...overrides,
   }
@@ -166,18 +169,32 @@ test('isRowApplicable requires BOTH accepted AND ready', () => {
   )
 })
 
-test('policyholder participant action requires an existing policy and participant identity', () => {
+test('policyholder participant action requires an explicit participant mode and the matching participant identity', () => {
   assert.equal(isRowReadyToApply(baseState({
     customerApplyAction: 'add_policyholder_to_existing_client',
     policyApplyAction: 'link_existing_policy',
     selectedPolicyId: 'pol-75846',
-    selectedIndividualClientId: 'bella',
+    participantMode: 'existing_individual',
+    selectedPolicyholderIndividualClientId: 'bella',
+  })), true)
+  assert.equal(isRowReadyToApply(baseState({
+    customerApplyAction: 'add_policyholder_to_existing_client',
+    policyApplyAction: 'link_existing_policy',
+    selectedPolicyId: 'pol-75846',
+    participantMode: 'create_company',
   })), true)
   assert.equal(isRowReadyToApply(baseState({
     customerApplyAction: 'add_policyholder_to_existing_client',
     policyApplyAction: 'create_policy',
     selectedPolicyId: null,
-    selectedIndividualClientId: 'bella',
+    participantMode: 'existing_individual',
+    selectedPolicyholderIndividualClientId: 'bella',
+  })), false)
+  assert.equal(isRowReadyToApply(baseState({
+    customerApplyAction: 'add_policyholder_to_existing_client',
+    policyApplyAction: 'link_existing_policy',
+    selectedPolicyId: 'pol-75846',
+    participantMode: null,
   })), false)
 })
 

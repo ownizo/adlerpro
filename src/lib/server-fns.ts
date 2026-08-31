@@ -4066,6 +4066,9 @@ function recordToApplyActionRowState(record: CarrierImportRecord): ApplyActionRo
     selectedIndividualClientId: record.selectedIndividualClientId ?? null,
     selectedCompanyId: record.selectedCompanyId ?? null,
     selectedPolicyId: record.selectedPolicyId ?? null,
+    participantMode: (record.selectedPolicyholderMode as any) ?? null,
+    selectedPolicyholderIndividualClientId: record.selectedPolicyholderIndividualClientId ?? null,
+    selectedPolicyholderCompanyId: record.selectedPolicyholderCompanyId ?? null,
     approvedPolicyChanges: (record.approvedPolicyChanges as Record<string, unknown> | undefined) ?? null,
   }
 }
@@ -4079,6 +4082,9 @@ export const adminSetCarrierImportRecordApplyActions = createServerFn({ method: 
     selectedIndividualClientId?: string
     selectedCompanyId?: string
     selectedPolicyId?: string
+    selectedPolicyholderMode?: string
+    selectedPolicyholderIndividualClientId?: string
+    selectedPolicyholderCompanyId?: string
     approvedPolicyChanges?: Record<string, Json>
   }) => d)
   .handler(async ({ data }) => {
@@ -4092,6 +4098,9 @@ export const adminSetCarrierImportRecordApplyActions = createServerFn({ method: 
       selectedIndividualClientId: data.selectedIndividualClientId,
       selectedCompanyId: data.selectedCompanyId,
       selectedPolicyId: data.selectedPolicyId,
+      selectedPolicyholderMode: data.selectedPolicyholderMode as any,
+      selectedPolicyholderIndividualClientId: data.selectedPolicyholderIndividualClientId,
+      selectedPolicyholderCompanyId: data.selectedPolicyholderCompanyId,
       approvedPolicyChanges: data.approvedPolicyChanges,
     })
     return { success: true }

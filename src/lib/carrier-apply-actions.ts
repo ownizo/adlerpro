@@ -12,9 +12,9 @@
  * the two can never disagree.
  */
 
-import type { CarrierDecisionStatus, CustomerApplyAction, PolicyApplyAction } from './types.ts'
+import type { CarrierDecisionStatus, CustomerApplyAction, PolicyApplyAction, PolicyholderParticipantMode } from './types.ts'
 
-export type { CustomerApplyAction, PolicyApplyAction }
+export type { CustomerApplyAction, PolicyApplyAction, PolicyholderParticipantMode }
 
 export const CUSTOMER_APPLY_ACTIONS: readonly CustomerApplyAction[] = [
   'link_existing_individual',
@@ -50,6 +50,9 @@ export interface ApplyActionRowState {
   selectedIndividualClientId: string | null
   selectedCompanyId: string | null
   selectedPolicyId: string | null
+  participantMode: PolicyholderParticipantMode | null
+  selectedPolicyholderIndividualClientId: string | null
+  selectedPolicyholderCompanyId: string | null
   approvedPolicyChanges: Record<string, unknown> | null
 }
 
@@ -75,6 +78,20 @@ export function isRowReadyToApply(state: ApplyActionRowState): boolean {
       break
     case 'add_policyholder_to_existing_client':
       if (!state.selectedPolicyId) return false
+      if (!state.participantMode) return false
+      switch (state.participantMode) {
+        case 'existing_individual':
+          if (!state.selectedPolicyholderIndividualClientId) return false
+          break
+        case 'existing_company':
+          if (!state.selectedPolicyholderCompanyId) return false
+          break
+        case 'create_individual':
+        case 'create_company':
+          break
+        default:
+          return false
+      }
       break
   }
 

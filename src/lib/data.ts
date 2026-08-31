@@ -40,6 +40,7 @@ import type {
   PolicyApplyAction,
   CarrierRunApplyStatus,
   PolicyParticipant,
+  PolicyholderParticipantMode,
 } from './types'
 import {
   buildWebsiteLeadOpportunityPayload,
@@ -2080,6 +2081,9 @@ export interface SetCarrierImportRecordApplyActionsInput {
   selectedIndividualClientId?: string | null
   selectedCompanyId?: string | null
   selectedPolicyId?: string | null
+  selectedPolicyholderMode?: PolicyholderParticipantMode | null
+  selectedPolicyholderIndividualClientId?: string | null
+  selectedPolicyholderCompanyId?: string | null
   approvedPolicyChanges?: Record<string, Json> | null
 }
 
@@ -2140,17 +2144,25 @@ export async function setCarrierImportRecordApplyActions(
     if (!check.consistent) throw new Error(`setCarrierImportRecordApplyActions: ${check.reason}`)
   }
 
-  if (input.customerApplyAction === 'add_policyholder_to_existing_client' && !input.selectedPolicyId) {
-    throw new Error('setCarrierImportRecordApplyActions: add_policyholder_to_existing_client requires selected_policy_id')
+  if (input.customerApplyAction === 'add_policyholder_to_existing_client') {
+    if (!input.selectedPolicyId) {
+      throw new Error('setCarrierImportRecordApplyActions: add_policyholder_to_existing_client requires selected_policy_id')
+    }
+    if (!input.selectedPolicyholderMode) {
+      throw new Error('setCarrierImportRecordApplyActions: add_policyholder_to_existing_client requires an explicit selected_policyholder_mode')
+    }
   }
 
   const sb = getSupabaseAdmin()
   const updates = objectToSnake({
     customerApplyAction: input.customerApplyAction,
     policyApplyAction: input.policyApplyAction,
-    selectedIndividualClientId: input.selectedIndividualClientId ?? null,
-    selectedCompanyId: input.selectedCompanyId ?? null,
+    selectedIndividualClientId: input.customerApplyAction === 'add_policyholder_to_existing_client' ? null : input.selectedIndividualClientId ?? null,
+    selectedCompanyId: input.customerApplyAction === 'add_policyholder_to_existing_client' ? null : input.selectedCompanyId ?? null,
     selectedPolicyId: input.selectedPolicyId ?? null,
+    selectedPolicyholderMode: input.customerApplyAction === 'add_policyholder_to_existing_client' ? input.selectedPolicyholderMode ?? null : null,
+    selectedPolicyholderIndividualClientId: input.customerApplyAction === 'add_policyholder_to_existing_client' ? input.selectedPolicyholderIndividualClientId ?? null : null,
+    selectedPolicyholderCompanyId: input.customerApplyAction === 'add_policyholder_to_existing_client' ? input.selectedPolicyholderCompanyId ?? null : null,
     approvedPolicyChanges: input.approvedPolicyChanges ?? null,
     updatedAt: new Date().toISOString(),
   })
@@ -2217,6 +2229,9 @@ export async function applyCarrierImportRecord(recordId: string): Promise<ApplyC
     selectedIndividualClientId: record.selectedIndividualClientId ?? null,
     selectedCompanyId: record.selectedCompanyId ?? null,
     selectedPolicyId: record.selectedPolicyId ?? null,
+    participantMode: record.selectedPolicyholderMode ?? null,
+    selectedPolicyholderIndividualClientId: record.selectedPolicyholderIndividualClientId ?? null,
+    selectedPolicyholderCompanyId: record.selectedPolicyholderCompanyId ?? null,
     approvedPolicyChanges: (record.approvedPolicyChanges as Record<string, unknown> | undefined) ?? null,
   }
   if (!isRowReadyToApply(rowState)) {
