@@ -100,7 +100,7 @@ export interface StagedRowMatch {
  * como New Policy em vez de Exact", nunca um falso match entre
  * seguradoras diferentes.
  */
-function insurerTextMatchesProvider(insurerText: string, provider: CarrierProviderId): boolean {
+export function insurerTextMatchesProvider(insurerText: string, provider: CarrierProviderId): boolean {
   const normalized = insurerText.trim().toLowerCase()
   if (normalized === '') return false
   return normalized.includes(provider) || normalized.includes(CARRIER_PROVIDER_LABELS[provider].toLowerCase())

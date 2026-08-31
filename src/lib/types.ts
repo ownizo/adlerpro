@@ -885,3 +885,28 @@ export interface CarrierImportRecordReview {
   companyCandidate?: CarrierCompanyCandidateSummary
   policyCandidate?: CarrierPolicyCandidateSummary
 }
+
+// ── Reconciliation Editor hardening — manual existing-policy selector ──
+//
+// The reconciliation engine sometimes downgrades a policy match to
+// 'probable' WITHOUT retaining a matchedPolicyId (see carrier-import-
+// matching.ts's "Case D" — a customer has an existing same-provider
+// policy under a different number, e.g. a proposal number vs the
+// definitive one). CarrierImportRecordReview.policyCandidate is then
+// empty even though the Admin can plainly see the real policy exists.
+// PolicyOwnerOptionSummary is the minimal, review-safe shape for
+// listPoliciesForOwner (src/lib/data.ts) — every policy actually owned
+// by a specific individual/company, for the Admin to pick from
+// explicitly. Never exposes notes/tasks/opportunities/claims/documents.
+export interface PolicyOwnerOptionSummary {
+  id: string
+  insurer: string
+  policyNumber: string
+  type: string
+  startDate?: string
+  endDate?: string
+  annualPremium?: number
+  status: string
+  individualClientId?: string
+  companyId?: string
+}

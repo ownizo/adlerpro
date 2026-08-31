@@ -4222,3 +4222,22 @@ export const adminApplyCarrierSyncRun = createServerFn({ method: 'POST' })
       results,
     }
   })
+
+// ============================================================
+// Reconciliation Editor hardening — manual existing-policy selector
+//
+// Fixes the real-world "proposal vs definitive policy number" case
+// (Charles / MGEN 75849): the reconciliation engine sometimes downgrades
+// a policy match to 'probable' WITHOUT a matchedPolicyId (customer
+// already has a same-provider policy under a different number — see
+// carrier-import-matching.ts "Case D"), so review.policyCandidate is
+// empty even though the Admin can see the real policy. This lets the
+// Admin explicitly browse and pick from a specific customer's own
+// existing policies instead of being forced into "Create new policy"
+// (which would duplicate it).
+// ============================================================
+
+export const adminListPoliciesForOwner = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { individualClientId?: string; companyId?: string }) => d)
+  .handler(async ({ data }) => db.listPoliciesForOwner(data))

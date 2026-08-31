@@ -14,6 +14,7 @@ import {
   adminCancelCarrierSyncRun,
   adminSetCarrierImportRecordApplyActions,
   adminApplyCarrierSyncRun,
+  adminListPoliciesForOwner,
   type AdminApplyCarrierSyncRunResult,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -33,7 +34,15 @@ import {
   type PolicyProposalField,
 } from '@/lib/carrier-apply-field-mapping'
 import { mapPortfolioRows } from '@/lib/carrier-import-mappers'
-import type { CarrierImportRecord, CarrierImportRecordReview, CarrierSyncRun, Json } from '@/lib/types'
+import { sortPolicyOwnerOptionsByProviderPreference } from '@/lib/carrier-policy-owner-options'
+import type {
+  CarrierImportRecord,
+  CarrierImportRecordReview,
+  CarrierPolicyCandidateSummary,
+  CarrierSyncRun,
+  Json,
+  PolicyOwnerOptionSummary,
+} from '@/lib/types'
 
 const CUSTOMER_ACTION_LABELS: Record<CustomerApplyAction, string> = {
   link_existing_individual: 'Use existing person',
@@ -475,6 +484,18 @@ function ImportRecordReviewPanel({
   const [applyActionError, setApplyActionError] = useState<string | null>(null)
   const [applyActionSaved, setApplyActionSaved] = useState(false)
 
+  // Reconciliation Editor hardening — manual "existing policy" selector.
+  // Never relies solely on review.policyCandidate: the reconciliation
+  // engine sometimes downgrades a match to 'probable' WITHOUT retaining
+  // a matchedPolicyId (a customer already has a same-provider policy
+  // under a DIFFERENT number — proposal vs definitive, see
+  // carrier-import-matching.ts "Case D"), so an Admin who can plainly see
+  // the real policy must still be able to pick it explicitly instead of
+  // being forced into "Create new policy" (which would duplicate it).
+  const [selectedManualPolicyId, setSelectedManualPolicyId] = useState<string>(record.selectedPolicyId ?? '')
+  const [manualPolicyOptions, setManualPolicyOptions] = useState<PolicyOwnerOptionSummary[]>([])
+  const [manualPolicyOptionsLoading, setManualPolicyOptionsLoading] = useState(false)
+
   // Server-side candidate resolution only — this route never queries
   // Supabase directly from the browser (see adminGetCarrierImportRecordReview).
   useEffect(() => {
@@ -486,6 +507,39 @@ function ImportRecordReviewPanel({
       .finally(() => { if (!cancelled) setReviewLoading(false) })
     return () => { cancelled = true }
   }, [record.id])
+
+  // "At minimum: selected exact customer can be used" (requirement 6) —
+  // the owner this row resolves to once the Admin picks link_existing_*,
+  // used to fetch that owner's OWN policies (never a broader list) for
+  // the manual selector below.
+  const resolvedOwnerIndividualId = customerAction === 'link_existing_individual' ? review?.individualCandidate?.id : undefined
+  const resolvedOwnerCompanyId = customerAction === 'link_existing_company' ? review?.companyCandidate?.id : undefined
+
+  useEffect(() => {
+    if (!resolvedOwnerIndividualId && !resolvedOwnerCompanyId) {
+      setManualPolicyOptions([])
+      return
+    }
+    let cancelled = false
+    setManualPolicyOptionsLoading(true)
+    adminListPoliciesForOwner({
+      data: resolvedOwnerIndividualId ? { individualClientId: resolvedOwnerIndividualId } : { companyId: resolvedOwnerCompanyId },
+    })
+      .then((data) => { if (!cancelled) setManualPolicyOptions(data) })
+      .catch((err: unknown) => console.error('adminListPoliciesForOwner error:', err))
+      .finally(() => { if (!cancelled) setManualPolicyOptionsLoading(false) })
+    return () => { cancelled = true }
+  }, [resolvedOwnerIndividualId, resolvedOwnerCompanyId])
+
+  // Preserve the existing "auto-select the engine's exact candidate"
+  // behavior by default — the Admin can still override via the dropdown
+  // below. Never overrides an already-persisted or already-chosen value.
+  useEffect(() => {
+    if (selectedManualPolicyId) return
+    if (record.selectedPolicyId) { setSelectedManualPolicyId(record.selectedPolicyId); return }
+    if (review?.policyCandidate) setSelectedManualPolicyId(review.policyCandidate.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [record.selectedPolicyId, review?.policyCandidate?.id])
 
   const canLinkClient =
     (record.customerMatchStatus === 'exact' || record.customerMatchStatus === 'probable') &&
@@ -517,7 +571,43 @@ function ImportRecordReviewPanel({
   // itself — this is display-only until Save is clicked.
   const mappedForRecord = mapPortfolioRows(record.provider as CarrierProviderId, [record.rawPayload as Record<string, unknown>])
   const parsedRow = mappedForRecord.recognized ? mappedForRecord.rows[0] : undefined
-  const policyProposals = parsedRow ? computePolicyFieldProposals(review?.policyCandidate, parsedRow) : []
+
+  // Merge the engine's own candidate (if any) into the manually-fetched
+  // owner policy list so it's never lost/duplicated — "Do not only rely
+  // on review.policyCandidate", but also never regress the case where it
+  // already carries a valid pick. Same-provider-first ordering per
+  // requirement 1.
+  const mergedPolicyOptions: PolicyOwnerOptionSummary[] = (() => {
+    const byId = new Map(manualPolicyOptions.map((o) => [o.id, o]))
+    if (review?.policyCandidate && !byId.has(review.policyCandidate.id)) {
+      byId.set(review.policyCandidate.id, {
+        id: review.policyCandidate.id,
+        insurer: review.policyCandidate.insurer,
+        policyNumber: review.policyCandidate.policyNumber,
+        type: review.policyCandidate.policyType ?? '',
+        startDate: review.policyCandidate.startDate,
+        endDate: review.policyCandidate.endDate,
+        annualPremium: review.policyCandidate.annualPremium,
+        status: '',
+      })
+    }
+    return sortPolicyOwnerOptionsByProviderPreference([...byId.values()], record.provider as CarrierProviderId)
+  })()
+
+  const selectedManualPolicyOption = mergedPolicyOptions.find((o) => o.id === selectedManualPolicyId)
+  const effectivePolicyCandidate: CarrierPolicyCandidateSummary | undefined = selectedManualPolicyOption
+    ? {
+        id: selectedManualPolicyOption.id,
+        policyNumber: selectedManualPolicyOption.policyNumber,
+        insurer: selectedManualPolicyOption.insurer,
+        policyType: selectedManualPolicyOption.type,
+        startDate: selectedManualPolicyOption.startDate,
+        endDate: selectedManualPolicyOption.endDate,
+        annualPremium: selectedManualPolicyOption.annualPremium,
+      }
+    : undefined
+
+  const policyProposals = parsedRow ? computePolicyFieldProposals(effectivePolicyCandidate, parsedRow) : []
 
   const canApplyThisRow = record.decisionStatus === 'accepted' && record.applyStatus !== 'applied'
 
@@ -543,7 +633,7 @@ function ImportRecordReviewPanel({
           : undefined
       const selectedPolicyId =
         policyAction === 'link_existing_policy' || policyAction === 'update_existing_policy'
-          ? review?.policyCandidate?.id
+          ? selectedManualPolicyId || undefined
           : undefined
       const approvedPolicyChanges =
         policyAction === 'update_existing_policy'
@@ -761,18 +851,44 @@ function ImportRecordReviewPanel({
                     onChange={(e) => setPolicyAction(e.target.value as PolicyApplyAction)}
                   >
                     <option value="">Select…</option>
-                    {review?.policyCandidate && (
+                    {mergedPolicyOptions.length > 0 && (
                       <option value="link_existing_policy">{POLICY_ACTION_LABELS.link_existing_policy}</option>
                     )}
                     {customerAction !== 'add_policyholder_to_existing_client' && (
                       <option value="create_policy">{POLICY_ACTION_LABELS.create_policy}</option>
                     )}
-                    {review?.policyCandidate && policyProposals.length > 0 && (
+                    {mergedPolicyOptions.length > 0 && (
                       <option value="update_existing_policy">{POLICY_ACTION_LABELS.update_existing_policy}</option>
                     )}
                     <option value="no_policy_change">{POLICY_ACTION_LABELS.no_policy_change}</option>
                   </select>
                 </label>
+
+                {(policyAction === 'link_existing_policy' || policyAction === 'update_existing_policy') && (
+                  <label className="text-sm sm:col-span-2">
+                    <span className="text-navy-500 text-xs block" style={{ marginBottom: '0.2rem' }}>
+                      Existing policy{manualPolicyOptionsLoading ? ' (loading…)' : ''}
+                    </span>
+                    <select
+                      className="w-full px-2 py-1.5 border border-navy-200 rounded-[2px] text-sm"
+                      value={selectedManualPolicyId}
+                      onChange={(e) => setSelectedManualPolicyId(e.target.value)}
+                    >
+                      <option value="">Select…</option>
+                      {mergedPolicyOptions.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.insurer} · {option.policyNumber} · {option.startDate ? formatDate(option.startDate) : '—'} → {option.endDate ? formatDate(option.endDate) : '—'}
+                          {option.annualPremium != null ? ` · ${formatCurrency(option.annualPremium)}/year` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {!manualPolicyOptionsLoading && mergedPolicyOptions.length === 0 && (
+                      <p className="text-xs text-navy-400" style={{ marginTop: '0.2rem' }}>
+                        This customer has no existing policies to select from.
+                      </p>
+                    )}
+                  </label>
+                )}
               </div>
             )}
 
