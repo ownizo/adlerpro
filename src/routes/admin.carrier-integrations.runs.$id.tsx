@@ -39,6 +39,7 @@ const CUSTOMER_ACTION_LABELS: Record<CustomerApplyAction, string> = {
   link_existing_company: 'Use existing company',
   create_individual: 'Create new person',
   create_company: 'Create new company',
+  add_policyholder_to_existing_client: 'Add as policyholder to existing client',
   no_customer_change: 'No customer change',
 }
 
@@ -463,6 +464,7 @@ function ImportRecordReviewPanel({
   // whatever is already persisted on the record (so re-opening the panel
   // shows the previously-saved choice), never inferred from match status.
   const [customerAction, setCustomerAction] = useState<CustomerApplyAction | ''>(record.customerApplyAction ?? '')
+  const [participantResolution, setParticipantResolution] = useState<'existing' | 'new'>('existing')
   const [policyAction, setPolicyAction] = useState<PolicyApplyAction | ''>(record.policyApplyAction ?? '')
   const [approvedFields, setApprovedFields] = useState<Set<PolicyProposalField>>(new Set())
   const [applyActionSaving, setApplyActionSaving] = useState(false)
@@ -522,9 +524,11 @@ function ImportRecordReviewPanel({
     setApplyActionSaved(false)
     try {
       const selectedIndividualClientId =
-        customerAction === 'link_existing_individual' ? review?.individualCandidate?.id : undefined
+        customerAction === 'link_existing_individual' || (customerAction === 'add_policyholder_to_existing_client' && participantResolution === 'existing')
+          ? review?.individualCandidate?.id : undefined
       const selectedCompanyId =
-        customerAction === 'link_existing_company' ? review?.companyCandidate?.id : undefined
+        customerAction === 'link_existing_company' || (customerAction === 'add_policyholder_to_existing_client' && participantResolution === 'existing')
+          ? review?.companyCandidate?.id : undefined
       const selectedPolicyId =
         policyAction === 'link_existing_policy' || policyAction === 'update_existing_policy'
           ? review?.policyCandidate?.id
@@ -591,6 +595,8 @@ function ImportRecordReviewPanel({
             <div><span className="text-navy-400">External client id: </span>{record.externalClientId ?? '—'}</div>
             <div><span className="text-navy-400">External policy id: </span>{record.externalPolicyId ?? '—'}</div>
             <div><span className="text-navy-400">External policy number: </span>{record.externalPolicyNumber ?? '—'}</div>
+            <div><span className="text-navy-400">Imported tomador: </span>{String(record.rawPayload.tomador ?? '—')}</div>
+            <div><span className="text-navy-400">Imported NIF: </span>{String(record.rawPayload.nif ?? '—')}</div>
           </div>
         </section>
 
@@ -707,11 +713,28 @@ function ImportRecordReviewPanel({
                     {review?.companyCandidate && (
                       <option value="link_existing_company">{CUSTOMER_ACTION_LABELS.link_existing_company}</option>
                     )}
+                    {review?.policyCandidate && (
+                      <option value="add_policyholder_to_existing_client">{CUSTOMER_ACTION_LABELS.add_policyholder_to_existing_client}</option>
+                    )}
                     <option value="create_individual">{CUSTOMER_ACTION_LABELS.create_individual}</option>
                     <option value="create_company">{CUSTOMER_ACTION_LABELS.create_company}</option>
                     <option value="no_customer_change">{CUSTOMER_ACTION_LABELS.no_customer_change}</option>
                   </select>
                 </label>
+
+                {customerAction === 'add_policyholder_to_existing_client' && (
+                  <label className="text-sm sm:col-span-2">
+                    <span className="text-navy-500 text-xs block" style={{ marginBottom: '0.2rem' }}>Policyholder</span>
+                    <select
+                      className="w-full px-2 py-1.5 border border-navy-200 rounded-[2px] text-sm"
+                      value={participantResolution}
+                      onChange={(e) => setParticipantResolution(e.target.value as 'existing' | 'new')}
+                    >
+                      <option value="existing">Use existing person/company</option>
+                      <option value="new">Create new person/company</option>
+                    </select>
+                  </label>
+                )}
 
                 <label className="text-sm">
                   <span className="text-navy-500 text-xs block" style={{ marginBottom: '0.2rem' }}>Policy</span>
@@ -724,7 +747,9 @@ function ImportRecordReviewPanel({
                     {review?.policyCandidate && (
                       <option value="link_existing_policy">{POLICY_ACTION_LABELS.link_existing_policy}</option>
                     )}
-                    <option value="create_policy">{POLICY_ACTION_LABELS.create_policy}</option>
+                    {customerAction !== 'add_policyholder_to_existing_client' && (
+                      <option value="create_policy">{POLICY_ACTION_LABELS.create_policy}</option>
+                    )}
                     {review?.policyCandidate && policyProposals.length > 0 && (
                       <option value="update_existing_policy">{POLICY_ACTION_LABELS.update_existing_policy}</option>
                     )}

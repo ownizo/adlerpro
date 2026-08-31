@@ -657,6 +657,7 @@ export type CustomerApplyAction =
   | 'link_existing_company'
   | 'create_individual'
   | 'create_company'
+  | 'add_policyholder_to_existing_client'
   | 'no_customer_change'
 
 export type PolicyApplyAction =
@@ -740,6 +741,10 @@ export interface CarrierImportRecord {
   selectedIndividualClientId?: string
   selectedCompanyId?: string
   selectedPolicyId?: string
+  /** Participant identity when customerApplyAction adds the imported
+   * tomador as a policyholder without changing the policy owner. */
+  selectedPolicyholderIndividualId?: string
+  selectedPolicyholderCompanyId?: string
   /** Only the explicitly approved CRM-policy field changes — never
    * applied just because a policy matched. Subset of { policyNumber,
    * startDate, endDate, annualPremium }. */
@@ -794,6 +799,19 @@ export interface ExternalPolicyIdentity {
 
   firstSeenAt: string
   lastSeenAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PolicyParticipant {
+  id: string
+  policyId: string
+  individualClientId?: string
+  companyId?: string
+  role: 'policyholder' | string
+  provider?: string
+  externalClientId?: string
+  source: string
   createdAt: string
   updatedAt: string
 }

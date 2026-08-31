@@ -166,6 +166,25 @@ test('isRowApplicable requires BOTH accepted AND ready', () => {
   )
 })
 
+test('policyholder participant action requires an existing policy and participant identity', () => {
+  assert.equal(isRowReadyToApply(baseState({
+    customerApplyAction: 'add_policyholder_to_existing_client',
+    policyApplyAction: 'link_existing_policy',
+    selectedPolicyId: 'pol-75846',
+    selectedIndividualClientId: 'bella',
+  })), true)
+  assert.equal(isRowReadyToApply(baseState({
+    customerApplyAction: 'add_policyholder_to_existing_client',
+    policyApplyAction: 'create_policy',
+    selectedPolicyId: null,
+    selectedIndividualClientId: 'bella',
+  })), false)
+})
+
+test('policyholder participant action is an explicit allowlisted customer action', () => {
+  assert.equal(isValidCustomerApplyAction('add_policyholder_to_existing_client'), true)
+})
+
 // ── OWNER CONSISTENCY ────────────────────────────────────────────────
 
 test('checkOwnerConsistency: linking an existing policy whose owner matches the selected individual is consistent', () => {

@@ -39,6 +39,7 @@ import type {
   CustomerApplyAction,
   PolicyApplyAction,
   CarrierRunApplyStatus,
+  PolicyParticipant,
 } from './types'
 import {
   buildWebsiteLeadOpportunityPayload,
@@ -272,6 +273,13 @@ export async function getPolicy(id: string): Promise<Policy | undefined> {
   const { data, error } = await sb.from('policies').select('*').eq('id', id).single()
   if (error) return undefined
   return objectToCamel(data) as Policy
+}
+
+export async function getPolicyParticipants(policyId: string): Promise<PolicyParticipant[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('policy_participants').select('*').eq('policy_id', policyId).order('created_at', { ascending: true })
+  if (error) { console.error('getPolicyParticipants error:', error); return [] }
+  return rowsToCamel<PolicyParticipant>(data ?? [])
 }
 
 export async function createPolicy(policy: Policy): Promise<void> {
@@ -2118,7 +2126,7 @@ export async function setCarrierImportRecordApplyActions(
 
   if (
     (input.policyApplyAction === 'link_existing_policy' || input.policyApplyAction === 'update_existing_policy') &&
-    input.selectedPolicyId
+    input.selectedPolicyId && input.customerApplyAction !== 'add_policyholder_to_existing_client'
   ) {
     const policy = await getPolicy(input.selectedPolicyId)
     if (!policy) throw new Error('setCarrierImportRecordApplyActions: selected policy does not exist')
@@ -2130,6 +2138,10 @@ export async function setCarrierImportRecordApplyActions(
       policyOwnerCompanyId: policy.companyId,
     })
     if (!check.consistent) throw new Error(`setCarrierImportRecordApplyActions: ${check.reason}`)
+  }
+
+  if (input.customerApplyAction === 'add_policyholder_to_existing_client' && !input.selectedPolicyId) {
+    throw new Error('setCarrierImportRecordApplyActions: add_policyholder_to_existing_client requires selected_policy_id')
   }
 
   const sb = getSupabaseAdmin()
@@ -2216,6 +2228,7 @@ export async function applyCarrierImportRecord(recordId: string): Promise<ApplyC
   const needsMapping =
     record.customerApplyAction === 'create_individual' ||
     record.customerApplyAction === 'create_company' ||
+    record.customerApplyAction === 'add_policyholder_to_existing_client' ||
     record.policyApplyAction === 'create_policy'
 
   let mappedRow: ParsedImportRow | undefined
@@ -2233,7 +2246,7 @@ export async function applyCarrierImportRecord(recordId: string): Promise<ApplyC
   let newCompany: Record<string, unknown> | undefined
   let newPolicy: Record<string, unknown> | undefined
 
-  if (record.customerApplyAction === 'create_individual') {
+  if (record.customerApplyAction === 'create_individual' || record.customerApplyAction === 'add_policyholder_to_existing_client') {
     const result = mapParsedRowToNewIndividualFields(mappedRow!)
     if (!result.ok) {
       await markCarrierImportRecordApplyFailed(recordId, result.error)

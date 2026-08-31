@@ -21,6 +21,7 @@ export const CUSTOMER_APPLY_ACTIONS: readonly CustomerApplyAction[] = [
   'link_existing_company',
   'create_individual',
   'create_company',
+  'add_policyholder_to_existing_client',
   'no_customer_change',
 ]
 
@@ -71,6 +72,9 @@ export function isRowReadyToApply(state: ApplyActionRowState): boolean {
     case 'create_individual':
     case 'create_company':
     case 'no_customer_change':
+      break
+    case 'add_policyholder_to_existing_client':
+      if (!state.selectedPolicyId) return false
       break
   }
 

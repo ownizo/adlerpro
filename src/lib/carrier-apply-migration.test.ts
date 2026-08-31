@@ -43,6 +43,22 @@ test('the legacy-owner fix keeps exact individual ownership and no-owner protect
   assert.match(legacyOwnerFixSrc, /v_policy\.individual_client_id IS NOT NULL OR NULLIF\(BTRIM\(v_policy\.company_id\), ''\) IS NOT NULL/)
 })
 
+test('policy participants migration is additive, constrained, RLS-protected, and idempotent', () => {
+  const participantSrc = readFileSync(join(migrationsDir, '20260831_crm3_policy_participants.sql'), 'utf8')
+  assert.match(participantSrc, /CREATE TABLE IF NOT EXISTS public\.policy_participants/)
+  assert.match(participantSrc, /individual_client_id uuid NULL REFERENCES public\.individual_clients\(id\) ON DELETE RESTRICT/)
+  assert.match(participantSrc, /company_id text NULL REFERENCES public\.companies\(id\) ON DELETE RESTRICT/)
+  assert.match(participantSrc, /policy_participants_owner_xor/)
+  assert.match(participantSrc, /role IN \('policyholder'\)/)
+  assert.match(participantSrc, /CREATE UNIQUE INDEX IF NOT EXISTS policy_participants_policy_owner_role_uidx/)
+  assert.match(participantSrc, /ALTER TABLE public\.policy_participants ENABLE ROW LEVEL SECURITY/)
+  assert.match(participantSrc, /CREATE OR REPLACE FUNCTION public\.apply_carrier_import_record/)
+  assert.match(participantSrc, /ON CONFLICT DO NOTHING/)
+  assert.match(participantSrc, /external client identity .*already linked to a different CRM customer/)
+  assert.match(participantSrc, /participant_ind|participant_company/)
+  assert.doesNotMatch(participantSrc, /SECURITY DEFINER/)
+})
+
 test('the two already-live migrations are untouched — their own defining anchors are still present verbatim', () => {
   const identitySrc = readFileSync(priorIdentityMigrationPath, 'utf8')
   const fingerprintSrc = readFileSync(priorFingerprintMigrationPath, 'utf8')
