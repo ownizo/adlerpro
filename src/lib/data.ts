@@ -50,6 +50,8 @@ import {
   validateOpportunityOwner,
 } from './sales-opportunity-rules'
 import { normalizePolicyNumber } from './identity-normalization'
+import type { CarrierProviderId } from './carrier-providers'
+import type { StagedRowMatch } from './carrier-import-matching'
 
 // ============================================================
 // Cliente Supabase (server-side — usa service_role key)
@@ -1815,4 +1817,194 @@ export async function updateCarrierImportDecision(
 
   const { error } = await (sb.from('carrier_import_records') as any).update(updates).eq('id', recordId)
   if (error) throw new Error(`updateCarrierImportDecision: ${error.message}`)
+}
+
+// ============================================================
+// CRM3 Block 3 — Manual Portfolio Import
+//
+// Reuses the existing carrier_sync_runs/carrier_import_records tables
+// exactly as they are — no redesign. Every write here is either a new
+// carrier_sync_runs row (mode='dry_run', never anything else) or new
+// carrier_import_records rows. NEVER touches individual_clients/
+// companies/policies — matching only ever reads them (via
+// listCandidateClients/listCandidatePolicies below) to feed
+// matchPortfolioRows (src/lib/carrier-import-matching.ts), which itself
+// never writes anywhere.
+// ============================================================
+
+/** Full individual_clients + companies lists, once per import run, for
+ * src/lib/carrier-import-matching.ts's candidate pool — never a per-row
+ * fetch. Read-only, plain SELECTs; matches the same "load everything
+ * once" pattern already used by fetchAdminAll for the admin dashboard. */
+export async function listCandidateClients(): Promise<{
+  individualClients: IndividualClient[]
+  companies: Company[]
+}> {
+  const [individualClients, companies] = await Promise.all([getIndividualClients(), getCompanies()])
+  return { individualClients, companies }
+}
+
+export async function listCandidatePolicies(): Promise<Policy[]> {
+  return getPolicies()
+}
+
+export async function listExternalClientIdentities(): Promise<ExternalClientIdentity[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('external_client_identities').select('*')
+  if (error) { console.error('listExternalClientIdentities error:', error); return [] }
+  return rowsToCamel<ExternalClientIdentity>(data ?? [])
+}
+
+export async function listExternalPolicyIdentities(): Promise<ExternalPolicyIdentity[]> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb.from('external_policy_identities').select('*')
+  if (error) { console.error('listExternalPolicyIdentities error:', error); return [] }
+  return rowsToCamel<ExternalPolicyIdentity>(data ?? [])
+}
+
+/** Requires migrations/20260831_carrier_sync_runs_import_fingerprint.sql
+ * (a NEW, additive, NOT-YET-APPLIED migration — see that file) for the
+ * import_fingerprint column/index this queries. */
+export async function findCarrierSyncRunByFingerprint(fingerprint: string): Promise<CarrierSyncRun | undefined> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await (sb.from('carrier_sync_runs') as any)
+    .select('*')
+    .eq('import_fingerprint', fingerprint)
+    .maybeSingle()
+  if (error || !data) return undefined
+  return objectToCamel(data) as unknown as CarrierSyncRun
+}
+
+export interface CreateCarrierSyncRunForImportInput {
+  provider: CarrierProviderId
+  importFingerprint: string
+  recordsReceived: number
+}
+
+export type CreateCarrierSyncRunForImportResult =
+  // Repeated upload of the exact same sanitized portfolio content —
+  // never silently creates a second run (ver requisito "Do not silently
+  // create duplicate runs/import records if avoidable").
+  | { status: 'duplicate'; run: CarrierSyncRun }
+  | { status: 'created'; run: CarrierSyncRun }
+
+/**
+ * Creates the carrier_sync_runs row for a manual import — ALWAYS
+ * mode='dry_run' (this Block never does a real "import" mode write).
+ * Checks the fingerprint first, and again on an INSERT race against the
+ * new partial unique index, exactly like the existing external-identity
+ * link functions above (check, then re-query on conflict, never assume).
+ */
+export async function createCarrierSyncRunForImport(
+  input: CreateCarrierSyncRunForImportInput,
+): Promise<CreateCarrierSyncRunForImportResult> {
+  const existing = await findCarrierSyncRunByFingerprint(input.importFingerprint)
+  if (existing) return { status: 'duplicate', run: existing }
+
+  const sb = getSupabaseAdmin()
+  const now = new Date().toISOString()
+  const payload = {
+    id: crypto.randomUUID(),
+    provider: input.provider,
+    mode: 'dry_run',
+    status: 'processing',
+    importFingerprint: input.importFingerprint,
+    recordsReceived: input.recordsReceived,
+    recordsExactMatch: 0,
+    recordsReview: 0,
+    recordsNew: 0,
+    recordsError: 0,
+    summary: {},
+    startedAt: now,
+    createdAt: now,
+  }
+  const { data, error } = await sb
+    .from('carrier_sync_runs')
+    .insert(objectToSnake(payload as unknown as Record<string, unknown>) as any)
+    .select('*')
+    .single()
+
+  if (error) {
+    if (isUniqueViolationOn(error, 'carrier_sync_runs_import_fingerprint_uidx')) {
+      const raced = await findCarrierSyncRunByFingerprint(input.importFingerprint)
+      if (raced) return { status: 'duplicate', run: raced }
+    }
+    throw new Error(`createCarrierSyncRunForImport: ${error.message}`)
+  }
+  return { status: 'created', run: objectToCamel(data) as unknown as CarrierSyncRun }
+}
+
+/**
+ * Stages every already-matched row as a carrier_import_records row.
+ * raw_payload is ALWAYS row.sanitizedRaw — the already-redacted value
+ * produced by the provider mapper (NIB/IBAN stripped, medical keys
+ * redacted) — never the original unsanitized row. Never touches
+ * individual_clients/companies/policies.
+ */
+export async function stageCarrierImportRecords(
+  runId: string,
+  provider: CarrierProviderId,
+  matches: StagedRowMatch[],
+): Promise<void> {
+  if (matches.length === 0) return
+  const sb = getSupabaseAdmin()
+  const now = new Date().toISOString()
+  const payloads = matches.map((m) => ({
+    id: crypto.randomUUID(),
+    syncRunId: runId,
+    provider,
+    externalClientId: m.row.externalClientId,
+    externalPolicyNumber: m.row.externalPolicyNumber,
+    rawPayload: m.row.sanitizedRaw,
+    customerMatchStatus: m.customerMatchStatus,
+    policyMatchStatus: m.policyMatchStatus,
+    matchedIndividualClientId: m.matchedIndividualClientId,
+    matchedCompanyId: m.matchedCompanyId,
+    matchedPolicyId: m.matchedPolicyId,
+    customerMatchReason: m.customerMatchReason,
+    policyMatchReason: m.policyMatchReason,
+    decisionStatus: 'pending',
+    createdAt: now,
+    updatedAt: now,
+  }))
+  const { error } = await sb
+    .from('carrier_import_records')
+    .insert(payloads.map((p) => objectToSnake(p as unknown as Record<string, unknown>)) as any)
+  if (error) throw new Error(`stageCarrierImportRecords: ${error.message}`)
+}
+
+export interface CarrierSyncRunCounts {
+  recordsExactMatch: number
+  recordsReview: number
+  recordsNew: number
+  recordsError: number
+}
+
+/** Marks the run completed (still mode='dry_run' — completed only means
+ * "finished computing matches", never "imported into the CRM"). */
+export async function finalizeCarrierSyncRunCounts(runId: string, counts: CarrierSyncRunCounts): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const updates = {
+    status: 'completed',
+    records_exact_match: counts.recordsExactMatch,
+    records_review: counts.recordsReview,
+    records_new: counts.recordsNew,
+    records_error: counts.recordsError,
+    completed_at: new Date().toISOString(),
+  }
+  const { error } = await (sb.from('carrier_sync_runs') as any).update(updates).eq('id', runId)
+  if (error) throw new Error(`finalizeCarrierSyncRunCounts: ${error.message}`)
+}
+
+/**
+ * "Cancel import" (wrong insurer selected, etc.) — deletes the staging
+ * run; carrier_import_records rows cascade automatically (ON DELETE
+ * CASCADE on sync_run_id, already in the original CRM3 migration). Never
+ * touches individual_clients/companies/policies — there was never
+ * anything to undo there, since preview never writes to them.
+ */
+export async function deleteCarrierSyncRun(runId: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb.from('carrier_sync_runs').delete().eq('id', runId)
+  if (error) throw new Error(`deleteCarrierSyncRun: ${error.message}`)
 }

@@ -916,6 +916,12 @@ function AdminDashboardContent() {
                     >
                       Export Excel
                     </button>
+                    {/* CRM3 Block 3 — same route as System → Carrier
+                        Integrations' "Import Portfolio" button; one
+                        importer, two entry points. */}
+                    <Link to="/admin/carrier-integrations/import" className="admin-btn admin-btn-secondary">
+                      Import Portfolio
+                    </Link>
                     <button
                       onClick={() => {
                         setEditingIndividualClientId(null)

@@ -32,6 +32,7 @@ import { Route as OneDocumentsRouteImport } from './routes/one/documents'
 import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
 import { Route as OneClaimsRouteImport } from './routes/one/claims'
 import { Route as AdminCarrierIntegrationsRouteImport } from './routes/admin.carrier-integrations'
+import { Route as AdminCarrierIntegrationsImportRouteImport } from './routes/admin.carrier-integrations.import'
 import { Route as AdminCarrierIntegrationsRunsIdRouteImport } from './routes/admin.carrier-integrations.runs.$id'
 
 const TermsAndConditionsRoute = TermsAndConditionsRouteImport.update({
@@ -150,6 +151,12 @@ const AdminCarrierIntegrationsRoute =
     path: '/carrier-integrations',
     getParentRoute: () => AdminRoute,
   } as any)
+const AdminCarrierIntegrationsImportRoute =
+  AdminCarrierIntegrationsImportRouteImport.update({
+    id: '/import',
+    path: '/import',
+    getParentRoute: () => AdminCarrierIntegrationsRoute,
+  } as any)
 const AdminCarrierIntegrationsRunsIdRoute =
   AdminCarrierIntegrationsRunsIdRouteImport.update({
     id: '/runs/$id',
@@ -181,6 +188,7 @@ export interface FileRoutesByFullPath {
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
   '/one/': typeof OneIndexRoute
+  '/admin/carrier-integrations/import': typeof AdminCarrierIntegrationsImportRoute
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
 export interface FileRoutesByTo {
@@ -207,6 +215,7 @@ export interface FileRoutesByTo {
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
   '/one': typeof OneIndexRoute
+  '/admin/carrier-integrations/import': typeof AdminCarrierIntegrationsImportRoute
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
 export interface FileRoutesById {
@@ -234,6 +243,7 @@ export interface FileRoutesById {
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
   '/one/': typeof OneIndexRoute
+  '/admin/carrier-integrations/import': typeof AdminCarrierIntegrationsImportRoute
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
 export interface FileRouteTypes {
@@ -262,6 +272,7 @@ export interface FileRouteTypes {
     | '/one/reset-password'
     | '/one/terms'
     | '/one/'
+    | '/admin/carrier-integrations/import'
     | '/admin/carrier-integrations/runs/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -288,6 +299,7 @@ export interface FileRouteTypes {
     | '/one/reset-password'
     | '/one/terms'
     | '/one'
+    | '/admin/carrier-integrations/import'
     | '/admin/carrier-integrations/runs/$id'
   id:
     | '__root__'
@@ -314,6 +326,7 @@ export interface FileRouteTypes {
     | '/one/reset-password'
     | '/one/terms'
     | '/one/'
+    | '/admin/carrier-integrations/import'
     | '/admin/carrier-integrations/runs/$id'
   fileRoutesById: FileRoutesById
 }
@@ -505,6 +518,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCarrierIntegrationsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/carrier-integrations/import': {
+      id: '/admin/carrier-integrations/import'
+      path: '/import'
+      fullPath: '/admin/carrier-integrations/import'
+      preLoaderRoute: typeof AdminCarrierIntegrationsImportRouteImport
+      parentRoute: typeof AdminCarrierIntegrationsRoute
+    }
     '/admin/carrier-integrations/runs/$id': {
       id: '/admin/carrier-integrations/runs/$id'
       path: '/runs/$id'
@@ -516,11 +536,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminCarrierIntegrationsRouteChildren {
+  AdminCarrierIntegrationsImportRoute: typeof AdminCarrierIntegrationsImportRoute
   AdminCarrierIntegrationsRunsIdRoute: typeof AdminCarrierIntegrationsRunsIdRoute
 }
 
 const AdminCarrierIntegrationsRouteChildren: AdminCarrierIntegrationsRouteChildren =
   {
+    AdminCarrierIntegrationsImportRoute: AdminCarrierIntegrationsImportRoute,
     AdminCarrierIntegrationsRunsIdRoute: AdminCarrierIntegrationsRunsIdRoute,
   }
 

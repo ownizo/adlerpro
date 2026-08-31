@@ -77,6 +77,9 @@ function CarrierIntegrationsPage() {
               Connect insurer portfolio data and reconcile it safely with existing CRM records.
             </p>
           </div>
+          <Link to="/admin/carrier-integrations/import" className="admin-btn admin-btn-primary">
+            Import Portfolio
+          </Link>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3" style={{ marginBottom: '1.5rem' }}>
