@@ -22,6 +22,7 @@ import { CARRIER_PROVIDER_LABELS, type CarrierProviderId } from '@/lib/carrier-p
 import {
   computeRunApplyReadiness,
   describeRowApplyResult,
+  type ApplyActionRowState,
   type CustomerApplyAction,
   type PolicyApplyAction,
   type RowApplyResultStatus,
@@ -88,7 +89,7 @@ const DECISION_CHIP_CLASS: Record<string, string> = {
   ignored: 'admin-chip--neutral',
 }
 
-function recordToApplyActionRowState(record: CarrierImportRecord) {
+function recordToApplyActionRowState(record: CarrierImportRecord): ApplyActionRowState {
   return {
     decisionStatus: record.decisionStatus,
     customerApplyAction: record.customerApplyAction ?? null,
@@ -96,6 +97,9 @@ function recordToApplyActionRowState(record: CarrierImportRecord) {
     selectedIndividualClientId: record.selectedIndividualClientId ?? null,
     selectedCompanyId: record.selectedCompanyId ?? null,
     selectedPolicyId: record.selectedPolicyId ?? null,
+    participantMode: record.selectedPolicyholderMode ?? null,
+    selectedPolicyholderIndividualClientId: record.selectedPolicyholderIndividualClientId ?? null,
+    selectedPolicyholderCompanyId: record.selectedPolicyholderCompanyId ?? null,
     approvedPolicyChanges: (record.approvedPolicyChanges as Record<string, unknown> | undefined) ?? null,
   }
 }

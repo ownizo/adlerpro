@@ -753,7 +753,7 @@ export interface CarrierImportRecord {
   selectedPolicyholderMode?: PolicyholderParticipantMode
   /** Participant identity when customerApplyAction adds the imported
    * tomador as a policyholder without changing the policy owner. */
-  selectedPolicyholderIndividualId?: string
+  selectedPolicyholderIndividualClientId?: string
   selectedPolicyholderCompanyId?: string
   /** Only the explicitly approved CRM-policy field changes — never
    * applied just because a policy matched. Subset of { policyNumber,
