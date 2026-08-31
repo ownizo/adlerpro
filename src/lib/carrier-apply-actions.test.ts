@@ -28,6 +28,9 @@ function baseState(overrides: Partial<ApplyActionRowState> = {}): ApplyActionRow
     selectedIndividualClientId: null,
     selectedCompanyId: null,
     selectedPolicyId: null,
+    participantMode: null,
+    selectedPolicyholderIndividualClientId: null,
+    selectedPolicyholderCompanyId: null,
     approvedPolicyChanges: null,
     ...overrides,
   }
@@ -164,6 +167,39 @@ test('isRowApplicable requires BOTH accepted AND ready', () => {
     isRowApplicable(baseState({ decisionStatus: 'accepted', customerApplyAction: 'create_individual', policyApplyAction: 'create_policy' })),
     true,
   )
+})
+
+test('policyholder participant action requires an explicit participant mode and the matching participant identity', () => {
+  assert.equal(isRowReadyToApply(baseState({
+    customerApplyAction: 'add_policyholder_to_existing_client',
+    policyApplyAction: 'link_existing_policy',
+    selectedPolicyId: 'pol-75846',
+    participantMode: 'existing_individual',
+    selectedPolicyholderIndividualClientId: 'bella',
+  })), true)
+  assert.equal(isRowReadyToApply(baseState({
+    customerApplyAction: 'add_policyholder_to_existing_client',
+    policyApplyAction: 'link_existing_policy',
+    selectedPolicyId: 'pol-75846',
+    participantMode: 'create_company',
+  })), true)
+  assert.equal(isRowReadyToApply(baseState({
+    customerApplyAction: 'add_policyholder_to_existing_client',
+    policyApplyAction: 'create_policy',
+    selectedPolicyId: null,
+    participantMode: 'existing_individual',
+    selectedPolicyholderIndividualClientId: 'bella',
+  })), false)
+  assert.equal(isRowReadyToApply(baseState({
+    customerApplyAction: 'add_policyholder_to_existing_client',
+    policyApplyAction: 'link_existing_policy',
+    selectedPolicyId: 'pol-75846',
+    participantMode: null,
+  })), false)
+})
+
+test('policyholder participant action is an explicit allowlisted customer action', () => {
+  assert.equal(isValidCustomerApplyAction('add_policyholder_to_existing_client'), true)
 })
 
 // ── OWNER CONSISTENCY ────────────────────────────────────────────────
