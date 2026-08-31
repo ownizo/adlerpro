@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute, Navigate, Link } from '@tanstack/react-router'
+import { createFileRoute, Navigate, Link, useNavigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { useIdentity } from '@/lib/identity-context'
 import {
@@ -11,9 +11,11 @@ import {
   adminIgnoreCarrierImportDecision,
   adminLinkCarrierClientIdentity,
   adminLinkCarrierPolicyIdentity,
+  adminCancelCarrierSyncRun,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { redactSensitivePayload } from '@/lib/carrier-payload-redaction'
+import { CARRIER_PROVIDER_LABELS, type CarrierProviderId } from '@/lib/carrier-providers'
 import type { CarrierImportRecord, CarrierImportRecordReview, CarrierSyncRun } from '@/lib/types'
 
 /**
@@ -62,11 +64,13 @@ function KpiTile({ label, value }: { label: string; value: number }) {
 
 function CarrierRunDetailPage() {
   const { user, ready } = useIdentity()
+  const navigate = useNavigate()
   const { id } = Route.useParams()
   const [run, setRun] = useState<CarrierSyncRun | undefined>(undefined)
   const [records, setRecords] = useState<CarrierImportRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const [cancelling, setCancelling] = useState(false)
 
   const reload = () => {
     setLoading(true)
@@ -116,6 +120,41 @@ function CarrierRunDetailPage() {
           <p className="text-sm text-navy-400">Loading…</p>
         ) : (
           <>
+            {/* Wrong-insurer protection (CRM3 Block 3): provider is
+                immutable once a run exists — there is no update-provider
+                code path anywhere. The only way to "fix" a wrong
+                selection is to cancel this run and upload again. */}
+            <div
+              className="admin-panel"
+              style={{ marginBottom: '1rem', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}
+            >
+              <p className="text-sm font-medium" style={{ color: 'var(--ui-text-primary)' }}>
+                Importing {run.recordsReceived} record{run.recordsReceived === 1 ? '' : 's'} from{' '}
+                {CARRIER_PROVIDER_LABELS[run.provider as CarrierProviderId] ?? run.provider}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="admin-btn admin-btn-danger admin-btn--sm"
+                  disabled={cancelling}
+                  onClick={async () => {
+                    setCancelling(true)
+                    try {
+                      await adminCancelCarrierSyncRun({ data: run.id })
+                      navigate({ to: '/admin/carrier-integrations' })
+                    } finally {
+                      setCancelling(false)
+                    }
+                  }}
+                >
+                  Cancel import
+                </button>
+                <Link to="/admin/carrier-integrations/import" className="admin-btn admin-btn-secondary admin-btn--sm">
+                  Upload again
+                </Link>
+              </div>
+            </div>
+
             <div className="admin-panel" style={{ marginBottom: '1rem', padding: '1rem' }}>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
                 <div><span className="text-navy-400">Provider: </span>{run.provider}</div>

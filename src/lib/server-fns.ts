@@ -33,6 +33,11 @@ import type {
   SalesOpportunityEditableUpdate,
   Json,
 } from './types'
+import { isValidCarrierProvider } from './carrier-providers'
+import { parsePortfolioWorkbook } from './carrier-excel-workbook'
+import { mapPortfolioRows } from './carrier-import-mappers'
+import { computeImportFingerprint } from './carrier-import-fingerprint'
+import { matchPortfolioRows, classifyStagedRowForCounts } from './carrier-import-matching'
 import { buildOpportunityTitle, pickWebsiteLeadContextFields } from './sales-opportunity-rules'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser, generateStrongPassword, deleteIdentityUserById } from './identity-admin'
@@ -3932,5 +3937,108 @@ export const adminIgnoreCarrierImportDecision = createServerFn({ method: 'POST' 
   .inputValidator((d: { recordId: string; decisionNote?: string }) => d)
   .handler(async ({ data }) => {
     await db.updateCarrierImportDecision(data.recordId, { decisionStatus: 'ignored', decisionNote: data.decisionNote })
+    return { success: true }
+  })
+
+// ============================================================
+// CRM3 Block 3 — Manual Portfolio Import
+//
+// Admin-only, no exceptions. Parses and matches entirely server-side —
+// the service-role key never reaches the browser, and the browser never
+// sees anything beyond this function's typed JSON result. Provider is
+// validated against the allowlist here, server-side, BEFORE any parsing —
+// the browser's provider value is never trusted blindly. Never writes to
+// individual_clients/companies/policies; only ever creates a
+// carrier_sync_runs row (mode='dry_run') and carrier_import_records rows.
+// ============================================================
+
+export const adminPreviewPortfolioImport = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { provider: string; filename: string; fileBase64: string }) => d)
+  .handler(async ({ data }) => {
+    if (!isValidCarrierProvider(data.provider)) {
+      return { status: 'invalid_provider' as const }
+    }
+    const provider = data.provider
+
+    let buffer: Buffer
+    try {
+      buffer = Buffer.from(data.fileBase64, 'base64')
+    } catch {
+      return { status: 'file_error' as const, error: 'Could not decode the uploaded file' }
+    }
+
+    const parsed = await parsePortfolioWorkbook(buffer, data.filename)
+    if (!parsed.ok) {
+      return { status: 'file_error' as const, error: parsed.error }
+    }
+
+    const mapped = mapPortfolioRows(provider, parsed.rows)
+    if (!mapped.recognized) {
+      return { status: 'unrecognized_format' as const, error: mapped.error ?? `File format not yet recognised for ${provider}` }
+    }
+    if (mapped.rows.length === 0) {
+      return { status: 'unrecognized_format' as const, error: 'Workbook has no recognizable rows' }
+    }
+
+    const importFingerprint = computeImportFingerprint(provider, mapped.rows)
+
+    const runResult = await db.createCarrierSyncRunForImport({
+      provider,
+      importFingerprint,
+      recordsReceived: mapped.rows.length,
+    })
+    if (runResult.status === 'duplicate') {
+      return { status: 'duplicate' as const, runId: runResult.run.id }
+    }
+
+    const runId = runResult.run.id
+    try {
+      const [{ individualClients, companies }, policies, externalClientIdentities, externalPolicyIdentities] =
+        await Promise.all([
+          db.listCandidateClients(),
+          db.listCandidatePolicies(),
+          db.listExternalClientIdentities(),
+          db.listExternalPolicyIdentities(),
+        ])
+
+      const matches = matchPortfolioRows(provider, mapped.rows, {
+        individualClients: individualClients.map((c) => ({ id: c.id, fullName: c.fullName, nif: c.nif, email: c.email, phone: c.phone, address: c.address })),
+        companies: companies.map((c) => ({ id: c.id, name: c.name, nif: c.nif, contactEmail: c.contactEmail, contactPhone: c.contactPhone, address: c.address })),
+        policies: policies.map((p) => ({ id: p.id, insurer: p.insurer, policyNumber: p.policyNumber, companyId: p.companyId, individualClientId: p.individualClientId, startDate: p.startDate, endDate: p.endDate, annualPremium: p.annualPremium })),
+        externalClientIdentities: externalClientIdentities.map((i) => ({ provider: i.provider, externalClientId: i.externalClientId, individualClientId: i.individualClientId, companyId: i.companyId })),
+        externalPolicyIdentities: externalPolicyIdentities.map((i) => ({ provider: i.provider, externalPolicyId: i.externalPolicyId, policyId: i.policyId })),
+      })
+
+      await db.stageCarrierImportRecords(runId, provider, matches)
+
+      const counts = { exact: 0, review: 0, new: 0, error: 0 }
+      for (const match of matches) counts[classifyStagedRowForCounts(match)]++
+      await db.finalizeCarrierSyncRunCounts(runId, {
+        recordsExactMatch: counts.exact,
+        recordsReview: counts.review,
+        recordsNew: counts.new,
+        recordsError: counts.error,
+      })
+
+      return { status: 'created' as const, runId, counts }
+    } catch (err) {
+      // Never leave a run stuck in 'processing' with nothing staged —
+      // clean it up so it isn't mistaken for a real pending import.
+      await db.deleteCarrierSyncRun(runId).catch(() => {})
+      throw err
+    }
+  })
+
+// "Cancel import" (wrong insurer selected, etc.) — deletes the staging
+// run entirely; carrier_import_records cascade automatically. Never
+// touches individual_clients/companies/policies. Provider is immutable by
+// design: there is no update-provider code path anywhere — the only way
+// to "change" it is to delete this run and upload again.
+export const adminCancelCarrierSyncRun = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((runId: string) => runId)
+  .handler(async ({ data: runId }) => {
+    await db.deleteCarrierSyncRun(runId)
     return { success: true }
   })
