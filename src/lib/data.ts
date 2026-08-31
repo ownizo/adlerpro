@@ -36,6 +36,9 @@ import type {
   CarrierCompanyCandidateSummary,
   CarrierPolicyCandidateSummary,
   CarrierImportRecordReview,
+  CustomerApplyAction,
+  PolicyApplyAction,
+  CarrierRunApplyStatus,
 } from './types'
 import {
   buildWebsiteLeadOpportunityPayload,
@@ -50,8 +53,22 @@ import {
   validateOpportunityOwner,
 } from './sales-opportunity-rules'
 import { normalizePolicyNumber } from './identity-normalization'
-import type { CarrierProviderId } from './carrier-providers'
+import { CARRIER_PROVIDER_LABELS, type CarrierProviderId } from './carrier-providers'
 import type { StagedRowMatch } from './carrier-import-matching'
+import { mapPortfolioRows } from './carrier-import-mappers'
+import type { ParsedImportRow } from './carrier-import-parsing'
+import {
+  isRowReadyToApply,
+  isValidCustomerApplyAction,
+  isValidPolicyApplyAction,
+  checkOwnerConsistency,
+  type ApplyActionRowState,
+} from './carrier-apply-actions'
+import {
+  mapParsedRowToNewIndividualFields,
+  mapParsedRowToNewCompanyFields,
+  mapParsedRowToNewPolicyFields,
+} from './carrier-apply-field-mapping'
 
 // ============================================================
 // Cliente Supabase (server-side — usa service_role key)
@@ -1482,6 +1499,13 @@ export async function getCarrierImportRecordReview(recordId: string): Promise<Ca
         endDate: policy.endDate,
         annualPremium: policy.annualPremium,
         ownerLabel,
+        // CRM3 Block 4 — the raw owner ids, needed to check that a
+        // selected customer actually matches this policy's real owner
+        // (see checkOwnerConsistency). Never fabricated: mirrors
+        // whichever of policy.companyId/policy.individualClientId is
+        // actually set.
+        ownerIndividualClientId: policy.individualClientId || undefined,
+        ownerCompanyId: policy.companyId || undefined,
       }
     }
   }
@@ -2002,9 +2026,295 @@ export async function finalizeCarrierSyncRunCounts(runId: string, counts: Carrie
  * CASCADE on sync_run_id, already in the original CRM3 migration). Never
  * touches individual_clients/companies/policies — there was never
  * anything to undo there, since preview never writes to them.
+ *
+ * CRM3 Block 4: once ANY record in this run has apply_status='applied',
+ * the run is an audit trail and must never be deleted (see requirement
+ * "Cancel run blocked once any row applied"). Checked here in TypeScript
+ * for a clear, friendly error AND enforced again at the database level
+ * by the carrier_sync_runs_block_delete_if_applied trigger (see
+ * migrations/20260831_crm3_apply_portfolio_import.sql) — belt and
+ * suspenders, so this can never be bypassed by a future code path that
+ * forgets this check.
  */
 export async function deleteCarrierSyncRun(runId: string): Promise<void> {
   const sb = getSupabaseAdmin()
+  const { count, error: countError } = await sb
+    .from('carrier_import_records')
+    .select('id', { count: 'exact', head: true })
+    .eq('sync_run_id', runId)
+    .eq('apply_status', 'applied')
+  if (countError) throw new Error(`deleteCarrierSyncRun: ${countError.message}`)
+  if ((count ?? 0) > 0) {
+    throw new Error('deleteCarrierSyncRun: cannot cancel a run that already has applied records — the import run is now an audit trail')
+  }
+
   const { error } = await sb.from('carrier_sync_runs').delete().eq('id', runId)
   if (error) throw new Error(`deleteCarrierSyncRun: ${error.message}`)
+}
+
+// ============================================================
+// CRM3 Block 4 — Confirm & Apply Portfolio Import
+//
+// "Accepted" (decision_status) never implies any of this — every
+// function below either resolves EXPLICIT apply actions onto a record
+// (setCarrierImportRecordApplyActions) or applies a single already-
+// resolved, already-accepted record via the atomic
+// apply_carrier_import_record RPC (applyCarrierImportRecord). Nothing
+// here ever infers a create/link/update from a match status alone. See
+// migrations/20260831_crm3_apply_portfolio_import.sql for the full
+// design rationale.
+// ============================================================
+
+export interface SetCarrierImportRecordApplyActionsInput {
+  customerApplyAction: CustomerApplyAction
+  policyApplyAction: PolicyApplyAction
+  selectedIndividualClientId?: string | null
+  selectedCompanyId?: string | null
+  selectedPolicyId?: string | null
+  approvedPolicyChanges?: Record<string, Json> | null
+}
+
+/**
+ * Persists an Admin's explicit, resolved apply action for one record —
+ * a separate step from Accept/Reject/Ignore (updateCarrierImportDecision
+ * above), never triggered automatically by it. Validates the action
+ * enum values server-side (never trusts a browser-supplied string
+ * blindly — see isValidCustomerApplyAction/isValidPolicyApplyAction),
+ * and pre-checks owner consistency for a selected existing policy
+ * against a selected customer so a mismatch is rejected immediately
+ * here rather than only surfacing later when the run is applied (the
+ * apply RPC re-checks this again anyway, as the ultimate,
+ * race-safe authority).
+ */
+export async function setCarrierImportRecordApplyActions(
+  recordId: string,
+  input: SetCarrierImportRecordApplyActionsInput,
+): Promise<void> {
+  if (!isValidCustomerApplyAction(input.customerApplyAction)) {
+    throw new Error(`setCarrierImportRecordApplyActions: invalid customerApplyAction "${input.customerApplyAction}"`)
+  }
+  if (!isValidPolicyApplyAction(input.policyApplyAction)) {
+    throw new Error(`setCarrierImportRecordApplyActions: invalid policyApplyAction "${input.policyApplyAction}"`)
+  }
+  if (input.selectedIndividualClientId && input.selectedCompanyId) {
+    throw new Error('setCarrierImportRecordApplyActions: cannot select both an individual and a company for the same record')
+  }
+
+  const record = await getCarrierImportRecord(recordId)
+  if (!record) throw new Error('setCarrierImportRecordApplyActions: record not found')
+  if (record.decisionStatus !== 'accepted') {
+    throw new Error('setCarrierImportRecordApplyActions: apply actions can only be resolved on an accepted record')
+  }
+  if (record.applyStatus === 'applied') {
+    throw new Error('setCarrierImportRecordApplyActions: this record has already been applied and can no longer be changed')
+  }
+
+  if (
+    (input.policyApplyAction === 'link_existing_policy' || input.policyApplyAction === 'update_existing_policy') &&
+    input.selectedPolicyId
+  ) {
+    const policy = await getPolicy(input.selectedPolicyId)
+    if (!policy) throw new Error('setCarrierImportRecordApplyActions: selected policy does not exist')
+    const check = checkOwnerConsistency({
+      policyApplyAction: input.policyApplyAction,
+      selectedIndividualClientId: input.selectedIndividualClientId ?? null,
+      selectedCompanyId: input.selectedCompanyId ?? null,
+      policyOwnerIndividualClientId: policy.individualClientId,
+      policyOwnerCompanyId: policy.companyId,
+    })
+    if (!check.consistent) throw new Error(`setCarrierImportRecordApplyActions: ${check.reason}`)
+  }
+
+  const sb = getSupabaseAdmin()
+  const updates = objectToSnake({
+    customerApplyAction: input.customerApplyAction,
+    policyApplyAction: input.policyApplyAction,
+    selectedIndividualClientId: input.selectedIndividualClientId ?? null,
+    selectedCompanyId: input.selectedCompanyId ?? null,
+    selectedPolicyId: input.selectedPolicyId ?? null,
+    approvedPolicyChanges: input.approvedPolicyChanges ?? null,
+    updatedAt: new Date().toISOString(),
+  })
+  const { error } = await (sb.from('carrier_import_records') as any).update(updates).eq('id', recordId)
+  if (error) throw new Error(`setCarrierImportRecordApplyActions: ${error.message}`)
+}
+
+async function markCarrierImportRecordApplyFailed(recordId: string, message: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await (sb.from('carrier_import_records') as any)
+    .update({ apply_status: 'failed', apply_error: message, updated_at: new Date().toISOString() })
+    .eq('id', recordId)
+  if (error) console.error('markCarrierImportRecordApplyFailed error:', error)
+}
+
+export interface ApplyCarrierImportRecordResult {
+  recordId: string
+  status: 'applied' | 'already_applied' | 'failed'
+  individualClientId?: string
+  companyId?: string
+  policyId?: string
+  externalClientIdentityCreated: boolean
+  externalPolicyIdentityCreated: boolean
+  error?: string
+}
+
+/**
+ * Applies exactly one accepted, fully-resolved carrier_import_record via
+ * the atomic apply_carrier_import_record RPC — one row, one Postgres
+ * transaction (see the migration for the full rationale). Never called
+ * for a row that isn't ready: isRowReadyToApply is checked again here as
+ * a final guard (the same check the run-level readiness summary and
+ * adminApplyCarrierSyncRun already use), so this function can never
+ * silently apply an under-resolved row even if called directly.
+ *
+ * Re-derives the semantic ParsedImportRow fields needed for a *create*
+ * action by re-running mapPortfolioRows against the record's own
+ * already-persisted, already-sanitized raw_payload — see
+ * carrier-apply-field-mapping.ts for why this is safe and preferred over
+ * a second persisted semantic column.
+ */
+export async function applyCarrierImportRecord(recordId: string): Promise<ApplyCarrierImportRecordResult> {
+  const record = await getCarrierImportRecord(recordId)
+  if (!record) {
+    return { recordId, status: 'failed', externalClientIdentityCreated: false, externalPolicyIdentityCreated: false, error: 'Record not found' }
+  }
+
+  if (record.applyStatus === 'applied') {
+    return {
+      recordId,
+      status: 'already_applied',
+      individualClientId: record.selectedIndividualClientId,
+      companyId: record.selectedCompanyId,
+      policyId: record.selectedPolicyId,
+      externalClientIdentityCreated: false,
+      externalPolicyIdentityCreated: false,
+    }
+  }
+
+  const rowState: ApplyActionRowState = {
+    decisionStatus: record.decisionStatus,
+    customerApplyAction: record.customerApplyAction ?? null,
+    policyApplyAction: record.policyApplyAction ?? null,
+    selectedIndividualClientId: record.selectedIndividualClientId ?? null,
+    selectedCompanyId: record.selectedCompanyId ?? null,
+    selectedPolicyId: record.selectedPolicyId ?? null,
+    approvedPolicyChanges: (record.approvedPolicyChanges as Record<string, unknown> | undefined) ?? null,
+  }
+  if (!isRowReadyToApply(rowState)) {
+    const message = 'This record does not have a fully resolved apply action.'
+    await markCarrierImportRecordApplyFailed(recordId, message)
+    return { recordId, status: 'failed', externalClientIdentityCreated: false, externalPolicyIdentityCreated: false, error: message }
+  }
+
+  const needsMapping =
+    record.customerApplyAction === 'create_individual' ||
+    record.customerApplyAction === 'create_company' ||
+    record.policyApplyAction === 'create_policy'
+
+  let mappedRow: ParsedImportRow | undefined
+  if (needsMapping) {
+    const mapped = mapPortfolioRows(record.provider as CarrierProviderId, [record.rawPayload as Record<string, unknown>])
+    mappedRow = mapped.recognized ? mapped.rows[0] : undefined
+    if (!mappedRow) {
+      const message = 'Could not re-derive the imported fields needed to create this record.'
+      await markCarrierImportRecordApplyFailed(recordId, message)
+      return { recordId, status: 'failed', externalClientIdentityCreated: false, externalPolicyIdentityCreated: false, error: message }
+    }
+  }
+
+  let newIndividual: Record<string, unknown> | undefined
+  let newCompany: Record<string, unknown> | undefined
+  let newPolicy: Record<string, unknown> | undefined
+
+  if (record.customerApplyAction === 'create_individual') {
+    const result = mapParsedRowToNewIndividualFields(mappedRow!)
+    if (!result.ok) {
+      await markCarrierImportRecordApplyFailed(recordId, result.error)
+      return { recordId, status: 'failed', externalClientIdentityCreated: false, externalPolicyIdentityCreated: false, error: result.error }
+    }
+    newIndividual = result.fields as unknown as Record<string, unknown>
+  }
+  if (record.customerApplyAction === 'create_company') {
+    const result = mapParsedRowToNewCompanyFields(mappedRow!)
+    if (!result.ok) {
+      await markCarrierImportRecordApplyFailed(recordId, result.error)
+      return { recordId, status: 'failed', externalClientIdentityCreated: false, externalPolicyIdentityCreated: false, error: result.error }
+    }
+    newCompany = result.fields as unknown as Record<string, unknown>
+  }
+  if (record.policyApplyAction === 'create_policy') {
+    const insurer = CARRIER_PROVIDER_LABELS[record.provider as CarrierProviderId] ?? record.provider
+    const result = mapParsedRowToNewPolicyFields(mappedRow!, insurer)
+    if (!result.ok) {
+      await markCarrierImportRecordApplyFailed(recordId, result.error)
+      return { recordId, status: 'failed', externalClientIdentityCreated: false, externalPolicyIdentityCreated: false, error: result.error }
+    }
+    newPolicy = result.fields as unknown as Record<string, unknown>
+  }
+
+  // Precomputed here (never re-implemented in SQL) so the fallback
+  // external-policy-identity matching key can never drift from the one
+  // createExternalPolicyIdentity already uses — see the migration.
+  const externalPolicyNumberNormalized = record.externalPolicyNumber
+    ? normalizePolicyNumber(record.externalPolicyNumber, record.provider)
+    : null
+
+  const sb = getSupabaseAdmin()
+  const { data, error } = await (sb.rpc as any)('apply_carrier_import_record', {
+    p_record_id: recordId,
+    p_new_individual: newIndividual ?? null,
+    p_new_company: newCompany ?? null,
+    p_new_policy: newPolicy ?? null,
+    p_external_policy_number_normalized: externalPolicyNumberNormalized,
+  }).single()
+
+  if (error) {
+    await markCarrierImportRecordApplyFailed(recordId, error.message)
+    return { recordId, status: 'failed', externalClientIdentityCreated: false, externalPolicyIdentityCreated: false, error: error.message }
+  }
+  if (!data) {
+    const message = 'apply_carrier_import_record returned no result'
+    await markCarrierImportRecordApplyFailed(recordId, message)
+    return { recordId, status: 'failed', externalClientIdentityCreated: false, externalPolicyIdentityCreated: false, error: message }
+  }
+
+  const row = data as {
+    result_status: 'applied' | 'already_applied'
+    individual_client_id: string | null
+    company_id: string | null
+    policy_id: string | null
+    external_client_identity_created: boolean
+    external_policy_identity_created: boolean
+  }
+
+  return {
+    recordId,
+    status: row.result_status,
+    individualClientId: row.individual_client_id ?? undefined,
+    companyId: row.company_id ?? undefined,
+    policyId: row.policy_id ?? undefined,
+    externalClientIdentityCreated: row.external_client_identity_created,
+    externalPolicyIdentityCreated: row.external_policy_identity_created,
+  }
+}
+
+export interface CarrierSyncRunApplyStateUpdate {
+  applyStatus: CarrierRunApplyStatus
+  applyStartedAt?: string
+  appliedAt?: string
+  appliedBy?: string
+}
+
+/** Run-level apply bookkeeping only — never touches provider/mode/status
+ * or any of the existing dry-run counters (see PROVIDER IMMUTABLE tests
+ * in carrier-portfolio-import-admin.test.ts, which this deliberately
+ * does not violate). */
+export async function updateCarrierSyncRunApplyState(runId: string, update: CarrierSyncRunApplyStateUpdate): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const updates: Record<string, unknown> = { apply_status: update.applyStatus }
+  if (update.applyStartedAt !== undefined) updates.apply_started_at = update.applyStartedAt
+  if (update.appliedAt !== undefined) updates.applied_at = update.appliedAt
+  if (update.appliedBy !== undefined) updates.applied_by = update.appliedBy
+  const { error } = await (sb.from('carrier_sync_runs') as any).update(updates).eq('id', runId)
+  if (error) throw new Error(`updateCarrierSyncRunApplyState: ${error.message}`)
 }

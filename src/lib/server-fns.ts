@@ -38,6 +38,8 @@ import { parsePortfolioWorkbook } from './carrier-excel-workbook'
 import { mapPortfolioRows } from './carrier-import-mappers'
 import { computeImportFingerprint } from './carrier-import-fingerprint'
 import { matchPortfolioRows, classifyStagedRowForCounts } from './carrier-import-matching'
+import { computeRunApplyReadiness, type ApplyActionRowState, type CustomerApplyAction, type PolicyApplyAction } from './carrier-apply-actions'
+import type { CarrierImportRecord, CarrierRunApplyStatus } from './types'
 import { buildOpportunityTitle, pickWebsiteLeadContextFields } from './sales-opportunity-rules'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser, generateStrongPassword, deleteIdentityUserById } from './identity-admin'
@@ -4041,4 +4043,173 @@ export const adminCancelCarrierSyncRun = createServerFn({ method: 'POST' })
   .handler(async ({ data: runId }) => {
     await db.deleteCarrierSyncRun(runId)
     return { success: true }
+  })
+
+// ============================================================
+// CRM3 Block 4 — Confirm & Apply Portfolio Import
+//
+// "Accepted" never implies an apply action — see the "CRITICAL
+// principle" in migrations/20260831_crm3_apply_portfolio_import.sql.
+// adminSetCarrierImportRecordApplyActions is a deliberate, separate
+// step an Admin takes per accepted record (never triggered by Accept
+// itself); adminApplyCarrierSyncRun then evaluates every accepted
+// record's resolved actions and applies them one row at a time via
+// db.applyCarrierImportRecord (each one its own atomic RPC
+// transaction — see apply_carrier_import_record).
+// ============================================================
+
+function recordToApplyActionRowState(record: CarrierImportRecord): ApplyActionRowState {
+  return {
+    decisionStatus: record.decisionStatus,
+    customerApplyAction: (record.customerApplyAction as CustomerApplyAction | undefined) ?? null,
+    policyApplyAction: (record.policyApplyAction as PolicyApplyAction | undefined) ?? null,
+    selectedIndividualClientId: record.selectedIndividualClientId ?? null,
+    selectedCompanyId: record.selectedCompanyId ?? null,
+    selectedPolicyId: record.selectedPolicyId ?? null,
+    approvedPolicyChanges: (record.approvedPolicyChanges as Record<string, unknown> | undefined) ?? null,
+  }
+}
+
+export const adminSetCarrierImportRecordApplyActions = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: {
+    recordId: string
+    customerApplyAction: string
+    policyApplyAction: string
+    selectedIndividualClientId?: string
+    selectedCompanyId?: string
+    selectedPolicyId?: string
+    approvedPolicyChanges?: Record<string, Json>
+  }) => d)
+  .handler(async ({ data }) => {
+    // db.setCarrierImportRecordApplyActions validates the action enum
+    // values itself (isValidCustomerApplyAction/isValidPolicyApplyAction)
+    // and throws on anything else — the browser-supplied strings are
+    // never trusted blindly.
+    await db.setCarrierImportRecordApplyActions(data.recordId, {
+      customerApplyAction: data.customerApplyAction as CustomerApplyAction,
+      policyApplyAction: data.policyApplyAction as PolicyApplyAction,
+      selectedIndividualClientId: data.selectedIndividualClientId,
+      selectedCompanyId: data.selectedCompanyId,
+      selectedPolicyId: data.selectedPolicyId,
+      approvedPolicyChanges: data.approvedPolicyChanges,
+    })
+    return { success: true }
+  })
+
+export interface AdminApplyCarrierSyncRunResult {
+  accepted: number
+  applied: number
+  alreadyApplied: number
+  skipped: number
+  failed: number
+  createdIndividuals: number
+  createdCompanies: number
+  createdPolicies: number
+  linkedCustomers: number
+  linkedPolicies: number
+  updatedPolicies: number
+  runApplyStatus: CarrierRunApplyStatus
+  results: Array<{ recordId: string; status: string; error?: string }>
+}
+
+/**
+ * The only way any carrier_import_record ever mutates the CRM.
+ * Admin-only (requireRoleMiddleware('admin')). Loads the run, refuses a
+ * deleted/nonexistent run, refuses a run that isn't a dry-run
+ * reconciliation run, refuses re-applying an already-applied or
+ * currently-applying run, and — critically — refuses to apply ANYTHING
+ * if any accepted record is still missing an explicit apply action
+ * (computeRunApplyReadiness is the single source of truth for this,
+ * shared with the UI's own readiness summary so the two can never
+ * disagree). Accepted records are then applied ONE BY ONE via
+ * db.applyCarrierImportRecord — the run itself is not one giant
+ * transaction, so one row's failure never blocks the rest (partial
+ * failure is a normal, representable outcome: runApplyStatus becomes
+ * 'partially_failed', never silently 'applied').
+ *
+ * Records that were never accepted (rejected/ignored/still pending) are
+ * left untouched — "skipped" in the returned summary counts exactly
+ * these, matching the per-row "Skipped" result the UI shows for them.
+ */
+export const adminApplyCarrierSyncRun = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((runId: string) => runId)
+  .handler(async ({ data: runId, context }): Promise<AdminApplyCarrierSyncRunResult> => {
+    const run = await db.getCarrierSyncRun(runId)
+    if (!run) throw new Error('adminApplyCarrierSyncRun: run not found')
+    if (run.mode !== 'dry_run') {
+      throw new Error('adminApplyCarrierSyncRun: only a manual dry-run reconciliation run can be applied')
+    }
+    if (run.applyStatus === 'applied') {
+      throw new Error('adminApplyCarrierSyncRun: this run has already been fully applied')
+    }
+    if (run.applyStatus === 'applying') {
+      throw new Error('adminApplyCarrierSyncRun: this run is already being applied')
+    }
+
+    const records = await db.listCarrierImportRecords(runId)
+    const readiness = computeRunApplyReadiness(records.map(recordToApplyActionRowState))
+    if (readiness.unresolvedCount > 0) {
+      throw new Error(`adminApplyCarrierSyncRun: ${readiness.unresolvedCount} accepted record(s) still need an apply action`)
+    }
+    const acceptedRecords = records.filter((r) => r.decisionStatus === 'accepted')
+    if (acceptedRecords.length === 0) {
+      throw new Error('adminApplyCarrierSyncRun: no accepted records to apply')
+    }
+
+    await db.updateCarrierSyncRunApplyState(runId, { applyStatus: 'applying', applyStartedAt: new Date().toISOString() })
+
+    let applied = 0
+    let alreadyApplied = 0
+    let failed = 0
+    let createdIndividuals = 0
+    let createdCompanies = 0
+    let createdPolicies = 0
+    let linkedCustomers = 0
+    let linkedPolicies = 0
+    let updatedPolicies = 0
+    const results: Array<{ recordId: string; status: string; error?: string }> = []
+
+    for (const record of acceptedRecords) {
+      const result = await db.applyCarrierImportRecord(record.id)
+      results.push({ recordId: record.id, status: result.status, error: result.error })
+
+      if (result.status === 'applied') {
+        applied++
+        if (record.customerApplyAction === 'create_individual') createdIndividuals++
+        if (record.customerApplyAction === 'create_company') createdCompanies++
+        if (record.customerApplyAction === 'link_existing_individual' || record.customerApplyAction === 'link_existing_company') linkedCustomers++
+        if (record.policyApplyAction === 'create_policy') createdPolicies++
+        if (record.policyApplyAction === 'link_existing_policy') linkedPolicies++
+        if (record.policyApplyAction === 'update_existing_policy') updatedPolicies++
+      } else if (result.status === 'already_applied') {
+        alreadyApplied++
+      } else {
+        failed++
+      }
+    }
+
+    const runApplyStatus: CarrierRunApplyStatus = failed > 0 ? 'partially_failed' : 'applied'
+    await db.updateCarrierSyncRunApplyState(runId, {
+      applyStatus: runApplyStatus,
+      appliedAt: new Date().toISOString(),
+      appliedBy: context.user.id,
+    })
+
+    return {
+      accepted: acceptedRecords.length,
+      applied,
+      alreadyApplied,
+      skipped: records.length - acceptedRecords.length,
+      failed,
+      createdIndividuals,
+      createdCompanies,
+      createdPolicies,
+      linkedCustomers,
+      linkedPolicies,
+      updatedPolicies,
+      runApplyStatus,
+      results,
+    }
   })
