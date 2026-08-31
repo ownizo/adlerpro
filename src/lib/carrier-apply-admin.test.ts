@@ -164,3 +164,15 @@ test('setCarrierImportRecordApplyActions never deletes a carrier_import_records 
   const block = extractDataFnBlock('setCarrierImportRecordApplyActions')
   assert.doesNotMatch(block, /\.delete\(\)/)
 })
+
+// ── HARDENING 3 — approved_policy_changes key allowlist (TS side) ────
+
+test('setCarrierImportRecordApplyActions rejects an approvedPolicyChanges value containing an unallowed key, BEFORE persisting anything', () => {
+  const block = extractDataFnBlock('setCarrierImportRecordApplyActions')
+  const checkIdx = block.indexOf('findInvalidApprovedPolicyChangeKeys(input.approvedPolicyChanges)')
+  const updateCallIdx = block.indexOf(".from('carrier_import_records')")
+  assert.ok(checkIdx !== -1, 'missing the key-allowlist check')
+  assert.ok(updateCallIdx !== -1, 'missing the persisting update call')
+  assert.ok(checkIdx < updateCallIdx, 'the key check must run before the record is persisted')
+  assert.match(block, /unsupported key/)
+})

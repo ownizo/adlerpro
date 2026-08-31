@@ -73,7 +73,12 @@ ALTER TABLE public.carrier_import_records
   -- no key-name translation is needed on either side of the RPC
   -- boundary). Absence of a key means "leave that field alone", not
   -- "clear it" — see apply_carrier_import_record's COALESCE-based
-  -- UPDATE below.
+  -- UPDATE below. This is the ONLY allowed key set — never an arbitrary
+  -- object: enforced both in TypeScript (setCarrierImportRecordApplyActions
+  -- rejects an unknown key before this ever gets persisted) and again,
+  -- independently, inside apply_carrier_import_record itself (which
+  -- re-checks the value it reads off the locked row, never trusting
+  -- that TypeScript's check was the only gate).
   ADD COLUMN IF NOT EXISTS approved_policy_changes jsonb NULL,
   ADD COLUMN IF NOT EXISTS apply_status  text NOT NULL DEFAULT 'pending',
   ADD COLUMN IF NOT EXISTS apply_error   text NULL,
@@ -347,7 +352,12 @@ BEGIN
       IF v_company_nif IS NULL THEN
         RAISE EXCEPTION 'apply_carrier_import_record: create_company requires a NIF';
       END IF;
-      v_company_id := 'comp_' || (floor(extract(epoch FROM clock_timestamp()) * 1000))::bigint::text;
+      -- Collision-resistant id, not epoch-millis — see the matching
+      -- comment on the create_policy id below. Keeps the existing
+      -- 'comp_' text-id prefix; only NEW Block 4-created rows use this
+      -- suffix shape, adminCreateCompany's 'comp_' || epoch-millis rows
+      -- are entirely untouched.
+      v_company_id := 'comp_' || replace(gen_random_uuid()::text, '-', '');
       INSERT INTO public.companies (id, name, nif, sector, contact_name, contact_email, contact_phone, address, created_at)
       VALUES (
         v_company_id, v_company_name, v_company_nif,
@@ -403,6 +413,20 @@ BEGIN
         END IF;
       END IF;
 
+      -- approved_policy_changes may never carry a key outside this
+      -- allowlist — defense-in-depth so a malformed or tampered value
+      -- can never silently reach an UPDATE, even one that (by
+      -- construction, today) only reads the five keys below anyway.
+      -- Rechecked here on the LOCKED row, independent of whatever
+      -- setCarrierImportRecordApplyActions already validated in
+      -- TypeScript before persisting it.
+      IF v_record.approved_policy_changes IS NOT NULL AND EXISTS (
+        SELECT 1 FROM jsonb_object_keys(v_record.approved_policy_changes) AS key
+        WHERE key NOT IN ('policyNumber', 'startDate', 'endDate', 'annualPremium', 'status')
+      ) THEN
+        RAISE EXCEPTION 'apply_carrier_import_record: approved_policy_changes contains an unsupported key';
+      END IF;
+
       -- Only explicitly approved fields are ever written — presence of a
       -- key means "apply this change", absence means "leave it alone".
       -- Matched/probable/exact never implies an overwrite by itself.
@@ -430,18 +454,33 @@ BEGIN
         RAISE EXCEPTION 'apply_carrier_import_record: create_policy is missing a required field (insurer/policyNumber/startDate/endDate)';
       END IF;
 
-      -- Same id convention as adminCreatePolicy (src/lib/server-fns.ts):
-      -- 'pol_' || epoch-millis.
-      v_policy_id := 'pol_' || (floor(extract(epoch FROM clock_timestamp()) * 1000))::bigint::text;
+      -- Collision-resistant id, not epoch-millis: two rows applied in
+      -- the same millisecond (a fast run, or two concurrent applies)
+      -- could otherwise collide on the policies primary key. Keeps the
+      -- existing 'pol_' text-id prefix/shape — only the suffix changes
+      -- from epoch-millis to a UUID with its dashes stripped, so
+      -- existing ids (adminCreatePolicy's 'pol_' || epoch-millis) are
+      -- entirely untouched; only NEW Block 4-created rows use this.
+      v_policy_id := 'pol_' || replace(gen_random_uuid()::text, '-', '');
       INSERT INTO public.policies (
         id, company_id, individual_client_id, type, insurer, policy_number, description,
         start_date, end_date, annual_premium, insured_value, status, created_at
       ) VALUES (
         v_policy_id,
-        -- companies.id is text and Policy.companyId is a required string
-        -- using '' as the "no company" sentinel — same convention
-        -- adminCreatePolicy already uses (data.companyId || '').
-        COALESCE(v_company_id, ''),
+        -- policies.company_id is a foreign key to companies(id) — an
+        -- individual-owned policy MUST store NULL here, never ''
+        -- (there is no companies row with id ''; the TypeScript-layer
+        -- '' sentinel used elsewhere, e.g. adminCreatePolicy's
+        -- data.companyId || '', is a convention of the Policy TS type
+        -- only and must never be written by this raw-SQL INSERT).
+        -- Preserves the same owner-XOR shape already used for
+        -- matched_company_id/matched_individual_client_id and
+        -- selected_company_id/selected_individual_client_id in this
+        -- same table: exactly one of the two is non-NULL, enforced by
+        -- the IF above (create_policy requires a resolved customer)
+        -- and by v_individual_id/v_company_id themselves already being
+        -- mutually exclusive (see the customer-resolution CASE).
+        v_company_id,
         v_individual_id,
         COALESCE(NULLIF(p_new_policy->>'type', ''), 'health'),
         v_insurer, v_policy_number,

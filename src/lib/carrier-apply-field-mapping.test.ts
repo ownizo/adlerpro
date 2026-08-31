@@ -7,6 +7,8 @@ import {
   mapParsedRowToNewPolicyFields,
   computePolicyFieldProposals,
   buildApprovedPolicyChanges,
+  findInvalidApprovedPolicyChangeKeys,
+  APPROVED_POLICY_CHANGE_KEYS,
 } from './carrier-apply-field-mapping.ts'
 import type { ParsedImportRow } from './carrier-import-parsing.ts'
 import type { CarrierPolicyCandidateSummary } from './types.ts'
@@ -130,4 +132,36 @@ test('buildApprovedPolicyChanges: approving every proposed field includes them a
   const proposals = computePolicyFieldProposals(candidate, row({ externalPolicyNumber: '75849', startDate: '2026-01-01', endDate: '2026-12-31', premium: 350 }))
   const changes = buildApprovedPolicyChanges(proposals, new Set(['policyNumber', 'startDate', 'endDate', 'annualPremium']))
   assert.deepEqual(changes, { policyNumber: '75849', startDate: '2026-01-01', endDate: '2026-12-31', annualPremium: 350 })
+})
+
+// ── HARDENING 3 — approved_policy_changes key allowlist ──────────────
+
+test('findInvalidApprovedPolicyChangeKeys: the allowed subset (policyNumber/startDate/endDate/annualPremium/status) passes with no invalid keys', () => {
+  assert.deepEqual(
+    findInvalidApprovedPolicyChangeKeys({ policyNumber: '75849', startDate: '2026-01-01', endDate: '2026-12-31', annualPremium: 350, status: 'active' }),
+    [],
+  )
+})
+
+test('findInvalidApprovedPolicyChangeKeys: a subset of the allowlist is still fully allowed', () => {
+  assert.deepEqual(findInvalidApprovedPolicyChangeKeys({ policyNumber: '75849' }), [])
+})
+
+test('findInvalidApprovedPolicyChangeKeys: an unknown key is rejected (reported), never silently dropped', () => {
+  assert.deepEqual(findInvalidApprovedPolicyChangeKeys({ policyNumber: '75849', insuredValue: 999999 }), ['insuredValue'])
+})
+
+test('findInvalidApprovedPolicyChangeKeys: reports every unknown key, not just the first', () => {
+  assert.deepEqual(
+    findInvalidApprovedPolicyChangeKeys({ nib: '12345', hackerField: true }).sort(),
+    ['hackerField', 'nib'],
+  )
+})
+
+test('findInvalidApprovedPolicyChangeKeys: an empty object has no invalid keys (emptiness itself is rejected elsewhere, by isRowReadyToApply, for update_existing_policy)', () => {
+  assert.deepEqual(findInvalidApprovedPolicyChangeKeys({}), [])
+})
+
+test('APPROVED_POLICY_CHANGE_KEYS is exactly the five-key allowlist from the review', () => {
+  assert.deepEqual([...APPROVED_POLICY_CHANGE_KEYS].sort(), ['annualPremium', 'endDate', 'policyNumber', 'startDate', 'status'].sort())
 })

@@ -68,6 +68,7 @@ import {
   mapParsedRowToNewIndividualFields,
   mapParsedRowToNewCompanyFields,
   mapParsedRowToNewPolicyFields,
+  findInvalidApprovedPolicyChangeKeys,
 } from './carrier-apply-field-mapping'
 
 // ============================================================
@@ -2098,6 +2099,12 @@ export async function setCarrierImportRecordApplyActions(
   }
   if (input.selectedIndividualClientId && input.selectedCompanyId) {
     throw new Error('setCarrierImportRecordApplyActions: cannot select both an individual and a company for the same record')
+  }
+  if (input.approvedPolicyChanges) {
+    const invalidKeys = findInvalidApprovedPolicyChangeKeys(input.approvedPolicyChanges)
+    if (invalidKeys.length > 0) {
+      throw new Error(`setCarrierImportRecordApplyActions: approved_policy_changes contains unsupported key(s): ${invalidKeys.join(', ')}`)
+    }
   }
 
   const record = await getCarrierImportRecord(recordId)

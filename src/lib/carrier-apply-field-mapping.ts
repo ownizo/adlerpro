@@ -163,3 +163,25 @@ export function buildApprovedPolicyChanges(
   }
   return changes
 }
+
+/** The ONLY keys approved_policy_changes may ever carry for Block 4 —
+ * broader than PolicyProposalField (which only covers what the UI's own
+ * diff can propose) because 'status' is an allowed approved-change field
+ * even though nothing here currently proposes it. Enforced twice: here
+ * in TypeScript (setCarrierImportRecordApplyActions rejects an unknown
+ * key before ever persisting it) and again, independently, inside
+ * apply_carrier_import_record on the SQL side (re-checks the value it
+ * reads off the locked row — never trusts that the TypeScript check was
+ * the only gate). Unknown keys are always rejected outright, never
+ * silently dropped. */
+export const APPROVED_POLICY_CHANGE_KEYS = ['policyNumber', 'startDate', 'endDate', 'annualPremium', 'status'] as const
+
+export type ApprovedPolicyChangeKey = (typeof APPROVED_POLICY_CHANGE_KEYS)[number]
+
+/** Returns every key in `changes` that isn't in the allowlist — empty
+ * when every key is allowed. Deliberately returns the offending keys
+ * (not just a boolean) so a caller can build a specific, actionable
+ * error message. */
+export function findInvalidApprovedPolicyChangeKeys(changes: Record<string, unknown>): string[] {
+  return Object.keys(changes).filter((key) => !(APPROVED_POLICY_CHANGE_KEYS as readonly string[]).includes(key))
+}

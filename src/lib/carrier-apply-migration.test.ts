@@ -152,3 +152,60 @@ test('the migration never adds an nib/iban column or writes one in an INSERT col
   assert.doesNotMatch(newMigrationSrc, /ADD COLUMN IF NOT EXISTS (nib|iban)\b/i)
   assert.doesNotMatch(newMigrationSrc, /INSERT INTO[\s\S]{0,300}\b(nib|iban)\b/i)
 })
+
+// ── BLOCKER 1 FIX — policy owner NULL semantics (not '' sentinel) ────
+
+test('BLOCKER FIX: the migration no longer uses COALESCE(v_company_id, \'\') anywhere', () => {
+  assert.doesNotMatch(newMigrationSrc, /COALESCE\(v_company_id,\s*''\)/)
+})
+
+test('BLOCKER FIX: create_policy inserts the bare v_company_id (NULL when individual-owned) as the company_id value, not an empty-string sentinel', () => {
+  const idx = newMigrationSrc.indexOf("WHEN 'create_policy' THEN")
+  assert.ok(idx !== -1)
+  const insertIdx = newMigrationSrc.indexOf('INSERT INTO public.policies', idx)
+  const valuesIdx = newMigrationSrc.indexOf('VALUES (', insertIdx)
+  const afterValues = newMigrationSrc.slice(valuesIdx, valuesIdx + 1200)
+  // The VALUES list must supply v_policy_id, then (after the
+  // explanatory comment) v_company_id bare — possibly NULL — then
+  // v_individual_id — never wrapped in a COALESCE(..., '') that would
+  // turn a NULL company into ''.
+  assert.match(afterValues, /v_policy_id,[\s\S]*?\n\s*v_company_id,\s*\n\s*v_individual_id,/)
+  assert.doesNotMatch(afterValues, /COALESCE\(v_company_id/)
+})
+
+test('BLOCKER FIX: the policies.company_id foreign-key / NULL-semantics rationale is documented at the insert site', () => {
+  assert.match(newMigrationSrc, /policies\.company_id is a foreign key to companies\(id\)/)
+  assert.match(newMigrationSrc, /individual-owned policy MUST store NULL here, never ''/)
+})
+
+test('OWNER XOR PRESERVED: v_individual_id and v_company_id remain mutually exclusive going into the policies INSERT — create_policy still refuses when neither is resolved', () => {
+  assert.match(newMigrationSrc, /IF v_individual_id IS NULL AND v_company_id IS NULL THEN\s*\n\s*RAISE EXCEPTION 'apply_carrier_import_record: create_policy requires a resolved customer'/)
+})
+
+// ── HARDENING 2 FIX — collision-resistant generated ids ──────────────
+
+test('HARDENING FIX: new company/policy ids use gen_random_uuid(), never epoch-millis, for newly created Block 4 rows', () => {
+  assert.match(newMigrationSrc, /v_company_id := 'comp_' \|\| replace\(gen_random_uuid\(\)::text, '-', ''\);/)
+  assert.match(newMigrationSrc, /v_policy_id := 'pol_' \|\| replace\(gen_random_uuid\(\)::text, '-', ''\);/)
+  assert.doesNotMatch(newMigrationSrc, /floor\(extract\(epoch FROM clock_timestamp\(\)\)/)
+})
+
+test('HARDENING FIX: the existing comp_/pol_ text-id PREFIX convention is preserved — only the suffix generation changed', () => {
+  assert.match(newMigrationSrc, /'comp_' \|\|/)
+  assert.match(newMigrationSrc, /'pol_' \|\|/)
+})
+
+// ── HARDENING 3 FIX — approved_policy_changes key allowlist (SQL side) ─
+
+test('HARDENING FIX: apply_carrier_import_record rejects any approved_policy_changes key outside the allowlist', () => {
+  assert.match(newMigrationSrc, /jsonb_object_keys\(v_record\.approved_policy_changes\)/)
+  assert.match(newMigrationSrc, /WHERE key NOT IN \('policyNumber', 'startDate', 'endDate', 'annualPremium', 'status'\)/)
+  assert.match(newMigrationSrc, /approved_policy_changes contains an unsupported key/)
+})
+
+test('HARDENING FIX: the SQL-side key check runs before the UPDATE that applies the changes', () => {
+  const checkIdx = newMigrationSrc.indexOf('approved_policy_changes contains an unsupported key')
+  const updateIdx = newMigrationSrc.indexOf('UPDATE public.policies SET')
+  assert.ok(checkIdx !== -1 && updateIdx !== -1)
+  assert.ok(checkIdx < updateIdx)
+})
