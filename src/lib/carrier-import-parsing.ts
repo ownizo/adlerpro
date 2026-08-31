@@ -40,7 +40,7 @@ export function normalizeRowKeys(row: Record<string, unknown>): Record<string, u
   return result
 }
 
-const DDMMYYYY_RE = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})$/
+const DDMMYYYY_RE = /^(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4})(?: \d{2}:\d{2}:\d{2})?$/
 const YYYYMMDD_RE = /^(\d{4})-(\d{1,2})-(\d{1,2})$/
 
 function pad2(n: number): string {
@@ -59,8 +59,8 @@ function isValidCalendarDate(year: number, month: number, day: number): boolean 
  * Aceita:
  *   - um objeto Date real (já resolvido pelo parser do workbook, quando o
  *     Excel guarda a célula como data nativa)
- *   - 'DD/MM/AAAA', 'DD-MM-AAAA', 'DD.MM.AAAA' (formato português comum em
- *     ficheiros de seguradoras portuguesas)
+ *   - 'DD/MM/AAAA', 'DD-MM-AAAA', 'DD.MM.AAAA' (com ou sem HH:mm:ss,
+ *     formato português comum em ficheiros de seguradoras portuguesas)
  *   - 'AAAA-MM-DD' (ISO, já inequívoco)
  * Qualquer outro formato (incluindo MM/DD/AAAA americano, que seria
  * ambíguo com DD/MM/AAAA para a maioria dos dias) devolve undefined em vez

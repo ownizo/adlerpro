@@ -17,14 +17,31 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const migrationsDir = join(__dirname, '..', '..', 'migrations')
 
 const newMigrationPath = join(migrationsDir, '20260831_crm3_apply_portfolio_import.sql')
+const legacyOwnerFixMigrationPath = join(migrationsDir, '20260831_crm3_apply_legacy_owner_fix.sql')
 const priorIdentityMigrationPath = join(migrationsDir, '20260830_crm3_identity_reconciliation.sql')
 const priorFingerprintMigrationPath = join(migrationsDir, '20260831_carrier_sync_runs_import_fingerprint.sql')
 
 test('the new Block 4 migration file exists as its own additive file', () => {
   assert.ok(existsSync(newMigrationPath), 'expected migrations/20260831_crm3_apply_portfolio_import.sql to exist')
+  assert.ok(existsSync(legacyOwnerFixMigrationPath), 'expected additive legacy-owner fix migration to exist')
 })
 
 const newMigrationSrc = readFileSync(newMigrationPath, 'utf8')
+const legacyOwnerFixSrc = readFileSync(legacyOwnerFixMigrationPath, 'utf8')
+
+test('the legacy-owner fix replaces only the RPC and does not alter data or use SECURITY DEFINER', () => {
+  assert.match(legacyOwnerFixSrc, /CREATE OR REPLACE FUNCTION public\.apply_carrier_import_record/)
+  assert.match(legacyOwnerFixSrc, /NULLIF\(BTRIM\(v_policy\.company_id\), ''\)/)
+  assert.doesNotMatch(legacyOwnerFixSrc, /UPDATE public\.policies SET[^;]*company_id/)
+  assert.doesNotMatch(legacyOwnerFixSrc, /SECURITY DEFINER/)
+  assert.match(legacyOwnerFixSrc, /REVOKE ALL ON FUNCTION public\.apply_carrier_import_record\([^)]*\) FROM PUBLIC/)
+  assert.match(legacyOwnerFixSrc, /GRANT EXECUTE ON FUNCTION public\.apply_carrier_import_record\([^)]*\) TO service_role/)
+})
+
+test('the legacy-owner fix keeps exact individual ownership and no-owner protection', () => {
+  assert.match(legacyOwnerFixSrc, /v_policy\.individual_client_id::text IS DISTINCT FROM v_individual_id::text/)
+  assert.match(legacyOwnerFixSrc, /v_policy\.individual_client_id IS NOT NULL OR NULLIF\(BTRIM\(v_policy\.company_id\), ''\) IS NOT NULL/)
+})
 
 test('the two already-live migrations are untouched — their own defining anchors are still present verbatim', () => {
   const identitySrc = readFileSync(priorIdentityMigrationPath, 'utf8')
