@@ -645,6 +645,37 @@ export type CarrierMatchStatus =
  * funde nada por si só (ver requisito "Accept... does NOT create/merge"). */
 export type CarrierDecisionStatus = 'pending' | 'accepted' | 'rejected' | 'ignored'
 
+// ── CRM3 Block 4 — explicit apply actions ──────────────────────────────
+// "Accepted" means only "the Admin accepts this reconciliation record for
+// further processing" — it is never, by itself, enough to create or
+// update anything. Each accepted row also needs one of these explicit,
+// resolved actions on the customer side AND one on the policy side (see
+// isRowReadyToApply in carrier-apply-actions.ts, the single source of
+// truth for "this row may be applied").
+export type CustomerApplyAction =
+  | 'link_existing_individual'
+  | 'link_existing_company'
+  | 'create_individual'
+  | 'create_company'
+  | 'no_customer_change'
+
+export type PolicyApplyAction =
+  | 'link_existing_policy'
+  | 'create_policy'
+  | 'update_existing_policy'
+  | 'no_policy_change'
+
+/** Per-record apply outcome — pending until an apply run processes it;
+ * applied/skipped/failed thereafter. Once 'applied', re-applying the
+ * same record is always a safe no-op (see apply_carrier_import_record). */
+export type CarrierApplyStatus = 'pending' | 'applied' | 'skipped' | 'failed'
+
+/** Run-level apply state (CRM3 Block 4) — not_applied until "Confirm &
+ * Apply" is clicked; applying while rows are being processed one by
+ * one; applied/partially_failed once every accepted row has been
+ * attempted. See adminApplyCarrierSyncRun. */
+export type CarrierRunApplyStatus = 'not_applied' | 'applying' | 'applied' | 'partially_failed'
+
 export interface CarrierSyncRun {
   id: string
   provider: string
@@ -660,6 +691,11 @@ export interface CarrierSyncRun {
   summary: Record<string, Json>
   errorMessage?: string
   createdAt: string
+
+  applyStatus: CarrierRunApplyStatus
+  applyStartedAt?: string
+  appliedAt?: string
+  appliedBy?: string
 }
 
 export interface CarrierImportRecord {
@@ -691,6 +727,27 @@ export interface CarrierImportRecord {
   decisionStatus: CarrierDecisionStatus
   decisionNote?: string
   decidedAt?: string
+
+  // ── CRM3 Block 4 — explicit apply actions ──────────────────────────
+  // "Accepted" alone never implies any of these — see requirement
+  // "NEVER infer a destructive/create/update action merely because
+  // decision_status = accepted". A row needs BOTH a customerApplyAction
+  // and a policyApplyAction, each with its own required selection,
+  // before it may be applied — see isRowReadyToApply in
+  // carrier-apply-actions.ts.
+  customerApplyAction?: CustomerApplyAction
+  policyApplyAction?: PolicyApplyAction
+  selectedIndividualClientId?: string
+  selectedCompanyId?: string
+  selectedPolicyId?: string
+  /** Only the explicitly approved CRM-policy field changes — never
+   * applied just because a policy matched. Subset of { policyNumber,
+   * startDate, endDate, annualPremium }. */
+  approvedPolicyChanges?: Record<string, Json>
+
+  applyStatus: CarrierApplyStatus
+  applyError?: string
+  appliedAt?: string
 
   createdAt: string
   updatedAt: string
@@ -785,6 +842,13 @@ export interface CarrierPolicyCandidateSummary {
    * resolved because it's cheap (one extra lookup by an id already on the
    * policy row), never a second-hand guess. */
   ownerLabel?: string
+  /** Raw owner ids (CRM3 Block 4) — needed to check that a selected
+   * customer actually matches this policy's real current owner before
+   * "link existing policy" / "update existing policy" may apply (see
+   * checkOwnerConsistency in carrier-apply-actions.ts). ownerLabel alone
+   * (a display string) isn't enough to compare against a selected id. */
+  ownerIndividualClientId?: string
+  ownerCompanyId?: string
 }
 
 export interface CarrierImportRecordReview {

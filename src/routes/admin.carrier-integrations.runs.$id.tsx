@@ -12,11 +12,49 @@ import {
   adminLinkCarrierClientIdentity,
   adminLinkCarrierPolicyIdentity,
   adminCancelCarrierSyncRun,
+  adminSetCarrierImportRecordApplyActions,
+  adminApplyCarrierSyncRun,
+  type AdminApplyCarrierSyncRunResult,
 } from '@/lib/server-fns'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { redactSensitivePayload } from '@/lib/carrier-payload-redaction'
 import { CARRIER_PROVIDER_LABELS, type CarrierProviderId } from '@/lib/carrier-providers'
-import type { CarrierImportRecord, CarrierImportRecordReview, CarrierSyncRun } from '@/lib/types'
+import {
+  computeRunApplyReadiness,
+  describeRowApplyResult,
+  type CustomerApplyAction,
+  type PolicyApplyAction,
+  type RowApplyResultStatus,
+} from '@/lib/carrier-apply-actions'
+import {
+  computePolicyFieldProposals,
+  buildApprovedPolicyChanges,
+  type PolicyProposalField,
+} from '@/lib/carrier-apply-field-mapping'
+import { mapPortfolioRows } from '@/lib/carrier-import-mappers'
+import type { CarrierImportRecord, CarrierImportRecordReview, CarrierSyncRun, Json } from '@/lib/types'
+
+const CUSTOMER_ACTION_LABELS: Record<CustomerApplyAction, string> = {
+  link_existing_individual: 'Use existing person',
+  link_existing_company: 'Use existing company',
+  create_individual: 'Create new person',
+  create_company: 'Create new company',
+  no_customer_change: 'No customer change',
+}
+
+const POLICY_ACTION_LABELS: Record<PolicyApplyAction, string> = {
+  link_existing_policy: 'Use existing policy',
+  create_policy: 'Create new policy',
+  update_existing_policy: 'Use existing policy & apply approved changes',
+  no_policy_change: 'No policy change',
+}
+
+const POLICY_FIELD_LABELS: Record<PolicyProposalField, string> = {
+  policyNumber: 'Policy number',
+  startDate: 'Start date',
+  endDate: 'End date',
+  annualPremium: 'Annual premium',
+}
 
 /**
  * /admin/carrier-integrations/runs/$id — review a single reconciliation
@@ -49,6 +87,18 @@ const DECISION_CHIP_CLASS: Record<string, string> = {
   ignored: 'admin-chip--neutral',
 }
 
+function recordToApplyActionRowState(record: CarrierImportRecord) {
+  return {
+    decisionStatus: record.decisionStatus,
+    customerApplyAction: record.customerApplyAction ?? null,
+    policyApplyAction: record.policyApplyAction ?? null,
+    selectedIndividualClientId: record.selectedIndividualClientId ?? null,
+    selectedCompanyId: record.selectedCompanyId ?? null,
+    selectedPolicyId: record.selectedPolicyId ?? null,
+    approvedPolicyChanges: (record.approvedPolicyChanges as Record<string, unknown> | undefined) ?? null,
+  }
+}
+
 function MatchChip({ status }: { status: string }) {
   return <span className={`admin-chip ${MATCH_STATUS_CHIP_CLASS[status] ?? 'admin-chip--neutral'}`}>{status}</span>
 }
@@ -71,6 +121,10 @@ function CarrierRunDetailPage() {
   const [loading, setLoading] = useState(true)
   const [reviewingId, setReviewingId] = useState<string | null>(null)
   const [cancelling, setCancelling] = useState(false)
+  const [showConfirmApply, setShowConfirmApply] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const [applyResult, setApplyResult] = useState<AdminApplyCarrierSyncRunResult | null>(null)
+  const [applyError, setApplyError] = useState<string | null>(null)
 
   const reload = () => {
     setLoading(true)
@@ -100,6 +154,25 @@ function CarrierRunDetailPage() {
   if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
 
   const reviewingRecord = records.find((r) => r.id === reviewingId) ?? null
+
+  const readiness = computeRunApplyReadiness(records.map(recordToApplyActionRowState))
+  const runApplyStatus = run?.applyStatus ?? 'not_applied'
+  const alreadyFullyApplied = runApplyStatus === 'applied' || runApplyStatus === 'partially_failed'
+
+  async function confirmApply() {
+    setApplying(true)
+    setApplyError(null)
+    try {
+      const result = await adminApplyCarrierSyncRun({ data: id })
+      setApplyResult(result)
+      setShowConfirmApply(false)
+      reload()
+    } catch (err) {
+      setApplyError(err instanceof Error ? err.message : 'Something went wrong while applying this import')
+    } finally {
+      setApplying(false)
+    }
+  }
 
   return (
     <AppLayout>
@@ -174,6 +247,62 @@ function CarrierRunDetailPage() {
               <KpiTile label="Errors" value={run.recordsError} />
             </div>
 
+            {/* CRM3 Block 4 — Confirm & Apply. Never mutates on its own:
+                the button only opens a confirmation modal, and applying
+                is entirely blocked while any accepted record still lacks
+                an explicit apply action. */}
+            <div className="admin-panel" style={{ marginBottom: '1rem', padding: '1rem' }}>
+              {alreadyFullyApplied || applyResult ? (
+                <div>
+                  <h3 className="admin-panel-title" style={{ marginBottom: '0.5rem' }}>Portfolio applied</h3>
+                  <p className="text-sm text-navy-600">
+                    {applyResult
+                      ? `${applyResult.accepted + applyResult.skipped} records processed / ${applyResult.applied} applied / ${applyResult.skipped} skipped / ${applyResult.failed} failed${applyResult.alreadyApplied ? ` / ${applyResult.alreadyApplied} already applied` : ''}`
+                      : `Run status: ${runApplyStatus}`}
+                  </p>
+                  <button type="button" className="admin-btn admin-btn-primary admin-btn--sm" disabled style={{ marginTop: '0.75rem' }}>
+                    Confirm &amp; Apply
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <h3 className="admin-panel-title" style={{ marginBottom: '0.5rem' }}>Apply</h3>
+                  {readiness.acceptedCount === 0 ? (
+                    <p className="text-sm text-navy-400">No accepted records yet — accept a record above before applying.</p>
+                  ) : readiness.unresolvedCount > 0 ? (
+                    <p className="text-sm text-red-500">
+                      {readiness.unresolvedCount} accepted record{readiness.unresolvedCount === 1 ? '' : 's'} still need{readiness.unresolvedCount === 1 ? 's' : ''} an apply action.
+                    </p>
+                  ) : (
+                    <div className="text-sm text-navy-600">
+                      <p className="font-medium" style={{ marginBottom: '0.3rem' }}>
+                        Ready to apply / {readiness.readyCount} accepted record{readiness.readyCount === 1 ? '' : 's'}
+                      </p>
+                      <ul style={{ marginLeft: '1rem', listStyle: 'disc' }}>
+                        {readiness.willLinkCustomers > 0 && <li>{readiness.willLinkCustomers} existing client{readiness.willLinkCustomers === 1 ? '' : 's'} will be linked</li>}
+                        {readiness.willCreateIndividuals + readiness.willCreateCompanies > 0 && (
+                          <li>{readiness.willCreateIndividuals + readiness.willCreateCompanies} new client{readiness.willCreateIndividuals + readiness.willCreateCompanies === 1 ? '' : 's'} will be created</li>
+                        )}
+                        {readiness.willLinkPolicies > 0 && <li>{readiness.willLinkPolicies} existing polic{readiness.willLinkPolicies === 1 ? 'y' : 'ies'} will be linked</li>}
+                        {readiness.willCreatePolicies > 0 && <li>{readiness.willCreatePolicies} new polic{readiness.willCreatePolicies === 1 ? 'y' : 'ies'} will be created</li>}
+                        {readiness.willUpdatePolicies > 0 && <li>{readiness.willUpdatePolicies} existing polic{readiness.willUpdatePolicies === 1 ? 'y has' : 'ies have'} approved changes</li>}
+                      </ul>
+                    </div>
+                  )}
+                  {applyError && <p className="text-sm text-red-500" style={{ marginTop: '0.5rem' }}>{applyError}</p>}
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-primary admin-btn--sm"
+                    disabled={!readiness.canApply}
+                    style={{ marginTop: '0.75rem' }}
+                    onClick={() => setShowConfirmApply(true)}
+                  >
+                    Confirm &amp; Apply
+                  </button>
+                </div>
+              )}
+            </div>
+
             <div className="admin-panel">
               {records.length === 0 ? (
                 <p className="text-sm text-navy-400" style={{ padding: '1rem' }}>No records in this run.</p>
@@ -187,6 +316,7 @@ function CarrierRunDetailPage() {
                         <th>Customer Match</th>
                         <th>Policy Match</th>
                         <th>Decision</th>
+                        <th>Apply</th>
                         <th>Action</th>
                       </tr>
                     </thead>
@@ -201,6 +331,17 @@ function CarrierRunDetailPage() {
                             <span className={`admin-chip ${DECISION_CHIP_CLASS[record.decisionStatus] ?? 'admin-chip--neutral'}`}>
                               {record.decisionStatus}
                             </span>
+                          </td>
+                          <td>
+                            {record.applyStatus !== 'pending' ? (
+                              describeRowApplyResult(record.applyStatus as RowApplyResultStatus)
+                            ) : record.decisionStatus !== 'accepted' ? (
+                              <span className="text-navy-400 text-xs">—</span>
+                            ) : record.customerApplyAction && record.policyApplyAction ? (
+                              <span className="text-navy-500 text-xs">Ready</span>
+                            ) : (
+                              <span className="text-red-500 text-xs">Needs action</span>
+                            )}
                           </td>
                           <td>
                             <button
@@ -227,9 +368,61 @@ function CarrierRunDetailPage() {
           record={reviewingRecord}
           onClose={() => setReviewingId(null)}
           onChanged={() => { setReviewingId(null); reload() }}
+          onApplyActionsChanged={reload}
+        />
+      )}
+
+      {showConfirmApply && run && (
+        <ConfirmApplyModal
+          provider={CARRIER_PROVIDER_LABELS[run.provider as CarrierProviderId] ?? run.provider}
+          count={readiness.readyCount}
+          busy={applying}
+          onCancel={() => setShowConfirmApply(false)}
+          onConfirm={confirmApply}
         />
       )}
     </AppLayout>
+  )
+}
+
+/** Exact copy per requirement — no mutation happens until this modal's
+ * own "Confirm & Apply" click, never on the first button click. */
+function ConfirmApplyModal({
+  provider,
+  count,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  provider: string
+  count: number
+  busy: boolean
+  onCancel: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.45)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: '1rem',
+      }}
+      onClick={onCancel}
+    >
+      <div className="admin-panel" style={{ maxWidth: '480px', width: '100%', padding: '1.25rem' }} onClick={(e) => e.stopPropagation()}>
+        <h2 className="admin-panel-title" style={{ marginBottom: '0.75rem' }}>Confirm portfolio import</h2>
+        <p className="text-sm text-navy-600" style={{ marginBottom: '1rem' }}>
+          You are about to apply {count} accepted record{count === 1 ? '' : 's'} from {provider}. This can create or update CRM records according to the reviewed actions.
+        </p>
+        <div className="flex items-center gap-2">
+          <button type="button" className="admin-btn admin-btn-secondary admin-btn--sm" disabled={busy} onClick={onCancel}>Cancel</button>
+          <button type="button" className="admin-btn admin-btn-primary admin-btn--sm" disabled={busy} onClick={onConfirm}>
+            {busy ? 'Applying…' : 'Confirm & Apply'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -244,16 +437,28 @@ function ImportRecordReviewPanel({
   record,
   onClose,
   onChanged,
+  onApplyActionsChanged,
 }: {
   record: CarrierImportRecord
   onClose: () => void
   onChanged: () => void
+  onApplyActionsChanged: () => void
 }) {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [review, setReview] = useState<CarrierImportRecordReview | undefined>(undefined)
   const [reviewLoading, setReviewLoading] = useState(true)
+
+  // CRM3 Block 4 — explicit apply action resolution. Initialized from
+  // whatever is already persisted on the record (so re-opening the panel
+  // shows the previously-saved choice), never inferred from match status.
+  const [customerAction, setCustomerAction] = useState<CustomerApplyAction | ''>(record.customerApplyAction ?? '')
+  const [policyAction, setPolicyAction] = useState<PolicyApplyAction | ''>(record.policyApplyAction ?? '')
+  const [approvedFields, setApprovedFields] = useState<Set<PolicyProposalField>>(new Set())
+  const [applyActionSaving, setApplyActionSaving] = useState(false)
+  const [applyActionError, setApplyActionError] = useState<string | null>(null)
+  const [applyActionSaved, setApplyActionSaved] = useState(false)
 
   // Server-side candidate resolution only — this route never queries
   // Supabase directly from the browser (see adminGetCarrierImportRecordReview).
@@ -287,6 +492,56 @@ function ImportRecordReviewPanel({
       setError(err instanceof Error ? err.message : 'Something went wrong')
     } finally {
       setBusy(false)
+    }
+  }
+
+  // CRM3 Block 4 — re-derive the semantic imported row (same technique
+  // used server-side at apply time — see applyCarrierImportRecord) only
+  // to compute individually-approvable field proposals for "Use existing
+  // policy & apply approved changes". Never used to apply anything by
+  // itself — this is display-only until Save is clicked.
+  const mappedForRecord = mapPortfolioRows(record.provider as CarrierProviderId, [record.rawPayload as Record<string, unknown>])
+  const parsedRow = mappedForRecord.recognized ? mappedForRecord.rows[0] : undefined
+  const policyProposals = parsedRow ? computePolicyFieldProposals(review?.policyCandidate, parsedRow) : []
+
+  const canApplyThisRow = record.decisionStatus === 'accepted' && record.applyStatus !== 'applied'
+
+  async function saveApplyAction() {
+    if (!customerAction || !policyAction) return
+    setApplyActionSaving(true)
+    setApplyActionError(null)
+    setApplyActionSaved(false)
+    try {
+      const selectedIndividualClientId =
+        customerAction === 'link_existing_individual' ? review?.individualCandidate?.id : undefined
+      const selectedCompanyId =
+        customerAction === 'link_existing_company' ? review?.companyCandidate?.id : undefined
+      const selectedPolicyId =
+        policyAction === 'link_existing_policy' || policyAction === 'update_existing_policy'
+          ? review?.policyCandidate?.id
+          : undefined
+      const approvedPolicyChanges =
+        policyAction === 'update_existing_policy'
+          ? (buildApprovedPolicyChanges(policyProposals, approvedFields) as Record<string, Json>)
+          : undefined
+
+      await adminSetCarrierImportRecordApplyActions({
+        data: {
+          recordId: record.id,
+          customerApplyAction: customerAction,
+          policyApplyAction: policyAction,
+          selectedIndividualClientId,
+          selectedCompanyId,
+          selectedPolicyId,
+          approvedPolicyChanges,
+        },
+      })
+      setApplyActionSaved(true)
+      onApplyActionsChanged()
+    } catch (err) {
+      setApplyActionError(err instanceof Error ? err.message : 'Could not save this apply action')
+    } finally {
+      setApplyActionSaving(false)
     }
   }
 
@@ -414,6 +669,105 @@ function ImportRecordReviewPanel({
           </span>
           {record.decisionNote && <p className="text-sm text-navy-500" style={{ marginTop: '0.4rem' }}>{record.decisionNote}</p>}
         </section>
+
+        {/* 5. Apply action (CRM3 Block 4) — only ever shown on an
+            accepted record, since "accepted" never implies an apply
+            action by itself. Nothing here mutates the CRM: Save only
+            persists the chosen action; the actual mutation happens later
+            at Confirm & Apply, and only for a record whose apply action
+            is fully resolved (see isRowReadyToApply). */}
+        {record.decisionStatus === 'accepted' && (
+          <section style={{ marginBottom: '1rem' }}>
+            <h3 className="text-xs font-semibold uppercase text-navy-400" style={{ marginBottom: '0.4rem' }}>Apply action</h3>
+
+            {record.applyStatus === 'applied' ? (
+              <p className="text-sm text-navy-500">This record has already been applied — its apply action can no longer be changed.</p>
+            ) : (
+              <div className="grid sm:grid-cols-2 gap-3">
+                <label className="text-sm">
+                  <span className="text-navy-500 text-xs block" style={{ marginBottom: '0.2rem' }}>Customer</span>
+                  <select
+                    className="w-full px-2 py-1.5 border border-navy-200 rounded-[2px] text-sm"
+                    value={customerAction}
+                    onChange={(e) => setCustomerAction(e.target.value as CustomerApplyAction)}
+                  >
+                    <option value="">Select…</option>
+                    {review?.individualCandidate && (
+                      <option value="link_existing_individual">{CUSTOMER_ACTION_LABELS.link_existing_individual}</option>
+                    )}
+                    {review?.companyCandidate && (
+                      <option value="link_existing_company">{CUSTOMER_ACTION_LABELS.link_existing_company}</option>
+                    )}
+                    <option value="create_individual">{CUSTOMER_ACTION_LABELS.create_individual}</option>
+                    <option value="create_company">{CUSTOMER_ACTION_LABELS.create_company}</option>
+                    <option value="no_customer_change">{CUSTOMER_ACTION_LABELS.no_customer_change}</option>
+                  </select>
+                </label>
+
+                <label className="text-sm">
+                  <span className="text-navy-500 text-xs block" style={{ marginBottom: '0.2rem' }}>Policy</span>
+                  <select
+                    className="w-full px-2 py-1.5 border border-navy-200 rounded-[2px] text-sm"
+                    value={policyAction}
+                    onChange={(e) => setPolicyAction(e.target.value as PolicyApplyAction)}
+                  >
+                    <option value="">Select…</option>
+                    {review?.policyCandidate && (
+                      <option value="link_existing_policy">{POLICY_ACTION_LABELS.link_existing_policy}</option>
+                    )}
+                    <option value="create_policy">{POLICY_ACTION_LABELS.create_policy}</option>
+                    {review?.policyCandidate && policyProposals.length > 0 && (
+                      <option value="update_existing_policy">{POLICY_ACTION_LABELS.update_existing_policy}</option>
+                    )}
+                    <option value="no_policy_change">{POLICY_ACTION_LABELS.no_policy_change}</option>
+                  </select>
+                </label>
+              </div>
+            )}
+
+            {policyAction === 'update_existing_policy' && policyProposals.length > 0 && (
+              <div className="border border-navy-100 rounded-[4px] p-3" style={{ marginTop: '0.6rem' }}>
+                <p className="text-xs font-semibold text-navy-500" style={{ marginBottom: '0.4rem' }}>
+                  Approve the field changes to apply — only checked fields will be written.
+                </p>
+                {policyProposals.map((proposal) => (
+                  <label key={proposal.field} className="flex items-center gap-2 text-sm" style={{ marginBottom: '0.3rem' }}>
+                    <input
+                      type="checkbox"
+                      checked={approvedFields.has(proposal.field)}
+                      onChange={(e) => {
+                        setApprovedFields((prev) => {
+                          const next = new Set(prev)
+                          if (e.target.checked) next.add(proposal.field)
+                          else next.delete(proposal.field)
+                          return next
+                        })
+                      }}
+                    />
+                    <span>
+                      {POLICY_FIELD_LABELS[proposal.field]}: <span className="text-navy-400">{String(proposal.current ?? '—')}</span> → <span className="font-medium">{String(proposal.proposed)}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {applyActionError && <p className="text-sm text-red-500" style={{ marginTop: '0.5rem' }}>{applyActionError}</p>}
+            {applyActionSaved && !applyActionError && <p className="text-sm text-green-600" style={{ marginTop: '0.5rem' }}>Apply action saved.</p>}
+
+            {canApplyThisRow && (
+              <button
+                type="button"
+                className="admin-btn admin-btn-secondary admin-btn--sm"
+                style={{ marginTop: '0.6rem' }}
+                disabled={applyActionSaving || !customerAction || !policyAction}
+                onClick={saveApplyAction}
+              >
+                {applyActionSaving ? 'Saving…' : 'Save apply action'}
+              </button>
+            )}
+          </section>
+        )}
 
         <details style={{ marginBottom: '1rem' }}>
           <summary className="text-xs font-semibold uppercase text-navy-400 cursor-pointer">Technical details</summary>
