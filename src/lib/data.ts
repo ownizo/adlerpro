@@ -41,6 +41,7 @@ import type {
   CarrierRunApplyStatus,
   PolicyParticipant,
   PolicyholderParticipantMode,
+  PolicyOwnerOptionSummary,
 } from './types'
 import {
   buildWebsiteLeadOpportunityPayload,
@@ -1880,6 +1881,55 @@ export async function listCandidateClients(): Promise<{
 
 export async function listCandidatePolicies(): Promise<Policy[]> {
   return getPolicies()
+}
+
+/**
+ * Reconciliation Editor hardening — the manual "existing policy"
+ * selector. Returns ONLY the policies actually owned by the given
+ * individual/company, via a server-side scoped query (never the full
+ * listCandidatePolicies() list filtered client-side — see requirement
+ * "No client-side direct unrestricted policy query"). Exactly one of
+ * individualClientId/companyId is required, mirroring the XOR shape
+ * used everywhere else in CRM3 (matched_* / selected_*).
+ *
+ * getPolicies(companyId?) returns EVERY policy in the system when
+ * called with no argument — so companyId is only ever passed here when
+ * truthy, after the XOR check below; this function can never
+ * accidentally return the unfiltered list.
+ *
+ * Field shape matches PolicyOwnerOptionSummary (types.ts) — the same
+ * minimal, review-safe fields already used elsewhere for candidate
+ * summaries (never notes/tasks/opportunities/claims/documents).
+ */
+export async function listPoliciesForOwner(input: {
+  individualClientId?: string
+  companyId?: string
+}): Promise<PolicyOwnerOptionSummary[]> {
+  const individualClientId = input.individualClientId?.trim() || undefined
+  const companyId = input.companyId?.trim() || undefined
+  if (!individualClientId && !companyId) {
+    throw new Error('listPoliciesForOwner: exactly one of individualClientId or companyId is required')
+  }
+  if (individualClientId && companyId) {
+    throw new Error('listPoliciesForOwner: cannot filter by both individualClientId and companyId')
+  }
+
+  const policies = individualClientId
+    ? await getPoliciesByIndividualClientId(individualClientId)
+    : await getPolicies(companyId)
+
+  return policies.map((p) => ({
+    id: p.id,
+    insurer: p.insurer,
+    policyNumber: p.policyNumber,
+    type: p.type,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    annualPremium: p.annualPremium,
+    status: p.status,
+    individualClientId: p.individualClientId,
+    companyId: p.companyId || undefined,
+  }))
 }
 
 export async function listExternalClientIdentities(): Promise<ExternalClientIdentity[]> {
