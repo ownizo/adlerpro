@@ -975,7 +975,23 @@ function ImportRecordReviewPanel({
             type="button"
             disabled={busy}
             className="admin-btn admin-btn-secondary admin-btn--sm"
-            onClick={() => run(() => adminIgnoreCarrierImportDecision({ data: { recordId: record.id, decisionNote: note || undefined } }))}
+            onClick={() => {
+              // Ignore sits in the same panel as apply-action editing
+              // (the "Apply action" section only renders once a record
+              // is accepted) and fires its mutation on a single click,
+              // with no other confirmation anywhere in this panel — a
+              // stray or mistimed click here silently discards an
+              // already-accepted, already-configured row's apply action
+              // (decision_status flips to 'ignored', wiping out
+              // everything saveApplyAction persisted). Guard it the
+              // same way every other single-click destructive action in
+              // this codebase is guarded (see admin.tsx) — saving/
+              // editing apply actions itself never touches
+              // decision_status (setCarrierImportRecordApplyActions
+              // never includes it), so this confirm is the only gate.
+              if (!confirm('Ignore this record? This clears its decision — including any apply action already configured for it.')) return
+              run(() => adminIgnoreCarrierImportDecision({ data: { recordId: record.id, decisionNote: note || undefined } }))
+            }}
           >
             Ignore
           </button>
