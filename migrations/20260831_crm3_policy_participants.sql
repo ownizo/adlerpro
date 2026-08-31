@@ -150,19 +150,164 @@ BEGIN
 
   IF r.customer_apply_action = 'add_policyholder_to_existing_client' THEN
     normalized_external_client_id := NULLIF(BTRIM(r.external_client_id), '');
+
+    CASE r.selected_policyholder_mode
+      WHEN 'existing_individual' THEN
+        IF r.selected_policyholder_individual_client_id IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: existing_individual policyholder requires selected_policyholder_individual_client_id'; END IF;
+        IF NOT EXISTS (SELECT 1 FROM public.individual_clients WHERE id = r.selected_policyholder_individual_client_id) THEN RAISE EXCEPTION 'apply_carrier_import_record: selected policyholder does not exist'; END IF;
+        participant_ind := r.selected_policyholder_individual_client_id;
+        participant_company := NULL;
+      WHEN 'existing_company' THEN
+        IF r.selected_policyholder_company_id IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: existing_company policyholder requires selected_policyholder_company_id'; END IF;
+        IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id = r.selected_policyholder_company_id) THEN RAISE EXCEPTION 'apply_carrier_import_record: selected policyholder does not exist'; END IF;
+        participant_company := r.selected_policyholder_company_id;
+        participant_ind := NULL;
+      WHEN 'create_individual' THEN
+        IF r.selected_policyholder_individual_client_id IS NOT NULL THEN
+          IF NOT EXISTS (SELECT 1 FROM public.individual_clients WHERE id = r.selected_policyholder_individual_client_id) THEN RAISE EXCEPTION 'apply_carrier_import_record: selected policyholder does not exist'; END IF;
+          participant_ind := r.selected_policyholder_individual_client_id;
+        ELSIF normalized_external_client_id IS NOT NULL THEN
+          SELECT e.individual_client_id INTO participant_ind
+          FROM public.external_client_identities e
+          WHERE e.provider = r.provider
+            AND NULLIF(BTRIM(e.external_client_id), '') = normalized_external_client_id
+            AND e.individual_client_id IS NOT NULL
+          ORDER BY e.last_seen_at DESC NULLS LAST
+          LIMIT 1;
+
+          IF participant_ind IS NOT NULL THEN
+            IF EXISTS (
+              SELECT 1 FROM public.external_client_identities e
+              WHERE e.provider = r.provider
+                AND NULLIF(BTRIM(e.external_client_id), '') = normalized_external_client_id
+                AND e.company_id IS NOT NULL
+            ) THEN
+              RAISE EXCEPTION 'apply_carrier_import_record: external client identity %/% is already linked to a different CRM customer', r.provider, normalized_external_client_id;
+            END IF;
+          END IF;
+        END IF;
+
+        IF participant_ind IS NULL THEN
+          IF NULLIF(btrim(COALESCE(p_new_individual->>'fullName','')), '') IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: create_individual requires a full name'; END IF;
+          INSERT INTO public.individual_clients (id, full_name, nif, email, phone, address, status, created_at)
+          VALUES (
+            gen_random_uuid(),
+            NULLIF(btrim(COALESCE(p_new_individual->>'fullName', '')), ''),
+            NULLIF(btrim(COALESCE(p_new_individual->>'nif', '')), ''),
+            NULLIF(btrim(COALESCE(p_new_individual->>'email', '')), ''),
+            NULLIF(btrim(COALESCE(p_new_individual->>'phone', '')), ''),
+            NULLIF(btrim(COALESCE(p_new_individual->>'address', '')), ''),
+            'active', now()
+          )
+          RETURNING id INTO participant_ind;
+        END IF;
+
+        participant_company := NULL;
+        r.selected_policyholder_individual_client_id := participant_ind;
+        r.selected_policyholder_company_id := NULL;
+      WHEN 'create_company' THEN
+        IF r.selected_policyholder_company_id IS NOT NULL THEN
+          IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id = r.selected_policyholder_company_id) THEN RAISE EXCEPTION 'apply_carrier_import_record: selected policyholder does not exist'; END IF;
+          participant_company := r.selected_policyholder_company_id;
+        ELSIF normalized_external_client_id IS NOT NULL THEN
+          SELECT e.company_id INTO participant_company
+          FROM public.external_client_identities e
+          WHERE e.provider = r.provider
+            AND NULLIF(BTRIM(e.external_client_id), '') = normalized_external_client_id
+            AND e.company_id IS NOT NULL
+          ORDER BY e.last_seen_at DESC NULLS LAST
+          LIMIT 1;
+
+          IF participant_company IS NOT NULL THEN
+            IF EXISTS (
+              SELECT 1 FROM public.external_client_identities e
+              WHERE e.provider = r.provider
+                AND NULLIF(BTRIM(e.external_client_id), '') = normalized_external_client_id
+                AND e.individual_client_id IS NOT NULL
+            ) THEN
+              RAISE EXCEPTION 'apply_carrier_import_record: external client identity %/% is already linked to a different CRM customer', r.provider, normalized_external_client_id;
+            END IF;
+          END IF;
+        END IF;
+
+        IF participant_company IS NULL THEN
+          IF NULLIF(btrim(COALESCE(p_new_company->>'name', '')), '') IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: create_company requires a name'; END IF;
+          IF NULLIF(btrim(COALESCE(p_new_company->>'nif', '')), '') IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: create_company requires a NIF'; END IF;
+          participant_company := 'comp_' || replace(gen_random_uuid()::text, '-', '');
+          INSERT INTO public.companies (id, name, nif, sector, contact_name, contact_email, contact_phone, address, created_at)
+          VALUES (
+            participant_company,
+            NULLIF(btrim(COALESCE(p_new_company->>'name', '')), ''),
+            NULLIF(btrim(COALESCE(p_new_company->>'nif', '')), ''),
+            COALESCE(NULLIF(p_new_company->>'sector', ''), ''),
+            COALESCE(NULLIF(p_new_company->>'contactName', ''), NULLIF(btrim(COALESCE(p_new_company->>'name', '')), '')),
+            COALESCE(NULLIF(p_new_company->>'contactEmail', ''), ''),
+            COALESCE(NULLIF(p_new_company->>'contactPhone', ''), ''),
+            COALESCE(NULLIF(p_new_company->>'address', ''), ''),
+            now()
+          );
+        END IF;
+
+        participant_ind := NULL;
+        r.selected_policyholder_company_id := participant_company;
+        r.selected_policyholder_individual_client_id := NULL;
+      ELSE
+        RAISE EXCEPTION 'apply_carrier_import_record: unsupported policyholder participant mode %', r.selected_policyholder_mode;
+    END CASE;
+
     IF normalized_external_client_id IS NOT NULL THEN
-      IF EXISTS (
-        SELECT 1 FROM public.external_client_identities e
-        WHERE e.provider = r.provider AND NULLIF(BTRIM(e.external_client_id), '') = normalized_external_client_id
-          AND NOT ((participant_ind IS NOT NULL AND e.individual_client_id = participant_ind) OR (participant_company IS NOT NULL AND e.company_id = participant_company))
-      ) THEN
-        RAISE EXCEPTION 'apply_carrier_import_record: external client identity %/% is already linked to a different CRM customer', r.provider, normalized_external_client_id;
+      IF participant_ind IS NOT NULL THEN
+        IF EXISTS (
+          SELECT 1 FROM public.external_client_identities e
+          WHERE e.provider = r.provider
+            AND NULLIF(BTRIM(e.external_client_id), '') = normalized_external_client_id
+            AND e.individual_client_id IS NOT NULL AND e.individual_client_id IS DISTINCT FROM participant_ind
+        ) THEN
+          RAISE EXCEPTION 'apply_carrier_import_record: external client identity %/% is already linked to a different CRM customer', r.provider, normalized_external_client_id;
+        END IF;
+      ELSIF participant_company IS NOT NULL THEN
+        IF EXISTS (
+          SELECT 1 FROM public.external_client_identities e
+          WHERE e.provider = r.provider
+            AND NULLIF(BTRIM(e.external_client_id), '') = normalized_external_client_id
+            AND e.company_id IS NOT NULL AND e.company_id IS DISTINCT FROM participant_company
+        ) THEN
+          RAISE EXCEPTION 'apply_carrier_import_record: external client identity %/% is already linked to a different CRM customer', r.provider, normalized_external_client_id;
+        END IF;
+      END IF;
+    END IF;
+
+    IF normalized_external_client_id IS NOT NULL THEN
+      IF participant_ind IS NOT NULL THEN
+        IF EXISTS (
+          SELECT 1 FROM public.policy_participants pp
+          WHERE pp.policy_id = pid
+            AND pp.role = 'policyholder'
+            AND pp.provider = r.provider
+            AND NULLIF(BTRIM(pp.external_client_id), '') = normalized_external_client_id
+            AND pp.individual_client_id IS NOT NULL
+            AND pp.individual_client_id IS DISTINCT FROM participant_ind
+        ) THEN
+          RAISE EXCEPTION 'apply_carrier_import_record: external participant relation %/% is already linked to a different CRM customer', r.provider, normalized_external_client_id;
+        END IF;
+      ELSIF participant_company IS NOT NULL THEN
+        IF EXISTS (
+          SELECT 1 FROM public.policy_participants pp
+          WHERE pp.policy_id = pid
+            AND pp.role = 'policyholder'
+            AND pp.provider = r.provider
+            AND NULLIF(BTRIM(pp.external_client_id), '') = normalized_external_client_id
+            AND pp.company_id IS NOT NULL
+            AND pp.company_id IS DISTINCT FROM participant_company
+        ) THEN
+          RAISE EXCEPTION 'apply_carrier_import_record: external participant relation %/% is already linked to a different CRM customer', r.provider, normalized_external_client_id;
+        END IF;
       END IF;
     END IF;
 
     INSERT INTO public.policy_participants (policy_id, individual_client_id, company_id, role, provider, external_client_id, source)
     VALUES (pid, participant_ind, participant_company, 'policyholder', r.provider, normalized_external_client_id, 'carrier_import')
-    ON CONFLICT DO NOTHING;
+    ON CONFLICT (policy_id, role, COALESCE(individual_client_id::text, company_id)) DO NOTHING;
 
     IF normalized_external_client_id IS NOT NULL THEN
       INSERT INTO public.external_client_identities (id, individual_client_id, company_id, provider, external_client_id, first_seen_at, last_seen_at, created_at, updated_at)
@@ -177,8 +322,14 @@ BEGIN
       selected_company_id = COALESCE(owner_company, selected_company_id),
       selected_policy_id = pid,
       selected_policyholder_mode = r.selected_policyholder_mode,
-      selected_policyholder_individual_client_id = r.selected_policyholder_individual_client_id,
-      selected_policyholder_company_id = r.selected_policyholder_company_id,
+      selected_policyholder_individual_client_id = CASE
+        WHEN r.selected_policyholder_mode IN ('existing_individual', 'create_individual') THEN participant_ind
+        ELSE r.selected_policyholder_individual_client_id
+      END,
+      selected_policyholder_company_id = CASE
+        WHEN r.selected_policyholder_mode IN ('existing_company', 'create_company') THEN participant_company
+        ELSE r.selected_policyholder_company_id
+      END,
       apply_status = 'applied',
       apply_error = NULL,
       applied_at = now(),
