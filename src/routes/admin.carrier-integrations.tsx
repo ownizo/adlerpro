@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createFileRoute, Navigate, Link } from '@tanstack/react-router'
+import { createFileRoute, Navigate, Link, Outlet, useRouterState } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { useIdentity } from '@/lib/identity-context'
 import { adminListCarrierSyncRuns } from '@/lib/server-fns'
@@ -41,7 +41,24 @@ const SYNC_STATUS_CHIP_CLASS: Record<string, string> = {
   failed: 'admin-chip--danger',
 }
 
+// CarrierIntegrationsPage stays a thin wrapper so /admin/carrier-integrations'
+// existing content (now in CarrierIntegrationsContent, byte-for-byte the
+// same) is untouched. It only exists so genuinely separate child routes —
+// /admin/carrier-integrations/import and /admin/carrier-integrations/runs/$id,
+// both nested under this route in the generated route tree — actually
+// render: TanStack Router always renders an ancestor route's component for
+// any of its descendants, so this route needs an <Outlet/> for those
+// descendants to show at all. Same fix already applied to /admin itself —
+// see AdminPage/AdminDashboardContent in src/routes/admin.tsx. At the exact
+// "/admin/carrier-integrations" path there is no matched child route, so
+// this never affects the existing page.
 function CarrierIntegrationsPage() {
+  const location = useRouterState({ select: (state) => state.location })
+  if (location.pathname !== '/admin/carrier-integrations') return <Outlet />
+  return <CarrierIntegrationsContent />
+}
+
+function CarrierIntegrationsContent() {
   const { user, ready } = useIdentity()
   const [runs, setRuns] = useState<CarrierSyncRun[]>([])
   const [loading, setLoading] = useState(true)
