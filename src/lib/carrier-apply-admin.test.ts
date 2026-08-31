@@ -95,6 +95,12 @@ test('adminApplyCarrierSyncRun processes accepted records ONE BY ONE (a loop, no
   assert.match(block, /'partially_failed'/)
 })
 
+test('adminApplyCarrierSyncRun leaves partially_failed runs retryable while applied rows remain idempotent', () => {
+  const block = extractServerFnBlock('adminApplyCarrierSyncRun')
+  assert.doesNotMatch(block, /run\.applyStatus === 'partially_failed'/)
+  assert.match(block, /db\.applyCarrierImportRecord\(record\.id\)/)
+})
+
 // ── IDEMPOTENCY / DOUBLE-APPLY SAFETY ───────────────────────────────
 
 test('applyCarrierImportRecord checks apply_status === applied FIRST and returns already_applied WITHOUT calling the RPC', () => {

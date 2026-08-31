@@ -44,6 +44,13 @@ test('parseImportDateSafely: DD/MM/AAAA (Portuguese) is parsed unambiguously', (
   assert.equal(parseImportDateSafely('01.06.2026'), '2026-06-01')
 })
 
+test('parseImportDateSafely: Portuguese carrier timestamps are parsed as DD/MM/YYYY', () => {
+  assert.equal(parseImportDateSafely('21/07/2026 00:00:00'), '2026-07-21')
+  assert.equal(parseImportDateSafely('20/07/2027 00:00:00'), '2027-07-20')
+  assert.equal(parseImportDateSafely('22/08/2026 00:00:00'), '2026-08-22')
+  assert.equal(parseImportDateSafely('21/08/2027 00:00:00'), '2027-08-21')
+})
+
 test('parseImportDateSafely: ISO AAAA-MM-DD is accepted as-is', () => {
   assert.equal(parseImportDateSafely('2026-03-15'), '2026-03-15')
 })

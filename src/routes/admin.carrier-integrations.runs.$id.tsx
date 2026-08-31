@@ -157,7 +157,8 @@ function CarrierRunDetailPage() {
 
   const readiness = computeRunApplyReadiness(records.map(recordToApplyActionRowState))
   const runApplyStatus = run?.applyStatus ?? 'not_applied'
-  const alreadyFullyApplied = runApplyStatus === 'applied' || runApplyStatus === 'partially_failed'
+  const alreadyFullyApplied = runApplyStatus === 'applied'
+  const hasRetryableFailures = runApplyStatus === 'partially_failed' || records.some((record) => record.applyStatus === 'failed')
 
   async function confirmApply() {
     setApplying(true)
@@ -252,16 +253,24 @@ function CarrierRunDetailPage() {
                 is entirely blocked while any accepted record still lacks
                 an explicit apply action. */}
             <div className="admin-panel" style={{ marginBottom: '1rem', padding: '1rem' }}>
-              {alreadyFullyApplied || applyResult ? (
+              {alreadyFullyApplied || applyResult || hasRetryableFailures ? (
                 <div>
-                  <h3 className="admin-panel-title" style={{ marginBottom: '0.5rem' }}>Portfolio applied</h3>
+                  <h3 className="admin-panel-title" style={{ marginBottom: '0.5rem' }}>
+                    {applyResult?.failed || hasRetryableFailures ? 'Portfolio apply incomplete' : 'Portfolio applied'}
+                  </h3>
                   <p className="text-sm text-navy-600">
                     {applyResult
                       ? `${applyResult.accepted + applyResult.skipped} records processed / ${applyResult.applied} applied / ${applyResult.skipped} skipped / ${applyResult.failed} failed${applyResult.alreadyApplied ? ` / ${applyResult.alreadyApplied} already applied` : ''}`
                       : `Run status: ${runApplyStatus}`}
                   </p>
-                  <button type="button" className="admin-btn admin-btn-primary admin-btn--sm" disabled style={{ marginTop: '0.75rem' }}>
-                    Confirm &amp; Apply
+                  <button
+                    type="button"
+                    className="admin-btn admin-btn-primary admin-btn--sm"
+                    disabled={!hasRetryableFailures}
+                    style={{ marginTop: '0.75rem' }}
+                    onClick={() => setShowConfirmApply(true)}
+                  >
+                    Retry failed records
                   </button>
                 </div>
               ) : (

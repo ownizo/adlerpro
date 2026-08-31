@@ -97,13 +97,9 @@ export function isRowApplicable(state: ApplyActionRowState): boolean {
   return state.decisionStatus === 'accepted' && isRowReadyToApply(state)
 }
 
-/** Owner-consistency gate: once a customer action and a policy action
- * are both resolved, an existing policy being linked/updated must
- * belong to the resolved customer. Reparenting is out of scope for
- * Block 4 — mismatch always blocks (see requirement "Owner mismatch is
- * a blocking conflict for now"). A row with no_customer_change (nothing
- * resolved to compare against) is never blocked by this check — there
- * is nothing to be inconsistent with. */
+/** Owner-consistency gate: once a policy is linked/updated, both owner
+ * dimensions must agree with the resolved customer. Blank legacy company
+ * ids are equivalent to NULL for this comparison only. */
 export function checkOwnerConsistency(params: {
   policyApplyAction: PolicyApplyAction
   selectedIndividualClientId: string | null
@@ -113,11 +109,17 @@ export function checkOwnerConsistency(params: {
 }): { consistent: boolean; reason?: string } {
   const linksExistingPolicy = params.policyApplyAction === 'link_existing_policy' || params.policyApplyAction === 'update_existing_policy'
   if (!linksExistingPolicy) return { consistent: true }
-  if (!params.selectedIndividualClientId && !params.selectedCompanyId) return { consistent: true }
 
-  const matches =
-    (!!params.selectedIndividualClientId && params.policyOwnerIndividualClientId === params.selectedIndividualClientId) ||
-    (!!params.selectedCompanyId && params.policyOwnerCompanyId === params.selectedCompanyId)
+  const selectedIndividualId = params.selectedIndividualClientId?.trim() || null
+  const selectedCompanyId = params.selectedCompanyId?.trim() || null
+  const policyOwnerIndividualId = params.policyOwnerIndividualClientId?.trim() || null
+  const policyOwnerCompanyId = params.policyOwnerCompanyId?.trim() || null
+
+  const matches = selectedIndividualId
+    ? policyOwnerIndividualId === selectedIndividualId && policyOwnerCompanyId === null && selectedCompanyId === null
+    : selectedCompanyId
+      ? policyOwnerCompanyId === selectedCompanyId && policyOwnerIndividualId === null
+      : policyOwnerIndividualId === null && policyOwnerCompanyId === null
 
   return matches
     ? { consistent: true }

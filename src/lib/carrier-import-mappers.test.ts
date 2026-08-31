@@ -57,6 +57,37 @@ test('MGEN MAPPING: recognizes a well-formed row and maps every documented field
   assert.equal(row.carrierSegment, 'individual')
 })
 
+test('MGEN MAPPING: rehydrates the sanitized raw payload shape used by first-apply retries', () => {
+  const result = mapPortfolioRows('mgen', [mgenRow({
+    data_inicio: '21/07/2026 00:00:00',
+    data_fim: '20/07/2027 00:00:00',
+    premio_total: '730,55',
+    contrato_id: '75083',
+  }), mgenRow({
+    data_inicio: '22/08/2026 00:00:00',
+    data_fim: '21/08/2027 00:00:00',
+    premio_total: '6.055,74',
+    contrato_id: '75849',
+  })])
+  assert.equal(result.recognized, true)
+  if (result.recognized) {
+    assert.deepEqual(result.rows.map(({ startDate, endDate, premium, externalPolicyNumber, sanitizedRaw }) => ({
+      startDate, endDate, premium, externalPolicyNumber,
+      rawStartDate: sanitizedRaw.data_inicio,
+      rawEndDate: sanitizedRaw.data_fim,
+    })), [
+      {
+        startDate: '2026-07-21', endDate: '2027-07-20', premium: 730.55, externalPolicyNumber: '75083',
+        rawStartDate: '21/07/2026 00:00:00', rawEndDate: '20/07/2027 00:00:00',
+      },
+      {
+        startDate: '2026-08-22', endDate: '2027-08-21', premium: 6055.74, externalPolicyNumber: '75849',
+        rawStartDate: '22/08/2026 00:00:00', rawEndDate: '21/08/2027 00:00:00',
+      },
+    ])
+  }
+})
+
 test('MGEN MAPPING: also works with real-world header casing/accents/spacing (via header normalization)', () => {
   const result = mapPortfolioRows('mgen', [
     {

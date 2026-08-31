@@ -179,6 +179,20 @@ test('checkOwnerConsistency: linking an existing policy whose owner matches the 
   assert.equal(result.consistent, true)
 })
 
+test('checkOwnerConsistency: correct individual with legacy blank company_id is consistent', () => {
+  assert.equal(checkOwnerConsistency({
+    policyApplyAction: 'link_existing_policy', selectedIndividualClientId: 'ind-1', selectedCompanyId: null,
+    policyOwnerIndividualClientId: 'ind-1', policyOwnerCompanyId: '',
+  }).consistent, true)
+})
+
+test('checkOwnerConsistency: correct individual with NULL company_id is consistent', () => {
+  assert.equal(checkOwnerConsistency({
+    policyApplyAction: 'link_existing_policy', selectedIndividualClientId: 'ind-1', selectedCompanyId: null,
+    policyOwnerIndividualClientId: 'ind-1', policyOwnerCompanyId: null,
+  }).consistent, true)
+})
+
 test('checkOwnerConsistency: linking an existing policy whose owner does NOT match the selected individual blocks — the Bella/Ilya scenario', () => {
   const result = checkOwnerConsistency({
     policyApplyAction: 'link_existing_policy',
@@ -215,7 +229,7 @@ test('checkOwnerConsistency: create_policy / no_policy_change are never blocked 
   }
 })
 
-test('checkOwnerConsistency: no_customer_change (nothing resolved to compare) never blocks', () => {
+test('checkOwnerConsistency: no selected owner does not bypass a policy with an owner', () => {
   const result = checkOwnerConsistency({
     policyApplyAction: 'link_existing_policy',
     selectedIndividualClientId: null,
@@ -223,7 +237,14 @@ test('checkOwnerConsistency: no_customer_change (nothing resolved to compare) ne
     policyOwnerIndividualClientId: 'someone',
     policyOwnerCompanyId: undefined,
   })
-  assert.equal(result.consistent, true)
+  assert.equal(result.consistent, false)
+})
+
+test('checkOwnerConsistency: wrong individual is blocked even if the company dimension is blank', () => {
+  assert.equal(checkOwnerConsistency({
+    policyApplyAction: 'link_existing_policy', selectedIndividualClientId: 'ind-selected', selectedCompanyId: null,
+    policyOwnerIndividualClientId: 'someone', policyOwnerCompanyId: '',
+  }).consistent, false)
 })
 
 test('checkOwnerConsistency: company owner match/mismatch works the same way as individual', () => {
@@ -245,6 +266,20 @@ test('checkOwnerConsistency: company owner match/mismatch works the same way as 
     }).consistent,
     false,
   )
+})
+
+test('checkOwnerConsistency: actual company owner mismatch is blocked', () => {
+  assert.equal(checkOwnerConsistency({
+    policyApplyAction: 'link_existing_policy', selectedIndividualClientId: null, selectedCompanyId: 'comp-1',
+    policyOwnerIndividualClientId: null, policyOwnerCompanyId: 'comp-other',
+  }).consistent, false)
+})
+
+test('checkOwnerConsistency: correct company owner is consistent only with no individual owner', () => {
+  assert.equal(checkOwnerConsistency({
+    policyApplyAction: 'link_existing_policy', selectedIndividualClientId: null, selectedCompanyId: 'comp-1',
+    policyOwnerIndividualClientId: null, policyOwnerCompanyId: 'comp-1',
+  }).consistent, true)
 })
 
 // ── RUN-LEVEL READINESS SUMMARY ──────────────────────────────────────
