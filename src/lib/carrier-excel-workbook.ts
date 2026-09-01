@@ -86,6 +86,64 @@ function decodeCsvText(buffer: Buffer): string {
   }
 }
 
+/**
+ * Remove padding NUL (U+0000) de transporte de um CSV de largura fixa —
+ * confirmado por inspeção byte-a-byte contra o ficheiro real POLRES.CSV
+ * (17 linhas físicas, 66 colunas, TODOS os campos entre aspas — nunca
+ * apenas alguns).
+ *
+ * A inspeção byte-a-byte mostra DUAS zonas de padding distintas e
+ * INDEPENDENTES por linha de dados — não uma única zona contígua da
+ * coluna 60 até ao fim da linha, como uma primeira análise (apenas por
+ * contagem de ";") tinha sugerido:
+ *
+ *   1. ADESÃO SUBST. (coluna 60, campo entre aspas) tem SEMPRE
+ *      exatamente 5 bytes 0x00 como conteúdo INTEIRO desse campo — um
+ *      sub-campo de largura fixa 5 (o mesmo comprimento de "00001") que,
+ *      quando vazio, é gravado como NUL em vez de espaços/string vazia.
+ *      As colunas seguintes (61-65: IBAN/BIC/AUTORIZAÇÃO/TDOC TOMADOR/
+ *      TDOC PROPIETÁRIO) têm SEMPRE conteúdo real a seguir — nunca fazem
+ *      parte do mesmo run de padding. É este run de 5 bytes, no MEIO do
+ *      registo, que a SheetJS expõe como o VALOR da célula ADESÃO
+ *      SUBST., preservado pelo mapper Allianz em sanitizedRaw.
+ *   2. A 66ª coluna (cabeçalho vazio/malformado — já descartado por
+ *      normalizeHeaderName, ver PR #105) tem SEMPRE ~243-245 bytes 0x00
+ *      como conteúdo inteiro desse último campo, terminando mesmo antes
+ *      do \r\n — este é o único padding que é literalmente "fim de
+ *      registo físico".
+ *
+ * Ambos os casos partilham a mesma forma: um run de U+0000 que é o
+ * conteúdo INTEIRO (ou o restolho final) de UM campo entre aspas — por
+ * isso a condição para remover um run passou a ser "imediatamente antes
+ * de uma aspa de fecho (fim de campo citado), de \r\n, de \n, ou do fim
+ * do texto (EOF)" — não só "antes do fim da linha". Isto é o que produzia
+ * uma string JSON com U+0000 em sanitizedRaw, que o Postgres jsonb
+ * rejeita ("unsupported Unicode escape sequence") — stageCarrierImportRecords
+ * falhava mesmo com parsing/reconhecimento já corretos (ver
+ * REAL_SANITIZED_RAW_HAS_NUL no relatório de verificação: só ficou false
+ * depois desta correção — uma primeira versão que só cobria o fim de
+ * linha deixava o run de 5 bytes de ADESÃO SUBST. intacto).
+ *
+ * Continua a NUNCA remover um NUL genérico em qualquer posição do
+ * documento: só um run que toque nessa fronteira de fim-de-campo/
+ * fim-de-linha/EOF é removido — o que precede o run (aspa de abertura,
+ * ";", carateres reais como em "ABC\0\0\0\r\n"/"ABC\0\0\0"") é irrelevante,
+ * exatamente como já acontecia com o caso fim-de-linha. Um NUL embutido a
+ * meio de uma célula, sem tocar nenhuma destas fronteiras (ex.: "A;B\0C;D"
+ * ou um campo citado "AB\0CD"), nunca é tocado por este regex — fica como
+ * dado de origem inválido detetável, não silenciosamente apagado (ver
+ * requisito "should remain detectable as invalid source data rather than
+ * being globally erased").
+ *
+ * Aplicado a TODO texto CSV já descodificado (decodeCsvText), independente
+ * de ter sido UTF-8 ou Windows-1252 — o byte 0x00 é U+0000 em ambos, o
+ * padding é um problema de transporte/formato de largura fixa, não de
+ * codificação de carateres.
+ */
+export function stripTrailingCsvNulPadding(text: string): string {
+  return text.replace(/\x00+(?="|\r?\n|$)/gm, '')
+}
+
 export async function parsePortfolioWorkbook(buffer: Buffer, filename: string): Promise<ParseWorkbookResult> {
   const isCsv = isCsvFilename(filename)
   if (!isCsv && !/\.(xlsx|xls)$/i.test(filename)) {
@@ -110,7 +168,7 @@ export async function parsePortfolioWorkbook(buffer: Buffer, filename: string): 
       // "APÃLICE"); an already-correctly-decoded JS string parses
       // correctly and keeps every Portuguese accented header intact for
       // normalizeHeaderName downstream, regardless of source encoding.
-      const text = decodeCsvText(buffer)
+      const text = stripTrailingCsvNulPadding(decodeCsvText(buffer))
       workbook = XLSX.read(text, { type: 'string', cellDates: true, raw: true })
     } else {
       // cellDates: true — datas nativas do Excel vêm como objetos Date, não
