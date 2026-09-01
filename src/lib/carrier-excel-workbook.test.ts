@@ -12,6 +12,35 @@ async function buildWorkbookBuffer(rows: Record<string, unknown>[]): Promise<Buf
   return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
 }
 
+// Windows-1252 bytes that differ from their Unicode code point in the
+// 0x80-0x9F range (0xA0-0xFF is identical between Windows-1252 and
+// Unicode/Latin-1, so an accented letter like Ó/Ã/É/Í/Ç needs no
+// special-casing — its JS character code IS its Windows-1252 byte value).
+// Used to build synthetic Windows-1252 fixtures without any customer data
+// and without a Windows-1252-capable Buffer encoding built into Node.
+const WINDOWS_1252_HIGH_RANGE: Record<string, number> = {
+  '€': 0x80,
+  '‘': 0x91, // ‘
+  '’': 0x92, // ’
+  '“': 0x93, // “
+  '”': 0x94, // ”
+}
+
+function windows1252Buffer(text: string): Buffer {
+  const bytes: number[] = []
+  for (const ch of text) {
+    const special = WINDOWS_1252_HIGH_RANGE[ch]
+    if (special !== undefined) {
+      bytes.push(special)
+      continue
+    }
+    const codePoint = ch.codePointAt(0)!
+    if (codePoint > 0xff) throw new Error(`windows1252Buffer: unsupported test character ${JSON.stringify(ch)}`)
+    bytes.push(codePoint)
+  }
+  return Buffer.from(bytes)
+}
+
 test('parses a well-formed workbook into row objects keyed by header', async () => {
   const buffer = await buildWorkbookBuffer([
     { tomador_id: 'C1', nif: '123456789' },
@@ -249,4 +278,172 @@ test('CSV INTEGRATION: banking/direct-debit fields uploaded via CSV are still st
   assert.equal(JSON.stringify(row.sanitizedRaw).includes('AUTH-FAKE-1'), false)
   // and legitimate fields are NOT collateral damage
   assert.equal(row.sanitizedRaw['nome_tomador'], 'Ana Exemplo')
+})
+
+// ── Windows-1252 CSV decoding (real Allianz POLRES.CSV) ─────────────────
+//
+// ROOT CAUSE (diagnosed against the real local POLRES.CSV, never
+// committed): the real file is Windows-1252/Latin-1 encoded, not UTF-8.
+// Decoding it as UTF-8 doesn't throw — Node silently substitutes every
+// invalid byte (e.g. 0xD3 for "Ó") with U+FFFD, corrupting exactly the
+// accented headers the Allianz fingerprint needs (apolice, adesao,
+// premio_com.s1), so recognition failed even though delimiter/quoting/
+// row-count/column-count were all already correct. Fixed by trying
+// strict UTF-8 first (TextDecoder('utf-8', {fatal:true}) — throws on
+// invalid bytes rather than silently substituting) and falling back to
+// Windows-1252 only when that throws — never guessed from the presence
+// of U+FFFD in the decoded result, and existing valid-UTF-8 CSVs are
+// completely unaffected.
+//
+// Synthetic fixtures ONLY — no production customer data.
+
+test('UTF-8 ROUND-TRIP: a valid UTF-8 CSV with APÓLICE/ADESÃO/PRÉMIO COM.S1 headers is still decoded correctly (UTF-8 path is unaffected by the encoding-detection change)', async () => {
+  const buffer = csvBuffer('APÓLICE;ADESÃO;PRÉMIO COM.S1\r\n900000001;00001;123,45\r\n')
+  const result = await parsePortfolioWorkbook(buffer, 'polres.csv')
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  const row = result.rows[0]!
+  assert.equal(row['APÓLICE'], '900000001')
+  assert.equal(row['ADESÃO'], '00001')
+  assert.equal(row['PRÉMIO COM.S1'], '123,45')
+})
+
+test('WINDOWS-1252 DECODING: a Windows-1252-encoded CSV with APÓLICE/ADESÃO/PRÉMIO COM.S1 headers decodes to the exact same Unicode strings as the UTF-8 version', async () => {
+  const buffer = windows1252Buffer('APÓLICE;ADESÃO;PRÉMIO COM.S1\r\n900000001;00001;123,45\r\n')
+  const result = await parsePortfolioWorkbook(buffer, 'polres.csv')
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  const row = result.rows[0]!
+  assert.equal(row['APÓLICE'], '900000001')
+  assert.equal(row['ADESÃO'], '00001')
+  assert.equal(row['PRÉMIO COM.S1'], '123,45')
+  // no replacement character anywhere in the parsed keys — proves the
+  // Windows-1252 fallback actually ran, rather than UTF-8 silently
+  // substituting U+FFFD and happening to still produce SOME row.
+  assert.equal(Object.keys(row).some((k) => k.includes('�')), false)
+})
+
+test('WINDOWS-1252 INTEGRATION: a full Windows-1252 POLRES-shaped CSV is recognized by mapPortfolioRows(\'allianz\', ...) — the actual bug that was reported', async () => {
+  const buffer = windows1252Buffer(
+    'RAMO;APÓLICE;ADESÃO;NOME TOMADOR;DOC TOMADOR;OBJECTO/BEM SEGURO;PRÉMIO COM.S1\r\n' +
+    '1289;900000001;00001;Ana Exemplo;900000000;Objecto de teste;123,45\r\n',
+  )
+  const parsed = await parsePortfolioWorkbook(buffer, 'POLRES.CSV')
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) return
+
+  const mapped = mapPortfolioRows('allianz', parsed.rows)
+  assert.equal(mapped.recognized, true)
+  assert.equal(mapped.rows.length, 1)
+  const row = mapped.rows[0]!
+  // externalPolicyNumber populated, carrierPlanId "00001" retains leading zeros
+  assert.equal(row.externalPolicyNumber, '900000001')
+  assert.equal(row.carrierPlanId, '00001')
+  assert.notEqual(row.carrierPlanId, 0)
+})
+
+test('UTF-8 BOM CSV remains recognized end-to-end after the Windows-1252 fallback was added', async () => {
+  const buffer = Buffer.concat([
+    Buffer.from([0xef, 0xbb, 0xbf]),
+    csvBuffer(
+      'RAMO;APÓLICE;ADESÃO;NOME TOMADOR;DOC TOMADOR;OBJECTO/BEM SEGURO\r\n' +
+      '1289;900000001;00001;Ana Exemplo;900000000;Objecto de teste\r\n',
+    ),
+  ])
+  const parsed = await parsePortfolioWorkbook(buffer, 'POLRES.CSV')
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) return
+  assert.equal('APÓLICE' in parsed.rows[0]!, true)
+
+  const mapped = mapPortfolioRows('allianz', parsed.rows)
+  assert.equal(mapped.recognized, true)
+})
+
+test('UTF-8 CSV without a BOM remains recognized end-to-end', async () => {
+  const buffer = csvBuffer(
+    'RAMO;APÓLICE;ADESÃO;NOME TOMADOR;DOC TOMADOR;OBJECTO/BEM SEGURO\r\n' +
+    '1289;900000001;00001;Ana Exemplo;900000000;Objecto de teste\r\n',
+  )
+  const parsed = await parsePortfolioWorkbook(buffer, 'POLRES.CSV')
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) return
+
+  const mapped = mapPortfolioRows('allianz', parsed.rows)
+  assert.equal(mapped.recognized, true)
+})
+
+test('WINDOWS-1252: Windows CRLF line endings still produce separate rows, not merged into one', async () => {
+  const buffer = windows1252Buffer('APÓLICE;ADESÃO\r\n900000001;00001\r\n900000002;00002\r\n')
+  const result = await parsePortfolioWorkbook(buffer, 'polres.csv')
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.rows.length, 2)
+  assert.equal(result.rows[0]?.['APÓLICE'], '900000001')
+  assert.equal(result.rows[1]?.['APÓLICE'], '900000002')
+})
+
+test('WINDOWS-1252: 0x80-0x9F range characters (€, smart quotes) decode correctly — proves Windows-1252, not plain ISO-8859-1/Latin-1', async () => {
+  // ISO-8859-1/Latin-1 has no mapping for 0x80-0x9F (they're C1 control
+  // codes there) — only Windows-1252 assigns real printable characters to
+  // that range. If the fallback used plain Latin-1 instead of
+  // Windows-1252, these values would decode as control characters, not €
+  // and curly quotes.
+  const buffer = windows1252Buffer('NOTA;VALOR\r\n"Preço em €";"Nota “especial”"\r\n')
+  const result = await parsePortfolioWorkbook(buffer, 'polres.csv')
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  assert.equal(result.rows[0]?.NOTA, 'Preço em €')
+  assert.equal(result.rows[0]?.VALOR, 'Nota “especial”')
+})
+
+test('WINDOWS-1252 FALLBACK: invalid-UTF-8 bytes take the Windows-1252 path without leaving any U+FFFD in legitimate decoded text', async () => {
+  const buffer = windows1252Buffer(
+    'NOME TOMADOR;LOCALIDADE TOMADOR;PROFISSÃO TOMADOR\r\n' +
+    'António Conceição;Santarém;Médico\r\n',
+  )
+  const result = await parsePortfolioWorkbook(buffer, 'polres.csv')
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  const row = result.rows[0]!
+  assert.equal(row['NOME TOMADOR'], 'António Conceição')
+  assert.equal(row['LOCALIDADE TOMADOR'], 'Santarém')
+  assert.equal(row['PROFISSÃO TOMADOR'], 'Médico')
+  for (const value of Object.values(row)) {
+    assert.equal(typeof value === 'string' && value.includes('�'), false)
+  }
+})
+
+test('WINDOWS-1252: banking/direct-debit fields uploaded via a Windows-1252 CSV are still stripped from sanitizedRaw', async () => {
+  const buffer = windows1252Buffer(
+    'RAMO;APÓLICE;ADESÃO;NOME TOMADOR;DOC TOMADOR;OBJECTO/BEM SEGURO;NOME BANCO;IBAN;AUTORIZAÇÃO\r\n' +
+    '1289;900000001;00001;Ana Exemplo;900000000;Objecto de teste;Banco Fictício;PT50000000000000000000000;AUTH-FAKE-1\r\n',
+  )
+  const parsed = await parsePortfolioWorkbook(buffer, 'POLRES.CSV')
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) return
+
+  const mapped = mapPortfolioRows('allianz', parsed.rows)
+  assert.equal(mapped.recognized, true)
+  const row = mapped.rows[0]!
+  for (const key of ['nome_banco', 'iban', 'autorizacao']) {
+    assert.equal(key in row.sanitizedRaw, false, `expected "${key}" to be absent from sanitizedRaw`)
+  }
+  assert.equal(JSON.stringify(row.sanitizedRaw).includes('PT50000000000000000000000'), false)
+})
+
+test('WINDOWS-1252: the trailing NUL-only header (real POLRES.CSV shape) is still discarded when the file is Windows-1252 encoded', async () => {
+  const buffer = Buffer.concat([
+    windows1252Buffer('APÓLICE;ADESÃO;'),
+    Buffer.alloc(20, 0x00),
+    windows1252Buffer('\r\n900000001;00001;'),
+    Buffer.alloc(20, 0x00),
+    windows1252Buffer('\r\n'),
+  ])
+  const result = await parsePortfolioWorkbook(buffer, 'polres.csv')
+  assert.equal(result.ok, true)
+  if (!result.ok) return
+  const row = result.rows[0]!
+  assert.equal(row['APÓLICE'], '900000001')
+  assert.equal(row['ADESÃO'], '00001')
+  assert.equal(JSON.stringify(row).includes('"undefined"'), false)
 })

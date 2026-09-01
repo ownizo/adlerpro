@@ -210,9 +210,17 @@ test('CSV UPLOAD: provider is never inferred from the filename or file content a
   // parsePortfolioWorkbook, and passing it through to that function/the
   // duplicate-run filename-independent fingerprint check above. Neither
   // ever compares it against a provider name (e.g. "allianz"/"polres").
+  //
+  // Deliberately no `s` (dotall) flag: this must only catch an actual
+  // same-line code comparison (e.g. `filename.includes('allianz')`), not
+  // any file that happens to mention both words anywhere at all — e.g. a
+  // doc comment on one line explaining a `filename` parameter, and a
+  // completely unrelated comment several lines later citing the real
+  // "POLRES.CSV" file by name for diagnostic clarity, must never trip
+  // this guard; those are prose, not a filename-sniffing predicate.
   for (const src of [routeSrc, excelWorkbookSrc, extractServerFnBlock('adminPreviewPortfolioImport')]) {
-    assert.doesNotMatch(src, /filename.*allianz|allianz.*filename/is)
-    assert.doesNotMatch(src, /filename.*polres|polres.*filename/is)
+    assert.doesNotMatch(src, /filename.*allianz|allianz.*filename/i)
+    assert.doesNotMatch(src, /filename.*polres|polres.*filename/i)
   }
 })
 
