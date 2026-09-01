@@ -21,7 +21,17 @@ import type { Json } from './types.ts'
  */
 export function normalizeHeaderName(header: unknown): string {
   if (header === null || header === undefined) return ''
-  const trimmed = String(header).trim()
+  // Some real carrier exports (seen in the Allianz POLRES CSV) include a
+  // malformed trailing column whose header is filled with NUL bytes
+  // (U+0000) — String.prototype.trim() does NOT strip those (they are
+  // control characters, not whitespace), so without this the column would
+  // survive as a NUL-filled key all the way into sanitizedRaw. Stripping
+  // NUL bytes here — before trim — makes such a header normalize to ''
+  // (discarded by every caller that already skips '' keys), while leaving
+  // every legitimate header's punctuation (periods, slashes, etc.)
+  // completely untouched — this is not a punctuation-semantics change.
+  const withoutNul = String(header).replace(/\u0000/g, '')
+  const trimmed = withoutNul.trim()
   if (trimmed === '') return ''
   const withoutDiacritics = trimmed.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   const collapsed = withoutDiacritics.toLowerCase().replace(/\s+/g, ' ').trim()
@@ -130,8 +140,21 @@ export function parseAmountSafely(value: unknown): number | undefined {
  * conta/BIC/SWIFT) — chamado SEMPRE antes de qualquer persistência de
  * staging, nunca opcional (ver requisito "PRIVACY — CRITICAL"). Devolve um
  * objeto novo, nunca muta `row`.
+ *
+ * Reforçado para o formato real Allianz POLRES: os seus cabeçalhos
+ * bancários/de débito direto em português (NOME BANCO, CÓD BANCO, AGÊNCIA
+ * BANC., CTA BANCO, DÍGITO CONTROLO, AUTORIZAÇÃO — além de IBAN/BIC, já
+ * cobertos) normalizam para chaves como nome_banco/cod_banco/
+ * agencia_banc./cta_banco/digito_controlo/autorizacao — nenhuma delas
+ * contém as palavras inglesas "bank"/"account", por isso as cláusulas
+ * genéricas acima não as apanhavam. As cláusulas novas (banco/banc\./
+ * controlo/autorizacao) são específicas destes nomes reais e não usam
+ * \b (chaves normalizadas usam "_" como separador, que \b trata como
+ * carácter de palavra) — mas são suficientemente específicas para não
+ * apanhar campos genéricos não relacionados como "tipo".
  */
-const BANKING_KEY_RE = /\bnib\b|\biban\b|bank.*account|account.*(number|nr|no)|\bswift\b|\bbic\b/i
+const BANKING_KEY_RE =
+  /\bnib\b|\biban\b|bank.*account|account.*(number|nr|no)|\bswift\b|\bbic\b|banco|banc\.|controlo|autorizacao/i
 
 export function stripBankingFields(row: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {}
