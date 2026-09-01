@@ -98,7 +98,7 @@ function ImportPortfolioPage() {
           <div>
             <h1 className="admin-page-title">Import Portfolio</h1>
             <p className="admin-page-subtitle">
-              Upload an insurer portfolio Excel file to preview a reconciliation against existing CRM records.
+              Upload an insurer portfolio Excel or CSV file to preview a reconciliation against existing CRM records.
               Nothing is created or changed in the CRM at this stage.
             </p>
           </div>
@@ -128,10 +128,10 @@ function ImportPortfolioPage() {
           </div>
 
           <div style={{ marginBottom: '1rem' }}>
-            <label className="block text-sm font-medium text-navy-600 mb-1">Excel file</label>
+            <label className="block text-sm font-medium text-navy-600 mb-1">Excel or CSV file</label>
             <input
               type="file"
-              accept=".xlsx,.xls"
+              accept=".xlsx,.xls,.csv"
               disabled={!provider || submitting}
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               className="w-full text-sm"

@@ -188,3 +188,35 @@ test('DUPLICATE_IMPORT_PROTECTION: the fingerprint is computed from provider + s
   const nearbyText = block.slice(Math.max(0, fingerprintCallIdx - 50), fingerprintCallIdx + 50)
   assert.doesNotMatch(nearbyText, /filename/)
 })
+
+// ── CSV upload support (fix/crm3-portfolio-csv-upload) ─────────────────
+//
+// Provider selection is untouched by adding CSV support: it's still the
+// explicit `data.provider` value validated against the allowlist above
+// (see "PROVIDER REQUIRED" test), never something derived from the
+// uploaded file. These tests lock that specifically for the CSV case —
+// no code path anywhere sniffs the filename or file content to guess
+// "this looks like Allianz".
+
+const routeSrc = readFileSync(join(__dirname, '../routes/admin.carrier-integrations.import.tsx'), 'utf8')
+const excelWorkbookSrc = readFileSync(join(__dirname, 'carrier-excel-workbook.ts'), 'utf8')
+
+test('CSV UPLOAD: the file picker accepts .xlsx, .xls and .csv', () => {
+  assert.match(routeSrc, /accept="\.xlsx,\.xls,\.csv"/)
+})
+
+test('CSV UPLOAD: provider is never inferred from the filename or file content anywhere in the import pipeline', () => {
+  // The only two places filename is read at all: the extension check in
+  // parsePortfolioWorkbook, and passing it through to that function/the
+  // duplicate-run filename-independent fingerprint check above. Neither
+  // ever compares it against a provider name (e.g. "allianz"/"polres").
+  for (const src of [routeSrc, excelWorkbookSrc, extractServerFnBlock('adminPreviewPortfolioImport')]) {
+    assert.doesNotMatch(src, /filename.*allianz|allianz.*filename/is)
+    assert.doesNotMatch(src, /filename.*polres|polres.*filename/is)
+  }
+})
+
+test('CSV UPLOAD: parsePortfolioWorkbook still requires an explicit, caller-supplied filename — extension is the only thing derived from it', () => {
+  assert.match(excelWorkbookSrc, /isCsvFilename\(filename\)/)
+  assert.match(excelWorkbookSrc, /Only \.xlsx, \.xls or \.csv files are accepted/)
+})
