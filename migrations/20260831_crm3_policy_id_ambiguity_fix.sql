@@ -78,6 +78,29 @@
 -- migrations/20260831_crm3_apply_portfolio_import.sql,
 -- migrations/20260831_crm3_apply_legacy_owner_fix.sql, or
 -- migrations/20260831_crm3_policy_participants.sql.
+--
+-- SECOND FIX (found while preparing this hotfix, pre-existing, unrelated
+-- to the ambiguity bug above): apply_carrier_import_record's
+-- add_policyholder_to_existing_client path used to run TWO
+-- `CASE r.selected_policyholder_mode` resolution blocks — an early one,
+-- before policy resolution, that already INSERTed a brand new
+-- individual_clients/companies row for create_individual/create_company
+-- (and redundantly re-validated existing_individual/existing_company),
+-- and a later, canonical one, after policy resolution, that
+-- independently re-resolves the participant from scratch (existing-
+-- selection reuse, external identity reuse, create-only-if-still-
+-- unresolved, retry persistence, policy_participants insertion, external
+-- identity linking) and overwrites whatever the early block produced.
+-- The early block's create-mode INSERT was therefore pure orphan
+-- creation: on every create_individual/create_company apply it left
+-- behind a person/company row referenced by nothing. Confirmed to affect
+-- the real production MGEN row for 75846 / Bella Feigina
+-- (add_policyholder_to_existing_client, selected_policyholder_mode =
+-- create_individual, against a policy owned by Ilya). Fixed by removing
+-- the early block's CASE entirely, keeping only the mode-shape
+-- validation that must still run before policy resolution (mode not
+-- null, mode is one of the four known values); the later block remains
+-- the sole authoritative participant-resolution path.
 
 CREATE OR REPLACE FUNCTION public.apply_carrier_import_record_block4(
   p_record_id uuid,
@@ -268,48 +291,27 @@ BEGIN
     pid := r.selected_policy_id;
     IF pid IS NULL OR r.policy_apply_action NOT IN ('link_existing_policy','update_existing_policy') THEN RAISE EXCEPTION 'apply_carrier_import_record: add_policyholder_to_existing_client requires an existing policy'; END IF;
     IF r.selected_policyholder_mode IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: add_policyholder_to_existing_client requires an explicit selected_policyholder_mode'; END IF;
-
-    CASE r.selected_policyholder_mode
-      WHEN 'existing_individual' THEN
-        IF r.selected_policyholder_individual_client_id IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: existing_individual policyholder requires selected_policyholder_individual_client_id'; END IF;
-        IF NOT EXISTS (SELECT 1 FROM public.individual_clients WHERE id = r.selected_policyholder_individual_client_id) THEN RAISE EXCEPTION 'apply_carrier_import_record: selected policyholder does not exist'; END IF;
-        participant_ind := r.selected_policyholder_individual_client_id;
-      WHEN 'existing_company' THEN
-        IF r.selected_policyholder_company_id IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: existing_company policyholder requires selected_policyholder_company_id'; END IF;
-        IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id = r.selected_policyholder_company_id) THEN RAISE EXCEPTION 'apply_carrier_import_record: selected policyholder does not exist'; END IF;
-        participant_company := r.selected_policyholder_company_id;
-      WHEN 'create_individual' THEN
-        IF NULLIF(btrim(COALESCE(p_new_individual->>'fullName','')), '') IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: create_individual requires a full name'; END IF;
-        INSERT INTO public.individual_clients (id, full_name, nif, email, phone, address, status, created_at)
-        VALUES (
-          gen_random_uuid(),
-          NULLIF(btrim(COALESCE(p_new_individual->>'fullName', '')), ''),
-          NULLIF(btrim(COALESCE(p_new_individual->>'nif', '')), ''),
-          NULLIF(btrim(COALESCE(p_new_individual->>'email', '')), ''),
-          NULLIF(btrim(COALESCE(p_new_individual->>'phone', '')), ''),
-          NULLIF(btrim(COALESCE(p_new_individual->>'address', '')), ''),
-          'active', now()
-        )
-        RETURNING id INTO participant_ind;
-      WHEN 'create_company' THEN
-        IF NULLIF(btrim(COALESCE(p_new_company->>'name', '')), '') IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: create_company requires a name'; END IF;
-        IF NULLIF(btrim(COALESCE(p_new_company->>'nif', '')), '') IS NULL THEN RAISE EXCEPTION 'apply_carrier_import_record: create_company requires a NIF'; END IF;
-        participant_company := 'comp_' || replace(gen_random_uuid()::text, '-', '');
-        INSERT INTO public.companies (id, name, nif, sector, contact_name, contact_email, contact_phone, address, created_at)
-        VALUES (
-          participant_company,
-          NULLIF(btrim(COALESCE(p_new_company->>'name', '')), ''),
-          NULLIF(btrim(COALESCE(p_new_company->>'nif', '')), ''),
-          COALESCE(NULLIF(p_new_company->>'sector', ''), ''),
-          COALESCE(NULLIF(p_new_company->>'contactName', ''), NULLIF(btrim(COALESCE(p_new_company->>'name', '')), '')),
-          COALESCE(NULLIF(p_new_company->>'contactEmail', ''), ''),
-          COALESCE(NULLIF(p_new_company->>'contactPhone', ''), ''),
-          COALESCE(NULLIF(p_new_company->>'address', ''), ''),
-          now()
-        );
-      ELSE
-        RAISE EXCEPTION 'apply_carrier_import_record: unsupported policyholder participant mode %', r.selected_policyholder_mode;
-    END CASE;
+    IF r.selected_policyholder_mode NOT IN ('existing_individual', 'existing_company', 'create_individual', 'create_company') THEN
+      RAISE EXCEPTION 'apply_carrier_import_record: unsupported policyholder participant mode %', r.selected_policyholder_mode;
+    END IF;
+    -- NOTE: participant resolution (existing-participant reuse, external
+    -- identity reuse, create-only-if-still-unresolved, and the actual
+    -- individual_clients/companies INSERT for create_individual/
+    -- create_company) happens exactly once, below, in the idempotent
+    -- block guarded by `IF r.customer_apply_action =
+    -- 'add_policyholder_to_existing_client' THEN` after policy
+    -- resolution. This block used to also run a CASE that created a new
+    -- individual_client/company for create_individual/create_company
+    -- and re-validated existing_individual/existing_company — entirely
+    -- redundant with (and racing ahead of) the canonical resolution
+    -- below, and on every create_individual/create_company apply it left
+    -- behind an orphan individual_clients/companies row never linked to
+    -- any policy_participants or external_client_identities row, because
+    -- the canonical block resolves and creates the real participant
+    -- independently and overwrites participant_ind/participant_company
+    -- without ever consulting what this block produced. Removed; keep
+    -- only the mode-shape validation above, which the canonical block
+    -- does not duplicate.
   END IF;
 
   IF r.policy_apply_action = 'create_policy' THEN
