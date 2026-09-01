@@ -105,3 +105,68 @@ test('stripBankingFields: case-insensitive and matches common variants (SWIFT/BI
   const result = stripBankingFields(input)
   assert.deepEqual(result, { keep: 'y' })
 })
+
+// ── Allianz POLRES banking/direct-debit fields — strengthened stripping ─
+
+test('stripBankingFields: every real Allianz POLRES banking/direct-debit field (normalized) is stripped', () => {
+  const input = {
+    nome_banco: 'x',
+    cod_banco: 'x',
+    'agencia_banc.': 'x',
+    cta_banco: 'x',
+    digito_controlo: 'x',
+    iban: 'x',
+    bic: 'x',
+    autorizacao: 'x',
+    // legitimate, unrelated fields must survive
+    nome_tomador: 'Maria Silva',
+    apolice: '208231303',
+    tipo: 'individual',
+  }
+  const result = stripBankingFields(input)
+  assert.deepEqual(result, { nome_tomador: 'Maria Silva', apolice: '208231303', tipo: 'individual' })
+})
+
+test('stripBankingFields: existing IBAN/NIB/BIC/SWIFT/account-number protections remain green after strengthening', () => {
+  const input = { nib: '000102030405060708090', iban: 'PT50000201231234567890154', bankAccountNumber: '12345', swift: 'x', BIC: 'x', tomador: 'Maria', nif: '123456789' }
+  const result = stripBankingFields(input)
+  assert.deepEqual(result, { tomador: 'Maria', nif: '123456789' })
+})
+
+test('stripBankingFields: does not accidentally strip unrelated fields like "tipo"', () => {
+  const result = stripBankingFields({ tipo: 'auto', keep: 'y' })
+  assert.deepEqual(result, { tipo: 'auto', keep: 'y' })
+})
+
+test('stripBankingFields: digito_controlo/autorizacao match the exact POLRES key only — a similarly-named but unrelated field survives', () => {
+  const input = {
+    digito_controlo: 'x', // the real POLRES banking field — must still be stripped
+    autorizacao: 'x', // the real POLRES banking field — must still be stripped
+    controlo_risco: 'keep-me',
+    autorizacao_marketing: 'keep-me',
+    autorizacao_documental: 'keep-me',
+  }
+  const result = stripBankingFields(input)
+  assert.deepEqual(result, {
+    controlo_risco: 'keep-me',
+    autorizacao_marketing: 'keep-me',
+    autorizacao_documental: 'keep-me',
+  })
+})
+
+// ── malformed NUL-only header ─────────────────────────────────────────
+
+test('normalizeHeaderName: a header made only of NUL characters normalizes to empty string', () => {
+  assert.equal(normalizeHeaderName('\u0000\u0000\u0000'), '')
+  assert.equal(normalizeHeaderName('\u0000 \u0000'), '')
+})
+
+test('normalizeRowKeys: a NUL-only header key is discarded, not persisted as a literal NUL-filled key', () => {
+  const input = { '\u0000\u0000\u0000': 'garbage', nif: '123456789' }
+  const result = normalizeRowKeys(input)
+  assert.deepEqual(result, { nif: '123456789' })
+})
+
+test('normalizeHeaderName: NUL bytes mixed into an otherwise legitimate header are stripped without touching punctuation', () => {
+  assert.equal(normalizeHeaderName('C.POSTAL TOMADOR '), 'c.postal_tomador')
+})

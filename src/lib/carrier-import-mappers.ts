@@ -146,7 +146,7 @@ export const mgenMapper: ProviderMapper = (normalizedRows) => {
   return { recognized: true, rows }
 }
 
-// ── Allianz / Zurich / Hiscox — placeholders, formato desconhecido ──────
+// ── Zurich / Hiscox — placeholders, formato desconhecido ────────────────
 
 function unknownFormatMapper(provider: CarrierProviderId): ProviderMapper {
   return (): ProviderMapperResult => ({
@@ -156,9 +156,103 @@ function unknownFormatMapper(provider: CarrierProviderId): ProviderMapper {
   })
 }
 
-export const allianzMapper: ProviderMapper = unknownFormatMapper('allianz')
 export const zurichMapper: ProviderMapper = unknownFormatMapper('zurich')
 export const hiscoxMapper: ProviderMapper = unknownFormatMapper('hiscox')
+
+// ── Allianz — POLRES, primeiro mapper real (CRM3 Block 3) ───────────────
+//
+// Este mapper é DELIBERADAMENTE parcial: só mapeia campos cujo significado
+// está confirmado pelo portfolio real (ver requisito "INTENTIONALLY DO
+// NOT MAP YET") para o porquê de premium/startDate/endDate/effectiveDate
+// ficarem por mapear nesta PR: PRÉMIO COM.S1/S2/S3
+// não está provado que corresponda a policies.annual_premium (valores
+// comerciais divergem materialmente dos annual_premium já em CRM), e
+// D.INICIO/D.FIM ora são datas de início original ora coincidem com um dia
+// a mais do que o fim de cobertura atual em CRM — nenhum dos dois é seguro
+// para propor automaticamente. Esses campos sobrevivem SÓ em sanitizedRaw
+// para revisão manual; isto significa que o dry-run/reconciliation
+// funciona mas o "create policy" apply para Allianz continua
+// intencionalmente por ativar (mapParsedRowToNewPolicyFields exige
+// start/end date).
+
+const ALLIANZ_FIELD_MAP: Partial<Record<string, keyof ParsedImportRow>> = {
+  nome_tomador: 'customerName',
+  doc_tomador: 'taxIdRaw',
+  'mor.tomador': 'address',
+  'c.postal_tomador': 'postalCode',
+  localidade_tomador: 'city',
+  tlf_tomador: 'phone',
+  // APÓLICE é sempre o número de apólice BASE — nunca combinado com
+  // ADESÃO (ver requisito "POLICY + ADHESION EDGE CASE"): duas linhas com
+  // a mesma APÓLICE e ADESÃO diferente (00001/00002) têm de reconciliar
+  // contra a MESMA policies.policy_number existente em CRM.
+  apolice: 'externalPolicyNumber',
+  // ADESÃO fica em carrierPlanId, nunca fundida em externalPolicyNumber —
+  // string sempre (nunca parseAmountSafely), para preservar zeros à
+  // esquerda ("00001" nunca vira 1).
+  adesao: 'carrierPlanId',
+  'objecto/bem_seguro': 'productDescription',
+  'f.pagamento': 'paymentFrequency',
+  // RAMO fica tal e qual (código Allianz, ex.: 1289/0229/2050) — nunca
+  // traduzido para um tipo de apólice inventado.
+  ramo: 'carrierSegment',
+}
+
+// Núcleo mínimo que decide "isto é mesmo um POLRES Allianz" (ver requisito
+// "FORMAT RECOGNITION"). apolice/adesao/nome_tomador/doc_tomador/ramo por
+// si só não bastam — um Excel genérico qualquer também pode ter NIF, nome
+// e "apólice" — por isso exige-se ainda pelo menos um campo
+// estruturalmente específico do POLRES.
+const ALLIANZ_CORE_REQUIRED_KEYS = ['apolice', 'adesao', 'nome_tomador', 'doc_tomador', 'ramo']
+const ALLIANZ_STRUCTURAL_KEYS = ['objecto/bem_seguro', 'cod_subramo_s1', 'premio_com.s1']
+
+export const allianzMapper: ProviderMapper = (normalizedRows) => {
+  if (normalizedRows.length === 0) {
+    return { recognized: false, rows: [], error: 'File format not yet recognised for Allianz' }
+  }
+
+  const firstRowKeys = new Set(Object.keys(normalizedRows[0]!))
+  const hasCore = ALLIANZ_CORE_REQUIRED_KEYS.every((key) => firstRowKeys.has(key))
+  const hasStructural = ALLIANZ_STRUCTURAL_KEYS.some((key) => firstRowKeys.has(key))
+  if (!hasCore || !hasStructural) {
+    return { recognized: false, rows: [], error: 'File format not yet recognised for Allianz' }
+  }
+
+  const rows: ParsedImportRow[] = normalizedRows.map((rawRow) => {
+    const parsed: ParsedImportRow = { sanitizedRaw: {} }
+    for (const [key, value] of Object.entries(rawRow)) {
+      const targetField = ALLIANZ_FIELD_MAP[key]
+      if (!targetField) continue
+      if (value === null || value === undefined || value === '') continue
+      // Todos os campos mapeados acima são strings (ver STRING_FIELDS) —
+      // nunca datas/valores nesta PR (ver "INTENTIONALLY DO NOT MAP YET").
+      if (STRING_FIELDS.has(targetField)) {
+        (parsed as any)[targetField] = String(value).trim()
+      }
+    }
+
+    // D.ANULAÇÃO: só "cancelled" havendo uma data de anulação válida e não
+    // vazia (ver requisito "CANCELLATION / REPLACEMENT EDGE CASE") — texto
+    // em branco, ou um valor que não é sequer uma data reconhecível, nunca
+    // marca uma apólice como cancelada por engano. A data em si nunca é
+    // guardada num campo ParsedImportRow — sobrevive só em sanitizedRaw,
+    // como todos os outros campos de data desta seguradora.
+    parsed.carrierStatus = parseImportDateSafely(rawRow['d.anulacao']) !== undefined ? 'cancelled' : 'active'
+
+    // premium/startDate/endDate/effectiveDate NÃO são mapeados aqui — ver
+    // comentário no topo desta secção. PRÉMIO COM.S1/S2/S3 e D.EMISSÃO/
+    // D.INICIO/D.FIM/D.ANULAÇÃO, tal como APÓLICE SUBST/ADESÃO SUBST.,
+    // sobrevivem só em sanitizedRaw via a cópia integral da linha abaixo —
+    // nunca resumida só aos campos mapeados.
+    const jsonSafeRow: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(rawRow)) jsonSafeRow[key] = toJsonSafeValue(value)
+    parsed.sanitizedRaw = sanitizeRawRowForStaging(jsonSafeRow)
+
+    return parsed
+  })
+
+  return { recognized: true, rows }
+}
 
 export const PROVIDER_MAPPERS: Record<CarrierProviderId, ProviderMapper> = {
   mgen: mgenMapper,
