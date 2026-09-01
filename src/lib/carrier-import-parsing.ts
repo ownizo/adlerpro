@@ -147,14 +147,21 @@ export function parseAmountSafely(value: unknown): number | undefined {
  * cobertos) normalizam para chaves como nome_banco/cod_banco/
  * agencia_banc./cta_banco/digito_controlo/autorizacao — nenhuma delas
  * contém as palavras inglesas "bank"/"account", por isso as cláusulas
- * genéricas acima não as apanhavam. As cláusulas novas (banco/banc\./
- * controlo/autorizacao) são específicas destes nomes reais e não usam
- * \b (chaves normalizadas usam "_" como separador, que \b trata como
- * carácter de palavra) — mas são suficientemente específicas para não
- * apanhar campos genéricos não relacionados como "tipo".
+ * genéricas acima não as apanhavam. A cláusula `banco|banc\.` cobre
+ * nome_banco/cod_banco/cta_banco/agencia_banc. (não usa \b — chaves
+ * normalizadas usam "_" como separador, que \b trata como carácter de
+ * palavra — mas "banco"/"banc." continuam suficientemente específicas
+ * para não apanhar campos genéricos não relacionados como "tipo").
+ *
+ * digito_controlo e autorizacao são âncoras EXATAS de chave completa
+ * (^...$), não substring — uma primeira versão usava `controlo`/
+ * `autorizacao` como substring genérica, o que também apanhava campos
+ * não bancários só de nome parecido (ex.: controlo_risco,
+ * autorizacao_marketing, autorizacao_documental). Isto continua a
+ * apanhar exatamente os dois campos POLRES reais, sem falsos positivos.
  */
 const BANKING_KEY_RE =
-  /\bnib\b|\biban\b|bank.*account|account.*(number|nr|no)|\bswift\b|\bbic\b|banco|banc\.|controlo|autorizacao/i
+  /\bnib\b|\biban\b|bank.*account|account.*(number|nr|no)|\bswift\b|\bbic\b|banco|banc\.|^digito_controlo$|^autorizacao$/i
 
 export function stripBankingFields(row: Record<string, unknown>): Record<string, unknown> {
   const result: Record<string, unknown> = {}

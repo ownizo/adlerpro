@@ -138,6 +138,22 @@ test('stripBankingFields: does not accidentally strip unrelated fields like "tip
   assert.deepEqual(result, { tipo: 'auto', keep: 'y' })
 })
 
+test('stripBankingFields: digito_controlo/autorizacao match the exact POLRES key only — a similarly-named but unrelated field survives', () => {
+  const input = {
+    digito_controlo: 'x', // the real POLRES banking field — must still be stripped
+    autorizacao: 'x', // the real POLRES banking field — must still be stripped
+    controlo_risco: 'keep-me',
+    autorizacao_marketing: 'keep-me',
+    autorizacao_documental: 'keep-me',
+  }
+  const result = stripBankingFields(input)
+  assert.deepEqual(result, {
+    controlo_risco: 'keep-me',
+    autorizacao_marketing: 'keep-me',
+    autorizacao_documental: 'keep-me',
+  })
+})
+
 // ── malformed NUL-only header ─────────────────────────────────────────
 
 test('normalizeHeaderName: a header made only of NUL characters normalizes to empty string', () => {
