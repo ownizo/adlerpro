@@ -44,6 +44,48 @@ function isCsvFilename(filename: string): boolean {
   return /\.csv$/i.test(filename)
 }
 
+const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf])
+
+/**
+ * Decodifica os bytes de um CSV para texto — suporta tanto CSV UTF-8
+ * (Excel "CSV UTF-8", a maioria dos exports modernos) como CSV
+ * Windows-1252/Latin-1 (o export real Allianz POLRES.CSV, confirmado por
+ * inspeção byte-a-byte contra o ficheiro real: um "Ó" grava como o byte
+ * 0xD3, uma sequência UTF-8 inválida, mas um carácter Windows-1252 válido
+ * — decodificar sempre como UTF-8 corrompe todo cabeçalho acentuado em
+ * U+FFFD, exatamente o bug que fez o fingerprint Allianz falhar mesmo com
+ * apolice/adesao/premio_com.s1 presentes no ficheiro real).
+ *
+ * Estratégia (nunca adivinha pela presença de U+FFFD no resultado — usa
+ * TextDecoder('utf-8', { fatal: true }), que LANÇA em vez de substituir
+ * silenciosamente, como o mecanismo determinístico de validade):
+ *   1. Remove um BOM UTF-8 (EF BB BF) inicial, se presente — explicitamente,
+ *      por corte de bytes ANTES de qualquer descodificação, nunca deixado
+ *      para o comportamento implícito por omissão do TextDecoder (que
+ *      também o remove, mas não de forma óbvia/testada aqui).
+ *   2. Tenta descodificar os bytes restantes como UTF-8 estrito — se toda
+ *      a sequência de bytes for UTF-8 válido, é isso que o ficheiro é.
+ *   3. Se a descodificação estrita LANÇAR (bytes inválidos como UTF-8),
+ *      volta a descodificar os MESMOS bytes (sem BOM) como Windows-1252 —
+ *      windows-1252 tem um mapeamento para todos os 256 valores de byte,
+ *      por isso nunca lança. Windows-1252 (não ISO-8859-1/Latin-1) é
+ *      escolhido deliberadamente porque exports reais podem conter bytes
+ *      na gama 0x80-0x9F (€, aspas tipográficas, etc.) que só têm
+ *      significado em Windows-1252, não em ISO-8859-1 puro.
+ *
+ * Ficheiros CSV UTF-8 válidos (com ou sem BOM) continuam a descodificar
+ * exatamente como antes — este helper nunca escolhe Windows-1252 para um
+ * ficheiro que já é UTF-8 válido.
+ */
+function decodeCsvText(buffer: Buffer): string {
+  const bytes = buffer.subarray(0, 3).equals(UTF8_BOM) ? buffer.subarray(3) : buffer
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes)
+  } catch {
+    return new TextDecoder('windows-1252').decode(bytes)
+  }
+}
+
 export async function parsePortfolioWorkbook(buffer: Buffer, filename: string): Promise<ParseWorkbookResult> {
   const isCsv = isCsvFilename(filename)
   if (!isCsv && !/\.(xlsx|xls)$/i.test(filename)) {
@@ -61,19 +103,14 @@ export async function parsePortfolioWorkbook(buffer: Buffer, filename: string): 
   let workbook: any
   try {
     if (isCsv) {
-      // Decode as UTF-8 text ourselves and pass type:'string' — passing
-      // the raw Buffer with type:'buffer' makes SheetJS mis-decode
+      // Decode as text ourselves (UTF-8 or Windows-1252 — see
+      // decodeCsvText) and pass type:'string' — passing the raw Buffer
+      // with type:'buffer' makes SheetJS assume UTF-8 too and mis-decode
       // accented headers/values (mojibake — e.g. "APÓLICE" becomes
-      // "APÃLICE"); an already-UTF-8-decoded JS string parses correctly
-      // and keeps every Portuguese accented header intact for
-      // normalizeHeaderName downstream.
-      let text = buffer.toString('utf8')
-      // Strip a leading UTF-8 BOM (U+FEFF) — common in "CSV UTF-8"
-      // exports from Windows/Excel. Left in place it silently attaches
-      // to the FIRST header's name, so that column would never match any
-      // provider mapper's required keys (e.g. "apolice" would arrive as
-      // "﻿apolice").
-      if (text.charCodeAt(0) === 0xfeff) text = text.slice(1)
+      // "APÃLICE"); an already-correctly-decoded JS string parses
+      // correctly and keeps every Portuguese accented header intact for
+      // normalizeHeaderName downstream, regardless of source encoding.
+      const text = decodeCsvText(buffer)
       workbook = XLSX.read(text, { type: 'string', cellDates: true, raw: true })
     } else {
       // cellDates: true — datas nativas do Excel vêm como objetos Date, não
