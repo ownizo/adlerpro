@@ -31,6 +31,7 @@ import { Route as OneLoginRouteImport } from './routes/one/login'
 import { Route as OneDocumentsRouteImport } from './routes/one/documents'
 import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
 import { Route as OneClaimsRouteImport } from './routes/one/claims'
+import { Route as AdminPaymentLinksRouteImport } from './routes/admin.payment-links'
 import { Route as AdminCarrierIntegrationsRouteImport } from './routes/admin.carrier-integrations'
 import { Route as AdminCarrierIntegrationsImportRouteImport } from './routes/admin.carrier-integrations.import'
 import { Route as AdminCarrierIntegrationsRunsIdRouteImport } from './routes/admin.carrier-integrations.runs.$id'
@@ -145,6 +146,11 @@ const OneClaimsRoute = OneClaimsRouteImport.update({
   path: '/one/claims',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminPaymentLinksRoute = AdminPaymentLinksRouteImport.update({
+  id: '/payment-links',
+  path: '/payment-links',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCarrierIntegrationsRoute =
   AdminCarrierIntegrationsRouteImport.update({
     id: '/carrier-integrations',
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
+  '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -206,6 +213,7 @@ export interface FileRoutesByTo {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
+  '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
+  '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -263,6 +272,7 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/admin/carrier-integrations'
+    | '/admin/payment-links'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/admin/carrier-integrations'
+    | '/admin/payment-links'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -317,6 +328,7 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/admin/carrier-integrations'
+    | '/admin/payment-links'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -511,6 +523,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OneClaimsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/payment-links': {
+      id: '/admin/payment-links'
+      path: '/payment-links'
+      fullPath: '/admin/payment-links'
+      preLoaderRoute: typeof AdminPaymentLinksRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/carrier-integrations': {
       id: '/admin/carrier-integrations'
       path: '/carrier-integrations'
@@ -553,10 +572,12 @@ const AdminCarrierIntegrationsRouteWithChildren =
 
 interface AdminRouteChildren {
   AdminCarrierIntegrationsRoute: typeof AdminCarrierIntegrationsRouteWithChildren
+  AdminPaymentLinksRoute: typeof AdminPaymentLinksRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCarrierIntegrationsRoute: AdminCarrierIntegrationsRouteWithChildren,
+  AdminPaymentLinksRoute: AdminPaymentLinksRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
