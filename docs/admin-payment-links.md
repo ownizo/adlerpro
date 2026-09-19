@@ -1,35 +1,70 @@
-# Admin insurance premium Payment Links
+# Admin insurance premium Checkout links
 
-`/admin/payment-links` is restricted to administrators. The server function independently enforces the existing admin role middleware before calling Stripe. This collects pass-through premiums for Adler & Rochefort (Ownizo Unipessoal Lda), for subsequent remittance to insurers; it does not automate remittance or create service invoices.
+`/admin/payment-links` (Payments → Payment Link) is restricted to administrators. The UI action remains **Create Payment Link**, but the implementation creates a single-use Stripe-hosted Checkout Session in `payment` mode, not a Stripe Payment Link. It collects pass-through premiums for Adler & Rochefort (Ownizo Unipessoal Lda), for subsequent remittance to insurers. It does not automate remittance or issue service invoices.
 
-## Configuration
+## Configuration and rollout
 
-Set server-only environment variables together in each environment:
+Apply `migrations/20260919_premium_payments.sql` to the intended Supabase database **before** enabling the feature. The migration has not been applied to a remote database by this PR. It follows the repository's dated SQL migration convention and is additive.
 
-| Environment | STRIPE_SECRET_KEY | STRIPE_INSURANCE_PREMIUM_PRODUCT_ID |
+Set these three server-only variables in each environment:
+
+| Variable | Development/test | Production |
 | --- | --- | --- |
-| Development/test | Test credential | prod_VHukk4H9WtEYWh |
-| Production | Live credential | prod_VHukIf4wWcTtbT |
+| `STRIPE_SECRET_KEY` | Test credential | Live credential |
+| `STRIPE_INSURANCE_PREMIUM_PRODUCT_ID` | `prod_VHukk4H9WtEYWh` | `prod_VHukIf4wWcTtbT` |
+| `STRIPE_WEBHOOK_SECRET` | Test endpoint / local listener signing secret | Live endpoint signing secret |
 
-Never prefix the secret with `VITE_`. No environment configuration or deployment is performed by this change. The TEST/LIVE badge comes from Stripe's returned Payment Link.
+No Stripe secret may have a `VITE_` prefix. Keep credentials in the host's environment settings, not source control. Existing Supabase configuration remains required: `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `VITE_SUPABASE_ANON_KEY` for existing browser authentication. The new table is accessible only by the server service role; neither anonymous nor authenticated browser clients receive table grants. Server functions reuse the existing admin-role middleware.
 
-## Behavior
+In Stripe Dashboard / Workbench:
 
-- Amounts accept a decimal point or comma and up to two decimal places, without grouping separators. Conversion uses integer arithmetic; `1248.36` becomes `124836` cents. Amounts must be positive and fit Stripe's eight-digit amount limit. Stripe can reject amounts below its payment-method minimum; amounts are never silently increased.
-- A one-time EUR Price references the configured existing product. One fixed quantity, disabled automatic tax, disabled invoice creation, disabled promotion codes, and a one-completed-session restriction are sent explicitly.
-- Link and PaymentIntent metadata include purpose, client name/email, insurer, and policy reference. The email is URL-prefilled and remains editable at checkout.
-- A UUID identifies each form operation. Distinct Price/Link idempotency keys include the authenticated admin ID. Same-details retries reuse both keys; edits start a new operation. Stripe's idempotency retention is at least 24 hours, not a permanent deduplication store. Reloading the page starts a new operation. After success, creation stays disabled until the admin selects “Create another link”.
-- Stripe errors are replaced with a safe message. The form does not add tax, a surcharge, or processing fees. Stripe's merchant processing fee does not change the configured premium.
+1. Enable compatible payment methods in the account's payment-method configuration. The code omits `payment_method_types`, so Stripe dynamically chooses eligible methods. Cards, Apple Pay, Google Pay, Link, MB WAY, Multibanco, and SEPA Direct Debit depend on account activation, currency/amount, customer location, browser/device, and Stripe eligibility; they are not guaranteed to appear for every checkout.
+2. Register a snapshot webhook destination at `https://admin.adlerrochefort.com/api/stripe-webhook` after deployment, separately for live and test environments. Subscribe to:
+   - `checkout.session.completed`
+   - `checkout.session.async_payment_succeeded`
+   - `checkout.session.async_payment_failed`
+   - `checkout.session.expired`
+   - `payment_intent.succeeded`
+   - `payment_intent.payment_failed`
+   - `payment_intent.processing`
+3. Set the endpoint's signing secret as `STRIPE_WEBHOOK_SECRET`. Use the account's own events (not Connect events); use the SDK's API version for snapshot delivery when available (`node_modules/stripe/esm/apiVersion.js`).
+4. Verify a test-mode Checkout, including a successful card payment, a declined payment/retry, a delayed-method pending → paid/failed flow, expiration, and webhook delivery/retries before enabling live credentials.
 
-## Currency limitation requiring review
+For local testing, forward events with `stripe listen --forward-to localhost:3000/api/stripe-webhook` and use that listener's signing secret. The endpoint accepts POST and verifies Stripe's signature against the **raw request body**. Invalid/missing signatures return 400. Missing configuration returns 503. Failed persistence or Stripe reads return 500 so Stripe retries. Unrelated events are acknowledged without changes.
 
-Stripe currently automatically enables Adaptive Pricing for Payment Links. A EUR Price fixes the underlying premium in EUR, but Payment Links can offer a converted local currency to a payer, including Stripe's conversion fee. The Payment Links API does not expose an Adaptive Pricing disable flag. This means the requested **strictly EUR-only customer checkout is not guaranteed by this integration**. Do not treat this as satisfying that requirement without accepting the limitation. To enforce EUR-only checkout, use hosted Checkout Sessions with Adaptive Pricing disabled instead; that is a change to the requested Payment Links architecture.
+## Exact premium and Checkout behavior
 
-References:
-- https://docs.stripe.com/payment-links/customize
-- https://support.stripe.com/questions/adaptive-pricing
-- https://docs.stripe.com/api/payment-link/create
+Amounts accept a point or comma and up to two decimals, without grouping separators. Integer conversion makes `1248.36` exactly `124836` cents. Amounts must be positive and fit Stripe's eight-digit amount limit. Stripe can reject values below a payment method's minimum; the amount is never increased automatically.
 
-## Validation
+Each attempt creates a one-time EUR Price on the configured existing product and a hosted Checkout Session with `mode: payment`, `currency: eur`, one fixed quantity, `adaptive_pricing.enabled: false`, `automatic_tax.enabled: false`, `invoice_creation.enabled: false`, and promotion codes disabled. No discounts, taxes, shipping, surcharges, application fees, subscription parameters, or customer fee additions are supplied. Dynamic Payment Methods stay enabled. Stripe's merchant processing cost does not alter the EUR premium.
 
-Run `npm test`, `npm run build`, and `npx tsc --noEmit`. Focused tests validate decimal conversion, hostile inputs, Stripe request settings, retry keys, metadata propagation, and error sanitization with a stub Stripe client. No Stripe objects or real payments are created by the tests. A real test-mode checkout still needs verification with configured credentials, including single-completion behavior.
+`customer_email` prefills Checkout directly. Session and PaymentIntent metadata contain purpose, customer name/email, insurer, policy reference, authenticated admin ID, and the internal premium payment UUID.
+
+Success returns to the **current request origin** plus `/admin/payment-links?session_id={CHECKOUT_SESSION_ID}`; cancellation returns to `/admin/payment-links?cancelled=1`. These are admin routes as requested: a signed-out policyholder sees the existing login flow. Neither returning to these URLs nor presenting a session ID proves payment. An authenticated admin status lookup validates the session against a stored premium and reads Stripe server-side. Cancellation does not cancel the session; an open link remains usable until completion or expiration (Stripe's default is 24 hours).
+
+## Persistence, retries, and status
+
+`premium_payments` stores the premium details, authenticated creator, mode, unique Stripe Session/PaymentIntent IDs, Checkout URL, status, timestamps, creation request key/fingerprint, and concurrency version. A reservation is committed before Stripe object creation. Creation failure can leave a reserved `created` row with no session ID; this is an unresolved creation attempt, not proof that a usable link exists.
+
+A UUID identifies a form operation. Price and Session calls use distinct, stable Stripe idempotency keys scoped to the admin. Same-details retries recover the stored session without creating another; an uncertain response uses the same Stripe keys. Changed details with the same key are rejected. After 23 hours, an unresolved creation attempt is refused because Stripe retains keys for at least 24 hours. Reconcile such an attempt in Stripe before deliberately creating a new link. Reloading the form or choosing “Create another link” starts a new operation; this is not policy-level deduplication.
+
+| Status | Meaning |
+| --- | --- |
+| Created | Checkout open; payment not confirmed (or a reserved creation attempt has no session yet) |
+| Pending | Checkout completed but unpaid, or PaymentIntent processing; wait for settlement |
+| Paid | Stripe confirms settlement with the matching EUR amount |
+| Failed | PaymentIntent canceled or failed; a still-open Checkout may allow a retry |
+| Expired | Checkout expired without a confirmed or processing payment |
+
+All handled events trigger retrieval of the current Checkout Session with expanded PaymentIntent. This avoids trusting stale event snapshots. `checkout.session.completed` with unpaid status is **not** payment success. Amount, currency, mode, environment, and internal/Stripe identifiers are checked before persistence. Early PaymentIntent webhooks resolve the corresponding Checkout Session through Stripe and can attach it to the reserved row.
+
+Database compare-and-swap updates use the version column. A conflict re-reads both the row and Stripe; `paid` cannot be downgraded by older events or concurrent status refreshes. `paid_at` records the first server-confirmed settlement observation. Repeated events are safe without a second event-log table. This feature does not track refunds/disputes or insurer remittances. The admin result refreshes from the server every 15 seconds while open.
+
+## Verification
+
+- `npm test` covers decimal conversion, input validation, exact Checkout parameters, metadata/email, retry keys and partial failures, old-attempt rejection, signature verification, delayed status transitions, duplicate/stale/early events, expiry and database-error retries using a stub Stripe client/store.
+- `npm run build` verifies both client and server bundles. Stripe secrets and server implementation must be absent from the client bundle.
+- `npx tsc --noEmit` must introduce no errors relative to the existing branch baseline.
+- The migration was executed in isolated PostgreSQL via PGlite, testing constraints, unique identifiers, stale-write rejection, RLS/client-role denial, service-role access and deleted-admin preservation. No production database or Stripe account was mutated.
+
+References: [Checkout API](https://docs.stripe.com/api/checkout/sessions/create), [webhook signatures and delivery](https://docs.stripe.com/webhooks), [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).

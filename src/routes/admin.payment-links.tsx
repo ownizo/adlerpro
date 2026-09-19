@@ -1,12 +1,16 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { useIdentity } from '@/lib/identity-context'
-import { createPremiumPaymentLink } from '@/lib/payment-links.functions'
+import { createPremiumPaymentLink, fetchPremiumPaymentStatus } from '@/lib/payment-links.functions'
 import { validatePaymentLinkInput, type PaymentLinkInput } from '@/lib/payment-link-validation'
 
 export const Route = createFileRoute('/admin/payment-links')({
   component: PaymentLinkPage,
+  validateSearch: (search: Record<string, unknown>): { session_id?: string; cancelled?: string } => ({
+    session_id: typeof search.session_id === 'string' ? search.session_id : undefined,
+    cancelled: String(search.cancelled) === '1' ? '1' : undefined,
+  }),
   head: () => ({ meta: [{ title: 'Payment Link · Adler & Rochefort Admin' }] }),
 })
 
@@ -20,6 +24,8 @@ const fields = [
 
 function PaymentLinkPage() {
   const { user, ready } = useIdentity()
+  const search = Route.useSearch()
+  const navigate = Route.useNavigate()
   const [form, setForm] = useState({ customerName: '', customerEmail: '', amount: '', insurer: '', policyReference: '' })
   const [busy, setBusy] = useState(false)
   const inFlight = useRef(false)
@@ -27,6 +33,25 @@ function PaymentLinkPage() {
   const [error, setError] = useState('')
   const [copyStatus, setCopyStatus] = useState('')
   const [result, setResult] = useState<Awaited<ReturnType<typeof createPremiumPaymentLink>> | null>(null)
+
+  const [statusError, setStatusError] = useState('')
+  const sessionId = search.session_id ?? result?.sessionId
+  const canReadStatus = ready && !!user?.roles?.includes('admin')
+  useEffect(() => {
+    if (!canReadStatus || !sessionId) return
+    let cancelled = false
+    async function refresh() {
+      try {
+        const payment = await fetchPremiumPaymentStatus({ data: { sessionId: sessionId! } })
+        if (!cancelled) { setResult(payment); setStatusError('') }
+      } catch {
+        if (!cancelled) setStatusError('Unable to refresh payment status. It will be retried automatically.')
+      }
+    }
+    void refresh()
+    const timer = setInterval(() => { void refresh() }, 15000)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [canReadStatus, sessionId])
 
   if (!ready) return <AppLayout><p>Loading…</p></AppLayout>
   if (!user) return <Navigate to="/login" />
@@ -58,6 +83,9 @@ function PaymentLinkPage() {
         <div><h1 className="admin-page-title">Payment Link</h1>
           <p className="admin-page-subtitle">Create a one-time payment link for an insurance premium.</p></div>
       </header>
+      {search.cancelled && <p role="status" className="text-sm">Checkout was cancelled. This does not confirm payment or expire the Checkout Session.</p>}
+      {search.session_id && !result && <p role="status" className="text-sm">Checking payment status with Stripe…</p>}
+      {statusError && <p role="alert" className="text-sm text-red-700">{statusError}</p>}
       <form onSubmit={submit} className="admin-kpi-card space-y-4">
         <fieldset disabled={busy || !!result} className="grid grid-cols-1 sm:grid-cols-2 gap-4 disabled:opacity-70">
           {fields.map(([key, label, maxLength]) => <div key={key}>
@@ -75,7 +103,8 @@ function PaymentLinkPage() {
         <button type="submit" disabled={busy || !!result} className="admin-btn admin-btn-primary disabled:opacity-50">{busy ? 'Creating…' : 'Create Payment Link'}</button>
       </form>
       {result && <section className="admin-kpi-card space-y-3" aria-label="Created Payment Link">
-        <p role="status" className="font-semibold">Payment Link created successfully <span className="admin-chip admin-chip--info">{result.livemode ? 'LIVE' : 'TEST'}</span></p>
+        <p role="status" className="font-semibold">Payment status: {{ created: 'Created', pending: 'Pending', paid: 'Paid', failed: 'Failed', expired: 'Expired' }[result.status]} <span className="admin-chip admin-chip--info">{result.livemode ? 'LIVE' : 'TEST'}</span></p>
+        <p className="text-sm">{result.status === 'pending' ? 'Payment submitted; awaiting confirmation from the payment provider.' : result.status === 'paid' ? 'Payment confirmed by Stripe.' : 'Payment is not confirmed. Status is refreshed automatically.'}</p>
         <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
           <div><dt>Amount</dt><dd className="font-semibold">{new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(result.amountCents / 100)}</dd></div>
           <div><dt>Insurer</dt><dd className="break-words">{result.insurer}</dd></div>
@@ -83,12 +112,12 @@ function PaymentLinkPage() {
         </dl>
         <p className="break-all text-sm">{result.url}</p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" className="admin-btn admin-btn-primary" onClick={async () => {
-            try { await navigator.clipboard.writeText(result.url); setCopyStatus('Link copied.') }
+          <button type="button" disabled={!result.url} className="admin-btn admin-btn-primary disabled:opacity-50" onClick={async () => {
+            try { await navigator.clipboard.writeText(result.url!); setCopyStatus('Link copied.') }
             catch { setCopyStatus('Unable to copy. Select and copy the URL above.') }
           }}>Copy link</button>
-          <a className="admin-btn admin-btn-secondary" href={result.url} target="_blank" rel="noopener noreferrer">Open link</a>
-          <button type="button" className="admin-btn admin-btn-secondary" onClick={() => { setResult(null); setCopyStatus(''); attempt.current = null }}>Create another link</button>
+          {result.url && <a className="admin-btn admin-btn-secondary" href={result.url} target="_blank" rel="noopener noreferrer">Open link</a>}
+          <button type="button" className="admin-btn admin-btn-secondary" onClick={() => { setResult(null); setCopyStatus(''); setStatusError(''); attempt.current = null; void navigate({ search: {}, replace: true }) }}>Create another link</button>
         </div>
         <p role="status" className="text-sm">{copyStatus}</p>
       </section>}
