@@ -70,6 +70,8 @@ export async function createPremiumCheckoutWithClient(
   }, { idempotencyKey: `${requestKey}:price` })
   const session = await stripe.checkout.sessions.create({
     mode: 'payment', currency: 'eur', ui_mode: 'hosted_page',
+    // Apple Pay and Google Pay are available through card when eligible.
+    payment_method_types: ['card', 'mb_way', 'amazon_pay'],
     line_items: [{ price: price.id, quantity: 1, adjustable_quantity: { enabled: false } }],
     customer_email: data.customerEmail,
     adaptive_pricing: { enabled: false },
@@ -82,7 +84,6 @@ export async function createPremiumCheckoutWithClient(
     metadata, payment_intent_data: { metadata },
     success_url: `${origin}/admin/payment-links?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin}/admin/payment-links?cancelled=1`,
-    // Omit payment_method_types to use Dashboard-managed Dynamic Payment Methods.
   }, { idempotencyKey: `${requestKey}:checkout` })
   if (!session.url) throw new Error('Stripe did not return a hosted Checkout URL.')
   // Reconciliation also handles a webhook that arrived before this response.

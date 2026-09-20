@@ -52,7 +52,7 @@ function intent(status: Stripe.PaymentIntent.Status, lastError = false) {
   return { id: 'pi_premium', object: 'payment_intent', amount: 124836, amount_received: status === 'succeeded' ? 124836 : 0, currency: 'eur', livemode: false, status, last_payment_error: lastError ? { message: 'Declined' } : null, metadata: { purpose: 'insurance_premium', premium_payment_id: paymentId } } as unknown as Stripe.PaymentIntent
 }
 
-test('creates exact EUR Checkout using Dynamic Payment Methods and email; no invoice/tax/discount/subscription', async () => {
+test('creates exact EUR Checkout using only card, MB WAY, Amazon Pay and email; no invoice/tax/discount/subscription', async () => {
   const f = fixture()
   const result = await f.create()
   const [price, checkout] = f.calls
@@ -62,13 +62,17 @@ test('creates exact EUR Checkout using Dynamic Payment Methods and email; no inv
   assert.equal(price.params.recurring, undefined)
   assert.equal(checkout.params.mode, 'payment')
   assert.equal(checkout.params.ui_mode, 'hosted_page')
+  assert.deepEqual(checkout.params.payment_method_types, ['card', 'mb_way', 'amazon_pay'])
+  for (const method of ['link', 'klarna', 'bancontact', 'satispay', 'eps', 'customer_balance', 'sepa_debit', 'apple_pay', 'google_pay']) {
+    assert.equal(checkout.params.payment_method_types.includes(method), false, `${method} must not be an explicit payment method`)
+  }
   assert.equal(checkout.params.currency, 'eur')
   assert.equal(checkout.params.customer_email, data.customerEmail)
   assert.deepEqual(checkout.params.adaptive_pricing, { enabled: false })
   assert.deepEqual(checkout.params.automatic_tax, { enabled: false })
   assert.deepEqual(checkout.params.invoice_creation, { enabled: false })
   assert.equal(checkout.params.allow_promotion_codes, false)
-  for (const key of ['payment_method_types', 'discounts', 'subscription_data', 'shipping_options', 'automatic_surcharge']) assert.equal(checkout.params[key], undefined)
+  for (const key of ['discounts', 'subscription_data', 'shipping_options', 'automatic_surcharge']) assert.equal(checkout.params[key], undefined)
   assert.deepEqual(checkout.params.line_items, [{ price: 'price_test', quantity: 1, adjustable_quantity: { enabled: false } }])
   assert.deepEqual(checkout.params.payment_intent_data.metadata, checkout.params.metadata)
   assert.deepEqual(checkout.params.metadata, { purpose: 'insurance_premium', premium_payment_id: paymentId, created_by: 'admin-id', customer_name: data.customerName, customer_email: data.customerEmail, insurer: data.insurer, policy_reference: data.policyReference })
