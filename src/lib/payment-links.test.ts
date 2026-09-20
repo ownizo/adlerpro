@@ -61,6 +61,7 @@ test('creates exact EUR Checkout using Dynamic Payment Methods and email; no inv
   assert.equal(price.params.currency, 'eur')
   assert.equal(price.params.recurring, undefined)
   assert.equal(checkout.params.mode, 'payment')
+  assert.equal(checkout.params.ui_mode, 'hosted_page')
   assert.equal(checkout.params.currency, 'eur')
   assert.equal(checkout.params.customer_email, data.customerEmail)
   assert.deepEqual(checkout.params.adaptive_pricing, { enabled: false })

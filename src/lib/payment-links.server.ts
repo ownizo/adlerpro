@@ -69,7 +69,7 @@ export async function createPremiumCheckoutWithClient(
     currency: 'eur', unit_amount: data.amountCents, product, metadata,
   }, { idempotencyKey: `${requestKey}:price` })
   const session = await stripe.checkout.sessions.create({
-    mode: 'payment', currency: 'eur', ui_mode: 'hosted',
+    mode: 'payment', currency: 'eur', ui_mode: 'hosted_page',
     line_items: [{ price: price.id, quantity: 1, adjustable_quantity: { enabled: false } }],
     customer_email: data.customerEmail,
     adaptive_pricing: { enabled: false },
