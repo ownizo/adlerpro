@@ -16,6 +16,8 @@ function fixture() {
   let row: PremiumPayment | null = null
   let failUpdate = false
   let conflict = false
+  const customers: Stripe.Customer[] = []
+  const customerCalls: { kind: string; params: any; options?: any }[] = []
   const calls: { kind: string; params: any; options: any }[] = []
   const session = {
     id: 'cs_test_premium', object: 'checkout.session', mode: 'payment', currency: 'eur',
@@ -39,20 +41,28 @@ function fixture() {
     },
   }
   const stripe = new Stripe('sk_test_unit_test_only')
+  stripe.customers.list = ((params: any) => {
+    customerCalls.push({ kind: 'list', params })
+    return { async *[Symbol.asyncIterator]() { yield* customers } }
+  }) as unknown as typeof stripe.customers.list
+  stripe.customers.create = (async (params: any, options: any) => {
+    customerCalls.push({ kind: 'create', params, options })
+    return { id: 'cus_premium', livemode: false, ...params }
+  }) as unknown as typeof stripe.customers.create
   stripe.products.retrieve = (async () => ({ id: 'prod_test', active: true, livemode: false })) as unknown as typeof stripe.products.retrieve
   stripe.prices.create = (async (params: any, options: any) => { calls.push({ kind: 'price', params, options }); return { id: 'price_test' } }) as unknown as typeof stripe.prices.create
   stripe.checkout.sessions.create = (async (params: any, options: any) => { calls.push({ kind: 'session', params, options }); return structuredClone(session) }) as unknown as typeof stripe.checkout.sessions.create
   stripe.checkout.sessions.retrieve = (async () => structuredClone(session)) as unknown as typeof stripe.checkout.sessions.retrieve
   stripe.checkout.sessions.list = (async () => ({ data: [structuredClone(session)] })) as unknown as typeof stripe.checkout.sessions.list
   const create = () => createPremiumCheckoutWithClient(stripe, store, 'prod_test', data, 'admin-id', origin)
-  return { stripe, store, session, calls, create, get row() { return row! }, set failUpdate(value: boolean) { failUpdate = value }, set conflict(value: boolean) { conflict = value } }
+  return { stripe, store, session, calls, customerCalls, customers, create, get row() { return row! }, set failUpdate(value: boolean) { failUpdate = value }, set conflict(value: boolean) { conflict = value } }
 }
 
 function intent(status: Stripe.PaymentIntent.Status, lastError = false) {
   return { id: 'pi_premium', object: 'payment_intent', amount: 124836, amount_received: status === 'succeeded' ? 124836 : 0, currency: 'eur', livemode: false, status, last_payment_error: lastError ? { message: 'Declined' } : null, metadata: { purpose: 'insurance_premium', premium_payment_id: paymentId } } as unknown as Stripe.PaymentIntent
 }
 
-test('creates exact EUR Checkout using only card, MB WAY, Amazon Pay and email; no invoice/tax/discount/subscription', async () => {
+test('creates exact EUR Checkout using the exact allowed methods and Customer; no invoice/tax/discount/subscription', async () => {
   const f = fixture()
   const result = await f.create()
   const [price, checkout] = f.calls
@@ -62,12 +72,22 @@ test('creates exact EUR Checkout using only card, MB WAY, Amazon Pay and email; 
   assert.equal(price.params.recurring, undefined)
   assert.equal(checkout.params.mode, 'payment')
   assert.equal(checkout.params.ui_mode, 'hosted_page')
-  assert.deepEqual(checkout.params.payment_method_types, ['card', 'mb_way', 'amazon_pay'])
-  for (const method of ['link', 'klarna', 'bancontact', 'satispay', 'eps', 'customer_balance', 'sepa_debit', 'apple_pay', 'google_pay']) {
+  assert.deepEqual(checkout.params.payment_method_types, ['card', 'mb_way', 'revolut_pay', 'sepa_debit', 'customer_balance'])
+  for (const method of ['amazon_pay', 'link', 'klarna', 'bancontact', 'eps', 'satispay', 'multibanco', 'us_bank_account', 'apple_pay', 'google_pay']) {
     assert.equal(checkout.params.payment_method_types.includes(method), false, `${method} must not be an explicit payment method`)
   }
   assert.equal(checkout.params.currency, 'eur')
-  assert.equal(checkout.params.customer_email, data.customerEmail)
+  assert.equal(checkout.params.customer, 'cus_premium')
+  assert.equal(checkout.params.customer_email, undefined)
+  assert.deepEqual(checkout.params.wallet_options, { link: { display: 'never' } })
+  assert.deepEqual(checkout.params.payment_method_options, {
+    customer_balance: { funding_type: 'bank_transfer', bank_transfer: { type: 'eu_bank_transfer' } },
+  })
+  assert.deepEqual(f.customerCalls[0], { kind: 'list', params: { email: data.customerEmail, limit: 100 } })
+  assert.deepEqual(f.customerCalls[1].params, {
+    name: data.customerName, email: data.customerEmail,
+    metadata: { purpose: 'insurance_premium_customer', customer_name: data.customerName, customer_email: data.customerEmail },
+  })
   assert.deepEqual(checkout.params.adaptive_pricing, { enabled: false })
   assert.deepEqual(checkout.params.automatic_tax, { enabled: false })
   assert.deepEqual(checkout.params.invoice_creation, { enabled: false })
@@ -84,6 +104,19 @@ test('creates exact EUR Checkout using only card, MB WAY, Amazon Pay and email; 
   assert.equal(result.livemode, false)
 })
 
+test('reuses an exact-email Customer in the payment environment without creating another', async () => {
+  const f = fixture()
+  f.customers.push(
+    { id: 'cus_other_email', email: 'other@example.com', livemode: false } as Stripe.Customer,
+    { id: 'cus_other_mode', email: data.customerEmail, livemode: true } as Stripe.Customer,
+    { id: 'cus_existing', email: data.customerEmail, livemode: false } as Stripe.Customer,
+  )
+  await f.create()
+  assert.equal(f.customerCalls.filter(call => call.kind === 'create').length, 0)
+  assert.equal(f.calls[1].params.customer, 'cus_existing')
+  assert.equal(f.calls[1].params.customer_email, undefined)
+})
+
 test('persistent retries reuse the session; partial failures reuse distinct Stripe keys', async () => {
   const f = fixture()
   f.failUpdate = true
@@ -93,6 +126,12 @@ test('persistent retries reuse the session; partial failures reuse distinct Stri
   assert.equal(f.calls[0].options.idempotencyKey, f.calls[2].options.idempotencyKey)
   assert.equal(f.calls[1].options.idempotencyKey, f.calls[3].options.idempotencyKey)
   assert.notEqual(f.calls[0].options.idempotencyKey, f.calls[1].options.idempotencyKey)
+  const creations = f.customerCalls.filter(call => call.kind === 'create')
+  assert.equal(creations.length, 2)
+  assert.equal(creations[0].options.idempotencyKey, `insurance-premium:admin-id:${data.requestId}:customer`)
+  assert.equal(creations[0].options.idempotencyKey, creations[1].options.idempotencyKey)
+  assert.notEqual(creations[0].options.idempotencyKey, f.calls[0].options.idempotencyKey)
+  assert.notEqual(creations[0].options.idempotencyKey, f.calls[1].options.idempotencyKey)
   assert.equal((await f.create()).sessionId, result.sessionId)
   assert.equal(f.calls.length, 4)
   await assert.rejects(createPremiumCheckoutWithClient(f.stripe, f.store, 'prod_test', { ...data, amountCents: 10 }, 'admin-id', origin), /different payment details/)
@@ -148,6 +187,48 @@ function signedRequest(stripe: Stripe, payload: string, timestamp?: number) {
 }
 function eventPayload(type: string, object: unknown) {
   return JSON.stringify({ id: 'evt_unit', object: 'event', type, livemode: false, data: { object } })
+}
+
+for (const method of ['sepa_debit', 'customer_balance'] as const) {
+  for (const outcome of ['succeeded', 'failed'] as const) {
+    test(`${method}: completion stays Pending until actual ${outcome} settlement`, async () => {
+      const f = fixture()
+      await f.create()
+      const pendingIntent = {
+        ...intent(method === 'sepa_debit' ? 'processing' : 'requires_action'),
+        payment_method_types: [method],
+        ...(method === 'customer_balance' ? { next_action: { type: 'display_bank_transfer_instructions' } } : {}),
+      } as Stripe.PaymentIntent
+      f.session.payment_intent = pendingIntent
+      // Instructions can already exist while the Checkout Session is still open.
+      assert.equal((await reconcilePremiumPayment(f.stripe, f.store, paymentId, f.session.id)).status, 'pending')
+      f.session.status = 'complete'
+      const completed = eventPayload('checkout.session.completed', f.session)
+      assert.equal((await handlePremiumWebhookWithDependencies(signedRequest(f.stripe, completed), f.stripe, secret, f.store)).status, 200)
+      assert.equal(f.row.status, 'pending')
+      assert.equal(f.row.paid_at, null)
+      f.session.payment_intent = { ...intent('processing'), payment_method_types: [method] }
+      const processing = eventPayload('payment_intent.processing', f.session.payment_intent)
+      assert.equal((await handlePremiumWebhookWithDependencies(signedRequest(f.stripe, processing), f.stripe, secret, f.store)).status, 200)
+      assert.equal(f.row.status, 'pending')
+      f.session.payment_intent = {
+        ...intent(outcome === 'succeeded' ? 'succeeded' : 'requires_payment_method', outcome === 'failed'),
+        payment_method_types: [method],
+      }
+      for (const type of [
+        outcome === 'succeeded' ? 'payment_intent.succeeded' : 'payment_intent.payment_failed',
+        outcome === 'succeeded' ? 'checkout.session.async_payment_succeeded' : 'checkout.session.async_payment_failed',
+      ]) {
+        const payload = eventPayload(type, type.startsWith('checkout.') ? f.session : f.session.payment_intent)
+        assert.equal((await handlePremiumWebhookWithDependencies(signedRequest(f.stripe, payload), f.stripe, secret, f.store)).status, 200)
+        assert.equal(f.row.status, outcome === 'succeeded' ? 'paid' : 'failed')
+        assert.equal(Boolean(f.row.paid_at), outcome === 'succeeded')
+      }
+      // A delayed completion event must not override the current settlement result.
+      assert.equal((await handlePremiumWebhookWithDependencies(signedRequest(f.stripe, completed), f.stripe, secret, f.store)).status, 200)
+      assert.equal(f.row.status, outcome === 'succeeded' ? 'paid' : 'failed')
+    })
+  }
 }
 
 test('webhook rejects missing, invalid, stale and tampered signatures before storage access', async () => {
