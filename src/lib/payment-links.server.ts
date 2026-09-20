@@ -6,7 +6,7 @@ import type { PremiumPayment } from './premium-payment-status.ts'
 import { premiumPaymentsStore } from './premium-payments-store.server.ts'
 import type { PremiumPaymentStore } from './premium-payments-store.server.ts'
 
-export type PremiumStripe = Pick<Stripe, 'prices' | 'checkout' | 'products'>
+export type PremiumStripe = Pick<Stripe, 'prices' | 'checkout' | 'products' | 'customers'>
 
 export function premiumStripe() {
   const key = process.env.STRIPE_SECRET_KEY
@@ -65,15 +65,38 @@ export async function createPremiumCheckoutWithClient(
     customer_name: data.customerName, customer_email: data.customerEmail,
     insurer: data.insurer, policy_reference: data.policyReference,
   }
+  let customer: Stripe.Customer | undefined
+  for await (const existing of stripe.customers.list({ email: data.customerEmail, limit: 100 })) {
+    if (existing.email === data.customerEmail && existing.livemode === payment.livemode) {
+      customer = existing
+      break
+    }
+  }
+  customer ??= await stripe.customers.create({
+    name: data.customerName,
+    email: data.customerEmail,
+    metadata: {
+      purpose: 'insurance_premium_customer',
+      customer_name: data.customerName,
+      customer_email: data.customerEmail,
+    },
+  }, { idempotencyKey: `${requestKey}:customer` })
   const price = await stripe.prices.create({
     currency: 'eur', unit_amount: data.amountCents, product, metadata,
   }, { idempotencyKey: `${requestKey}:price` })
   const session = await stripe.checkout.sessions.create({
     mode: 'payment', currency: 'eur', ui_mode: 'hosted_page',
     // Apple Pay and Google Pay are available through card when eligible.
-    payment_method_types: ['card', 'mb_way', 'amazon_pay'],
+    payment_method_types: ['card', 'mb_way', 'revolut_pay', 'sepa_debit', 'customer_balance'],
+    wallet_options: { link: { display: 'never' } },
+    payment_method_options: {
+      customer_balance: {
+        funding_type: 'bank_transfer',
+        bank_transfer: { type: 'eu_bank_transfer' },
+      },
+    },
     line_items: [{ price: price.id, quantity: 1, adjustable_quantity: { enabled: false } }],
-    customer_email: data.customerEmail,
+    customer: customer.id,
     adaptive_pricing: { enabled: false },
     automatic_tax: { enabled: false },
     invoice_creation: { enabled: false },

@@ -32,6 +32,7 @@ export function checkoutStatus(session: Stripe.Checkout.Session): PremiumPayment
   if (intent?.status === 'canceled') return 'failed'
   if (session.status === 'expired') return 'expired'
   if (intent?.status === 'requires_payment_method' && intent.last_payment_error) return 'failed'
+  if (intent?.status === 'requires_action' && intent.next_action?.type === 'display_bank_transfer_instructions') return 'pending'
   if (session.status === 'complete') return 'pending'
   return 'created'
 }
