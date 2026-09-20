@@ -49,7 +49,7 @@ const CARRIER_INTEGRATIONS_ICON = 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5
 // Kept as a union rather than folding carrier-integrations into AdminTab:
 // that page is its own route/component, not another case inside the giant
 // /admin tab switch — see admin.tsx's AdminPage/AdminDashboardContent split.
-type AdminNavItem = { label: string; tab: AdminTab } | { label: string; to: '/admin/carrier-integrations' }
+type AdminNavItem = { label: string; tab: AdminTab } | { label: string; to: '/admin/carrier-integrations' | '/admin/payment-links' }
 
 // Backoffice information architecture — flat groups, no collapsible parent
 // level (that extra "Administration" toggle added a click for no benefit
@@ -71,6 +71,7 @@ const ADMIN_NAV_GROUPS: Array<{ label: string; items: AdminNavItem[] }> = [
     { label: 'Renewals', tab: 'alerts' },
     { label: 'Claims', tab: 'claims' },
   ] },
+  { label: 'Payments', items: [{ label: 'Payment Link', to: '/admin/payment-links' }] },
   { label: 'Growth', items: [{ label: 'Marketing', tab: 'marketing' }] },
   { label: 'System', items: [
     { label: 'Billing', tab: 'billing' },
@@ -342,9 +343,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </button>
 
             <div className="admin-breadcrumb">
-              <span className="admin-breadcrumb-section">{ADMIN_BREADCRUMBS[activeAdminTab][0]}</span>
+              <span className="admin-breadcrumb-section">{location.pathname === '/admin/payment-links' ? 'Payments' : ADMIN_BREADCRUMBS[activeAdminTab][0]}</span>
               <span className="admin-breadcrumb-sep">/</span>
-              <span className="admin-breadcrumb-page">{ADMIN_BREADCRUMBS[activeAdminTab][1]}</span>
+              <span className="admin-breadcrumb-page">{location.pathname === '/admin/payment-links' ? 'Payment Link' : ADMIN_BREADCRUMBS[activeAdminTab][1]}</span>
             </div>
 
             <button type="button" className="admin-global-search" aria-label="Search">
