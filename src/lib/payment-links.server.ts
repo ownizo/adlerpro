@@ -92,7 +92,12 @@ export async function createPremiumCheckoutWithClient(
     payment_method_options: {
       customer_balance: {
         funding_type: 'bank_transfer',
-        bank_transfer: { type: 'eu_bank_transfer' },
+        bank_transfer: {
+          type: 'eu_bank_transfer',
+          eu_bank_transfer: {
+            country: 'IE',
+          },
+        },
       },
     },
     line_items: [{ price: price.id, quantity: 1, adjustable_quantity: { enabled: false } }],
