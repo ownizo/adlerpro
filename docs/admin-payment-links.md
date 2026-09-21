@@ -93,3 +93,35 @@ The additive 20260921 migration defaults/backfills methods to the full set and g
 Optional server-only `PAYMENT_SHORTLINK_ORIGIN=https://pay.adlerrochefort.com` changes the origin used by both create and refresh responses. If unset, the safe application fallback is `https://admin.adlerrochefort.com` (not an untrusted request Host). Configuration must be an HTTPS origin without credentials, path, query, or fragment; a trailing slash is normalized. HTTP is allowed only for localhost outside production.
 
 Future `pay.adlerrochefort.com` setup requires separately configuring DNS, TLS, and hosting this same public route, then setting the variable. This PR does not configure domains, apply production migrations, or deploy. Short links are bearer links: share them only with the intended payer. Tax, surcharge, invoicing, discount, subscription, and adaptive-pricing behavior is unchanged and disabled.
+
+## English Checkout disclosure and transactional notifications
+
+Checkout retains **Insurance Premium** and the dynamic Client / Email / Insurer / Policy description. The English legal disclosure is in `custom_text.submit.message`, near the confirmation button, to keep the product area readable. It identifies Ownizo Unipessoal Lda, NIF **517169029** (matching the repository terms page), ASF registration **425591790/3**, collection on behalf of the insurer, remittance, and `insurance@adlerrochefort.com`. The message is under Stripe's 1,200-character limit. Confirm its hosted layout in Stripe test mode before rollout; no live Session was created for this change.
+
+Apply `migrations/20260921_premium_payment_notifications.sql` after the existing premium migrations and before deploying the notification code. It adds a service-role-only transactional outbox, `premium_payment_notifications`, and an invoker-security trigger on status transitions. It preserves the premium table's constraints, RLS, and grants. Existing payment history is not backfilled into emails.
+
+The application uses the existing **Resend** provider/client with `RESEND_API_KEY` and `EMAIL_FROM` (fallback: `Adler & Rochefort <noreply@adlerrochefort.com>`). Use a verified sender domain. Replies go to `insurance@adlerrochefort.com`; customer and internal deliveries are separate messages, not CC/BCC disclosures.
+
+| Authoritative state | Customer | Internal (`insurance@adlerrochefort.com`) |
+| --- | --- | --- |
+| Pending | Your payment is pending confirmation | Premium payment pending confirmation |
+| Paid | Your payment has been confirmed | Premium payment confirmed |
+| Failed | Your payment could not be completed | Premium payment failed |
+| Expired | No customer email | Premium payment link expired |
+
+Emails are English and include exact EUR amount, client name/email, insurer, policy, status, configured payment methods clearly labelled **Payment methods offered**, and a delayed-settlement explanation. The integration does not claim that an offered method was actually used. Pending messages include the existing short URL and advise against paying again while settlement is pending. Failed/expired messages ask for review rather than suggesting that an unusable link can be retried. Test-mode notifications are clearly labelled `[TEST]`; they still use the configured mail provider and the entered recipient addresses.
+
+Only verified supported Stripe webhooks dispatch notifications, **after** existing authoritative Stripe reconciliation. Admin polling can commit a transition first; the database trigger atomically queues the notification anyway, and the next webhook drains it. Opening short links never sends mail or changes status. Provider failures do not roll back settlement: the webhook returns 500 so Stripe retries. An error for one audience does not prevent trying the other. No scheduled sender is introduced; monitor failed webhook deliveries and retry them after fixing configuration/provider issues.
+
+### Duplicate safety and recovery
+
+- A unique `(payment_id, status, audience)` constraint creates at most one notification per semantic state and recipient type, independent of Stripe event IDs or repeated transitions.
+- Before sending, a conditional database update freezes the full delivery payload and `first_attempt_at`. Concurrent retries use the same persisted payload and stable Resend idempotency key, `premium-notification/<notification UUID>`. Payloads remain stable across sender/origin configuration changes and template deployments.
+- `sent_at` and `provider_id` permanently record provider acceptance (not proof of inbox delivery). Completed records are never resent. A provider success followed by a database error is retried with the same key, recovering the original provider ID.
+- [Resend retains idempotency keys for 24 hours](https://resend.com/docs/dashboard/emails/idempotency-keys). Ambiguous attempts at least **23 hours** old are held and return a retryable webhook error; they are not automatically resent after provider deduplication expires. This deliberately prioritizes avoiding duplicate emails over blind eventual retry.
+- For a held notification, inspect the server-only outbox row and Resend delivery history using its key. If accepted, record the original provider ID and sent timestamp using a service-role operation. If delivery cannot be determined, do not reset the attempt or change the key. Only after confirming that Resend did not accept the message should an operator explicitly authorize resetting `first_attempt_at` and `delivery_payload` to retry. Never delete successful records or reset sent timestamps.
+- Before each delivery the dispatcher reads the current stored payment state. Obsolete pending/failed notifications are marked `skipped_at` instead of being sent after settlement. A newer transition may occur during an in-flight email request; the later confirmed message remains the authoritative update.
+
+Stripe Dashboard successful-payment customer emails/receipts can optionally be enabled as an additional channel. They do not replace these application notifications and can result in a separate Stripe receipt alongside the application confirmation.
+
+All prior exact-EUR, metadata, Customer, short-link, payment-method, signature-verification, and delayed-settlement behavior remains unchanged. No taxes, fees, invoicing, subscriptions, discounts, or currency conversion are introduced. No real emails, production migrations, deployments, or domain changes were performed while implementing this iteration.

@@ -1,3 +1,4 @@
+import type { PremiumPayment } from './premium-payment-status.ts'
 import type Stripe from 'stripe'
 import { premiumStripe, reconcilePremiumPayment } from './payment-links.server.ts'
 import { premiumPaymentsStore } from './premium-payments-store.server.ts'
@@ -13,7 +14,7 @@ const eventTypes = new Set([
   'payment_intent.processing',
 ])
 
-export async function processPremiumEvent(event: Stripe.Event, stripe: Stripe, store: PremiumPaymentStore) {
+export async function processPremiumEvent(event: Stripe.Event, stripe: Stripe, store: PremiumPaymentStore, notify: (payment: PremiumPayment) => Promise<void>) {
   if (!eventTypes.has(event.type)) return
   const object = event.data.object as Stripe.Checkout.Session | Stripe.PaymentIntent
   const paymentId = object.metadata?.premium_payment_id
@@ -31,10 +32,11 @@ export async function processPremiumEvent(event: Stripe.Event, stripe: Stripe, s
     sessionId = sessions.data[0].id
   }
   // Never trust the event snapshot for status: events may be retried or arrive out of order.
-  await reconcilePremiumPayment(stripe, store, payment.id, sessionId)
+  const reconciled = await reconcilePremiumPayment(stripe, store, payment.id, sessionId)
+  await notify(reconciled)
 }
 
-export async function handlePremiumWebhookWithDependencies(request: Request, stripe: Stripe, secret: string, store: PremiumPaymentStore) {
+export async function handlePremiumWebhookWithDependencies(request: Request, stripe: Stripe, secret: string, store: PremiumPaymentStore, notify: (payment: PremiumPayment) => Promise<void> = async () => {}) {
   if (!secret) return new Response('Webhook is not configured.', { status: 503 })
   const signature = request.headers.get('stripe-signature')
   if (!signature) return new Response('Missing Stripe signature.', { status: 400 })
@@ -46,7 +48,7 @@ export async function handlePremiumWebhookWithDependencies(request: Request, str
     return new Response('Invalid Stripe signature.', { status: 400 })
   }
   try {
-    await processPremiumEvent(event, stripe, store)
+    await processPremiumEvent(event, stripe, store, notify)
     return Response.json({ received: true })
   } catch {
     // Non-2xx makes Stripe retry failed persistence/API calls. Do not leak request data.
@@ -56,7 +58,8 @@ export async function handlePremiumWebhookWithDependencies(request: Request, str
 
 export async function handlePremiumWebhook(request: Request) {
   try {
-    return await handlePremiumWebhookWithDependencies(request, premiumStripe(), process.env.STRIPE_WEBHOOK_SECRET ?? '', premiumPaymentsStore)
+    const { notifyPremiumPayment } = await import('./premium-payment-notifications.server.ts')
+    return await handlePremiumWebhookWithDependencies(request, premiumStripe(), process.env.STRIPE_WEBHOOK_SECRET ?? '', premiumPaymentsStore, notifyPremiumPayment)
   } catch {
     return new Response('Webhook is not configured.', { status: 503 })
   }

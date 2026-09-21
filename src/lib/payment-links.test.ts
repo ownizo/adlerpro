@@ -1,3 +1,4 @@
+import { PREMIUM_CHECKOUT_LEGAL_TEXT } from './premium-checkout-content.ts'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import Stripe from 'stripe'
@@ -73,6 +74,9 @@ test('creates exact EUR Checkout using the exact allowed methods and Customer; n
   assert.equal(price.currency, 'eur')
   assert.equal(price.product_data.name, 'Insurance Premium')
   assert.equal(price.product_data.description, `Client: ${data.customerName}\nEmail: ${data.customerEmail}\nInsurer: ${data.insurer}\nPolicy: ${data.policyReference}`)
+  assert.equal(checkout.params.custom_text.submit.message, PREMIUM_CHECKOUT_LEGAL_TEXT)
+  assert.ok(PREMIUM_CHECKOUT_LEGAL_TEXT.length <= 1200)
+  for (const text of ['Portuguese Tax ID 517169029', '425591790/3', 'on behalf of the relevant insurer', 'will be remitted accordingly', 'insurance@adlerrochefort.com']) assert.ok(PREMIUM_CHECKOUT_LEGAL_TEXT.includes(text))
   assert.equal(checkout.params.mode, 'payment')
   assert.equal(checkout.params.ui_mode, 'hosted_page')
   assert.deepEqual(checkout.params.payment_method_types, [...PAYMENT_METHODS])
@@ -314,3 +318,36 @@ for (const preset of [...PAYMENT_PRESETS, { label: 'Custom', methods: ['mb_way',
     await assert.rejects(createPremiumCheckoutWithClient(f.stripe, f.store, 'prod_test', { ...data, paymentMethods: ['revolut_pay'] }, 'admin-id', origin), /different payment details/)
   })
 }
+
+for (const method of ['sepa_debit', 'customer_balance']) {
+  test(`webhook notification follows authoritative ${method} pending -> paid state, including retries`, async () => {
+    const f = fixture()
+    await f.create()
+    const statuses: string[] = []
+    const notify = async (payment: PremiumPayment) => { statuses.push(payment.status) }
+    f.session.status = 'complete'
+    f.session.payment_intent = { ...intent('processing'), payment_method_types: [method] }
+    const completed = eventPayload('checkout.session.completed', f.session)
+    assert.equal((await handlePremiumWebhookWithDependencies(signedRequest(f.stripe, completed), f.stripe, secret, f.store, notify)).status, 200)
+    assert.equal(f.row.status, 'pending')
+    f.session.payment_intent = intent('succeeded')
+    const paid = eventPayload('payment_intent.succeeded', f.session.payment_intent)
+    assert.equal((await handlePremiumWebhookWithDependencies(signedRequest(f.stripe, paid), f.stripe, secret, f.store, notify)).status, 200)
+    // Old completion event cannot send a new pending notification after success.
+    assert.equal((await handlePremiumWebhookWithDependencies(signedRequest(f.stripe, completed), f.stripe, secret, f.store, notify)).status, 200)
+    assert.deepEqual(statuses, ['pending', 'paid', 'paid'])
+  })
+}
+test('notification failure retries without rolling back settlement; invalid signatures never notify', async () => {
+  const f = fixture()
+  await f.create()
+  f.session.payment_intent = intent('succeeded')
+  const payload = eventPayload('payment_intent.succeeded', f.session.payment_intent)
+  let calls = 0
+  const failing = async () => { calls++; throw new Error('provider failure') }
+  assert.equal((await handlePremiumWebhookWithDependencies(signedRequest(f.stripe, payload), f.stripe, secret, f.store, failing)).status, 500)
+  assert.equal(f.row.status, 'paid')
+  assert.equal((await handlePremiumWebhookWithDependencies(signedRequest(f.stripe, payload), f.stripe, secret, f.store, async () => { calls++ })).status, 200)
+  assert.equal((await handlePremiumWebhookWithDependencies(new Request('https://example.com', { method: 'POST', body: payload }), f.stripe, secret, f.store, failing)).status, 400)
+  assert.equal(calls, 2)
+})

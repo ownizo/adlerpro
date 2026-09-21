@@ -125,7 +125,7 @@ function PaymentLinkPage() {
       </form>
       {result && <section className="admin-kpi-card space-y-3" aria-label="Created Payment Link">
         <p role="status" className="font-semibold">Payment status: {{ created: 'Created', pending: 'Pending', paid: 'Paid', failed: 'Failed', expired: 'Expired' }[result.status]} <span className="admin-chip admin-chip--info">{result.livemode ? 'LIVE' : 'TEST'}</span></p>
-        <p className="text-sm">{result.status === 'pending' ? 'Payment submitted; awaiting confirmation from the payment provider.' : result.status === 'paid' ? 'Payment confirmed by Stripe.' : 'Payment is not confirmed. Status is refreshed automatically.'}</p>
+        <p className="text-sm">{result.status === 'pending' ? 'Payment submitted; awaiting confirmation from the payment provider. Bank Transfer and SEPA Direct Debit may take time to confirm.' : result.status === 'paid' ? 'Payment confirmed by Stripe.' : 'Payment is not confirmed. Status is refreshed automatically.'}</p>
         <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
           <div><dt>Amount</dt><dd className="font-semibold">{new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(result.amountCents / 100)}</dd></div>
           <div><dt>Insurer</dt><dd className="break-words">{result.insurer}</dd></div>

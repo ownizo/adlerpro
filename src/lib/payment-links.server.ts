@@ -1,3 +1,4 @@
+import { PREMIUM_CHECKOUT_LEGAL_TEXT } from './premium-checkout-content.ts'
 import Stripe from 'stripe'
 import { createHash } from 'node:crypto'
 import type { validatePaymentLinkInput } from './payment-link-validation.ts'
@@ -107,6 +108,7 @@ export async function createPremiumCheckoutWithClient(
     invoice_creation: { enabled: false },
     allow_promotion_codes: false,
     submit_type: 'pay',
+    custom_text: { submit: { message: PREMIUM_CHECKOUT_LEGAL_TEXT } },
     // Stable for retries; eight letters identify this integration in Stripe reporting.
     integration_identifier: 'adler_insurance_premium_wqkzmtva',
     metadata, payment_intent_data: { metadata },
