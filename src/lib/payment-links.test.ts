@@ -81,7 +81,15 @@ test('creates exact EUR Checkout using the exact allowed methods and Customer; n
   assert.equal(checkout.params.customer_email, undefined)
   assert.deepEqual(checkout.params.wallet_options, { link: { display: 'never' } })
   assert.deepEqual(checkout.params.payment_method_options, {
-    customer_balance: { funding_type: 'bank_transfer', bank_transfer: { type: 'eu_bank_transfer' } },
+    customer_balance: {
+      funding_type: 'bank_transfer',
+      bank_transfer: {
+        type: 'eu_bank_transfer',
+        eu_bank_transfer: {
+          country: 'IE',
+        },
+      },
+    },
   })
   assert.deepEqual(f.customerCalls[0], { kind: 'list', params: { email: data.customerEmail, limit: 100 } })
   assert.deepEqual(f.customerCalls[1].params, {
