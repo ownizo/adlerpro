@@ -6,7 +6,7 @@ import type { PremiumPayment } from './premium-payment-status.ts'
 import { premiumPaymentsStore } from './premium-payments-store.server.ts'
 import type { PremiumPaymentStore } from './premium-payments-store.server.ts'
 
-export type PremiumStripe = Pick<Stripe, 'prices' | 'checkout' | 'products' | 'customers'>
+export type PremiumStripe = Pick<Stripe, 'checkout' | 'products' | 'customers'>
 
 export function premiumStripe() {
   const key = process.env.STRIPE_SECRET_KEY
@@ -48,7 +48,7 @@ export async function createPremiumCheckoutWithClient(
     request_key: requestKey, request_fingerprint: fingerprint,
     customer_name: data.customerName, customer_email: data.customerEmail,
     amount_cents: data.amountCents, currency: 'eur', insurer: data.insurer,
-    policy_reference: data.policyReference, created_by: adminId, livemode: configuredProduct.livemode,
+    payment_methods: data.paymentMethods, policy_reference: data.policyReference, created_by: adminId, livemode: configuredProduct.livemode,
   })
   if (payment.request_fingerprint !== fingerprint || payment.livemode !== configuredProduct.livemode) {
     throw new Error('This request identifier has already been used for different payment details.')
@@ -81,15 +81,12 @@ export async function createPremiumCheckoutWithClient(
       customer_email: data.customerEmail,
     },
   }, { idempotencyKey: `${requestKey}:customer` })
-  const price = await stripe.prices.create({
-    currency: 'eur', unit_amount: data.amountCents, product, metadata,
-  }, { idempotencyKey: `${requestKey}:price` })
   const session = await stripe.checkout.sessions.create({
     mode: 'payment', currency: 'eur', ui_mode: 'hosted_page',
     // Apple Pay and Google Pay are available through card when eligible.
-    payment_method_types: ['card', 'mb_way', 'revolut_pay', 'sepa_debit', 'customer_balance'],
-    wallet_options: { link: { display: 'never' } },
-    payment_method_options: {
+    payment_method_types: data.paymentMethods,
+    ...(data.paymentMethods.includes('card') ? { wallet_options: { link: { display: 'never' as const } } } : {}),
+    ...(data.paymentMethods.includes('customer_balance') ? { payment_method_options: {
       customer_balance: {
         funding_type: 'bank_transfer',
         bank_transfer: {
@@ -99,8 +96,11 @@ export async function createPremiumCheckoutWithClient(
           },
         },
       },
-    },
-    line_items: [{ price: price.id, quantity: 1, adjustable_quantity: { enabled: false } }],
+    } } : {}),
+    line_items: [{ price_data: { currency: 'eur', unit_amount: data.amountCents, product_data: {
+      name: 'Insurance Premium',
+      description: `Client: ${data.customerName}\nEmail: ${data.customerEmail}\nInsurer: ${data.insurer}\nPolicy: ${data.policyReference}`,
+    } }, quantity: 1, adjustable_quantity: { enabled: false } }],
     customer: customer.id,
     adaptive_pricing: { enabled: false },
     automatic_tax: { enabled: false },

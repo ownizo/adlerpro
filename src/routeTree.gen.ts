@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PCodeRouteImport } from './routes/p.$code'
 import { Route as TermsAndConditionsRouteImport } from './routes/terms-and-conditions'
 import { Route as QuotesComparisonRouteImport } from './routes/quotes-comparison'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -37,6 +38,11 @@ import { Route as AdminCarrierIntegrationsRouteImport } from './routes/admin.car
 import { Route as AdminCarrierIntegrationsImportRouteImport } from './routes/admin.carrier-integrations.import'
 import { Route as AdminCarrierIntegrationsRunsIdRouteImport } from './routes/admin.carrier-integrations.runs.$id'
 
+const PCodeRoute = PCodeRouteImport.update({
+  id: '/p/$code',
+  path: '/p/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TermsAndConditionsRoute = TermsAndConditionsRouteImport.update({
   id: '/terms-and-conditions',
   path: '/terms-and-conditions',
@@ -177,6 +183,7 @@ const AdminCarrierIntegrationsRunsIdRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
+  '/p/$code': typeof PCodeRoute
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/alerts': typeof AlertsRoute
@@ -206,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
 export interface FileRoutesByTo {
+  '/p/$code': typeof PCodeRoute
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/alerts': typeof AlertsRoute
@@ -235,6 +243,7 @@ export interface FileRoutesByTo {
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
 export interface FileRoutesById {
+  '/p/$code': typeof PCodeRoute
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
@@ -267,6 +276,7 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/p/$code'
     | '/'
     | '/admin'
     | '/alerts'
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/admin/carrier-integrations/runs/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/p/$code'
     | '/'
     | '/admin'
     | '/alerts'
@@ -325,6 +336,7 @@ export interface FileRouteTypes {
     | '/admin/carrier-integrations/runs/$id'
   id:
     | '__root__'
+    | '/p/$code'
     | '/'
     | '/admin'
     | '/alerts'
@@ -355,6 +367,7 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  PCodeRoute: typeof PCodeRoute
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AlertsRoute: typeof AlertsRoute
@@ -382,6 +395,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/p/$code': {
+      id: '/p/$code'
+      path: '/p/$code'
+      fullPath: '/p/$code'
+      preLoaderRoute: typeof PCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/terms-and-conditions': {
       id: '/terms-and-conditions'
       path: '/terms-and-conditions'
@@ -603,6 +623,7 @@ const AdminRouteChildren: AdminRouteChildren = {
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  PCodeRoute: PCodeRoute,
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AlertsRoute: AlertsRoute,

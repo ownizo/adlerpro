@@ -3,7 +3,7 @@ import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { useIdentity } from '@/lib/identity-context'
 import { createPremiumPaymentLink, fetchPremiumPaymentStatus } from '@/lib/payment-links.functions'
-import { validatePaymentLinkInput, type PaymentLinkInput } from '@/lib/payment-link-validation'
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS, PAYMENT_PRESETS, validatePaymentLinkInput, type PremiumPaymentMethod, type PaymentLinkInput } from '@/lib/payment-link-validation'
 
 export const Route = createFileRoute('/admin/payment-links')({
   component: PaymentLinkPage,
@@ -27,6 +27,8 @@ function PaymentLinkPage() {
   const search = Route.useSearch()
   const navigate = Route.useNavigate()
   const [form, setForm] = useState({ customerName: '', customerEmail: '', amount: '', insurer: '', policyReference: '' })
+  const [preset, setPreset] = useState('0')
+  const [paymentMethods, setPaymentMethods] = useState<PremiumPaymentMethod[]>([...PAYMENT_METHODS])
   const [busy, setBusy] = useState(false)
   const inFlight = useRef(false)
   const attempt = useRef<{ fingerprint: string; requestId: string } | null>(null)
@@ -61,9 +63,9 @@ function PaymentLinkPage() {
     event.preventDefault()
     if (inFlight.current || result) return
     setError('')
-    const fingerprint = JSON.stringify(form)
+    const fingerprint = JSON.stringify({ ...form, paymentMethods })
     if (attempt.current?.fingerprint !== fingerprint) attempt.current = { fingerprint, requestId: crypto.randomUUID() }
-    const data: PaymentLinkInput = { ...form, requestId: attempt.current.requestId }
+    const data: PaymentLinkInput = { ...form, paymentMethods, requestId: attempt.current.requestId }
     try {
       validatePaymentLinkInput(data)
       inFlight.current = true
@@ -98,6 +100,25 @@ function PaymentLinkPage() {
               value={form[key]} onChange={event => setForm({ ...form, [key]: event.target.value })} />
             {key === 'amount' && <p id="amount-help" className="text-xs text-navy-400 mt-1">Example: 1248.36. No thousands separators. This is the exact premium in EUR.</p>}
           </div>)}
+          <div className="sm:col-span-2 space-y-3">
+            <label htmlFor="payment-preset" className="block text-sm font-medium">Payment methods</label>
+            <select id="payment-preset" className="w-full rounded-lg border p-3 text-sm" value={preset} onChange={event => {
+              const next = event.target.value
+              setPreset(next)
+              if (next !== 'custom') setPaymentMethods([...PAYMENT_PRESETS[Number(next)].methods])
+            }}>
+              {PAYMENT_PRESETS.map((item, index) => <option key={item.label} value={String(index)}>{item.label}</option>)}
+              <option value="custom">Custom</option>
+            </select>
+            {preset === 'custom' && <fieldset className="space-y-2">
+              <legend className="text-sm mb-2">Choose at least one payment method</legend>
+              {PAYMENT_METHODS.map(method => <label key={method} className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={paymentMethods.includes(method)} onChange={event => {
+                  setPaymentMethods(PAYMENT_METHODS.filter(item => item === method ? event.target.checked : paymentMethods.includes(item)))
+                }} />{PAYMENT_METHOD_LABELS[method]}
+              </label>)}
+            </fieldset>}
+          </div>
         </fieldset>
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         <button type="submit" disabled={busy || !!result} className="admin-btn admin-btn-primary disabled:opacity-50">{busy ? 'Creating…' : 'Create Payment Link'}</button>
@@ -110,13 +131,14 @@ function PaymentLinkPage() {
           <div><dt>Insurer</dt><dd className="break-words">{result.insurer}</dd></div>
           <div><dt>Policy reference</dt><dd className="break-words">{result.policyReference}</dd></div>
         </dl>
-        <p className="break-all text-sm">{result.url}</p>
+        <p className="text-sm">Payment methods: {result.paymentMethods.map(method => PAYMENT_METHOD_LABELS[method]).join(' · ')}</p>
+        <p className="break-all font-semibold">{result.shortUrl}</p>
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={!result.url} className="admin-btn admin-btn-primary disabled:opacity-50" onClick={async () => {
-            try { await navigator.clipboard.writeText(result.url!); setCopyStatus('Link copied.') }
+          <button type="button" disabled={!result.shortUrl} className="admin-btn admin-btn-primary disabled:opacity-50" onClick={async () => {
+            try { await navigator.clipboard.writeText(result.shortUrl!); setCopyStatus('Link copied.') }
             catch { setCopyStatus('Unable to copy. Select and copy the URL above.') }
           }}>Copy link</button>
-          {result.url && <a className="admin-btn admin-btn-secondary" href={result.url} target="_blank" rel="noopener noreferrer">Open link</a>}
+          {result.shortUrl && <a className="admin-btn admin-btn-secondary" href={result.shortUrl} target="_blank" rel="noopener noreferrer">Open link</a>}
           <button type="button" className="admin-btn admin-btn-secondary" onClick={() => { setResult(null); setCopyStatus(''); setStatusError(''); attempt.current = null; void navigate({ search: {}, replace: true }) }}>Create another link</button>
         </div>
         <p role="status" className="text-sm">{copyStatus}</p>
