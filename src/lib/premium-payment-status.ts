@@ -1,3 +1,5 @@
+import type { PremiumPaymentMethod } from './payment-link-validation.ts'
+import { shortPaymentUrl } from './premium-shortlink-origin.ts'
 import type Stripe from 'stripe'
 
 export type PremiumPaymentStatus = 'created' | 'pending' | 'paid' | 'failed' | 'expired'
@@ -9,6 +11,8 @@ export interface PremiumPayment {
   stripe_checkout_session_id: string | null
   stripe_payment_intent_id: string | null
   checkout_url: string | null
+  short_code: string
+  payment_methods: PremiumPaymentMethod[]
   customer_name: string
   customer_email: string
   amount_cents: number
@@ -61,7 +65,9 @@ export function assertPremiumSession(session: Stripe.Checkout.Session, payment: 
 export function paymentResult(payment: PremiumPayment) {
   return {
     sessionId: payment.stripe_checkout_session_id,
-    url: payment.checkout_url,
+    shortCode: payment.short_code,
+    shortUrl: shortPaymentUrl(payment.short_code),
+    paymentMethods: payment.payment_methods,
     amountCents: payment.amount_cents,
     insurer: payment.insurer,
     policyReference: payment.policy_reference,

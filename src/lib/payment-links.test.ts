@@ -2,13 +2,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import Stripe from 'stripe'
 import { createPremiumCheckoutWithClient, reconcilePremiumPayment } from './payment-links.server.ts'
-import { validatePaymentLinkInput } from './payment-link-validation.ts'
+import { PAYMENT_METHODS, PAYMENT_PRESETS, validatePaymentLinkInput } from './payment-link-validation.ts'
 import { checkoutStatus, assertPremiumSession } from './premium-payment-status.ts'
 import type { PremiumPayment } from './premium-payment-status.ts'
 import type { PremiumPaymentStore } from './premium-payments-store.server.ts'
 import { handlePremiumWebhookWithDependencies } from './premium-payment-webhook.server.ts'
 
-const data = validatePaymentLinkInput({ customerName: 'Client Name', customerEmail: 'client+premium@example.com', insurer: 'Insurer', policyReference: 'POL-1', amount: '1248.36', requestId: 'b45e68aa-251c-4cc6-a7e4-26caf055c543' })
+const data = validatePaymentLinkInput({ paymentMethods: [...PAYMENT_METHODS], customerName: 'Client Name', customerEmail: 'client+premium@example.com', insurer: 'Insurer', policyReference: 'POL-1', amount: '1248.36', requestId: 'b45e68aa-251c-4cc6-a7e4-26caf055c543' })
 const paymentId = 'ec0ae50c-e5df-4e68-bd85-026940d21af4'
 const origin = 'https://admin.example.com'
 
@@ -27,10 +27,11 @@ function fixture() {
   } as unknown as Stripe.Checkout.Session
   const store: PremiumPaymentStore = {
     async reserve(input) {
-      row ??= { ...input, id: paymentId, stripe_checkout_session_id: null, stripe_payment_intent_id: null, checkout_url: null, status: 'created', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), paid_at: null, version: 0 }
+      row ??= { ...input, short_code: 'X7Km92AbCdEfGh12', id: paymentId, stripe_checkout_session_id: null, stripe_payment_intent_id: null, checkout_url: null, status: 'created', created_at: new Date().toISOString(), updated_at: new Date().toISOString(), paid_at: null, version: 0 }
       return structuredClone(row)
     },
     async get() { if (!row) throw new Error('Not found'); return structuredClone(row) },
+    async byShortCode(code) { return row?.short_code === code ? structuredClone(row) : null },
     async bySession(id) { if (row?.stripe_checkout_session_id !== id) throw new Error('Not found'); return structuredClone(row) },
     async update(current, patch) {
       if (failUpdate) throw new Error('Database unavailable')
@@ -65,14 +66,16 @@ function intent(status: Stripe.PaymentIntent.Status, lastError = false) {
 test('creates exact EUR Checkout using the exact allowed methods and Customer; no invoice/tax/discount/subscription', async () => {
   const f = fixture()
   const result = await f.create()
-  const [price, checkout] = f.calls
-  assert.equal(price.params.product, 'prod_test')
-  assert.equal(price.params.unit_amount, 124836)
-  assert.equal(price.params.currency, 'eur')
-  assert.equal(price.params.recurring, undefined)
+  const [checkout] = f.calls
+  assert.equal(f.calls.length, 1)
+  const price = checkout.params.line_items[0].price_data
+  assert.equal(price.unit_amount, 124836)
+  assert.equal(price.currency, 'eur')
+  assert.equal(price.product_data.name, 'Insurance Premium')
+  assert.equal(price.product_data.description, `Client: ${data.customerName}\nEmail: ${data.customerEmail}\nInsurer: ${data.insurer}\nPolicy: ${data.policyReference}`)
   assert.equal(checkout.params.mode, 'payment')
   assert.equal(checkout.params.ui_mode, 'hosted_page')
-  assert.deepEqual(checkout.params.payment_method_types, ['card', 'mb_way', 'revolut_pay', 'sepa_debit', 'customer_balance'])
+  assert.deepEqual(checkout.params.payment_method_types, [...PAYMENT_METHODS])
   for (const method of ['amazon_pay', 'link', 'klarna', 'bancontact', 'eps', 'satispay', 'multibanco', 'us_bank_account', 'apple_pay', 'google_pay']) {
     assert.equal(checkout.params.payment_method_types.includes(method), false, `${method} must not be an explicit payment method`)
   }
@@ -101,13 +104,14 @@ test('creates exact EUR Checkout using the exact allowed methods and Customer; n
   assert.deepEqual(checkout.params.invoice_creation, { enabled: false })
   assert.equal(checkout.params.allow_promotion_codes, false)
   for (const key of ['discounts', 'subscription_data', 'shipping_options', 'automatic_surcharge']) assert.equal(checkout.params[key], undefined)
-  assert.deepEqual(checkout.params.line_items, [{ price: 'price_test', quantity: 1, adjustable_quantity: { enabled: false } }])
+  assert.deepEqual(checkout.params.line_items, [{ price_data: price, quantity: 1, adjustable_quantity: { enabled: false } }])
   assert.deepEqual(checkout.params.payment_intent_data.metadata, checkout.params.metadata)
   assert.deepEqual(checkout.params.metadata, { purpose: 'insurance_premium', premium_payment_id: paymentId, created_by: 'admin-id', customer_name: data.customerName, customer_email: data.customerEmail, insurer: data.insurer, policy_reference: data.policyReference })
   assert.equal(checkout.params.success_url, `${origin}/admin/payment-links?session_id={CHECKOUT_SESSION_ID}`)
   assert.equal(checkout.params.cancel_url, `${origin}/admin/payment-links?cancelled=1`)
-  assert.equal(result.url, f.session.url)
-  assert.equal(new URL(result.url!).searchParams.has('prefilled_email'), false)
+  assert.equal(result.shortUrl, 'https://admin.adlerrochefort.com/p/X7Km92AbCdEfGh12')
+  assert.equal('url' in result, false)
+  assert.deepEqual(result.paymentMethods, data.paymentMethods)
   assert.equal(result.status, 'created')
   assert.equal(result.livemode, false)
 })
@@ -121,8 +125,8 @@ test('reuses an exact-email Customer in the payment environment without creating
   )
   await f.create()
   assert.equal(f.customerCalls.filter(call => call.kind === 'create').length, 0)
-  assert.equal(f.calls[1].params.customer, 'cus_existing')
-  assert.equal(f.calls[1].params.customer_email, undefined)
+  assert.equal(f.calls[0].params.customer, 'cus_existing')
+  assert.equal(f.calls[0].params.customer_email, undefined)
 })
 
 test('persistent retries reuse the session; partial failures reuse distinct Stripe keys', async () => {
@@ -131,9 +135,7 @@ test('persistent retries reuse the session; partial failures reuse distinct Stri
   await assert.rejects(f.create())
   f.failUpdate = false
   const result = await f.create()
-  assert.equal(f.calls[0].options.idempotencyKey, f.calls[2].options.idempotencyKey)
-  assert.equal(f.calls[1].options.idempotencyKey, f.calls[3].options.idempotencyKey)
-  assert.notEqual(f.calls[0].options.idempotencyKey, f.calls[1].options.idempotencyKey)
+  assert.equal(f.calls[0].options.idempotencyKey, f.calls[1].options.idempotencyKey)
   const creations = f.customerCalls.filter(call => call.kind === 'create')
   assert.equal(creations.length, 2)
   assert.equal(creations[0].options.idempotencyKey, `insurance-premium:admin-id:${data.requestId}:customer`)
@@ -141,7 +143,7 @@ test('persistent retries reuse the session; partial failures reuse distinct Stri
   assert.notEqual(creations[0].options.idempotencyKey, f.calls[0].options.idempotencyKey)
   assert.notEqual(creations[0].options.idempotencyKey, f.calls[1].options.idempotencyKey)
   assert.equal((await f.create()).sessionId, result.sessionId)
-  assert.equal(f.calls.length, 4)
+  assert.equal(f.calls.length, 2)
   await assert.rejects(createPremiumCheckoutWithClient(f.stripe, f.store, 'prod_test', { ...data, amountCents: 10 }, 'admin-id', origin), /different payment details/)
 })
 
@@ -152,7 +154,7 @@ test('refuses to recreate an uncertain attempt after the Stripe idempotency wind
   f.row.created_at = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   f.failUpdate = false
   await assert.rejects(f.create(), /too old/)
-  assert.equal(f.calls.length, 2)
+  assert.equal(f.calls.length, 1)
 })
 
 test('completed unpaid stays pending; delayed methods settle later or fail', async () => {
@@ -296,3 +298,19 @@ test('webhook ignores unrelated events and persists expiration without marking i
   assert.equal(f.row.status, 'expired')
   assert.equal(f.row.paid_at, null)
 })
+
+for (const preset of [...PAYMENT_PRESETS, { label: 'Custom', methods: ['mb_way', 'sepa_debit'] as const }]) {
+  test(`persists ${preset.label} and emits only applicable Stripe options`, async () => {
+    const f = fixture()
+    const methods = [...preset.methods]
+    const result = await createPremiumCheckoutWithClient(f.stripe, f.store, 'prod_test', { ...data, paymentMethods: methods }, 'admin-id', origin)
+    const params = f.calls[0].params
+    assert.deepEqual(params.payment_method_types, methods)
+    assert.deepEqual(f.row.payment_methods, methods)
+    assert.deepEqual(result.paymentMethods, methods)
+    assert.deepEqual(params.wallet_options, methods.includes('card') ? { link: { display: 'never' } } : undefined)
+    if (methods.includes('customer_balance')) assert.equal(params.payment_method_options.customer_balance.bank_transfer.eu_bank_transfer.country, 'IE')
+    else assert.equal(params.payment_method_options, undefined)
+    await assert.rejects(createPremiumCheckoutWithClient(f.stripe, f.store, 'prod_test', { ...data, paymentMethods: ['revolut_pay'] }, 'admin-id', origin), /different payment details/)
+  })
+}
