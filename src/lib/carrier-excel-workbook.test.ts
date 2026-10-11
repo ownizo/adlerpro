@@ -682,3 +682,44 @@ test('END-TO-END: a synthetic Windows-1252 POLRES CSV, matching the real file\'s
   assert.equal(rowBSanitized['apolice_subst'], '900000010')
   assert.equal(rowBSanitized['adesao_subst.'], '00001')
 })
+
+// ── Title row above the headers (real MyHiscox export layout) ───────────
+
+async function buildAoaWorkbookBuffer(aoa: unknown[][]): Promise<Buffer> {
+  const XLSX = await import('xlsx')
+  const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true })
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
+  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer
+}
+
+const HISCOX_HEADERS = ['Referência', 'Área de negócio', 'Produto', 'Tomador', 'NIPC/NIF', 'Data de efeito', 'Prémio total', 'Estado']
+
+test('TITLE ROW: a single-cell title row above the headers is skipped (MyHiscox layout) and the file maps end-to-end', async () => {
+  const buffer = await buildAoaWorkbookBuffer([
+    ['MyHiscox'],
+    HISCOX_HEADERS,
+    [1000001, 'Arte e clientes privados', 'Holiday Homes', 'Jane Example', 123456789, new Date(Date.UTC(2026, 9, 10)), '395,16 €', 'Ativa'],
+    [1000002, 'Arte e clientes privados', 'Holiday Homes', '-', '-', new Date(Date.UTC(2026, 8, 18)), '1256,02 €', 'Ativa'],
+  ])
+  const parsed = await parsePortfolioWorkbook(buffer, 'MyHiscox.xlsx')
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) return
+  assert.equal(parsed.rows.length, 2)
+  assert.deepEqual(Object.keys(parsed.rows[0]!), HISCOX_HEADERS)
+
+  const mapped = mapPortfolioRows('hiscox', parsed.rows)
+  assert.equal(mapped.recognized, true)
+  assert.equal(mapped.rows[0]!.externalPolicyNumber, '1000001')
+  assert.equal(mapped.rows[0]!.effectiveDate, '2026-10-10')
+  assert.equal(mapped.rows[1]!.customerName, undefined)
+  assert.equal(mapped.rows[1]!.premium, 1256.02)
+})
+
+test('TITLE ROW: files whose headers are already on the first row are read exactly as before', async () => {
+  const buffer = await buildWorkbookBuffer([{ nif: '123456789', contrato_id: 'C1', tomador: 'X' }])
+  const parsed = await parsePortfolioWorkbook(buffer, 'portfolio.xlsx')
+  assert.equal(parsed.ok, true)
+  if (!parsed.ok) return
+  assert.deepEqual(Object.keys(parsed.rows[0]!), ['nif', 'contrato_id', 'tomador'])
+})

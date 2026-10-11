@@ -144,6 +144,90 @@ export function stripTrailingCsvNulPadding(text: string): string {
   return text.replace(/\x00+(?="|\r?\n|$)/gm, '')
 }
 
+/**
+ * Converte, em todas as folhas, as células numéricas com formato de data
+ * (ex.: "m/d/yy") num objeto Date à meia-noite UTC do dia mostrado no
+ * Excel.
+ *
+ * Porquê: com `cellDates: true` a SheetJS cria o Date no fuso horário
+ * LOCAL do servidor (e ainda com um desvio de segundos herdado do LMT
+ * histórico). Confirmado com o export real MyHiscox: "10/10/2026" num
+ * processo com TZ=Europe/Lisbon vinha como 2026-10-09T23:00:45Z, e
+ * parseImportDateSafely (que usa getUTC*) devolvia 2026-10-09 — um dia a
+ * menos. Em UTC (Netlify) não se notava, mas o resultado não pode
+ * depender do fuso horário da máquina. SSF.parse_date_code decompõe o
+ * número de série em ano/mês/dia/hora sem passar por fuso nenhum.
+ */
+function convertExcelDateCellsToUtc(SSF: any, workbook: any): void {
+  const date1904 = Boolean(workbook?.Workbook?.WBProps?.date1904)
+  for (const sheetName of workbook?.SheetNames ?? []) {
+    const sheet = workbook.Sheets?.[sheetName]
+    if (!sheet) continue
+    for (const address of Object.keys(sheet)) {
+      if (address.startsWith('!')) continue
+      const cell = sheet[address]
+      if (!cell || cell.t !== 'n' || typeof cell.v !== 'number' || !cell.z) continue
+      if (!SSF.is_date(cell.z)) continue
+      const parts = SSF.parse_date_code(cell.v, { date1904 })
+      if (!parts) continue
+      cell.v = new Date(Date.UTC(parts.y, parts.m - 1, parts.d, parts.H, parts.M, Math.round(parts.S)))
+      cell.t = 'd'
+    }
+  }
+}
+
+/** Quantas linhas iniciais, no máximo, podem ser "preâmbulo" (título)
+ * antes da linha de cabeçalhos — mais do que isto nunca é um título, é um
+ * ficheiro que não reconhecemos. */
+const MAX_PREAMBLE_ROWS = 10
+
+function countNonEmptyCells(row: unknown[]): number {
+  let count = 0
+  for (const cell of row) {
+    if (cell === null || cell === undefined) continue
+    if (typeof cell === 'string' && cell.trim() === '') continue
+    count++
+  }
+  return count
+}
+
+/**
+ * Devolve o índice ABSOLUTO (0-based, na folha) da linha de cabeçalhos.
+ *
+ * Alguns exports reais têm uma linha de título por cima dos cabeçalhos —
+ * confirmado no export real "MyHiscox" (linha 1 = só "MyHiscox" na coluna
+ * A; os cabeçalhos Referência/Tomador/NIPC/NIF/... estão na linha 2). Sem
+ * isto, `sheet_to_json` usava a linha de título como cabeçalho e todas as
+ * chaves passavam a "MyHiscox"/"__EMPTY_n" — o mapper nunca reconhecia o
+ * ficheiro.
+ *
+ * Regra conservadora: só salta linhas iniciais com NO MÁXIMO uma célula
+ * preenchida (um título, nunca uma linha de dados ou de cabeçalhos), até
+ * MAX_PREAMBLE_ROWS. Ficheiros cujo cabeçalho já está na primeira linha
+ * (MGEN, Allianz POLRES, qualquer CSV com 2+ colunas) devolvem
+ * exatamente o mesmo índice de antes — comportamento inalterado. Se não
+ * existir nenhuma linha com 2+ células nas primeiras linhas, mantém-se
+ * também o comportamento anterior (primeira linha da folha).
+ */
+function findHeaderRowIndex(XLSX: any, sheet: any): number {
+  const ref: string | undefined = sheet?.['!ref']
+  if (!ref) return 0
+  const startRow: number = XLSX.utils.decode_range(ref).s.r
+  const leadingRows = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: null,
+    blankrows: true,
+    range: startRow,
+  }) as unknown[][]
+
+  const limit = Math.min(leadingRows.length, MAX_PREAMBLE_ROWS + 1)
+  for (let i = 0; i < limit; i++) {
+    const nonEmpty = countNonEmptyCells(leadingRows[i] ?? [])
+    if (nonEmpty >= 2) return startRow + i
+  }
+  return startRow
+}
+
 export async function parsePortfolioWorkbook(buffer: Buffer, filename: string): Promise<ParseWorkbookResult> {
   const isCsv = isCsvFilename(filename)
   if (!isCsv && !/\.(xlsx|xls)$/i.test(filename)) {
@@ -171,10 +255,21 @@ export async function parsePortfolioWorkbook(buffer: Buffer, filename: string): 
       const text = stripTrailingCsvNulPadding(decodeCsvText(buffer))
       workbook = XLSX.read(text, { type: 'string', cellDates: true, raw: true })
     } else {
-      // cellDates: true — datas nativas do Excel vêm como objetos Date, não
-      // como número de série, para que parseImportDateSafely as reconheça
-      // sem ambiguidade. bookVBA: false (default) — nunca interpreta macros.
-      workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true, bookVBA: false })
+      // Datas nativas do Excel: lidas como número de série + formato
+      // (cellNF) e convertidas para Date em UTC por convertExcelDateCellsToUtc
+      // — ver o porquê nessa função. bookVBA: false (default) — nunca
+      // interpreta macros.
+      // Com `await import('xlsx')` o SSF só está exposto em `.default` (CJS
+      // interop) — aceitam-se as duas formas. Se, num bundle futuro, não
+      // estiver disponível, volta-se ao comportamento anterior
+      // (cellDates: true) em vez de deixar as datas como números.
+      const SSF = (XLSX as any).SSF ?? (XLSX as any).default?.SSF
+      if (SSF?.is_date && SSF?.parse_date_code) {
+        workbook = XLSX.read(buffer, { type: 'buffer', cellNF: true, bookVBA: false })
+        convertExcelDateCellsToUtc(SSF, workbook)
+      } else {
+        workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true, bookVBA: false })
+      }
     }
   } catch {
     return { ok: false, error: isCsv ? 'Could not read this file as a CSV file' : 'Could not read this file as an Excel workbook' }
@@ -185,7 +280,8 @@ export async function parsePortfolioWorkbook(buffer: Buffer, filename: string): 
     return { ok: false, error: 'Workbook has no sheets' }
   }
   const sheet = workbook.Sheets[firstSheetName]
-  const rows = XLSX.utils.sheet_to_json(sheet, { defval: null }) as Array<Record<string, unknown>>
+  const headerRowIndex = findHeaderRowIndex(XLSX, sheet)
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: null, range: headerRowIndex }) as Array<Record<string, unknown>>
 
   if (rows.length === 0) {
     return { ok: false, error: 'Workbook has no recognizable rows' }

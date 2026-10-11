@@ -364,7 +364,7 @@ test('ZURICH UNKNOWN FORMAT SAFE FAILURE: never recognized, never stages rows, c
   assert.match(result.error ?? '', /Zurich/)
 })
 
-test('HISCOX UNKNOWN FORMAT SAFE FAILURE: never recognized, never stages rows, clear message', () => {
+test('HISCOX RANDOM FORMAT SAFE FAILURE: a non-MyHiscox sheet is never recognized, never stages rows, clear message', () => {
   const result = mapPortfolioRows('hiscox', [{ anything: 'x' }])
   assert.equal(result.recognized, false)
   assert.deepEqual(result.rows, [])
@@ -374,4 +374,89 @@ test('HISCOX UNKNOWN FORMAT SAFE FAILURE: never recognized, never stages rows, c
 test('OTHER PROVIDERS: even a well-formed MGEN-shaped row is never accepted for a different provider (no format guessing)', () => {
   const result = mapPortfolioRows('allianz', [mgenRow()])
   assert.equal(result.recognized, false)
+})
+
+// ── Hiscox MyHiscox export (CRM3 Block 3 — real mapper) ─────────────────
+//
+// Synthetic fixtures only — same 8 columns as the real MyHiscox export,
+// never real customer data.
+
+function hiscoxRow(overrides: Record<string, unknown> = {}) {
+  return {
+    'Referência': 1000001,
+    'Área de negócio': 'Arte e clientes privados',
+    'Produto': 'Holiday Homes',
+    'Tomador': 'Jane Example',
+    'NIPC/NIF': 123456789,
+    'Data de efeito': new Date(Date.UTC(2026, 9, 10)),
+    'Prémio total': '1256,02 €',
+    'Estado': 'Ativa',
+    ...overrides,
+  }
+}
+
+test('HISCOX MAPPING: a well-formed MyHiscox row is recognized and maps every documented field', () => {
+  const result = mapPortfolioRows('hiscox', [hiscoxRow()])
+  assert.equal(result.recognized, true)
+  const row = result.rows[0]!
+  assert.equal(row.externalPolicyNumber, '1000001')
+  assert.equal(row.carrierSegment, 'Arte e clientes privados')
+  assert.equal(row.productDescription, 'Holiday Homes')
+  assert.equal(row.customerName, 'Jane Example')
+  assert.equal(row.taxIdRaw, '123456789')
+  assert.equal(row.effectiveDate, '2026-10-10')
+  assert.equal(row.premium, 1256.02)
+  assert.equal(row.carrierStatus, 'active')
+})
+
+test('HISCOX MAPPING: fields the export does not carry are never invented', () => {
+  const row = mapPortfolioRows('hiscox', [hiscoxRow()]).rows[0]!
+  assert.equal(row.externalClientId, undefined)
+  assert.equal(row.address, undefined)
+  assert.equal(row.email, undefined)
+  assert.equal(row.phone, undefined)
+  // Data de efeito is not proven to be the current period start — never
+  // promoted to startDate/endDate.
+  assert.equal(row.startDate, undefined)
+  assert.equal(row.endDate, undefined)
+})
+
+test('HISCOX MAPPING: premium below 1000 without thousands separator parses ("395,16 €")', () => {
+  const row = mapPortfolioRows('hiscox', [hiscoxRow({ 'Prémio total': '395,16 €' })]).rows[0]!
+  assert.equal(row.premium, 395.16)
+})
+
+test('HISCOX MAPPING: "-" placeholders for Tomador/NIF are treated as empty, never as a name or tax id', () => {
+  const result = mapPortfolioRows('hiscox', [hiscoxRow({ 'Tomador': '-', 'NIPC/NIF': '-' })])
+  assert.equal(result.recognized, true)
+  const row = result.rows[0]!
+  assert.equal(row.customerName, undefined)
+  assert.equal(row.taxIdRaw, undefined)
+  assert.equal(row.externalPolicyNumber, '1000001')
+})
+
+test('HISCOX MAPPING: unknown Estado values are preserved untranslated; cancelled-like values normalize', () => {
+  assert.equal(mapPortfolioRows('hiscox', [hiscoxRow({ 'Estado': 'Anulada' })]).rows[0]!.carrierStatus, 'cancelled')
+  assert.equal(mapPortfolioRows('hiscox', [hiscoxRow({ 'Estado': 'Suspensa' })]).rows[0]!.carrierStatus, 'Suspensa')
+})
+
+test('HISCOX MAPPING: re-mapping the stored sanitizedRaw (apply retry path) yields the same fields', () => {
+  const first = mapPortfolioRows('hiscox', [hiscoxRow()]).rows[0]!
+  // Round-trip through JSON exactly like carrier_import_records.raw_payload.
+  const stored = JSON.parse(JSON.stringify(first.sanitizedRaw)) as Record<string, unknown>
+  const again = mapPortfolioRows('hiscox', [stored])
+  assert.equal(again.recognized, true)
+  const { sanitizedRaw: _a, ...firstFields } = first
+  const { sanitizedRaw: _b, ...againFields } = again.rows[0]!
+  assert.deepEqual(againFields, firstFields)
+})
+
+test('HISCOX MAPPING: an MGEN- or Allianz-shaped row is never accepted as Hiscox (no format guessing)', () => {
+  assert.equal(mapPortfolioRows('hiscox', [mgenRow()]).recognized, false)
+  assert.equal(mapPortfolioRows('hiscox', [allianzRow()]).recognized, false)
+})
+
+test('HISCOX MAPPING: a MyHiscox row is never accepted for another provider', () => {
+  assert.equal(mapPortfolioRows('mgen', [hiscoxRow()]).recognized, false)
+  assert.equal(mapPortfolioRows('allianz', [hiscoxRow()]).recognized, false)
 })
