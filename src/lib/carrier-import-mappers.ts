@@ -13,8 +13,8 @@
  * policy-reconciliation.ts nunca precisam de saber que uma seguradora nova
  * existe, só recebem sempre a mesma forma (ParsedImportRow).
  *
- * Allianz/Zurich/Hiscox: o formato real do ficheiro destas seguradoras não
- * é conhecido — os mappers abaixo devolvem sempre recognized=false com
+ * Zurich: o formato real do ficheiro desta seguradora ainda não é
+ * conhecido — o mapper abaixo devolve sempre recognized=false com
  * uma mensagem clara, nunca fingem reconhecer um formato que não foi
  * verificado (ver requisito "Do NOT pretend their Excel format is
  * known").
@@ -146,7 +146,7 @@ export const mgenMapper: ProviderMapper = (normalizedRows) => {
   return { recognized: true, rows }
 }
 
-// ── Zurich / Hiscox — placeholders, formato desconhecido ────────────────
+// ── Zurich — placeholder, formato desconhecido ──────────────────────────
 
 function unknownFormatMapper(provider: CarrierProviderId): ProviderMapper {
   return (): ProviderMapperResult => ({
@@ -157,7 +157,120 @@ function unknownFormatMapper(provider: CarrierProviderId): ProviderMapper {
 }
 
 export const zurichMapper: ProviderMapper = unknownFormatMapper('zurich')
-export const hiscoxMapper: ProviderMapper = unknownFormatMapper('hiscox')
+
+// ── Hiscox — export "MyHiscox" (portal de mediador) ─────────────────────
+//
+// Formato confirmado contra o export real MyHiscox.xlsx: uma folha, linha
+// de título "MyHiscox" (saltada por carrier-excel-workbook.ts), depois 8
+// colunas — Referência | Área de negócio | Produto | Tomador | NIPC/NIF |
+// Data de efeito | Prémio total | Estado.
+//
+// O export NÃO traz morada, contacto, id de cliente Hiscox, nem datas de
+// início/fim de período — esses campos ficam por preencher (nunca
+// inventados). Tal como na Allianz, "Data de efeito" só alimenta
+// effectiveDate: não está provado que seja o início do período atual
+// (pode ser a data de efeito original da apólice), por isso startDate/
+// endDate ficam por mapear e o "create policy" apply continua a exigir
+// datas confirmadas manualmente (mapParsedRowToNewPolicyFields).
+//
+// "Prémio total" é mapeado para premium, tal como premio_total na MGEN —
+// o export traz texto "1256,02 €", que parseAmountSafely já interpreta.
+
+const HISCOX_FIELD_MAP: Partial<Record<string, keyof ParsedImportRow>> = {
+  // Referência é o número de apólice Hiscox — sempre string (o Excel grava-o
+  // como número; String() preserva o valor exato, sem separadores).
+  referencia: 'externalPolicyNumber',
+  area_de_negocio: 'carrierSegment',
+  produto: 'productDescription',
+  tomador: 'customerName',
+  'nipc/nif': 'taxIdRaw',
+  data_de_efeito: 'effectiveDate',
+  premio_total: 'premium',
+}
+
+const HISCOX_CORE_REQUIRED_KEYS = ['referencia', 'tomador', 'nipc/nif']
+const HISCOX_STRUCTURAL_KEYS = ['area_de_negocio', 'data_de_efeito', 'premio_total']
+
+// O MyHiscox usa "-" como marcador de célula vazia (ex.: tomador/NIF de
+// uma apólice ainda sem dados de tomador no portal) — tratado como vazio,
+// nunca como nome "-" ou NIF "-".
+function isHiscoxEmptyMarker(value: unknown): boolean {
+  if (value === null || value === undefined) return true
+  if (typeof value !== 'string') return false
+  const trimmed = value.trim()
+  return trimmed === '' || /^[-–—]+$/.test(trimmed)
+}
+
+// Normaliza só os estados conhecidos — qualquer outro valor fica tal e
+// qual (nunca traduzido para um estado inventado).
+function normalizeHiscoxStatus(value: unknown): string | undefined {
+  if (isHiscoxEmptyMarker(value)) return undefined
+  const raw = String(value).trim()
+  const key = raw.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+  if (key === 'ativa' || key === 'activa' || key === 'em vigor') return 'active'
+  if (key === 'anulada' || key === 'cancelada' || key === 'terminada') return 'cancelled'
+  return raw
+}
+
+// "Data de efeito" vem do Excel como data nativa (Date). Em sanitizedRaw
+// fica guardada como timestamp ISO ("2026-10-10T00:00:00.000Z", via
+// toJsonSafeValue) — e é esse payload que data.ts volta a passar por
+// mapPortfolioRows nos retries de apply. parseImportDateSafely não aceita
+// timestamps, por isso aceita-se aqui SÓ a forma exata produzida por
+// Date.toISOString() à meia-noite UTC, reduzida à parte da data.
+const ISO_MIDNIGHT_TIMESTAMP_RE = /^(\d{4}-\d{2}-\d{2})T00:00:00(?:\.000)?Z$/
+
+function parseHiscoxDate(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const match = ISO_MIDNIGHT_TIMESTAMP_RE.exec(value.trim())
+    if (match) return parseImportDateSafely(match[1])
+  }
+  return parseImportDateSafely(value)
+}
+
+export const hiscoxMapper: ProviderMapper = (normalizedRows) => {
+  if (normalizedRows.length === 0) {
+    return { recognized: false, rows: [], error: 'File format not yet recognised for Hiscox' }
+  }
+
+  const firstRowKeys = new Set(Object.keys(normalizedRows[0]!))
+  const hasCore = HISCOX_CORE_REQUIRED_KEYS.every((key) => firstRowKeys.has(key))
+  const hasStructural = HISCOX_STRUCTURAL_KEYS.some((key) => firstRowKeys.has(key))
+  if (!hasCore || !hasStructural) {
+    return { recognized: false, rows: [], error: 'File format not yet recognised for Hiscox' }
+  }
+
+  const rows: ParsedImportRow[] = normalizedRows.map((rawRow) => {
+    const parsed: ParsedImportRow = { sanitizedRaw: {} }
+    for (const [key, value] of Object.entries(rawRow)) {
+      const targetField = HISCOX_FIELD_MAP[key]
+      if (!targetField) continue
+      if (isHiscoxEmptyMarker(value)) continue
+
+      if (DATE_FIELDS.has(targetField)) {
+        const parsedDate = parseHiscoxDate(value)
+        if (parsedDate !== undefined) (parsed as any)[targetField] = parsedDate
+      } else if (AMOUNT_FIELDS.has(targetField)) {
+        const parsedAmount = parseAmountSafely(value)
+        if (parsedAmount !== undefined) (parsed as any)[targetField] = parsedAmount
+      } else if (STRING_FIELDS.has(targetField)) {
+        const text = String(value).trim()
+        if (text !== '') (parsed as any)[targetField] = text
+      }
+    }
+
+    const status = normalizeHiscoxStatus(rawRow['estado'])
+    if (status !== undefined) parsed.carrierStatus = status
+
+    const jsonSafeRow: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(rawRow)) jsonSafeRow[key] = toJsonSafeValue(value)
+    parsed.sanitizedRaw = sanitizeRawRowForStaging(jsonSafeRow)
+
+    return parsed
+  })
+
+  return { recognized: true, rows }
+}
 
 // ── Allianz — POLRES, primeiro mapper real (CRM3 Block 3) ───────────────
 //
