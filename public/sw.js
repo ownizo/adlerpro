@@ -6,7 +6,7 @@
  * the network first and only fall back to the cache when the device is offline.
  * This keeps the portal installable without ever serving stale account data.
  */
-const CACHE = 'oms-cache-v1'
+const CACHE = 'oms-cache-v2'
 
 // Precache the app shell so a previously visited install opens while offline.
 const PRECACHE_URLS = [
