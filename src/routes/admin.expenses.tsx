@@ -180,7 +180,7 @@ function ExpensesPage() {
         <div className="flex flex-wrap gap-2">
           <button type="button" className="admin-btn admin-btn-primary" onClick={() => cameraInput.current?.click()}>Fotografar fatura</button>
           <button type="button" className="admin-btn admin-btn-secondary" onClick={() => fileInput.current?.click()}>Carregar PDF / imagem</button>
-          <button type="button" className="admin-btn admin-btn-secondary" onClick={() => setShowCapture(true)}>Enviar link por WhatsApp</button>
+          <button type="button" className="admin-btn admin-btn-secondary" onClick={() => setShowCapture(true)}>Link para o telemóvel</button>
           <input ref={cameraInput} type="file" accept="image/*" capture="environment" className="hidden"
             onChange={(e) => { void handleFiles(e.target.files); e.target.value = '' }} />
           <input ref={fileInput} type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.heic" multiple className="hidden"
