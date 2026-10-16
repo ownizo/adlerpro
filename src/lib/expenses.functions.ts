@@ -1,4 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
+import { getRequestUrl } from '@tanstack/react-start/server'
 import { requireRoleMiddleware } from '@/middleware/identity'
 import { isExpenseCategory } from './expense-categories'
 import { assertExpenseId, validateStartUpload } from './expense-validation'
@@ -68,4 +69,33 @@ export const fetchExpenseFileUrl = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const { expenseFileUrl } = await import('./expenses.server')
     return expenseFileUrl(data.id, data.download)
+  })
+
+export const createCaptureLinkFn = createServerFn({ method: 'POST' })
+  .middleware([requireRoleMiddleware('admin')])
+  .inputValidator((data: { label: string; phone: string; expiryDays: number }) => {
+    const label = typeof data?.label === 'string' ? data.label.trim() : ''
+    if (!label || label.length > 120) throw new Error('Indique um nome para o link (ex.: Telemóvel Hugo).')
+    if (typeof data.phone !== 'string' || !data.phone.trim()) throw new Error('Indique o número de telefone.')
+    if (![30, 90, 365].includes(data.expiryDays)) throw new Error('Validade inválida.')
+    return { label, phone: data.phone, expiryDays: data.expiryDays }
+  })
+  .handler(async ({ data, context }) => {
+    const { createCaptureLink } = await import('./expenses.server')
+    return createCaptureLink(data, context.user.id, getRequestUrl().origin)
+  })
+
+export const fetchCaptureLinks = createServerFn({ method: 'GET' })
+  .middleware([requireRoleMiddleware('admin')])
+  .handler(async () => {
+    const { listCaptureLinks } = await import('./expenses.server')
+    return listCaptureLinks()
+  })
+
+export const revokeCaptureLinkFn = createServerFn({ method: 'POST' })
+  .middleware([requireRoleMiddleware('admin')])
+  .inputValidator((data: { id: string }) => ({ id: assertExpenseId(data?.id) }))
+  .handler(async ({ data }) => {
+    const { revokeCaptureLink } = await import('./expenses.server')
+    return revokeCaptureLink(data.id)
   })

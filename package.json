@@ -24,6 +24,7 @@
     "@tanstack/store": "^0.9.1",
     "cookie": "^1.1.1",
     "drizzle-orm": "^1.0.0-beta.22",
+    "fflate": "^0.8.3",
     "i18next": "^26.0.3",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",

@@ -1,4 +1,6 @@
+import { createHash, randomBytes } from 'node:crypto'
 import { supabaseAdmin } from './supabase-admin'
+import { captureUrl, normaliseWhatsAppNumber, whatsAppShareUrl } from './expense-capture.ts'
 import { monthOf } from './expense-categories.ts'
 import {
   completeExpenseFields, normaliseExpenseFields, safeFileName,
@@ -113,4 +115,52 @@ export async function expenseFileUrl(id: string, download: boolean) {
     .createSignedUrl(expense.file_path, 600, download ? { download: expense.file_name } : undefined)
   if (error || !data) throw new Error('Não foi possível abrir o ficheiro.')
   return { url: data.signedUrl, mime: expense.file_mime, name: expense.file_name }
+}
+
+// ── Phone capture links ──────────────────────────────────────────────────────
+
+export type CaptureLink = {
+  id: string
+  label: string
+  phone: string | null
+  created_at: string
+  expires_at: string
+  revoked_at: string | null
+  last_used_at: string | null
+  uploads_count: number
+}
+
+export function hashCaptureToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex')
+}
+
+export async function createCaptureLink(input: { label: string; phone: string; expiryDays: number }, userId: string, origin: string) {
+  const phoneDigits = normaliseWhatsAppNumber(input.phone)
+  const token = randomBytes(32).toString('base64url')
+  const expires = new Date(Date.now() + input.expiryDays * 24 * 60 * 60 * 1000)
+  const { data, error } = await supabaseAdmin.from('expense_capture_links').insert({
+    token_hash: hashCaptureToken(token),
+    label: input.label,
+    phone: `+${phoneDigits}`,
+    created_by: userId,
+    expires_at: expires.toISOString(),
+  }).select('id, label, phone, created_at, expires_at, revoked_at, last_used_at, uploads_count').single()
+  if (error || !data) throw new Error('Não foi possível criar o link.')
+  const link = captureUrl(origin, token)
+  return { link: data as CaptureLink, url: link, whatsappUrl: whatsAppShareUrl(phoneDigits, link) }
+}
+
+export async function listCaptureLinks(): Promise<CaptureLink[]> {
+  const { data, error } = await supabaseAdmin.from('expense_capture_links')
+    .select('id, label, phone, created_at, expires_at, revoked_at, last_used_at, uploads_count')
+    .order('created_at', { ascending: false }).limit(50)
+  if (error) throw new Error('Não foi possível carregar os links.')
+  return (data ?? []) as CaptureLink[]
+}
+
+export async function revokeCaptureLink(id: string) {
+  const { error } = await supabaseAdmin.from('expense_capture_links')
+    .update({ revoked_at: new Date().toISOString() }).eq('id', id).is('revoked_at', null)
+  if (error) throw new Error('Não foi possível desativar o link.')
+  return { id }
 }
