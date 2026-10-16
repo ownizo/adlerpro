@@ -73,12 +73,13 @@ export const fetchExpenseFileUrl = createServerFn({ method: 'GET' })
 
 export const createCaptureLinkFn = createServerFn({ method: 'POST' })
   .middleware([requireRoleMiddleware('admin')])
-  .inputValidator((data: { label: string; phone: string; expiryDays: number }) => {
+  .inputValidator((data: { label: string; email?: string | null; expiryDays: number }) => {
     const label = typeof data?.label === 'string' ? data.label.trim() : ''
     if (!label || label.length > 120) throw new Error('Indique um nome para o link (ex.: Telemóvel Hugo).')
-    if (typeof data.phone !== 'string' || !data.phone.trim()) throw new Error('Indique o número de telefone.')
+    const email = typeof data.email === 'string' ? data.email.trim().toLowerCase() : ''
+    if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error('Email inválido.')
     if (![30, 90, 365].includes(data.expiryDays)) throw new Error('Validade inválida.')
-    return { label, phone: data.phone, expiryDays: data.expiryDays }
+    return { label, email: email || null, expiryDays: data.expiryDays }
   })
   .handler(async ({ data, context }) => {
     const { createCaptureLink } = await import('./expenses.server')

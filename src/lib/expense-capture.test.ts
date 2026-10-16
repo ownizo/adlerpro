@@ -1,16 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { captureUrl, isCaptureToken, normaliseWhatsAppNumber, whatsAppShareUrl } from './expense-capture.ts'
+import { captureUrl, isCaptureToken } from './expense-capture.ts'
 import { accountantWorkbookRows, packFileName } from './expense-export.ts'
 import type { Expense } from './expense-validation.ts'
-
-test('WhatsApp numbers normalise to international digits', () => {
-  assert.equal(normaliseWhatsAppNumber('928 226 570'), '351928226570')
-  assert.equal(normaliseWhatsAppNumber('+351 928 226 570'), '351928226570')
-  assert.equal(normaliseWhatsAppNumber('0044 7700 900123'), '447700900123')
-  assert.equal(normaliseWhatsAppNumber('+1 (415) 555-0100'), '14155550100')
-  assert.throws(() => normaliseWhatsAppNumber('123'))
-})
 
 test('capture token format and URLs', () => {
   const token = 'a'.repeat(43)
@@ -18,9 +10,6 @@ test('capture token format and URLs', () => {
   assert.equal(isCaptureToken('short'), false)
   assert.equal(isCaptureToken(`${'a'.repeat(42)}/`), false)
   assert.equal(captureUrl('https://admin.adlerrochefort.com/admin/expenses', token), `https://admin.adlerrochefort.com/despesa/${token}`)
-  const wa = whatsAppShareUrl('351928226570', 'https://x.test/despesa/abc')
-  assert.ok(wa.startsWith('https://wa.me/351928226570?text='))
-  assert.ok(decodeURIComponent(wa.split('text=')[1]).includes('https://x.test/despesa/abc'))
 })
 
 const base: Expense = {
