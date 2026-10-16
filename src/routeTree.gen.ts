@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as PCodeRouteImport } from './routes/p.$code'
 import { Route as TermsAndConditionsRouteImport } from './routes/terms-and-conditions'
 import { Route as QuotesComparisonRouteImport } from './routes/quotes-comparison'
 import { Route as ProfileRouteImport } from './routes/profile'
@@ -24,6 +23,7 @@ import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as OneIndexRouteImport } from './routes/one/index'
+import { Route as PCodeRouteImport } from './routes/p.$code'
 import { Route as OneTermsRouteImport } from './routes/one/terms'
 import { Route as OneResetPasswordRouteImport } from './routes/one/reset-password'
 import { Route as OneProfileRouteImport } from './routes/one/profile'
@@ -34,15 +34,11 @@ import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
 import { Route as OneClaimsRouteImport } from './routes/one/claims'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api.stripe-webhook'
 import { Route as AdminPaymentLinksRouteImport } from './routes/admin.payment-links'
+import { Route as AdminExpensesRouteImport } from './routes/admin.expenses'
 import { Route as AdminCarrierIntegrationsRouteImport } from './routes/admin.carrier-integrations'
 import { Route as AdminCarrierIntegrationsImportRouteImport } from './routes/admin.carrier-integrations.import'
 import { Route as AdminCarrierIntegrationsRunsIdRouteImport } from './routes/admin.carrier-integrations.runs.$id'
 
-const PCodeRoute = PCodeRouteImport.update({
-  id: '/p/$code',
-  path: '/p/$code',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TermsAndConditionsRoute = TermsAndConditionsRouteImport.update({
   id: '/terms-and-conditions',
   path: '/terms-and-conditions',
@@ -113,6 +109,11 @@ const OneIndexRoute = OneIndexRouteImport.update({
   path: '/one/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PCodeRoute = PCodeRouteImport.update({
+  id: '/p/$code',
+  path: '/p/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OneTermsRoute = OneTermsRouteImport.update({
   id: '/one/terms',
   path: '/one/terms',
@@ -163,6 +164,11 @@ const AdminPaymentLinksRoute = AdminPaymentLinksRouteImport.update({
   path: '/payment-links',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminExpensesRoute = AdminExpensesRouteImport.update({
+  id: '/expenses',
+  path: '/expenses',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCarrierIntegrationsRoute =
   AdminCarrierIntegrationsRouteImport.update({
     id: '/carrier-integrations',
@@ -183,7 +189,6 @@ const AdminCarrierIntegrationsRunsIdRoute =
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/p/$code': typeof PCodeRoute
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/alerts': typeof AlertsRoute
@@ -198,6 +203,7 @@ export interface FileRoutesByFullPath {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
+  '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/one/claims': typeof OneClaimsRoute
@@ -208,12 +214,12 @@ export interface FileRoutesByFullPath {
   '/one/profile': typeof OneProfileRoute
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
+  '/p/$code': typeof PCodeRoute
   '/one/': typeof OneIndexRoute
   '/admin/carrier-integrations/import': typeof AdminCarrierIntegrationsImportRoute
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
 export interface FileRoutesByTo {
-  '/p/$code': typeof PCodeRoute
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/alerts': typeof AlertsRoute
@@ -228,6 +234,7 @@ export interface FileRoutesByTo {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
+  '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/one/claims': typeof OneClaimsRoute
@@ -238,12 +245,12 @@ export interface FileRoutesByTo {
   '/one/profile': typeof OneProfileRoute
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
+  '/p/$code': typeof PCodeRoute
   '/one': typeof OneIndexRoute
   '/admin/carrier-integrations/import': typeof AdminCarrierIntegrationsImportRoute
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
 export interface FileRoutesById {
-  '/p/$code': typeof PCodeRoute
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
@@ -259,6 +266,7 @@ export interface FileRoutesById {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
+  '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/one/claims': typeof OneClaimsRoute
@@ -269,6 +277,7 @@ export interface FileRoutesById {
   '/one/profile': typeof OneProfileRoute
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
+  '/p/$code': typeof PCodeRoute
   '/one/': typeof OneIndexRoute
   '/admin/carrier-integrations/import': typeof AdminCarrierIntegrationsImportRoute
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
@@ -276,7 +285,6 @@ export interface FileRoutesById {
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    | '/p/$code'
     | '/'
     | '/admin'
     | '/alerts'
@@ -291,6 +299,7 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/admin/carrier-integrations'
+    | '/admin/expenses'
     | '/admin/payment-links'
     | '/api/stripe-webhook'
     | '/one/claims'
@@ -301,12 +310,12 @@ export interface FileRouteTypes {
     | '/one/profile'
     | '/one/reset-password'
     | '/one/terms'
+    | '/p/$code'
     | '/one/'
     | '/admin/carrier-integrations/import'
     | '/admin/carrier-integrations/runs/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/p/$code'
     | '/'
     | '/admin'
     | '/alerts'
@@ -321,6 +330,7 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/admin/carrier-integrations'
+    | '/admin/expenses'
     | '/admin/payment-links'
     | '/api/stripe-webhook'
     | '/one/claims'
@@ -331,12 +341,12 @@ export interface FileRouteTypes {
     | '/one/profile'
     | '/one/reset-password'
     | '/one/terms'
+    | '/p/$code'
     | '/one'
     | '/admin/carrier-integrations/import'
     | '/admin/carrier-integrations/runs/$id'
   id:
     | '__root__'
-    | '/p/$code'
     | '/'
     | '/admin'
     | '/alerts'
@@ -351,6 +361,7 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/admin/carrier-integrations'
+    | '/admin/expenses'
     | '/admin/payment-links'
     | '/api/stripe-webhook'
     | '/one/claims'
@@ -361,13 +372,13 @@ export interface FileRouteTypes {
     | '/one/profile'
     | '/one/reset-password'
     | '/one/terms'
+    | '/p/$code'
     | '/one/'
     | '/admin/carrier-integrations/import'
     | '/admin/carrier-integrations/runs/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  PCodeRoute: typeof PCodeRoute
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AlertsRoute: typeof AlertsRoute
@@ -390,18 +401,12 @@ export interface RootRouteChildren {
   OneProfileRoute: typeof OneProfileRoute
   OneResetPasswordRoute: typeof OneResetPasswordRoute
   OneTermsRoute: typeof OneTermsRoute
+  PCodeRoute: typeof PCodeRoute
   OneIndexRoute: typeof OneIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/p/$code': {
-      id: '/p/$code'
-      path: '/p/$code'
-      fullPath: '/p/$code'
-      preLoaderRoute: typeof PCodeRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/terms-and-conditions': {
       id: '/terms-and-conditions'
       path: '/terms-and-conditions'
@@ -500,6 +505,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OneIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p/$code': {
+      id: '/p/$code'
+      path: '/p/$code'
+      fullPath: '/p/$code'
+      preLoaderRoute: typeof PCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/one/terms': {
       id: '/one/terms'
       path: '/one/terms'
@@ -570,6 +582,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPaymentLinksRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/expenses': {
+      id: '/admin/expenses'
+      path: '/expenses'
+      fullPath: '/admin/expenses'
+      preLoaderRoute: typeof AdminExpensesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/carrier-integrations': {
       id: '/admin/carrier-integrations'
       path: '/carrier-integrations'
@@ -612,18 +631,19 @@ const AdminCarrierIntegrationsRouteWithChildren =
 
 interface AdminRouteChildren {
   AdminCarrierIntegrationsRoute: typeof AdminCarrierIntegrationsRouteWithChildren
+  AdminExpensesRoute: typeof AdminExpensesRoute
   AdminPaymentLinksRoute: typeof AdminPaymentLinksRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCarrierIntegrationsRoute: AdminCarrierIntegrationsRouteWithChildren,
+  AdminExpensesRoute: AdminExpensesRoute,
   AdminPaymentLinksRoute: AdminPaymentLinksRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
-  PCodeRoute: PCodeRoute,
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AlertsRoute: AlertsRoute,
@@ -646,6 +666,7 @@ const rootRouteChildren: RootRouteChildren = {
   OneProfileRoute: OneProfileRoute,
   OneResetPasswordRoute: OneResetPasswordRoute,
   OneTermsRoute: OneTermsRoute,
+  PCodeRoute: PCodeRoute,
   OneIndexRoute: OneIndexRoute,
 }
 export const routeTree = rootRouteImport
