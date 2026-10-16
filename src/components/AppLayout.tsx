@@ -42,6 +42,9 @@ const ADMIN_ICONS: Record<AdminTab, string> = {
 
 // Same outline-SVG convention, for the one `to`-based (non-tab) nav item —
 // a simple link/chain glyph for "external system connection".
+// Receipt glyph for the Expenses (Despesas) route.
+const EXPENSES_ICON = 'M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185zM9.75 9h.008v.008H9.75V9zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 4.5h.008v.008h-.008V13.5zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z'
+
 const CARRIER_INTEGRATIONS_ICON = 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244'
 
 // A nav item is either one of the existing /admin?tab=X tabs, or (CRM3
@@ -49,7 +52,7 @@ const CARRIER_INTEGRATIONS_ICON = 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5
 // Kept as a union rather than folding carrier-integrations into AdminTab:
 // that page is its own route/component, not another case inside the giant
 // /admin tab switch — see admin.tsx's AdminPage/AdminDashboardContent split.
-type AdminNavItem = { label: string; tab: AdminTab } | { label: string; to: '/admin/carrier-integrations' | '/admin/payment-links' }
+type AdminNavItem = { label: string; tab: AdminTab } | { label: string; to: '/admin/carrier-integrations' | '/admin/payment-links' | '/admin/expenses' }
 
 // Backoffice information architecture — flat groups, no collapsible parent
 // level (that extra "Administration" toggle added a click for no benefit
@@ -71,7 +74,10 @@ const ADMIN_NAV_GROUPS: Array<{ label: string; items: AdminNavItem[] }> = [
     { label: 'Renewals', tab: 'alerts' },
     { label: 'Claims', tab: 'claims' },
   ] },
-  { label: 'Payments', items: [{ label: 'Payment Link', to: '/admin/payment-links' }] },
+  { label: 'Finance', items: [
+    { label: 'Payment Link', to: '/admin/payment-links' },
+    { label: 'Despesas', to: '/admin/expenses' },
+  ] },
   { label: 'Growth', items: [{ label: 'Marketing', tab: 'marketing' }] },
   { label: 'System', items: [
     { label: 'Billing', tab: 'billing' },
@@ -257,7 +263,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                           onClick={() => setSidebarOpen(false)}
                         >
                           <svg className="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d={CARRIER_INTEGRATIONS_ICON} />
+                            <path strokeLinecap="round" strokeLinejoin="round" d={item.to === '/admin/expenses' ? EXPENSES_ICON : CARRIER_INTEGRATIONS_ICON} />
                           </svg>
                           <span className="admin-nav-item-label">{item.label}</span>
                         </Link>
@@ -343,9 +349,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </button>
 
             <div className="admin-breadcrumb">
-              <span className="admin-breadcrumb-section">{location.pathname === '/admin/payment-links' ? 'Payments' : ADMIN_BREADCRUMBS[activeAdminTab][0]}</span>
+              <span className="admin-breadcrumb-section">{location.pathname === '/admin/payment-links' || location.pathname === '/admin/expenses' ? 'Finance' : ADMIN_BREADCRUMBS[activeAdminTab][0]}</span>
               <span className="admin-breadcrumb-sep">/</span>
-              <span className="admin-breadcrumb-page">{location.pathname === '/admin/payment-links' ? 'Payment Link' : ADMIN_BREADCRUMBS[activeAdminTab][1]}</span>
+              <span className="admin-breadcrumb-page">{location.pathname === '/admin/payment-links' ? 'Payment Link' : location.pathname === '/admin/expenses' ? 'Despesas' : ADMIN_BREADCRUMBS[activeAdminTab][1]}</span>
             </div>
 
             <button type="button" className="admin-global-search" aria-label="Search">

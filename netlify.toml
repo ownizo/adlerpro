@@ -17,6 +17,9 @@
 [functions."extract-policy"]
   timeout = 120
 
+[functions."expense-extract"]
+  timeout = 120
+
 [functions."marketing-send"]
   timeout = 120
 
