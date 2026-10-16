@@ -32,6 +32,7 @@ import { Route as OneLoginRouteImport } from './routes/one/login'
 import { Route as OneDocumentsRouteImport } from './routes/one/documents'
 import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
 import { Route as OneClaimsRouteImport } from './routes/one/claims'
+import { Route as DespesaTokenRouteImport } from './routes/despesa.$token'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api.stripe-webhook'
 import { Route as AdminPaymentLinksRouteImport } from './routes/admin.payment-links'
 import { Route as AdminExpensesRouteImport } from './routes/admin.expenses'
@@ -154,6 +155,11 @@ const OneClaimsRoute = OneClaimsRouteImport.update({
   path: '/one/claims',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DespesaTokenRoute = DespesaTokenRouteImport.update({
+  id: '/despesa/$token',
+  path: '/despesa/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   id: '/api/stripe-webhook',
   path: '/api/stripe-webhook',
@@ -206,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
+  '/despesa/$token': typeof DespesaTokenRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -237,6 +244,7 @@ export interface FileRoutesByTo {
   '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
+  '/despesa/$token': typeof DespesaTokenRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -269,6 +277,7 @@ export interface FileRoutesById {
   '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
+  '/despesa/$token': typeof DespesaTokenRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -302,6 +311,7 @@ export interface FileRouteTypes {
     | '/admin/expenses'
     | '/admin/payment-links'
     | '/api/stripe-webhook'
+    | '/despesa/$token'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -333,6 +343,7 @@ export interface FileRouteTypes {
     | '/admin/expenses'
     | '/admin/payment-links'
     | '/api/stripe-webhook'
+    | '/despesa/$token'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -364,6 +375,7 @@ export interface FileRouteTypes {
     | '/admin/expenses'
     | '/admin/payment-links'
     | '/api/stripe-webhook'
+    | '/despesa/$token'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -393,6 +405,7 @@ export interface RootRouteChildren {
   QuotesComparisonRoute: typeof QuotesComparisonRoute
   TermsAndConditionsRoute: typeof TermsAndConditionsRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
+  DespesaTokenRoute: typeof DespesaTokenRoute
   OneClaimsRoute: typeof OneClaimsRoute
   OneDashboardRoute: typeof OneDashboardRoute
   OneDocumentsRoute: typeof OneDocumentsRoute
@@ -568,6 +581,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OneClaimsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/despesa/$token': {
+      id: '/despesa/$token'
+      path: '/despesa/$token'
+      fullPath: '/despesa/$token'
+      preLoaderRoute: typeof DespesaTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/stripe-webhook': {
       id: '/api/stripe-webhook'
       path: '/api/stripe-webhook'
@@ -658,6 +678,7 @@ const rootRouteChildren: RootRouteChildren = {
   QuotesComparisonRoute: QuotesComparisonRoute,
   TermsAndConditionsRoute: TermsAndConditionsRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
+  DespesaTokenRoute: DespesaTokenRoute,
   OneClaimsRoute: OneClaimsRoute,
   OneDashboardRoute: OneDashboardRoute,
   OneDocumentsRoute: OneDocumentsRoute,

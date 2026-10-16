@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { ExpenseReviewPanel } from '@/components/admin/expenses/ExpenseReviewPanel'
+import { CaptureLinkDialog } from '@/components/admin/expenses/CaptureLinkDialog'
 import { useIdentity } from '@/lib/identity-context'
 import { EXPENSE_CATEGORIES, expenseCategory } from '@/lib/expense-categories'
 import { fetchExpenses } from '@/lib/expenses.functions'
 import { extractInvoice, formatDate, formatMoney, formatMonth, uploadInvoice } from '@/lib/expense-client'
 import { expensesToCsv, expenseStatusLabel, totalsByCategory } from '@/lib/expense-export'
+import { exportAccountantPack, exportExcel } from '@/lib/expense-export-client'
 import type { Expense } from '@/lib/expense-validation'
 
 export const Route = createFileRoute('/admin/expenses')({
@@ -51,6 +53,9 @@ function ExpensesPage() {
   const [loadError, setLoadError] = useState('')
   const [jobs, setJobs] = useState<UploadJob[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [showCapture, setShowCapture] = useState(false)
+  const [exporting, setExporting] = useState('')
+  const [exportMenu, setExportMenu] = useState(false)
   const cameraInput = useRef<HTMLInputElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -67,6 +72,15 @@ function ExpensesPage() {
   }, [period, category])
 
   useEffect(() => { if (isAdmin) void load() }, [isAdmin, load])
+
+  // Invoices sent from the phone link appear without a manual refresh.
+  useEffect(() => {
+    if (!isAdmin) return
+    const onFocus = () => { if (document.visibilityState === 'visible') void load() }
+    document.addEventListener('visibilitychange', onFocus)
+    window.addEventListener('focus', onFocus)
+    return () => { document.removeEventListener('visibilitychange', onFocus); window.removeEventListener('focus', onFocus) }
+  }, [isAdmin, load])
 
   const upsert = useCallback((expense: Expense) => {
     setExpenses((list) => list.some((e) => e.id === expense.id) ? list.map((e) => e.id === expense.id ? expense : e) : [expense, ...list])
@@ -116,18 +130,41 @@ function ExpensesPage() {
     if (list.length === 1 && lastId) setSelectedId(lastId)
   }
 
+  const fileSuffix = period.mode === 'month' ? period.month : period.mode === 'year' ? period.year : 'todas'
+
   function exportCsv() {
     const csv = expensesToCsv(expenses)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    const suffix = period.mode === 'month' ? period.month : period.mode === 'year' ? period.year : 'todas'
     a.href = url
-    a.download = `despesas-${suffix}.csv`
+    a.download = `despesas-${fileSuffix}.csv`
     document.body.appendChild(a)
     a.click()
     a.remove()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  async function runExport(kind: 'xlsx' | 'zip' | 'csv') {
+    setExportMenu(false)
+    const pending = expenses.filter((e) => e.status !== 'confirmed').length
+    if (pending && !window.confirm(`Há ${pending} despesa(s) ainda não confirmada(s) neste período. Exportar mesmo assim? (aparecem com o estado na coluna «Estado»)`)) return
+    setLoadError('')
+    try {
+      if (kind === 'csv') return exportCsv()
+      if (kind === 'xlsx') {
+        setExporting('A gerar o Excel…')
+        await exportExcel(expenses, periodLabel(period), fileSuffix)
+      } else {
+        setExporting('A preparar o pacote…')
+        const { missing } = await exportAccountantPack(expenses, periodLabel(period), fileSuffix, (done, total) => setExporting(`A juntar faturas ${done}/${total}…`))
+        if (missing) setLoadError(`${missing} fatura(s) não foram incluídas no pacote — ver FICHEIROS-EM-FALTA.txt.`)
+      }
+    } catch {
+      setLoadError('Não foi possível gerar a exportação. Tente novamente.')
+    } finally {
+      setExporting('')
+    }
   }
 
   const activeJobs = jobs.filter((j) => j.state !== 'done')
@@ -143,6 +180,7 @@ function ExpensesPage() {
         <div className="flex flex-wrap gap-2">
           <button type="button" className="admin-btn admin-btn-primary" onClick={() => cameraInput.current?.click()}>Fotografar fatura</button>
           <button type="button" className="admin-btn admin-btn-secondary" onClick={() => fileInput.current?.click()}>Carregar PDF / imagem</button>
+          <button type="button" className="admin-btn admin-btn-secondary" onClick={() => setShowCapture(true)}>Enviar link por WhatsApp</button>
           <input ref={cameraInput} type="file" accept="image/*" capture="environment" className="hidden"
             onChange={(e) => { void handleFiles(e.target.files); e.target.value = '' }} />
           <input ref={fileInput} type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif,.pdf,.heic" multiple className="hidden"
@@ -197,7 +235,24 @@ function ExpensesPage() {
             {EXPENSE_CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
           </select>
         </label>
-        <button type="button" className="admin-btn admin-btn-secondary ml-auto" disabled={!expenses.length} onClick={exportCsv}>Exportar CSV</button>
+        <div className="relative ml-auto">
+          <button type="button" className="admin-btn admin-btn-secondary" disabled={!expenses.length || !!exporting} aria-haspopup="menu" aria-expanded={exportMenu}
+            onClick={() => setExportMenu((v) => !v)}>{exporting || 'Exportar para o contabilista ▾'}</button>
+          {exportMenu && <div role="menu" className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] p-1 shadow-lg text-sm">
+            <button type="button" role="menuitem" className="w-full text-left rounded px-3 py-2 hover:bg-[var(--admin-page)]" onClick={() => void runExport('zip')}>
+              <span className="font-semibold block">Pacote completo (.zip)</span>
+              <span className="text-xs text-[var(--admin-muted)]">Excel + todas as faturas, organizadas por mês</span>
+            </button>
+            <button type="button" role="menuitem" className="w-full text-left rounded px-3 py-2 hover:bg-[var(--admin-page)]" onClick={() => void runExport('xlsx')}>
+              <span className="font-semibold block">Excel (.xlsx)</span>
+              <span className="text-xs text-[var(--admin-muted)]">Lista, resumo por conta SNC e IVA por taxa</span>
+            </button>
+            <button type="button" role="menuitem" className="w-full text-left rounded px-3 py-2 hover:bg-[var(--admin-page)]" onClick={() => void runExport('csv')}>
+              <span className="font-semibold block">CSV</span>
+              <span className="text-xs text-[var(--admin-muted)]">Para importar no software de contabilidade</span>
+            </button>
+          </div>}
+        </div>
       </section>
 
       <section className="admin-kpi-grid" aria-label="Resumo">
@@ -238,7 +293,7 @@ function ExpensesPage() {
                       <span className="font-semibold whitespace-nowrap">{formatMoney(e.total_amount, e.currency)}</span>
                     </span>
                     <span className="flex items-center justify-between gap-2 text-xs text-[var(--admin-muted)]">
-                      <span>{formatDate(e.invoice_date)} · {expenseCategory(e.category).label}</span>
+                      <span>{formatDate(e.invoice_date)} · {expenseCategory(e.category).label}{e.source === 'capture' ? ' · 📱' : ''}</span>
                       <span className={STATUS_CHIP[e.status]}>{expenseStatusLabel(e.status)}</span>
                     </span>
                   </button>
@@ -255,7 +310,7 @@ function ExpensesPage() {
                     {expenses.map((e) => <tr key={e.id} className="cursor-pointer" onClick={() => setSelectedId(e.id)}>
                       <td className="whitespace-nowrap">{formatDate(e.invoice_date)}</td>
                       <td><button type="button" className="text-left font-semibold hover:underline" onClick={(ev) => { ev.stopPropagation(); setSelectedId(e.id) }}>{e.supplier_name || e.file_name}</button>
-                        {e.description && <div className="text-xs text-[var(--admin-muted)] truncate max-w-[280px]">{e.description}</div>}</td>
+                        {(e.description || e.source === 'capture') && <div className="text-xs text-[var(--admin-muted)] truncate max-w-[280px]">{e.source === 'capture' ? '📱 Enviada por telemóvel' : ''}{e.source === 'capture' && e.description ? ' · ' : ''}{e.description}</div>}</td>
                       <td>{expenseCategory(e.category).label}</td>
                       <td className="whitespace-nowrap">{e.invoice_number || '—'}</td>
                       <td className="text-right whitespace-nowrap">{formatMoney(e.net_amount, e.currency)}</td>
@@ -285,6 +340,8 @@ function ExpensesPage() {
         </aside>
       </div>
     </div>
+
+    {showCapture && <CaptureLinkDialog onClose={() => { setShowCapture(false); void load() }} />}
 
     {selectedId && <ExpenseReviewPanel
       id={selectedId}

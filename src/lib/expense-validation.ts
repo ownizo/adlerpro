@@ -40,6 +40,8 @@ export type Expense = {
   created_at: string
   updated_at: string
   confirmed_at: string | null
+  source?: 'admin' | 'capture'
+  capture_link_id?: string | null
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
