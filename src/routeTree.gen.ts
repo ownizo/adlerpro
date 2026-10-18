@@ -32,11 +32,14 @@ import { Route as OneLoginRouteImport } from './routes/one/login'
 import { Route as OneDocumentsRouteImport } from './routes/one/documents'
 import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
 import { Route as OneClaimsRouteImport } from './routes/one/claims'
+import { Route as OauthAuthorizeRouteImport } from './routes/oauth.authorize'
 import { Route as DespesaTokenRouteImport } from './routes/despesa.$token'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api.stripe-webhook'
+import { Route as AdminTodayRouteImport } from './routes/admin.today'
 import { Route as AdminSiteVisitsRouteImport } from './routes/admin.site-visits'
 import { Route as AdminPaymentLinksRouteImport } from './routes/admin.payment-links'
 import { Route as AdminExpensesRouteImport } from './routes/admin.expenses'
+import { Route as AdminClaudeRouteImport } from './routes/admin.claude'
 import { Route as AdminCarrierIntegrationsRouteImport } from './routes/admin.carrier-integrations'
 import { Route as AdminCarrierIntegrationsImportRouteImport } from './routes/admin.carrier-integrations.import'
 import { Route as AdminCarrierIntegrationsRunsIdRouteImport } from './routes/admin.carrier-integrations.runs.$id'
@@ -156,6 +159,11 @@ const OneClaimsRoute = OneClaimsRouteImport.update({
   path: '/one/claims',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OauthAuthorizeRoute = OauthAuthorizeRouteImport.update({
+  id: '/oauth/authorize',
+  path: '/oauth/authorize',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DespesaTokenRoute = DespesaTokenRouteImport.update({
   id: '/despesa/$token',
   path: '/despesa/$token',
@@ -165,6 +173,11 @@ const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   id: '/api/stripe-webhook',
   path: '/api/stripe-webhook',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AdminTodayRoute = AdminTodayRouteImport.update({
+  id: '/today',
+  path: '/today',
+  getParentRoute: () => AdminRoute,
 } as any)
 const AdminSiteVisitsRoute = AdminSiteVisitsRouteImport.update({
   id: '/site-visits',
@@ -179,6 +192,11 @@ const AdminPaymentLinksRoute = AdminPaymentLinksRouteImport.update({
 const AdminExpensesRoute = AdminExpensesRouteImport.update({
   id: '/expenses',
   path: '/expenses',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminClaudeRoute = AdminClaudeRouteImport.update({
+  id: '/claude',
+  path: '/claude',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminCarrierIntegrationsRoute =
@@ -215,11 +233,14 @@ export interface FileRoutesByFullPath {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
+  '/admin/claude': typeof AdminClaudeRoute
   '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/admin/site-visits': typeof AdminSiteVisitsRoute
+  '/admin/today': typeof AdminTodayRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/despesa/$token': typeof DespesaTokenRoute
+  '/oauth/authorize': typeof OauthAuthorizeRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -248,11 +269,14 @@ export interface FileRoutesByTo {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
+  '/admin/claude': typeof AdminClaudeRoute
   '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/admin/site-visits': typeof AdminSiteVisitsRoute
+  '/admin/today': typeof AdminTodayRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/despesa/$token': typeof DespesaTokenRoute
+  '/oauth/authorize': typeof OauthAuthorizeRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -282,11 +306,14 @@ export interface FileRoutesById {
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
+  '/admin/claude': typeof AdminClaudeRoute
   '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
   '/admin/site-visits': typeof AdminSiteVisitsRoute
+  '/admin/today': typeof AdminTodayRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/despesa/$token': typeof DespesaTokenRoute
+  '/oauth/authorize': typeof OauthAuthorizeRoute
   '/one/claims': typeof OneClaimsRoute
   '/one/dashboard': typeof OneDashboardRoute
   '/one/documents': typeof OneDocumentsRoute
@@ -317,11 +344,14 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/admin/carrier-integrations'
+    | '/admin/claude'
     | '/admin/expenses'
     | '/admin/payment-links'
     | '/admin/site-visits'
+    | '/admin/today'
     | '/api/stripe-webhook'
     | '/despesa/$token'
+    | '/oauth/authorize'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -350,11 +380,14 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/admin/carrier-integrations'
+    | '/admin/claude'
     | '/admin/expenses'
     | '/admin/payment-links'
     | '/admin/site-visits'
+    | '/admin/today'
     | '/api/stripe-webhook'
     | '/despesa/$token'
+    | '/oauth/authorize'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -383,11 +416,14 @@ export interface FileRouteTypes {
     | '/quotes-comparison'
     | '/terms-and-conditions'
     | '/admin/carrier-integrations'
+    | '/admin/claude'
     | '/admin/expenses'
     | '/admin/payment-links'
     | '/admin/site-visits'
+    | '/admin/today'
     | '/api/stripe-webhook'
     | '/despesa/$token'
+    | '/oauth/authorize'
     | '/one/claims'
     | '/one/dashboard'
     | '/one/documents'
@@ -418,6 +454,7 @@ export interface RootRouteChildren {
   TermsAndConditionsRoute: typeof TermsAndConditionsRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
   DespesaTokenRoute: typeof DespesaTokenRoute
+  OauthAuthorizeRoute: typeof OauthAuthorizeRoute
   OneClaimsRoute: typeof OneClaimsRoute
   OneDashboardRoute: typeof OneDashboardRoute
   OneDocumentsRoute: typeof OneDocumentsRoute
@@ -593,6 +630,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OneClaimsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oauth/authorize': {
+      id: '/oauth/authorize'
+      path: '/oauth/authorize'
+      fullPath: '/oauth/authorize'
+      preLoaderRoute: typeof OauthAuthorizeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/despesa/$token': {
       id: '/despesa/$token'
       path: '/despesa/$token'
@@ -606,6 +650,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/api/stripe-webhook'
       preLoaderRoute: typeof ApiStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/admin/today': {
+      id: '/admin/today'
+      path: '/today'
+      fullPath: '/admin/today'
+      preLoaderRoute: typeof AdminTodayRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/site-visits': {
       id: '/admin/site-visits'
@@ -626,6 +677,13 @@ declare module '@tanstack/react-router' {
       path: '/expenses'
       fullPath: '/admin/expenses'
       preLoaderRoute: typeof AdminExpensesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/claude': {
+      id: '/admin/claude'
+      path: '/claude'
+      fullPath: '/admin/claude'
+      preLoaderRoute: typeof AdminClaudeRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/carrier-integrations': {
@@ -670,16 +728,20 @@ const AdminCarrierIntegrationsRouteWithChildren =
 
 interface AdminRouteChildren {
   AdminCarrierIntegrationsRoute: typeof AdminCarrierIntegrationsRouteWithChildren
+  AdminClaudeRoute: typeof AdminClaudeRoute
   AdminExpensesRoute: typeof AdminExpensesRoute
   AdminPaymentLinksRoute: typeof AdminPaymentLinksRoute
   AdminSiteVisitsRoute: typeof AdminSiteVisitsRoute
+  AdminTodayRoute: typeof AdminTodayRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCarrierIntegrationsRoute: AdminCarrierIntegrationsRouteWithChildren,
+  AdminClaudeRoute: AdminClaudeRoute,
   AdminExpensesRoute: AdminExpensesRoute,
   AdminPaymentLinksRoute: AdminPaymentLinksRoute,
   AdminSiteVisitsRoute: AdminSiteVisitsRoute,
+  AdminTodayRoute: AdminTodayRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
@@ -700,6 +762,7 @@ const rootRouteChildren: RootRouteChildren = {
   TermsAndConditionsRoute: TermsAndConditionsRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
   DespesaTokenRoute: DespesaTokenRoute,
+  OauthAuthorizeRoute: OauthAuthorizeRoute,
   OneClaimsRoute: OneClaimsRoute,
   OneDashboardRoute: OneDashboardRoute,
   OneDocumentsRoute: OneDocumentsRoute,

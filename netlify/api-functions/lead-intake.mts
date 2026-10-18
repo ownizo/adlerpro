@@ -3,6 +3,7 @@ import {
   findOrCreateIndividualClientByEmail,
   createWebsiteLead,
   createSalesOpportunityForWebsiteLead,
+  createClientTask,
 } from '../../src/lib/data'
 import { parseLeadIntakePayload, buildLeadIntakeResponse } from './lib/lead-intake-shared'
 
@@ -28,6 +29,12 @@ import { parseLeadIntakePayload, buildLeadIntakeResponse } from './lib/lead-inta
 
 export const config = {
   path: '/api/lead-intake',
+}
+
+const PRODUCT_LABEL: Record<string, string> = {
+  health: 'saúde', 'international-health': 'saúde internacional', home: 'habitação', auto: 'automóvel', tvde: 'TVDE', life: 'vida',
+  'professional-liability': 'RC profissional', 'event-liability': 'RC eventos', 'private-clients': 'private clients', general: 'pedido geral',
+  'insurance-review': 'revisão de seguros', 'fiscal-representation': 'representação fiscal',
 }
 
 const MAX_BODY_BYTES = 16 * 1024 // generoso para o payload allowlisted; corta lixo/abuso cedo
@@ -158,6 +165,26 @@ export default async function handler(req: Request, _context: Context) {
     logEvent(opportunityResult.created ? 'OPPORTUNITY_CREATED' : 'OPPORTUNITY_REUSED', {
       submissionId: lead.submissionId,
     })
+    // Urgent "reply" task so the lead shows up on the Hoje screen and in
+    // Claude's daily brief. Only for a genuinely new opportunity (a retry
+    // never duplicates it).
+    if (opportunityResult.created) {
+      try {
+        await createClientTask({
+          id: crypto.randomUUID(),
+          individualClientId: clientId,
+          opportunityId: opportunityResult.id,
+          title: `Responder a ${lead.name}${lead.product ? ` — ${PRODUCT_LABEL[lead.product] ?? lead.product}` : ''}`,
+          dueDate: new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon' }).format(new Date()),
+          status: 'pending',
+          source: 'lead',
+          priority: 1,
+          createdAt: new Date().toISOString(),
+        })
+      } catch (taskErr) {
+        console.error('[lead-intake] reply task failed (non-fatal):', taskErr instanceof Error ? taskErr.message : taskErr)
+      }
+    }
   } catch (err) {
     logEvent('OPPORTUNITY_CREATE_FAILED', { submissionId: lead.submissionId })
     console.error('[lead-intake] opportunity creation failed (non-fatal):', err instanceof Error ? err.message : err)

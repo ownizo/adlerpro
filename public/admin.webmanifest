@@ -4,7 +4,7 @@
   "short_name": "A&R Admin",
   "description": "Backoffice da Adler & Rochefort",
   "lang": "en-GB",
-  "start_url": "/admin?tab=dashboard",
+  "start_url": "/admin/today",
   "scope": "/",
   "display": "standalone",
   "display_override": ["standalone"],
