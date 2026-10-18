@@ -15,9 +15,16 @@ const IS_MYCOVERVAULT =
   /mycovervault/i.test(process.env.SITE_NAME ?? '') ||
   /mycovervault/i.test(process.env.DEPLOY_PRIME_URL ?? '')
 
+// The admin backoffice deploy (admin.adlerrochefort.com) is installed as its
+// own app: its own manifest, name and icon.
+const IS_ADMIN_SITE =
+  /adlerpro-admin/i.test(process.env.SITE_NAME ?? '') ||
+  /admin\.adlerrochefort/i.test(process.env.URL ?? '')
+
 const config = defineConfig({
   define: {
     __IS_MYCOVERVAULT__: JSON.stringify(IS_MYCOVERVAULT),
+    __IS_ADMIN_SITE__: JSON.stringify(IS_ADMIN_SITE),
   },
   plugins: [
     viteTsConfigPaths({

@@ -46,6 +46,15 @@ const ADMIN_ICONS: Record<AdminTab, string> = {
 const EXPENSES_ICON = 'M9 14.25l6-6m4.5-3.493V21.75l-3.75-1.5-3.75 1.5-3.75-1.5-3.75 1.5V4.757c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0c1.1.128 1.907 1.077 1.907 2.185zM9.75 9h.008v.008H9.75V9zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm4.125 4.5h.008v.008h-.008V13.5zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z'
 
 const SITE_VISITS_ICON = 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'
+function adminNavIcon(item: AdminNavItem): string {
+  if ('tab' in item) return ADMIN_ICONS[item.tab]
+  if (item.to === '/admin/expenses') return EXPENSES_ICON
+  if (item.to === '/admin/site-visits') return SITE_VISITS_ICON
+  return CARRIER_INTEGRATIONS_ICON
+}
+
+const SIDEBAR_COLLAPSED_KEY = 'ar-admin-sidebar-collapsed'
+
 const CARRIER_INTEGRATIONS_ICON = 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244'
 
 // A nav item is either one of the existing /admin?tab=X tabs, or (CRM3
@@ -163,6 +172,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [navBadges, setNavBadges] = useState({ tasks: 0, alerts: 0 })
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   const quickCreateRef = useRef<HTMLDivElement>(null)
+  // App-style shell (admin): bottom sheet with every section on phones,
+  // collapsible icon rail on desktop, account menu on the avatar.
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
+  const accountRef = useRef<HTMLDivElement>(null)
+  const [railCollapsed, setRailCollapsed] = useState(false)
+  const mainRef = useRef<HTMLElement>(null)
 
   const adminTabParam = new URLSearchParams(location.searchStr).get('tab')
   const activeAdminTab: AdminTab = isAdminTabValue(adminTabParam) ? adminTabParam : 'dashboard'
@@ -227,6 +243,43 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [quickCreateOpen])
 
+  useEffect(() => {
+    try { setRailCollapsed(window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1') } catch { /* private mode */ }
+  }, [])
+
+  const toggleRail = () => {
+    setRailCollapsed((v) => {
+      try { window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, v ? '0' : '1') } catch { /* private mode */ }
+      return !v
+    })
+  }
+
+  // Changing screen behaves like an app: close any open sheet/menu, start
+  // the new screen at the top and fade it in.
+  useEffect(() => {
+    if (!isAdminRoute) return
+    setMoreOpen(false)
+    setAccountOpen(false)
+    setQuickCreateOpen(false)
+    const main = mainRef.current
+    if (!main) return
+    main.scrollTo({ top: 0 })
+    main.classList.remove('admin-screen-enter')
+    void main.offsetWidth
+    main.classList.add('admin-screen-enter')
+  }, [isAdminRoute, location.pathname, location.searchStr])
+
+  useEffect(() => {
+    if (!moreOpen && !accountOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setMoreOpen(false); setAccountOpen(false) } }
+    const onDown = (e: MouseEvent) => {
+      if (accountOpen && accountRef.current && !accountRef.current.contains(e.target as Node)) setAccountOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onDown)
+    return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown) }
+  }, [moreOpen, accountOpen])
+
   const handleLogout = async () => {
     try { await logout() } catch { /* proceed */ }
     window.location.href = '/'
@@ -239,7 +292,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div
-      className={cn('min-h-screen flex', isAdminRoute && 'admin-backoffice-shell')}
+      className={cn('min-h-screen flex', isAdminRoute && 'admin-backoffice-shell admin-app', isAdminRoute && railCollapsed && 'admin-app--rail')}
       style={{ background: isAdminRoute ? undefined : 'var(--ui-surface-bg)' }}
     >
       {sidebarOpen && (
@@ -252,11 +305,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
           isAdminRoute && 'admin-backoffice-sidebar'
         )}
+        aria-label={isAdminRoute ? 'Backoffice navigation' : undefined}
         style={isAdminRoute ? undefined : { background: 'var(--ui-surface-bg)', borderRight: '1.5px solid var(--ui-text-primary)' }}
       >
         {isAdminRoute ? (
           <Link to="/admin" search={{ tab: 'dashboard' }} className="admin-brand" onClick={() => setSidebarOpen(false)}>
             <img src="/logo-ar-horizontal-white.png" alt="Adler & Rochefort" className="admin-brand-logo" />
+            <img src="/lion-white.png" alt="Adler & Rochefort" className="admin-brand-lion" />
             <span className="admin-brand-tag">BACKOFFICE</span>
           </Link>
         ) : (
@@ -294,9 +349,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                           className="admin-nav-item"
                           activeProps={{ className: 'admin-nav-item admin-nav-item-active' }}
                           onClick={() => setSidebarOpen(false)}
+                          title={railCollapsed ? item.label : undefined}
                         >
                           <svg className="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d={item.to === '/admin/expenses' ? EXPENSES_ICON : item.to === '/admin/site-visits' ? SITE_VISITS_ICON : CARRIER_INTEGRATIONS_ICON} />
+                            <path strokeLinecap="round" strokeLinejoin="round" d={adminNavIcon(item)} />
                           </svg>
                           <span className="admin-nav-item-label">{item.label}</span>
                         </Link>
@@ -312,6 +368,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                         activeProps={{ className: 'admin-nav-item admin-nav-item-active' }}
                         activeOptions={{ includeSearch: true }}
                         onClick={() => setSidebarOpen(false)}
+                        title={railCollapsed ? item.label : undefined}
                       >
                         <svg className="w-[18px] h-[18px] shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d={ADMIN_ICONS[item.tab]} />
@@ -345,7 +402,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </nav>
         )}
 
-        {ready && user && (
+        {isAdminRoute && (
+          <button type="button" className="admin-rail-toggle" onClick={toggleRail} aria-label={railCollapsed ? 'Expand menu' : 'Collapse menu'} title={railCollapsed ? 'Expand menu' : 'Collapse menu'}>
+            <svg className="w-[18px] h-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d={railCollapsed ? 'M13.5 4.5L21 12l-7.5 7.5M3 4.5L10.5 12 3 19.5' : 'M10.5 19.5L3 12l7.5-7.5m10.5 15L13.5 12 21 4.5'} />
+            </svg>
+            <span className="admin-nav-item-label">Collapse</span>
+          </button>
+        )}
+
+        {ready && user && !isAdminRoute && (
           <div className={isAdminRoute ? 'admin-sidebar-footer' : 'p-4 mt-auto'} style={isAdminRoute ? undefined : { borderTop: '1px solid var(--ui-border)' }}>
             <div style={{ marginBottom: '0.5rem', padding: '0 0.25rem' }}>
               <p style={isAdminRoute ? undefined : { fontFamily: font, fontSize: '0.75rem', fontWeight: 600, color: 'var(--ui-text-primary)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -371,16 +437,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0">
         {isAdminRoute ? (
           <header className="admin-backoffice-header">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="admin-header-menu-btn lg:hidden"
-              aria-label={t('nav.openMenu')}
-            >
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-              </svg>
-            </button>
-
             <div className="admin-breadcrumb">
               <span className="admin-breadcrumb-section">{location.pathname === '/admin/payment-links' || location.pathname === '/admin/expenses' ? 'Finance' : location.pathname === '/admin/site-visits' ? 'Growth' : ADMIN_BREADCRUMBS[activeAdminTab][0]}</span>
               <span className="admin-breadcrumb-sep">/</span>
@@ -425,8 +481,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
 
               {ready && user && (
-                <div className="admin-user-avatar" title={user.name || user.email}>
-                  {initialsFor(user.name, user.email)}
+                <div className="admin-account" ref={accountRef}>
+                  <button type="button" className="admin-user-avatar" aria-label="Account" aria-expanded={accountOpen} onClick={() => setAccountOpen((v) => !v)}>
+                    {initialsFor(user.name, user.email)}
+                  </button>
+                  {accountOpen && (
+                    <div className="admin-account-menu" role="menu">
+                      <div className="admin-account-id">
+                        <p className="admin-account-name">{user.name || user.email}</p>
+                        <p className="admin-account-email">{user.email}</p>
+                      </div>
+                      <button type="button" role="menuitem" className="admin-account-signout" onClick={handleLogout}>Sign out</button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -493,6 +560,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         )}
 
         <main
+          ref={mainRef}
           className={cn(
             'flex-1 overflow-y-auto p-4 lg:p-8 pb-20 lg:pb-8',
             isAdminRoute && 'admin-backoffice-main'
@@ -516,13 +584,57 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </Link>
             )
           })}
-          <button type="button" className="admin-bottom-nav-item" onClick={() => setSidebarOpen(true)}>
+          <button type="button" className={cn('admin-bottom-nav-item', moreOpen && 'is-active')} aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)}>
             <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
             </svg>
             <span>Menu</span>
           </button>
         </nav>
+      )}
+
+      {isAdminRoute && (
+        <div className={cn('admin-sheet-layer lg:hidden', moreOpen && 'is-open')} aria-hidden={!moreOpen}>
+          <div className="admin-sheet-backdrop" onClick={() => setMoreOpen(false)} />
+          <div className="admin-sheet" role="dialog" aria-modal="true" aria-label="All sections">
+            <div className="admin-sheet-handle" aria-hidden="true" />
+            <div className="admin-sheet-body">
+              {isAdmin && ADMIN_NAV_GROUPS.map((group) => (
+                <section key={group.label} className="admin-sheet-group">
+                  <p className="admin-sheet-group-label">{group.label}</p>
+                  <div className="admin-sheet-grid">
+                    {group.items.map((item) => {
+                      const active = 'tab' in item ? location.pathname === '/admin' && activeAdminTab === item.tab : location.pathname === item.to
+                      const badge = 'tab' in item ? (item.tab === 'tasks' ? navBadges.tasks : item.tab === 'alerts' ? navBadges.alerts : 0) : 0
+                      const inner = <>
+                        <span className="admin-sheet-tile-icon">
+                          <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" d={adminNavIcon(item)} />
+                          </svg>
+                          {badge > 0 && <span className="admin-sheet-tile-badge">{badge > 99 ? '99+' : badge}</span>}
+                        </span>
+                        <span className="admin-sheet-tile-label">{item.label}</span>
+                      </>
+                      return 'tab' in item
+                        ? <Link key={item.tab} to="/admin" search={{ tab: item.tab }} className={cn('admin-sheet-tile', active && 'is-active')} tabIndex={moreOpen ? 0 : -1}>{inner}</Link>
+                        : <Link key={item.to} to={item.to} className={cn('admin-sheet-tile', active && 'is-active')} tabIndex={moreOpen ? 0 : -1}>{inner}</Link>
+                    })}
+                  </div>
+                </section>
+              ))}
+              {ready && user && (
+                <div className="admin-sheet-account">
+                  <span className="admin-user-avatar" aria-hidden="true">{initialsFor(user.name, user.email)}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="admin-account-name">{user.name || user.email}</p>
+                    <p className="admin-account-email">{user.email}</p>
+                  </div>
+                  <button type="button" className="admin-sheet-signout" onClick={handleLogout} tabIndex={moreOpen ? 0 : -1}>Sign out</button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {!isAdminRoute && <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex" style={{ background: 'var(--ui-surface-bg)', borderTop: '1.5px solid var(--ui-text-primary)', height: '60px' }}>
