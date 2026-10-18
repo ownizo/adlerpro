@@ -467,7 +467,9 @@ export interface ClientTask {
   status: 'pending' | 'done'
   doneAt?: string              // ISO timestamp; undefined enquanto pending
   createdAt: string
-  source: 'manual' | 'renewal' | 'opportunity'
+  source: 'manual' | 'renewal' | 'opportunity' | 'claude' | 'email' | 'lead' | 'accounting'
+  priority?: number            // 1 urgente, 2 normal, 3 baixa
+  createdBy?: string           // 'claude' quando criada pelo conector
   policyId?: string            // FK policies.id; só preenchido na fatia 4
   opportunityId?: string       // FK sales_opportunities.id; follow-up de uma oportunidade (CRM 2)
 }

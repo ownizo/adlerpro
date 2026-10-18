@@ -1145,8 +1145,9 @@ export async function createClientTask(task: ClientTask): Promise<void> {
   // XOR: exatamente um de {companyId, individualClientId}; '' conta como ausente
   const hasCompany = !!task.companyId && task.companyId.trim() !== ''
   const hasIndividual = !!task.individualClientId && task.individualClientId.trim() !== ''
-  if (hasCompany === hasIndividual) {
-    throw new Error('createClientTask: a tarefa deve pertencer a exatamente um de {companyId, individualClientId}')
+  // Tarefas gerais (sem cliente) são permitidas; nunca as duas ao mesmo tempo.
+  if (hasCompany && hasIndividual) {
+    throw new Error('createClientTask: a tarefa não pode pertencer a uma empresa e a uma pessoa ao mesmo tempo')
   }
   const sb = getSupabaseAdmin()
   const { error } = await sb.from('client_tasks').insert(objectToSnake(task as unknown as Record<string, unknown>))

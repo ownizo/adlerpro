@@ -2225,3 +2225,69 @@ button.admin-user-avatar:focus-visible {
     display: none !important;
   }
 }
+
+/* ---------- "Hoje" screen ---------- */
+
+.today { display: flex; flex-direction: column; gap: 1.1rem; }
+.today-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.today-date { font-size: 12.5px; font-weight: 600; color: var(--admin-muted); }
+.today-date::first-letter { text-transform: uppercase; }
+.today-title { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--admin-ink); }
+.today-claude {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  padding: 0.6rem 0.95rem; border-radius: 999px;
+  background: var(--admin-navy); color: #FFFFFF; font-size: 13.5px; font-weight: 600; text-decoration: none;
+}
+.today-claude:active { transform: scale(0.97); }
+.today-counts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.6rem; }
+.today-count {
+  display: flex; flex-direction: column; gap: 2px; padding: 0.8rem 0.9rem;
+  border-radius: 14px; background: var(--admin-card); border: 1px solid var(--admin-border);
+}
+.today-count-value { font-size: 22px; font-weight: 700; color: var(--admin-ink); line-height: 1.1; }
+.today-count-label { font-size: 11.5px; font-weight: 600; color: var(--admin-muted); }
+.today-count.is-danger .today-count-value { color: var(--admin-red); }
+.today-count.is-accent { background: var(--admin-navy); border-color: var(--admin-navy); }
+.today-count.is-accent .today-count-value, .today-count.is-accent .today-count-label { color: #FFFFFF; }
+.today-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
+.today-card--tasks { grid-row: span 2; }
+.today-more { font-size: 12.5px; font-weight: 600; color: var(--admin-navy); text-decoration: none; }
+.today-empty { font-size: 13.5px; color: var(--admin-muted); padding: 0.25rem 0 0.4rem; }
+.today-list { display: flex; flex-direction: column; }
+.today-task, .today-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.7rem 0; border-top: 1px solid var(--admin-border); }
+.today-list > li:first-child { border-top: 0; }
+.today-task.is-busy { opacity: 0.45; }
+.today-task-body { flex: 1; min-width: 0; text-decoration: none; color: inherit; display: block; }
+.today-task-title { font-size: 14px; font-weight: 600; color: var(--admin-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 0.4rem; }
+.today-task-meta { font-size: 12.5px; color: var(--admin-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+.today-task-meta .is-late { color: var(--admin-red); font-weight: 600; }
+.today-prio { width: 7px; height: 7px; border-radius: 50%; background: var(--admin-red); flex-shrink: 0; }
+.today-check {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid #C5CCD6; background: #FFFFFF; cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+.today-check:hover { border-color: var(--admin-navy); background: #EEF2F7; }
+.today-snooze {
+  flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--admin-muted);
+  border: 1px solid var(--admin-border); background: #FFFFFF; border-radius: 999px; padding: 0.3rem 0.65rem;
+}
+.today-add { display: flex; gap: 0.5rem; margin-bottom: 0.4rem; }
+.today-add input {
+  flex: 1; min-width: 0; border: 1px solid var(--admin-border); border-radius: 10px;
+  padding: 0.6rem 0.75rem; font-size: 14px; background: var(--admin-page);
+}
+.today-add button {
+  border-radius: 10px; padding: 0 0.9rem; font-size: 13px; font-weight: 600;
+  background: var(--admin-navy); color: #FFFFFF; border: 0;
+}
+.today-add button:disabled { opacity: 0.4; }
+
+@media (max-width: 1023px) {
+  .today-grid { grid-template-columns: minmax(0, 1fr); }
+  .today-card--tasks { grid-row: auto; }
+  .today-counts { grid-template-columns: repeat(5, minmax(84px, 1fr)); overflow-x: auto; margin: 0 -1rem; padding: 0 1rem 2px; scrollbar-width: none; }
+  .today-counts::-webkit-scrollbar { display: none; }
+  .today-title { font-size: 23px; }
+  .today-add input { font-size: 16px; }
+}

@@ -104,7 +104,13 @@ function LoginPage() {
       const isAdmin = Boolean(user.roles?.includes('admin'))
       const decision = await resolvePostLogin(isAdmin)
       if (cancelled) return
-      if (decision.status === 'redirect') navigate({ to: decision.to })
+      if (decision.status === 'redirect') {
+        // Came from the Claude connector consent screen → go back there.
+        let back: string | null = null
+        try { back = window.sessionStorage.getItem('ar-post-login-return'); window.sessionStorage.removeItem('ar-post-login-return') } catch { /* private mode */ }
+        if (isAdmin && back && back.startsWith('/oauth/authorize')) { window.location.assign(back); return }
+        navigate({ to: decision.to })
+      }
       else if (decision.status === 'unconfigured') setUnconfigured(true)
       else setLoadError(true)
     })()

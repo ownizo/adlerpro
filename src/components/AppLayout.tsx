@@ -50,8 +50,13 @@ function adminNavIcon(item: AdminNavItem): string {
   if ('tab' in item) return ADMIN_ICONS[item.tab]
   if (item.to === '/admin/expenses') return EXPENSES_ICON
   if (item.to === '/admin/site-visits') return SITE_VISITS_ICON
+  if (item.to === '/admin/today') return TODAY_ICON
+  if (item.to === '/admin/claude') return CLAUDE_ICON
   return CARRIER_INTEGRATIONS_ICON
 }
+
+const TODAY_ICON = 'M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z'
+const CLAUDE_ICON = 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z'
 
 const SIDEBAR_COLLAPSED_KEY = 'ar-admin-sidebar-collapsed'
 
@@ -62,7 +67,8 @@ const CARRIER_INTEGRATIONS_ICON = 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5
 // Kept as a union rather than folding carrier-integrations into AdminTab:
 // that page is its own route/component, not another case inside the giant
 // /admin tab switch — see admin.tsx's AdminPage/AdminDashboardContent split.
-type AdminNavItem = { label: string; tab: AdminTab } | { label: string; to: '/admin/carrier-integrations' | '/admin/payment-links' | '/admin/expenses' | '/admin/site-visits' }
+type AdminRoutePath = '/admin/carrier-integrations' | '/admin/payment-links' | '/admin/expenses' | '/admin/site-visits' | '/admin/today' | '/admin/claude'
+type AdminNavItem = { label: string; tab: AdminTab } | { label: string; to: AdminRoutePath }
 
 // Backoffice information architecture — flat groups, no collapsible parent
 // level (that extra "Administration" toggle added a click for no benefit
@@ -70,7 +76,7 @@ type AdminNavItem = { label: string; tab: AdminTab } | { label: string; to: '/ad
 // values as before, plus one real route (Carrier Integrations) — this is
 // still additive navigation, no reordering of unrelated groups/items.
 const ADMIN_NAV_GROUPS: Array<{ label: string; items: AdminNavItem[] }> = [
-  { label: 'Overview', items: [{ label: 'Dashboard', tab: 'dashboard' }] },
+  { label: 'Overview', items: [{ label: 'Hoje', to: '/admin/today' }, { label: 'Dashboard', tab: 'dashboard' }] },
   { label: 'Sales', items: [
     { label: 'Pipeline', tab: 'sales' },
     { label: 'Tasks', tab: 'tasks' },
@@ -97,11 +103,21 @@ const ADMIN_NAV_GROUPS: Array<{ label: string; items: AdminNavItem[] }> = [
     { label: 'Integrations', tab: 'api' },
     { label: 'Carrier Integrations', to: '/admin/carrier-integrations' },
     { label: 'Users & Metrics', tab: 'profiles' },
+    { label: 'Claude', to: '/admin/claude' },
   ] },
 ]
 
 // Breadcrumb shown in the admin topbar, derived from the current ?tab —
 // no backend/routing change, just a label lookup for the same AdminTab.
+const ROUTE_CRUMBS: Record<string, [string, string]> = {
+  '/admin/today': ['Overview', 'Hoje'],
+  '/admin/payment-links': ['Finance', 'Payment Link'],
+  '/admin/expenses': ['Finance', 'Despesas'],
+  '/admin/site-visits': ['Growth', 'Visitas do site'],
+  '/admin/carrier-integrations': ['System', 'Carrier Integrations'],
+  '/admin/claude': ['System', 'Claude'],
+}
+
 const ADMIN_BREADCRUMBS: Record<AdminTab, [string, string]> = {
   dashboard: ['Overview', 'Dashboard'],
   sales: ['Sales', 'Pipeline'],
@@ -309,7 +325,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         style={isAdminRoute ? undefined : { background: 'var(--ui-surface-bg)', borderRight: '1.5px solid var(--ui-text-primary)' }}
       >
         {isAdminRoute ? (
-          <Link to="/admin" search={{ tab: 'dashboard' }} className="admin-brand" onClick={() => setSidebarOpen(false)}>
+          <Link to="/admin/today" className="admin-brand" onClick={() => setSidebarOpen(false)}>
             <img src="/logo-ar-horizontal-white.png" alt="Adler & Rochefort" className="admin-brand-logo" />
             <img src="/lion-white.png" alt="Adler & Rochefort" className="admin-brand-lion" />
             <span className="admin-brand-tag">BACKOFFICE</span>
@@ -438,9 +454,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {isAdminRoute ? (
           <header className="admin-backoffice-header">
             <div className="admin-breadcrumb">
-              <span className="admin-breadcrumb-section">{location.pathname === '/admin/payment-links' || location.pathname === '/admin/expenses' ? 'Finance' : location.pathname === '/admin/site-visits' ? 'Growth' : ADMIN_BREADCRUMBS[activeAdminTab][0]}</span>
+              <span className="admin-breadcrumb-section">{ROUTE_CRUMBS[location.pathname]?.[0] ?? ADMIN_BREADCRUMBS[activeAdminTab][0]}</span>
               <span className="admin-breadcrumb-sep">/</span>
-              <span className="admin-breadcrumb-page">{location.pathname === '/admin/payment-links' ? 'Payment Link' : location.pathname === '/admin/expenses' ? 'Despesas' : location.pathname === '/admin/site-visits' ? 'Visitas do site' : ADMIN_BREADCRUMBS[activeAdminTab][1]}</span>
+              <span className="admin-breadcrumb-page">{ROUTE_CRUMBS[location.pathname]?.[1] ?? ADMIN_BREADCRUMBS[activeAdminTab][1]}</span>
             </div>
 
             <button type="button" className="admin-global-search" aria-label="Search">
@@ -573,7 +589,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
       {isAdminRoute && (
         <nav className="admin-bottom-nav lg:hidden" aria-label="Backoffice">
-          {ADMIN_BOTTOM_NAV.map((item) => {
+          <Link to="/admin/today" className={cn('admin-bottom-nav-item', location.pathname === '/admin/today' && 'is-active')}>
+            <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d={TODAY_ICON} />
+            </svg>
+            <span>Hoje</span>
+          </Link>
+          {ADMIN_BOTTOM_NAV.filter((item) => item.tab !== 'dashboard').map((item) => {
             const active = location.pathname === '/admin' && activeAdminTab === item.tab
             return (
               <Link key={item.tab} to="/admin" search={{ tab: item.tab }} className={cn('admin-bottom-nav-item', active && 'is-active')}>
