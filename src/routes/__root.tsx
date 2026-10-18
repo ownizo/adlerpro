@@ -6,6 +6,12 @@ import '../styles.css'
 // Initialise i18n before any component renders
 import '../lib/i18n'
 
+declare const __IS_ADMIN_SITE__: boolean
+function isAdminSite(): boolean {
+  if (typeof window !== 'undefined') return /^admin\.|adlerpro-admin/.test(window.location.hostname)
+  return __IS_ADMIN_SITE__
+}
+
 // Inline, render-blocking script: reads the persisted UI theme from
 // localStorage and sets the matching CSS variables on <html> before the page
 // paints, so a personalised theme never flashes the default first.
@@ -18,28 +24,29 @@ const SW_REGISTER = `(function(){if('serviceWorker'in navigator){window.addEvent
 export const Route = createRootRoute({
   head: () => {
     const mcv = isMyCoverVault()
-    const title = mcv ? 'My Cover Vault' : 'Os Meus Seguros'
+    const admin = isAdminSite()
+    const title = admin ? 'A&R Admin' : mcv ? 'My Cover Vault' : 'Os Meus Seguros'
     const description = mcv
       ? 'Secure client portal for Adler & Rochefort insurance clients.'
       : 'Portal seguro para clientes de corretagem de seguros empresariais'
     return {
       meta: [
         { charSet: 'utf-8' },
-        { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+        { name: 'viewport', content: 'width=device-width, initial-scale=1, viewport-fit=cover' },
         { title },
         { name: 'description', content: description },
-        { name: 'theme-color', content: '#0A1628' },
+        { name: 'theme-color', content: admin ? '#FFFFFF' : '#0A1628' },
         { name: 'mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
-        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: admin ? 'default' : 'black-translucent' },
         { name: 'apple-mobile-web-app-title', content: title },
       ],
       links: [
       { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
       { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon.png' },
       { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/favicon-192.png' },
-      { rel: 'manifest', href: '/manifest.webmanifest' },
-      { rel: 'apple-touch-icon', sizes: '180x180', href: '/apple-touch-icon.png' },
+      { rel: 'manifest', href: admin ? '/admin.webmanifest' : '/manifest.webmanifest' },
+      { rel: 'apple-touch-icon', sizes: '180x180', href: admin ? '/admin-apple-touch-icon.png' : '/apple-touch-icon.png' },
       {
         rel: 'preconnect',
         href: 'https://fonts.googleapis.com',

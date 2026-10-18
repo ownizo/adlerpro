@@ -1787,3 +1787,441 @@ code {
     justify-content: flex-end;
   }
 }
+
+/* ============================================================
+   Backoffice as an app (October 2026)
+   Fixed-height shell: only the work area scrolls, the sidebar /
+   top bar / bottom bar stay put, like a native app. Phones get a
+   bottom bar + "Menu" sheet (no hamburger); desktop gets a
+   collapsible icon rail.
+   ============================================================ */
+
+html:has(.admin-app),
+body:has(.admin-app) {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.admin-app {
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0 !important;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.admin-app a,
+.admin-app button,
+.admin-app select,
+.admin-app input {
+  touch-action: manipulation;
+}
+
+.admin-app .admin-backoffice-main {
+  min-height: 0;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-app .admin-backoffice-sidebar,
+.admin-app .admin-backoffice-header,
+.admin-app .admin-bottom-nav,
+.admin-app .admin-sheet {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.admin-screen-enter {
+  animation: admin-screen-in 200ms ease-out;
+}
+
+@keyframes admin-screen-in {
+  from { opacity: 0.35; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-screen-enter { animation: none; }
+  .admin-sheet, .admin-sheet-backdrop, .admin-backoffice-sidebar { transition: none !important; }
+}
+
+/* press feedback */
+.admin-nav-item,
+.admin-bottom-nav-item,
+.admin-sheet-tile,
+.admin-rail-toggle {
+  transition: transform 120ms ease, background-color 120ms ease, color 120ms ease;
+}
+
+.admin-nav-item:active,
+.admin-bottom-nav-item:active,
+.admin-sheet-tile:active,
+.admin-rail-toggle:active {
+  transform: scale(0.96);
+}
+
+/* ---------- account menu (avatar) ---------- */
+
+.admin-account {
+  position: relative;
+}
+
+button.admin-user-avatar {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+button.admin-user-avatar:focus-visible {
+  outline: 2px solid var(--admin-navy);
+  outline-offset: 2px;
+}
+
+.admin-account-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 248px;
+  background: #FFFFFF;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(17, 25, 39, 0.14);
+  padding: 6px;
+  z-index: 70;
+}
+
+.admin-account-id {
+  padding: 10px 12px 10px;
+  border-bottom: 1px solid var(--admin-border);
+  margin-bottom: 4px;
+}
+
+.admin-account-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--admin-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-account-email {
+  font-size: 12px;
+  color: var(--admin-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-account-signout {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--admin-red);
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+.admin-account-signout:hover {
+  background: #FDF1F2;
+}
+
+/* ---------- desktop: collapsible icon rail ---------- */
+
+.admin-brand-lion {
+  display: none;
+  width: 34px;
+  height: auto;
+}
+
+.admin-rail-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: left;
+  gap: 0.65rem;
+  margin: 0.25rem 0.75rem 1rem;
+  box-shadow: 0 -1px 0 rgba(255, 255, 255, 0.08);
+  padding: 0.55rem 0.65rem;
+  border-radius: 7px;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.admin-rail-toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #FFFFFF;
+}
+
+@media (min-width: 1024px) {
+  .admin-app .admin-backoffice-sidebar {
+    transition: width 200ms ease;
+  }
+
+  .admin-app--rail .admin-backoffice-sidebar {
+    width: 76px !important;
+  }
+
+  .admin-app--rail .admin-brand {
+    align-items: center;
+    padding: 1.2rem 0 1rem;
+  }
+
+  .admin-app--rail .admin-brand-logo,
+  .admin-app--rail .admin-brand-tag,
+  .admin-app--rail .admin-nav-item-label,
+  .admin-app--rail .admin-nav-group-label {
+    display: none;
+  }
+
+  .admin-app--rail .admin-brand-lion {
+    display: block;
+  }
+
+  .admin-app--rail .admin-nav {
+    padding: 0.75rem 0.6rem 1rem;
+  }
+
+  .admin-app--rail .admin-nav-group + .admin-nav-group {
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .admin-app--rail .admin-nav-item,
+  .admin-app--rail .admin-rail-toggle {
+    justify-content: center;
+    padding: 0.62rem 0;
+  }
+
+  .admin-app--rail .admin-rail-toggle {
+    margin: 0 0.6rem 1rem;
+  }
+
+  .admin-app--rail .admin-nav-badge {
+    position: absolute;
+    top: 3px;
+    right: 6px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    font-size: 9.5px;
+  }
+}
+
+/* ---------- phones & tablets ---------- */
+
+@media (max-width: 1023px) {
+  /* the bottom bar + Menu sheet replace the drawer */
+  .admin-app .admin-backoffice-sidebar {
+    display: none !important;
+  }
+
+  .admin-app .admin-backoffice-header {
+    position: relative;
+    padding-top: env(safe-area-inset-top);
+    height: calc(56px + env(safe-area-inset-top));
+    background: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    backdrop-filter: saturate(180%) blur(14px);
+  }
+
+  .admin-app .admin-breadcrumb-page {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+  .admin-app .admin-bottom-nav {
+    z-index: 80;
+    background: rgba(255, 255, 255, 0.92);
+    -webkit-backdrop-filter: saturate(180%) blur(14px);
+    backdrop-filter: saturate(180%) blur(14px);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  .admin-app .admin-bottom-nav-item svg {
+    padding: 3px 15px;
+    width: 22px;
+    height: 22px;
+    box-sizing: content-box;
+    border-radius: 999px;
+    transition: background-color 150ms ease;
+  }
+
+  .admin-app .admin-bottom-nav-item.is-active svg {
+    background: #E8EDF5;
+  }
+}
+
+/* ---------- "Menu" sheet ---------- */
+
+.admin-sheet-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 75;
+  pointer-events: none;
+}
+
+.admin-sheet-layer.is-open {
+  pointer-events: auto;
+}
+
+.admin-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.38);
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.admin-sheet-layer.is-open .admin-sheet-backdrop {
+  opacity: 1;
+}
+
+.admin-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(58px + env(safe-area-inset-bottom));
+  max-height: calc(100dvh - 58px - env(safe-area-inset-bottom) - env(safe-area-inset-top) - 24px);
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.18);
+  transform: translateY(calc(100% + 80px));
+  transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  visibility: hidden;
+}
+
+.admin-sheet-layer.is-open .admin-sheet {
+  transform: none;
+  visibility: visible;
+}
+
+.admin-sheet-handle {
+  width: 38px;
+  height: 5px;
+  border-radius: 999px;
+  background: #D0D5DD;
+  margin: 8px auto 2px;
+  flex-shrink: 0;
+}
+
+.admin-sheet-body {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px 14px 16px;
+}
+
+.admin-sheet-group + .admin-sheet-group {
+  margin-top: 12px;
+}
+
+.admin-sheet-group-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--admin-muted);
+  padding: 0 4px 6px;
+}
+
+.admin-sheet-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.admin-sheet-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 2px;
+  border-radius: 14px;
+  color: var(--admin-ink);
+  text-decoration: none;
+  text-align: center;
+}
+
+.admin-sheet-tile-icon {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: #F0F3F8;
+  color: var(--admin-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-sheet-tile.is-active .admin-sheet-tile-icon {
+  background: var(--admin-navy);
+  color: #FFFFFF;
+}
+
+.admin-sheet-tile-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.admin-sheet-tile-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--admin-red);
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-sheet-account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--admin-page);
+}
+
+.admin-sheet-signout {
+  border: 1px solid var(--admin-border);
+  background: #FFFFFF;
+  color: var(--admin-red);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+/* the phone bottom bar and its sheet never show on desktop (plain CSS above
+   outranks Tailwind's lg:hidden utility, so hide them explicitly) */
+@media (min-width: 1024px) {
+  .admin-bottom-nav,
+  .admin-sheet-layer {
+    display: none !important;
+  }
+}
