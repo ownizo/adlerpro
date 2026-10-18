@@ -34,6 +34,7 @@ import { Route as OneDashboardRouteImport } from './routes/one/dashboard'
 import { Route as OneClaimsRouteImport } from './routes/one/claims'
 import { Route as DespesaTokenRouteImport } from './routes/despesa.$token'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api.stripe-webhook'
+import { Route as AdminSiteVisitsRouteImport } from './routes/admin.site-visits'
 import { Route as AdminPaymentLinksRouteImport } from './routes/admin.payment-links'
 import { Route as AdminExpensesRouteImport } from './routes/admin.expenses'
 import { Route as AdminCarrierIntegrationsRouteImport } from './routes/admin.carrier-integrations'
@@ -165,6 +166,11 @@ const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   path: '/api/stripe-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSiteVisitsRoute = AdminSiteVisitsRouteImport.update({
+  id: '/site-visits',
+  path: '/site-visits',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminPaymentLinksRoute = AdminPaymentLinksRouteImport.update({
   id: '/payment-links',
   path: '/payment-links',
@@ -211,6 +217,7 @@ export interface FileRoutesByFullPath {
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
   '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
+  '/admin/site-visits': typeof AdminSiteVisitsRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/despesa/$token': typeof DespesaTokenRoute
   '/one/claims': typeof OneClaimsRoute
@@ -243,6 +250,7 @@ export interface FileRoutesByTo {
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
   '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
+  '/admin/site-visits': typeof AdminSiteVisitsRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/despesa/$token': typeof DespesaTokenRoute
   '/one/claims': typeof OneClaimsRoute
@@ -276,6 +284,7 @@ export interface FileRoutesById {
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
   '/admin/expenses': typeof AdminExpensesRoute
   '/admin/payment-links': typeof AdminPaymentLinksRoute
+  '/admin/site-visits': typeof AdminSiteVisitsRoute
   '/api/stripe-webhook': typeof ApiStripeWebhookRoute
   '/despesa/$token': typeof DespesaTokenRoute
   '/one/claims': typeof OneClaimsRoute
@@ -310,6 +319,7 @@ export interface FileRouteTypes {
     | '/admin/carrier-integrations'
     | '/admin/expenses'
     | '/admin/payment-links'
+    | '/admin/site-visits'
     | '/api/stripe-webhook'
     | '/despesa/$token'
     | '/one/claims'
@@ -342,6 +352,7 @@ export interface FileRouteTypes {
     | '/admin/carrier-integrations'
     | '/admin/expenses'
     | '/admin/payment-links'
+    | '/admin/site-visits'
     | '/api/stripe-webhook'
     | '/despesa/$token'
     | '/one/claims'
@@ -374,6 +385,7 @@ export interface FileRouteTypes {
     | '/admin/carrier-integrations'
     | '/admin/expenses'
     | '/admin/payment-links'
+    | '/admin/site-visits'
     | '/api/stripe-webhook'
     | '/despesa/$token'
     | '/one/claims'
@@ -595,6 +607,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiStripeWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/site-visits': {
+      id: '/admin/site-visits'
+      path: '/site-visits'
+      fullPath: '/admin/site-visits'
+      preLoaderRoute: typeof AdminSiteVisitsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/payment-links': {
       id: '/admin/payment-links'
       path: '/payment-links'
@@ -653,12 +672,14 @@ interface AdminRouteChildren {
   AdminCarrierIntegrationsRoute: typeof AdminCarrierIntegrationsRouteWithChildren
   AdminExpensesRoute: typeof AdminExpensesRoute
   AdminPaymentLinksRoute: typeof AdminPaymentLinksRoute
+  AdminSiteVisitsRoute: typeof AdminSiteVisitsRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCarrierIntegrationsRoute: AdminCarrierIntegrationsRouteWithChildren,
   AdminExpensesRoute: AdminExpensesRoute,
   AdminPaymentLinksRoute: AdminPaymentLinksRoute,
+  AdminSiteVisitsRoute: AdminSiteVisitsRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
