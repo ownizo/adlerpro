@@ -358,7 +358,7 @@ function LoginPage() {
       {langPill}
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/logo.png" alt="Adler & Rochefort" style={{ height: '72px', width: 'auto', margin: '0 auto 1rem' }} />
+          <img src="/logo-ar.png" alt="Adler & Rochefort" style={{ height: '110px', width: 'auto', margin: '0 auto 1.25rem', display: 'block' }} />
           <h1 style={{
             fontFamily: "'Montserrat', sans-serif",
             fontWeight: 700,

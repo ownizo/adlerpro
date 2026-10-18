@@ -124,6 +124,15 @@ function isAdminTabValue(value: unknown): value is AdminTab {
   return typeof value === 'string' && value in ADMIN_BREADCRUMBS
 }
 
+// Phone-sized backoffice navigation: the four screens used most on the go,
+// plus a button that opens the full sidebar for everything else.
+const ADMIN_BOTTOM_NAV: Array<{ label: string; tab: AdminTab; icon: string }> = [
+  { label: 'Dashboard', tab: 'dashboard', icon: 'M2.25 12l8.954-8.955a1.126 1.126 0 011.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25' },
+  { label: 'Pipeline', tab: 'sales', icon: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z' },
+  { label: 'People', tab: 'individual_clients', icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z' },
+  { label: 'Policies', tab: 'policies', icon: 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z' },
+]
+
 const BOTTOM_NAV_ITEMS = [
   { to: '/dashboard' as const, key: 'nav.dashboard', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
   { to: '/policies' as const, key: 'nav.policies', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
@@ -170,6 +179,27 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     i18n.changeLanguage(isAdminRoute ? 'en' : lang)
   }, [isAdminRoute, lang, i18n])
+
+  // Phones: tables marked `ar-stack` render as one card per row (CSS in
+  // styles.css). Each cell needs its column name to show as a label, so copy
+  // the header text into data-label whenever rows appear or change.
+  useEffect(() => {
+    if (!isAdminRoute || typeof window === 'undefined') return
+    const label = () => {
+      document.querySelectorAll<HTMLTableElement>('table.ar-stack').forEach((table) => {
+        const heads = Array.from(table.querySelectorAll('thead th')).map((th) => (th.textContent || '').trim())
+        table.querySelectorAll('tbody tr').forEach((tr) => {
+          const cells = Array.from(tr.children) as HTMLElement[]
+          if (cells.length !== heads.length) return
+          cells.forEach((td, i) => { if (td.dataset.label !== heads[i]) td.dataset.label = heads[i] })
+        })
+      })
+    }
+    label()
+    const obs = new MutationObserver(() => label())
+    obs.observe(document.body, { childList: true, subtree: true })
+    return () => obs.disconnect()
+  }, [isAdminRoute])
 
   useEffect(() => {
     if (!isAdmin || !ready) return
@@ -225,10 +255,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         style={isAdminRoute ? undefined : { background: 'var(--ui-surface-bg)', borderRight: '1.5px solid var(--ui-text-primary)' }}
       >
         {isAdminRoute ? (
-          <Link to="/admin" search={{ tab: 'dashboard' }} className="admin-brand">
-            <span className="admin-brand-name">ADLER &amp; ROCHEFORT</span>
+          <Link to="/admin" search={{ tab: 'dashboard' }} className="admin-brand" onClick={() => setSidebarOpen(false)}>
+            <img src="/logo-ar-horizontal-white.png" alt="Adler & Rochefort" className="admin-brand-logo" />
             <span className="admin-brand-tag">BACKOFFICE</span>
-            <span className="admin-brand-sub">Internal workspace</span>
           </Link>
         ) : (
           <div style={{ padding: '1.25rem 1rem 1rem', borderBottom: '1px solid var(--ui-border)' }}>
@@ -368,8 +397,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
             <div className="admin-header-actions">
               <div className="admin-quick-create" ref={quickCreateRef}>
-                <button type="button" className="admin-create-button" onClick={() => setQuickCreateOpen((v) => !v)}>
-                  + New
+                <button type="button" className="admin-create-button" aria-label="New" onClick={() => setQuickCreateOpen((v) => !v)}>
+                  <span aria-hidden="true">+</span><span className="admin-create-button-label"> New</span>
                 </button>
                 {quickCreateOpen && (
                   <div className="admin-quick-create-menu">
@@ -474,7 +503,29 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex" style={{ background: 'var(--ui-surface-bg)', borderTop: '1.5px solid var(--ui-text-primary)', height: '60px' }}>
+      {isAdminRoute && (
+        <nav className="admin-bottom-nav lg:hidden" aria-label="Backoffice">
+          {ADMIN_BOTTOM_NAV.map((item) => {
+            const active = location.pathname === '/admin' && activeAdminTab === item.tab
+            return (
+              <Link key={item.tab} to="/admin" search={{ tab: item.tab }} className={cn('admin-bottom-nav-item', active && 'is-active')}>
+                <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                </svg>
+                <span>{item.label}</span>
+              </Link>
+            )
+          })}
+          <button type="button" className="admin-bottom-nav-item" onClick={() => setSidebarOpen(true)}>
+            <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+            </svg>
+            <span>Menu</span>
+          </button>
+        </nav>
+      )}
+
+      {!isAdminRoute && <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 flex" style={{ background: 'var(--ui-surface-bg)', borderTop: '1.5px solid var(--ui-text-primary)', height: '60px' }}>
         {BOTTOM_NAV_ITEMS.map((item) => (
           <Link
             key={item.to}
@@ -491,7 +542,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </span>
           </Link>
         ))}
-      </nav>
+      </nav>}
 
       {!isAdminRoute && <ThemeCustomizer />}
     </div>
