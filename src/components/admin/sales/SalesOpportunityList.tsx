@@ -57,7 +57,7 @@ export function SalesOpportunityList({ opportunities, individualClients, compani
   return (
     <div className="admin-panel" style={{ padding: 0 }}>
       <div className="overflow-x-auto">
-        <table className="admin-table min-w-[920px]">
+        <table className="admin-table ar-stack min-w-[920px]">
           <thead>
             <tr>
               {COLUMNS.map((col) => (

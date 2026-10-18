@@ -1559,3 +1559,231 @@ code {
     grid-template-columns: repeat(1, 1fr);
   }
 }
+
+/* ---------- Brand logo in the backoffice sidebar ---------- */
+
+.admin-brand-logo {
+  display: block;
+  width: 100%;
+  max-width: 196px;
+  height: auto;
+  margin-bottom: 0.45rem;
+}
+
+/* ---------- Phone layout (October 2026) ---------- */
+
+.admin-bottom-nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  display: flex;
+  background: rgba(255, 255, 255, 0.98);
+  border-top: 1px solid var(--admin-border);
+  padding-bottom: env(safe-area-inset-bottom);
+  box-shadow: 0 -4px 16px rgba(23, 36, 61, 0.06);
+}
+
+.admin-bottom-nav-item {
+  flex: 1;
+  min-height: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--admin-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  text-decoration: none;
+  background: none;
+  border: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.admin-bottom-nav-item.is-active {
+  color: var(--admin-navy);
+}
+
+.admin-bottom-nav-item.is-active svg {
+  stroke-width: 2;
+}
+
+@media (max-width: 1023px) {
+  .admin-backoffice-main {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom)) !important;
+  }
+
+  /* the search box is decorative for now; the page name is enough on a phone */
+  .admin-global-search,
+  .admin-breadcrumb-section,
+  .admin-breadcrumb-sep {
+    display: none;
+  }
+
+  .admin-breadcrumb {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .admin-breadcrumb-page {
+    font-size: 16px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .admin-header-actions {
+    gap: 0.45rem;
+  }
+
+  .admin-backoffice-header {
+    padding: 0 0.85rem;
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+}
+
+@media (max-width: 639px) {
+  .admin-quick-create > .admin-create-button {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    line-height: 1;
+    border-radius: 10px;
+  }
+
+  .admin-create-button-label {
+    display: none;
+  }
+
+  .admin-page-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.85rem;
+  }
+
+  .admin-page-title {
+    font-size: 1.45rem;
+  }
+
+  .admin-kpi-grid {
+    gap: 0.6rem;
+  }
+
+  .admin-kpi-card {
+    padding: 0.85rem 0.9rem;
+  }
+
+  .admin-kpi-value {
+    font-size: 1.35rem;
+  }
+
+  .admin-panel {
+    padding: 0.95rem 0.9rem;
+  }
+
+  /* inputs at 16px stop iOS from zooming the page on focus */
+  .admin-backoffice-main input:not([type='checkbox']):not([type='radio']),
+  .admin-backoffice-main select,
+  .admin-backoffice-main textarea {
+    font-size: 16px;
+  }
+
+  /* tables marked ar-stack: one card per row, labels from the header */
+  div:has(> table.ar-stack) {
+    border: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+
+  table.ar-stack {
+    display: block;
+    width: 100%;
+    min-width: 0 !important;
+  }
+
+  table.ar-stack thead {
+    display: none;
+  }
+
+  table.ar-stack tbody {
+    display: block;
+    border: 0;
+  }
+
+  table.ar-stack tr {
+    display: block;
+    background: var(--admin-card);
+    border: 1px solid var(--admin-border) !important;
+    border-radius: 10px;
+    margin: 0 0 0.6rem;
+    padding: 0.35rem 0;
+  }
+
+  table.ar-stack td {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.9rem;
+    padding: 0.4rem 0.9rem !important;
+    border: 0 !important;
+    text-align: right;
+    font-size: 14px;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  table.ar-stack td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    max-width: 42%;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--admin-muted);
+    padding-top: 0.15rem;
+  }
+
+  table.ar-stack td:not([data-label])::before,
+  table.ar-stack td[data-label='']::before {
+    content: none;
+  }
+
+  table.ar-stack td:not([data-label]),
+  table.ar-stack td[data-label=''] {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  /* the first labelled cell is the row's title */
+  table.ar-stack td[data-label]:not([data-label='']):first-of-type,
+  table.ar-stack td[data-label='']:first-child + td[data-label] {
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  /* detail rows (one cell spanning the table) open as a full-width block */
+  table.ar-stack td[colspan] {
+    display: block;
+    text-align: left;
+    padding: 0.75rem 0.9rem !important;
+  }
+
+  table.ar-stack td[colspan]::before {
+    content: none;
+  }
+
+  .admin-row-actions {
+    justify-content: flex-end;
+  }
+}

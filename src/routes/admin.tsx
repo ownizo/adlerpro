@@ -477,9 +477,9 @@ function AdminDashboardContent() {
 
             {tab === 'companies' && (
               <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-navy-700">Companies ({companies.length})</h2>
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <h2 className="text-lg font-semibold text-navy-700 whitespace-nowrap">Companies ({companies.length})</h2>
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={async () => {
                         await exportToExcel(companies.map((c) => ({
@@ -620,8 +620,8 @@ function AdminDashboardContent() {
 
                     return (
                       <div key={company.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-                        <div className="flex items-stretch">
-                          <div className="flex items-start pl-4 pt-6">
+                        <div className="flex items-stretch flex-wrap sm:flex-nowrap">
+                          <div className="flex items-start pl-4 pt-5 sm:pt-6">
                             <input
                               type="checkbox"
                               checked={isSelected}
@@ -639,23 +639,23 @@ function AdminDashboardContent() {
                           </div>
                           <button
                             onClick={() => setExpandedCompanyId(isExpanded ? null : company.id)}
-                            className="flex-1 p-6 text-left hover:bg-navy-50/50 transition-colors"
+                            className="flex-1 min-w-0 p-4 sm:p-6 text-left hover:bg-navy-50/50 transition-colors"
                           >
-                            <div className="flex items-start justify-between gap-4">
-                              <div>
-                                <h3 className="text-lg font-semibold text-navy-700">{company.name}</h3>
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
+                              <div className="min-w-0">
+                                <h3 className="text-base sm:text-lg font-semibold text-navy-700">{company.name}</h3>
                                 <p className="text-sm text-navy-500 mt-1">NIF {company.nif} · {company.sector}</p>
                                 <p className="text-xs text-navy-400 mt-1">{company.address}</p>
                                 <p className="text-xs text-navy-500 mt-2">Company access: {company.accessEmail || '-'}</p>
                               </div>
-                              <div className="text-right">
+                              <div className="flex flex-wrap gap-x-3 sm:block sm:text-right shrink-0">
                                 <p className="text-sm font-medium text-navy-700">{users.length} users</p>
                                 <p className="text-sm text-navy-500">{companyPolicies.length} policies</p>
                                 <p className="text-sm text-navy-500">{companyDocs.length} documents</p>
                               </div>
                             </div>
                           </button>
-                          <div className="flex flex-col gap-1 p-4 border-l border-navy-100" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex sm:flex-col gap-2 sm:gap-1 p-3 sm:p-4 w-full sm:w-auto justify-end border-t sm:border-t-0 sm:border-l border-navy-100" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => {
                                 setEditingCompanyId(company.id)
@@ -689,7 +689,7 @@ function AdminDashboardContent() {
                         </div>
 
                         {isExpanded && (
-                          <div className="border-t border-navy-100 bg-navy-50/50 p-6 space-y-6">
+                          <div className="border-t border-navy-100 bg-navy-50/50 p-4 sm:p-6 space-y-6">
                             <div>
                               <h4 className="text-sm font-semibold text-navy-700 mb-3">Contact Details</h4>
                               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white rounded border border-navy-200 p-4">
@@ -773,7 +773,7 @@ function AdminDashboardContent() {
                               <div>
                                 <h4 className="text-sm font-semibold text-navy-700 mb-3">Company Users</h4>
                                 <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-                                  <table className="w-full">
+                                  <table className="ar-stack w-full">
                                     <thead>
                                       <tr className="bg-navy-50 border-b border-navy-200">
                                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Name</th>
@@ -1019,7 +1019,7 @@ function AdminDashboardContent() {
                 )}
 
                 <div className="admin-table-wrap overflow-x-auto">
-                  <table className="admin-table w-full min-w-[1100px]">
+                  <table className="admin-table ar-stack w-full min-w-[1100px]">
                     <thead>
                       <tr className="bg-navy-50 border-b border-navy-200">
                         <th className="px-4 py-3 w-10">
@@ -1195,7 +1195,7 @@ function AdminDashboardContent() {
             {tab === 'policies' && (
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <h1 className="admin-page-title" style={{ fontSize: "17px" }}>Policies</h1>
                     <span className="text-sm text-navy-500">Filter by client:</span>
                     <select
@@ -1633,7 +1633,7 @@ function AdminDashboardContent() {
               <div>
                 <h2 className="text-lg font-semibold text-navy-700 mb-4">Users &amp; Access Metrics</h2>
                 <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-                  <table className="w-full">
+                  <table className="ar-stack w-full">
                     <thead>
                       <tr className="bg-navy-50 border-b border-navy-200">
                         <th className="text-left px-6 py-3 text-xs font-semibold text-navy-500 uppercase">User</th>
@@ -2216,7 +2216,7 @@ function AdminDashboardTab({
               <p>Premiums allocated: {formatCurrency(selectedMonthDetails.premiums)} · Commissions allocated: {formatCurrency(selectedMonthDetails.commissions)}</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[640px]">
+              <table className="ar-stack w-full min-w-[640px]">
                 <thead>
                   <tr className="bg-navy-50 border-b border-navy-200">
                     <th className="text-left px-3 py-2 text-xs font-semibold text-navy-500 uppercase">Policy</th>
@@ -3552,7 +3552,7 @@ function AdminClaimsBoard({
 
   return (
     <div className="bg-white border border-navy-200 rounded-[4px] overflow-auto">
-      <table className="min-w-full text-sm">
+      <table className="ar-stack min-w-full text-sm">
         <thead className="bg-navy-50 text-navy-600">
           <tr>
             <th className="text-left px-3 py-2">Client/Company</th>
