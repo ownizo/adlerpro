@@ -52,11 +52,14 @@ function adminNavIcon(item: AdminNavItem): string {
   if (item.to === '/admin/site-visits') return SITE_VISITS_ICON
   if (item.to === '/admin/today') return TODAY_ICON
   if (item.to === '/admin/claude') return CLAUDE_ICON
+  if (item.to === '/admin/ai-visibility') return AI_VISIBILITY_ICON
   return CARRIER_INTEGRATIONS_ICON
 }
 
 const TODAY_ICON = 'M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z'
 const CLAUDE_ICON = 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z'
+
+const AI_VISIBILITY_ICON = 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178zM15 12a3 3 0 11-6 0 3 3 0 016 0z'
 
 const SIDEBAR_COLLAPSED_KEY = 'ar-admin-sidebar-collapsed'
 
@@ -67,7 +70,7 @@ const CARRIER_INTEGRATIONS_ICON = 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5
 // Kept as a union rather than folding carrier-integrations into AdminTab:
 // that page is its own route/component, not another case inside the giant
 // /admin tab switch — see admin.tsx's AdminPage/AdminDashboardContent split.
-type AdminRoutePath = '/admin/carrier-integrations' | '/admin/payment-links' | '/admin/expenses' | '/admin/site-visits' | '/admin/today' | '/admin/claude'
+type AdminRoutePath = '/admin/carrier-integrations' | '/admin/payment-links' | '/admin/expenses' | '/admin/site-visits' | '/admin/today' | '/admin/claude' | '/admin/ai-visibility'
 type AdminNavItem = { label: string; tab: AdminTab } | { label: string; to: AdminRoutePath }
 
 // Backoffice information architecture — flat groups, no collapsible parent
@@ -97,6 +100,7 @@ const ADMIN_NAV_GROUPS: Array<{ label: string; items: AdminNavItem[] }> = [
   { label: 'Growth', items: [
     { label: 'Marketing', tab: 'marketing' },
     { label: 'Visitas do site', to: '/admin/site-visits' },
+    { label: 'Visibilidade em IA', to: '/admin/ai-visibility' },
   ] },
   { label: 'System', items: [
     { label: 'Billing', tab: 'billing' },
@@ -114,6 +118,7 @@ const ROUTE_CRUMBS: Record<string, [string, string]> = {
   '/admin/payment-links': ['Finance', 'Payment Link'],
   '/admin/expenses': ['Finance', 'Despesas'],
   '/admin/site-visits': ['Growth', 'Visitas do site'],
+  '/admin/ai-visibility': ['Growth', 'Visibilidade em IA'],
   '/admin/carrier-integrations': ['System', 'Carrier Integrations'],
   '/admin/claude': ['System', 'Claude'],
 }

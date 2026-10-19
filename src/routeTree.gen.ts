@@ -41,6 +41,7 @@ import { Route as AdminPaymentLinksRouteImport } from './routes/admin.payment-li
 import { Route as AdminExpensesRouteImport } from './routes/admin.expenses'
 import { Route as AdminClaudeRouteImport } from './routes/admin.claude'
 import { Route as AdminCarrierIntegrationsRouteImport } from './routes/admin.carrier-integrations'
+import { Route as AdminAiVisibilityRouteImport } from './routes/admin.ai-visibility'
 import { Route as AdminCarrierIntegrationsImportRouteImport } from './routes/admin.carrier-integrations.import'
 import { Route as AdminCarrierIntegrationsRunsIdRouteImport } from './routes/admin.carrier-integrations.runs.$id'
 
@@ -205,6 +206,11 @@ const AdminCarrierIntegrationsRoute =
     path: '/carrier-integrations',
     getParentRoute: () => AdminRoute,
   } as any)
+const AdminAiVisibilityRoute = AdminAiVisibilityRouteImport.update({
+  id: '/ai-visibility',
+  path: '/ai-visibility',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCarrierIntegrationsImportRoute =
   AdminCarrierIntegrationsImportRouteImport.update({
     id: '/import',
@@ -232,6 +238,7 @@ export interface FileRoutesByFullPath {
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
+  '/admin/ai-visibility': typeof AdminAiVisibilityRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
   '/admin/claude': typeof AdminClaudeRoute
   '/admin/expenses': typeof AdminExpensesRoute
@@ -268,6 +275,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
+  '/admin/ai-visibility': typeof AdminAiVisibilityRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
   '/admin/claude': typeof AdminClaudeRoute
   '/admin/expenses': typeof AdminExpensesRoute
@@ -305,6 +313,7 @@ export interface FileRoutesById {
   '/profile': typeof ProfileRoute
   '/quotes-comparison': typeof QuotesComparisonRoute
   '/terms-and-conditions': typeof TermsAndConditionsRoute
+  '/admin/ai-visibility': typeof AdminAiVisibilityRoute
   '/admin/carrier-integrations': typeof AdminCarrierIntegrationsRouteWithChildren
   '/admin/claude': typeof AdminClaudeRoute
   '/admin/expenses': typeof AdminExpensesRoute
@@ -343,6 +352,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/quotes-comparison'
     | '/terms-and-conditions'
+    | '/admin/ai-visibility'
     | '/admin/carrier-integrations'
     | '/admin/claude'
     | '/admin/expenses'
@@ -379,6 +389,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/quotes-comparison'
     | '/terms-and-conditions'
+    | '/admin/ai-visibility'
     | '/admin/carrier-integrations'
     | '/admin/claude'
     | '/admin/expenses'
@@ -415,6 +426,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/quotes-comparison'
     | '/terms-and-conditions'
+    | '/admin/ai-visibility'
     | '/admin/carrier-integrations'
     | '/admin/claude'
     | '/admin/expenses'
@@ -693,6 +705,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCarrierIntegrationsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/ai-visibility': {
+      id: '/admin/ai-visibility'
+      path: '/ai-visibility'
+      fullPath: '/admin/ai-visibility'
+      preLoaderRoute: typeof AdminAiVisibilityRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/carrier-integrations/import': {
       id: '/admin/carrier-integrations/import'
       path: '/import'
@@ -727,6 +746,7 @@ const AdminCarrierIntegrationsRouteWithChildren =
   )
 
 interface AdminRouteChildren {
+  AdminAiVisibilityRoute: typeof AdminAiVisibilityRoute
   AdminCarrierIntegrationsRoute: typeof AdminCarrierIntegrationsRouteWithChildren
   AdminClaudeRoute: typeof AdminClaudeRoute
   AdminExpensesRoute: typeof AdminExpensesRoute
@@ -736,6 +756,7 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAiVisibilityRoute: AdminAiVisibilityRoute,
   AdminCarrierIntegrationsRoute: AdminCarrierIntegrationsRouteWithChildren,
   AdminClaudeRoute: AdminClaudeRoute,
   AdminExpensesRoute: AdminExpensesRoute,
