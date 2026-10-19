@@ -212,3 +212,78 @@ const ROW_APPLY_RESULT_LABELS: Record<RowApplyResultStatus, string> = {
 export function describeRowApplyResult(status: RowApplyResultStatus): string {
   return ROW_APPLY_RESULT_LABELS[status]
 }
+
+// ── Sugestão automática (aceitar num só passo) ───────────────────────────
+//
+// Para os casos sem dúvida — cliente/apólice novos, ou correspondência
+// EXATA já encontrada — a ação de aplicação é óbvia. suggestApplyActions
+// devolve-a para o Admin aceitar com um clique (ou em bloco). Tudo o que
+// não é inequívoco (probable/ambiguous/…) fica sem sugestão e continua a
+// precisar de revisão manual. Nunca sugere atualizar uma apólice existente
+// (update_existing_policy exige aprovar campo a campo).
+
+export interface SuggestApplyActionsInput {
+  customerMatchStatus: string
+  policyMatchStatus: string
+  matchedIndividualClientId?: string | null
+  matchedCompanyId?: string | null
+  matchedPolicyId?: string | null
+  customerName?: string
+  taxId?: string
+  externalPolicyNumber?: string
+  startDate?: string
+  endDate?: string
+}
+
+export type SuggestedApplyActions =
+  | {
+      ok: true
+      customerApplyAction: CustomerApplyAction
+      policyApplyAction: PolicyApplyAction
+      selectedIndividualClientId?: string
+      selectedCompanyId?: string
+      selectedPolicyId?: string
+    }
+  | { ok: false; reason: string }
+
+/** NIF português de pessoa coletiva: começa por 5, 6, 71, 72 ou 9. */
+export function looksLikeCompanyTaxId(taxId: string | undefined): boolean {
+  const digits = (taxId ?? '').replace(/\D/g, '')
+  if (digits.length !== 9) return false
+  return /^(5|6|71|72|9)/.test(digits)
+}
+
+export function suggestApplyActions(input: SuggestApplyActionsInput): SuggestedApplyActions {
+  let customer: { action: CustomerApplyAction; individual?: string; company?: string }
+  if (input.customerMatchStatus === 'exact' || input.customerMatchStatus === 'linked') {
+    if (input.matchedIndividualClientId) customer = { action: 'link_existing_individual', individual: input.matchedIndividualClientId }
+    else if (input.matchedCompanyId) customer = { action: 'link_existing_company', company: input.matchedCompanyId }
+    else return { ok: false, reason: 'Cliente encontrado mas sem ficha associada — rever.' }
+  } else if (input.customerMatchStatus === 'new' || input.customerMatchStatus === 'unmatched') {
+    if (!input.customerName?.trim()) return { ok: false, reason: 'O ficheiro não traz o nome do tomador — escolher o cliente manualmente.' }
+    customer = looksLikeCompanyTaxId(input.taxId) ? { action: 'create_company' } : { action: 'create_individual' }
+  } else {
+    return { ok: false, reason: 'Cliente com correspondência incerta — rever.' }
+  }
+
+  let policy: { action: PolicyApplyAction; policy?: string }
+  if (input.policyMatchStatus === 'exact' || input.policyMatchStatus === 'linked') {
+    if (!input.matchedPolicyId) return { ok: false, reason: 'Apólice encontrada mas sem ficha associada — rever.' }
+    policy = { action: 'link_existing_policy', policy: input.matchedPolicyId }
+  } else if (input.policyMatchStatus === 'new' || input.policyMatchStatus === 'unmatched') {
+    if (!input.externalPolicyNumber?.trim()) return { ok: false, reason: 'Sem número de apólice.' }
+    if (!input.startDate || !input.endDate) return { ok: false, reason: 'O ficheiro não traz as datas do período — criar a apólice manualmente.' }
+    policy = { action: 'create_policy' }
+  } else {
+    return { ok: false, reason: 'Apólice com correspondência incerta — rever.' }
+  }
+
+  return {
+    ok: true,
+    customerApplyAction: customer.action,
+    policyApplyAction: policy.action,
+    selectedIndividualClientId: customer.individual,
+    selectedCompanyId: customer.company,
+    selectedPolicyId: policy.policy,
+  }
+}

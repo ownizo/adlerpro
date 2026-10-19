@@ -119,9 +119,11 @@ test('DEFENSIVE: saveApplyAction never sets or references decisionStatus/decisio
 // ── Accept/Reject remain single-click (scoped fix — Ignore only) ────
 
 test('scope check: the fix is scoped to Ignore — Accept decision is unchanged (still a direct, single-click action, per the review\'s own instruction not to redesign)', () => {
-  const acceptIdx = routeSrc.indexOf('adminAcceptCarrierImportDecision({ data:')
+  // Accept is now one step (accept + suggested apply action) — still a
+  // direct click on the record panel, never behind a confirm()
+  const acceptIdx = routeSrc.indexOf('adminAcceptSuggestedCarrierRecords({ data: { runId: record.syncRunId')
   assert.ok(acceptIdx !== -1)
-  const onClickIdx = routeSrc.lastIndexOf('onClick={() =>', acceptIdx)
+  const onClickIdx = routeSrc.lastIndexOf('onClick={async () =>', acceptIdx)
   const buttonSlice = routeSrc.slice(onClickIdx, acceptIdx + 40)
   assert.doesNotMatch(buttonSlice, /confirm\(/)
 })

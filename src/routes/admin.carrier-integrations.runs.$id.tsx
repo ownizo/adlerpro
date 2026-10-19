@@ -6,7 +6,6 @@ import {
   adminGetCarrierSyncRun,
   adminListCarrierImportRecords,
   adminGetCarrierImportRecordReview,
-  adminAcceptCarrierImportDecision,
   adminRejectCarrierImportDecision,
   adminIgnoreCarrierImportDecision,
   adminLinkCarrierClientIdentity,
@@ -14,6 +13,7 @@ import {
   adminCancelCarrierSyncRun,
   adminSetCarrierImportRecordApplyActions,
   adminApplyCarrierSyncRun,
+  adminAcceptSuggestedCarrierRecords,
   adminListPoliciesForOwner,
   type AdminApplyCarrierSyncRunResult,
 } from '@/lib/server-fns'
@@ -113,6 +113,12 @@ function recordToApplyActionRowState(record: CarrierImportRecord): ApplyActionRo
   }
 }
 
+function importedCustomer(record: CarrierImportRecord): { name?: string; taxId?: string } {
+  const mapped = mapPortfolioRows(record.provider as CarrierProviderId, [record.rawPayload as Record<string, unknown>])
+  const row = mapped.recognized ? mapped.rows[0] : undefined
+  return { name: row?.customerName, taxId: row?.taxIdRaw }
+}
+
 function MatchChip({ status }: { status: string }) {
   return <span className={`admin-chip ${MATCH_STATUS_CHIP_CLASS[status] ?? 'admin-chip--neutral'}`}>{status}</span>
 }
@@ -139,6 +145,8 @@ function CarrierRunDetailPage() {
   const [applying, setApplying] = useState(false)
   const [applyResult, setApplyResult] = useState<AdminApplyCarrierSyncRunResult | null>(null)
   const [applyError, setApplyError] = useState<string | null>(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const [bulkResult, setBulkResult] = useState<{ prepared: number; applied?: number; failed?: number; skipped: Array<{ policyNumber: string; reason: string }> } | null>(null)
 
   const reload = () => {
     setLoading(true)
@@ -171,8 +179,37 @@ function CarrierRunDetailPage() {
 
   const readiness = computeRunApplyReadiness(records.map(recordToApplyActionRowState))
   const runApplyStatus = run?.applyStatus ?? 'not_applied'
-  const alreadyFullyApplied = runApplyStatus === 'applied'
+  // linhas ainda por decidir, ou aceites e ainda não aplicadas
+  const openRecords = records.filter((r) => r.applyStatus !== 'applied' && (r.decisionStatus === 'pending' || r.decisionStatus === 'accepted'))
+  const pendingRecords = records.filter((r) => r.decisionStatus === 'pending' && r.applyStatus !== 'applied')
+  const alreadyFullyApplied = runApplyStatus === 'applied' && openRecords.length === 0
   const hasRetryableFailures = runApplyStatus === 'partially_failed' || records.some((record) => record.applyStatus === 'failed')
+
+  /** Um só passo: aceita as linhas inequívocas com a ação sugerida e, se
+   * `andApply`, aplica-as logo ao CRM. */
+  async function acceptSuggestions(andApply: boolean) {
+    if (andApply && !confirm(`Aceitar e aplicar ao CRM as ${pendingRecords.length} linha(s) por decidir?\n\nClientes e apólices novos são criados; os que já existem são ligados. Linhas com dúvidas ficam para rever.`)) return
+    setBulkBusy(true)
+    setApplyError(null)
+    setBulkResult(null)
+    try {
+      const prep = await adminAcceptSuggestedCarrierRecords({ data: { runId: id } })
+      let applied: number | undefined
+      let failed: number | undefined
+      if (andApply && prep.prepared > 0) {
+        const result = await adminApplyCarrierSyncRun({ data: id })
+        setApplyResult(result)
+        applied = result.applied
+        failed = result.failed
+      }
+      setBulkResult({ prepared: prep.prepared, applied, failed, skipped: prep.skipped })
+      reload()
+    } catch (err) {
+      setApplyError(err instanceof Error ? err.message : 'Não foi possível aceitar as sugestões')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
 
   async function confirmApply() {
     setApplying(true)
@@ -262,6 +299,39 @@ function CarrierRunDetailPage() {
               <KpiTile label="Errors" value={run.recordsError} />
             </div>
 
+            {(pendingRecords.length > 0 || bulkResult) && (
+              <div className="admin-panel" style={{ marginBottom: '1rem', padding: '1rem' }}>
+                <h3 className="admin-panel-title" style={{ marginBottom: '0.35rem' }}>Importar num só passo</h3>
+                {pendingRecords.length > 0 && (
+                  <p className="text-sm text-navy-600">
+                    {pendingRecords.length} linha(s) por decidir. As linhas novas criam o cliente e a apólice; as que já existem no CRM são ligadas. As que tiverem dúvidas ficam para rever com "Review".
+                  </p>
+                )}
+                {bulkResult && (
+                  <div className="text-sm" style={{ marginTop: '0.5rem' }}>
+                    <p className="text-navy-600">
+                      {bulkResult.prepared} linha(s) aceites{bulkResult.applied !== undefined ? ` · ${bulkResult.applied} aplicadas ao CRM` : ''}{bulkResult.failed ? ` · ${bulkResult.failed} com erro` : ''}{bulkResult.skipped.length ? ` · ${bulkResult.skipped.length} para rever` : ''}.
+                    </p>
+                    {bulkResult.skipped.length > 0 && (
+                      <ul style={{ marginLeft: '1rem', listStyle: 'disc', marginTop: '0.3rem' }} className="text-navy-500">
+                        {bulkResult.skipped.map((sk) => <li key={sk.policyNumber}>{sk.policyNumber}: {sk.reason}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                {pendingRecords.length > 0 && (
+                  <div className="flex flex-wrap gap-2" style={{ marginTop: '0.75rem' }}>
+                    <button type="button" className="admin-btn admin-btn-primary admin-btn--sm" disabled={bulkBusy} onClick={() => acceptSuggestions(true)}>
+                      {bulkBusy ? 'A processar…' : `Aceitar e aplicar (${pendingRecords.length})`}
+                    </button>
+                    <button type="button" className="admin-btn admin-btn-secondary admin-btn--sm" disabled={bulkBusy} onClick={() => acceptSuggestions(false)}>
+                      Só aceitar (aplicar depois)
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* CRM3 Block 4 — Confirm & Apply. Never mutates on its own:
                 the button only opens a confirmation modal, and applying
                 is entirely blocked while any accepted record still lacks
@@ -347,7 +417,7 @@ function CarrierRunDetailPage() {
                       {records.map((record) => (
                         <tr key={record.id}>
                           <td>{record.externalPolicyNumber ?? record.externalPolicyId ?? '—'}</td>
-                          <td>{record.externalClientId ?? '—'}</td>
+                          <td>{importedCustomer(record).name ?? record.externalClientId ?? '—'}</td>
                           <td><MatchChip status={record.customerMatchStatus} /></td>
                           <td><MatchChip status={record.policyMatchStatus} /></td>
                           <td>
@@ -700,8 +770,8 @@ function ImportRecordReviewPanel({
             <div><span className="text-navy-400">External client id: </span>{record.externalClientId ?? '—'}</div>
             <div><span className="text-navy-400">External policy id: </span>{record.externalPolicyId ?? '—'}</div>
             <div><span className="text-navy-400">External policy number: </span>{record.externalPolicyNumber ?? '—'}</div>
-            <div><span className="text-navy-400">Imported tomador: </span>{String(record.rawPayload.tomador ?? '—')}</div>
-            <div><span className="text-navy-400">Imported NIF: </span>{String(record.rawPayload.nif ?? '—')}</div>
+            <div><span className="text-navy-400">Imported tomador: </span>{parsedRow?.customerName ?? String(record.rawPayload.tomador ?? '—')}</div>
+            <div><span className="text-navy-400">Imported NIF: </span>{parsedRow?.taxIdRaw ?? String(record.rawPayload.nif ?? '—')}</div>
           </div>
         </section>
 
@@ -959,9 +1029,26 @@ function ImportRecordReviewPanel({
             type="button"
             disabled={busy}
             className="admin-btn admin-btn-primary admin-btn--sm"
-            onClick={() => run(() => adminAcceptCarrierImportDecision({ data: { recordId: record.id, decisionNote: note || undefined } }))}
+            onClick={async () => {
+              // aceitar + gravar a ação sugerida num só clique; se não houver
+              // sugestão segura, fica aceite e o painel mostra as opções
+              setBusy(true)
+              setError(null)
+              try {
+                const r = await adminAcceptSuggestedCarrierRecords({ data: { runId: record.syncRunId, recordId: record.id, decisionNote: note || undefined } })
+                if (r.prepared > 0) onChanged()
+                else {
+                  setError(r.skipped[0]?.reason ? `Aceite. Escolha a ação: ${r.skipped[0].reason}` : 'Aceite. Escolha a ação abaixo.')
+                  onApplyActionsChanged()
+                }
+              } catch (err) {
+                setError(err instanceof Error ? err.message : 'Something went wrong')
+              } finally {
+                setBusy(false)
+              }
+            }}
           >
-            Accept decision
+            {record.decisionStatus === 'accepted' ? 'Accept decision' : 'Aceitar'}
           </button>
           <button
             type="button"
