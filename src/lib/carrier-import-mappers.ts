@@ -293,6 +293,108 @@ export const hiscoxMapper: ProviderMapper = (normalizedRows) => {
   return { recognized: true, rows }
 }
 
+// ── Innovarisk — "Policy List" (portal de mediador) ─────────────────────
+//
+// Formato confirmado contra o export real (outubro 2026): uma folha "Policy
+// List", linha 1 vazia (saltada por carrier-excel-workbook.ts), cabeçalhos
+// na linha 2 — Nº da Apólice | NIF | Tomador | Morada | AddressLine1-4 |
+// Postcode | Country | Frequência | Forma de Pagamento | Estado | Produto |
+// Moeda | Prémio Anual | Data de Inicio | Data da Renovação | Capital
+// Seguro | LastEvent | Branch | CodigoProduto | Razão | ModifiedDate.
+//
+// Período: "Data de Inicio" é o início do período atual e "Data da
+// Renovação" o aniversário seguinte (06/10/2026 → 06/10/2027). O fim do
+// período (endDate) é o dia anterior à renovação — a mesma convenção do
+// export Hiscox (10/10/2026 → 09/10/2027). A data da renovação original
+// fica sempre em sanitizedRaw. Capital seguro, forma de pagamento e moeda
+// ficam só em sanitizedRaw (não há campo próprio).
+
+const INNOVARISK_FIELD_MAP: Partial<Record<string, keyof ParsedImportRow>> = {
+  'nº_da_apolice': 'externalPolicyNumber',
+  nif: 'taxIdRaw',
+  tomador: 'customerName',
+  postcode: 'postalCode',
+  country: 'country',
+  frequencia: 'paymentFrequency',
+  produto: 'productDescription',
+  codigoproduto: 'carrierPlanId',
+  premio_anual: 'premium',
+  data_de_inicio: 'startDate',
+}
+
+const INNOVARISK_CORE_REQUIRED_KEYS = ['nº_da_apolice', 'tomador', 'nif']
+const INNOVARISK_STRUCTURAL_KEYS = ['premio_anual', 'data_de_inicio', 'data_da_renovacao', 'codigoproduto']
+
+function textOrUndefined(value: unknown): string | undefined {
+  if (value === null || value === undefined) return undefined
+  const text = String(value).trim()
+  return text === '' ? undefined : text
+}
+
+function normalizeInnovariskStatus(value: unknown): string | undefined {
+  const raw = textOrUndefined(value)
+  if (!raw) return undefined
+  const key = raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  if (key === 'active' || key === 'ativa' || key === 'activa' || key === 'em vigor') return 'active'
+  if (key === 'cancelled' || key === 'canceled' || key === 'lapsed' || key === 'anulada' || key === 'cancelada') return 'cancelled'
+  return raw
+}
+
+function dayBefore(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
+export const innovariskMapper: ProviderMapper = (normalizedRows) => {
+  const unrecognized = { recognized: false, rows: [], error: 'File format not yet recognised for Innovarisk' }
+  if (normalizedRows.length === 0) return unrecognized
+  const keys = new Set(normalizedRows.flatMap((r) => Object.keys(r)))
+  const hasCore = INNOVARISK_CORE_REQUIRED_KEYS.every((key) => keys.has(key))
+  const hasStructural = INNOVARISK_STRUCTURAL_KEYS.some((key) => keys.has(key))
+  if (!hasCore || !hasStructural) return unrecognized
+
+  const rows: ParsedImportRow[] = normalizedRows
+    // linhas totalmente vazias no fim da folha
+    .filter((rawRow) => textOrUndefined(rawRow['nº_da_apolice']) !== undefined)
+    .map((rawRow) => {
+      const parsed: ParsedImportRow = { sanitizedRaw: {} }
+      for (const [key, value] of Object.entries(rawRow)) {
+        const targetField = INNOVARISK_FIELD_MAP[key]
+        if (!targetField) continue
+        if (DATE_FIELDS.has(targetField)) {
+          const parsedDate = parseHiscoxDate(value)
+          if (parsedDate !== undefined) (parsed as any)[targetField] = parsedDate
+        } else if (AMOUNT_FIELDS.has(targetField)) {
+          const parsedAmount = parseAmountSafely(value)
+          if (parsedAmount !== undefined) (parsed as any)[targetField] = parsedAmount
+        } else if (STRING_FIELDS.has(targetField)) {
+          const text = textOrUndefined(value)
+          if (text !== undefined) (parsed as any)[targetField] = text
+        }
+      }
+      if (parsed.startDate) parsed.effectiveDate = parsed.startDate
+      const renewal = parseHiscoxDate(rawRow['data_da_renovacao'])
+      if (renewal && (!parsed.startDate || renewal > parsed.startDate)) parsed.endDate = dayBefore(renewal)
+
+      const street = [rawRow['addressline1'], rawRow['addressline2']].map(textOrUndefined).filter(Boolean).join(', ')
+      if (street) parsed.address = street
+      else if (textOrUndefined(rawRow['morada'])) parsed.address = textOrUndefined(rawRow['morada'])
+      const city = textOrUndefined(rawRow['addressline4']) ?? textOrUndefined(rawRow['addressline3'])
+      if (city) parsed.city = city
+
+      const status = normalizeInnovariskStatus(rawRow['estado'])
+      if (status !== undefined) parsed.carrierStatus = status
+
+      const jsonSafeRow: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(rawRow)) jsonSafeRow[key] = toJsonSafeValue(value)
+      parsed.sanitizedRaw = sanitizeRawRowForStaging(jsonSafeRow)
+      return parsed
+    })
+
+  return { recognized: true, rows }
+}
+
 // ── Allianz — POLRES, primeiro mapper real (CRM3 Block 3) ───────────────
 //
 // Este mapper é DELIBERADAMENTE parcial: só mapeia campos cujo significado
@@ -393,6 +495,7 @@ export const PROVIDER_MAPPERS: Record<CarrierProviderId, ProviderMapper> = {
   allianz: allianzMapper,
   zurich: zurichMapper,
   hiscox: hiscoxMapper,
+  innovarisk: innovariskMapper,
 }
 
 /** Aplica normalizeHeaderName às chaves de cada linha e despacha para o

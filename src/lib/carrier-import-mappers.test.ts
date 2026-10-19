@@ -478,3 +478,22 @@ test('HISCOX exportPortfolio (Oct 2026): tomador under a duplicated "Área de Ne
   assert.equal(r.carrierStatus, 'active')
   assert.equal(result.rows[0]!.customerName, undefined)
 })
+
+test('INNOVARISK Policy List: policy, client, address, period (end = day before renewal), premium, status', () => {
+  const row = { 'Nº da Apólice': 2563658, 'NIF': '320814360', 'Tomador': 'Jeffrey Example', 'Morada': 'Lote 54, Luz, 8600-146 Lagos, Portugal', 'AddressLine1': 'Aldeamento X, Lote 54', 'AddressLine2': '', 'AddressLine3': 'Luz', 'AddressLine4': 'Lagos', 'Postcode': '8600-146', 'Country': 'PRT', 'Frequência': 'Anual', 'Forma de Pagamento': 'Aviso de Recibo', 'Estado': 'Active', 'Produto': 'Home Insurance Plus', 'Moeda': 'EUR', 'Prémio Anual': 2206.85, 'Data de Inicio': new Date(Date.UTC(2026, 9, 6)), 'Data da Renovação': new Date(Date.UTC(2027, 9, 6)), 'Capital Seguro': 1415000, 'CodigoProduto': 'EDR' }
+  const result = mapPortfolioRows('innovarisk', [normalizeRowKeys(row)])
+  assert.equal(result.recognized, true)
+  const r = result.rows[0]!
+  assert.equal(r.externalPolicyNumber, '2563658')
+  assert.equal(r.taxIdRaw, '320814360')
+  assert.equal(r.customerName, 'Jeffrey Example')
+  assert.equal(r.address, 'Aldeamento X, Lote 54')
+  assert.equal(r.city, 'Lagos')
+  assert.equal(r.postalCode, '8600-146')
+  assert.equal(r.startDate, '2026-10-06')
+  assert.equal(r.endDate, '2027-10-05')
+  assert.equal(r.premium, 2206.85)
+  assert.equal(r.carrierStatus, 'active')
+  assert.equal(r.carrierPlanId, 'EDR')
+  assert.equal(mapPortfolioRows('innovarisk', [{ anything: 'x' }]).recognized, false)
+})
