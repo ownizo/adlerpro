@@ -9,7 +9,7 @@
  * usado no server function antes de qualquer processamento.
  */
 
-export const CARRIER_PROVIDERS = ['mgen', 'allianz', 'zurich', 'hiscox'] as const
+export const CARRIER_PROVIDERS = ['mgen', 'allianz', 'zurich', 'hiscox', 'innovarisk'] as const
 
 export type CarrierProviderId = (typeof CARRIER_PROVIDERS)[number]
 
@@ -18,6 +18,7 @@ export const CARRIER_PROVIDER_LABELS: Record<CarrierProviderId, string> = {
   allianz: 'Allianz',
   zurich: 'Zurich',
   hiscox: 'Hiscox',
+  innovarisk: 'Innovarisk',
 }
 
 /** Validação server-side do valor de provider vindo do browser — nunca
