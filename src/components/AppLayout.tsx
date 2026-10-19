@@ -217,12 +217,16 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     i18n.changeLanguage(isAdminRoute ? 'en' : lang)
   }, [isAdminRoute, lang, i18n])
 
-  // Phones: tables marked `ar-stack` render as one card per row (CSS in
+  // Phones: tables (marked `ar-stack`, automatically for the work area) render as one card per row (CSS in
   // styles.css). Each cell needs its column name to show as a label, so copy
   // the header text into data-label whenever rows appear or change.
   useEffect(() => {
     if (!isAdminRoute || typeof window === 'undefined') return
     const label = () => {
+      // every table in the work area with a header stacks on phones (opt out with .no-stack)
+      document.querySelectorAll<HTMLTableElement>('.admin-backoffice-main table:not(.no-stack):not(.ar-stack)').forEach((t) => {
+        if (t.tHead && t.tHead.rows.length) t.classList.add('ar-stack')
+      })
       document.querySelectorAll<HTMLTableElement>('table.ar-stack').forEach((table) => {
         const heads = Array.from(table.querySelectorAll('thead th')).map((th) => (th.textContent || '').trim())
         table.querySelectorAll('tbody tr').forEach((tr) => {
