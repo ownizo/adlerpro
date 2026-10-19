@@ -2322,3 +2322,6 @@ button.admin-user-avatar:focus-visible {
 .aiv-answer + .aiv-answer { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--admin-border); }
 .aiv-answer-head { font-size: 13px; color: var(--admin-ink); }
 .aiv-answer-text { margin-top: 0.4rem; font-size: 13px; line-height: 1.5; color: var(--admin-muted); white-space: pre-wrap; max-height: 260px; overflow-y: auto; }
+.aiv-engines { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.aiv-engine { font-size: 12px; font-weight: 600; padding: 0.3rem 0.7rem; border-radius: 999px; background: #F6EDEE; color: var(--admin-red); }
+.aiv-engine.is-on { background: #E3F4EA; color: #146C3A; }

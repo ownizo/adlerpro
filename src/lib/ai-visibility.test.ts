@@ -44,3 +44,40 @@ test('summary by engine, prompt, competitor and week', () => {
   assert.equal(s.competitors[0].name, 'Adler & Rochefort')
   assert.deepEqual(s.weeks.map((w) => w.week), ['2026-10-12', '2026-10-19'])
 })
+
+test('extracts answers from every provider format', async () => {
+  const { extractAnswer, configuredEngines } = await import('./ai-visibility-engines.ts')
+  // Claude
+  const claude = extractAnswer({ content: [
+    { type: 'server_tool_use', input: { query: 'x' } },
+    { type: 'web_search_tool_result', content: [{ type: 'web_search_result', url: 'https://www.howdengroup.com/pt', title: 'Howden' }] },
+    { type: 'text', text: 'Adler & Rochefort is ', citations: [{ type: 'web_search_result_location', url: 'https://adlerrochefort.com/en/', cited_text: 'x' }] },
+    { type: 'text', text: 'a good option.' },
+  ] })
+  assert.equal(claude.text, 'Adler & Rochefort is a good option.')
+  assert.deepEqual(claude.citations, ['https://adlerrochefort.com/en/'])
+  assert.ok(claude.sources.includes('https://www.howdengroup.com/pt'))
+  // OpenAI Responses
+  const openai = extractAnswer({ output: [
+    { type: 'web_search_call', action: { type: 'search', sources: [{ type: 'url', url: 'https://adlerrochefort.com/de/' }] } },
+    { type: 'message', role: 'assistant', content: [{ type: 'output_text', text: 'Try Howden.', annotations: [{ type: 'url_citation', url: 'https://howdengroup.com', title: 'Howden' }] }] },
+  ] })
+  assert.equal(openai.text, 'Try Howden.')
+  assert.deepEqual(openai.citations, ['https://howdengroup.com'])
+  assert.ok(openai.sources.includes('https://adlerrochefort.com/de/'))
+  // Gemini Interactions + generateContent
+  const gi = extractAnswer({ steps: [{ type: 'thought', summary: [{ type: 'text', text: 'thinking' }] }, { type: 'model_output', content: [{ type: 'text', text: 'Answer', annotations: [{ type: 'url_citation', url: 'https://adlerrochefort.com/x', title: 'A&R' }] }] }] })
+  assert.equal(gi.text, 'Answer')
+  assert.deepEqual(gi.citations, ['https://adlerrochefort.com/x'])
+  const gc = extractAnswer({ candidates: [{ content: { parts: [{ text: 'Hello' }] }, groundingMetadata: { groundingChunks: [{ web: { uri: 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc', title: 'adlerrochefort.com' } }] } }] })
+  assert.equal(gc.text, 'Hello')
+  assert.ok(gc.citations.includes('https://adlerrochefort.com/'))
+  // Perplexity Agent + legacy chat
+  const pa = extractAnswer({ output: [{ type: 'search_results', results: [{ url: 'https://adlerrochefort.com/', title: 'A&R' }] }, { type: 'message', content: [{ type: 'output_text', text: 'Use a broker.' }] }] })
+  assert.equal(pa.text, 'Use a broker.')
+  assert.ok(pa.sources.includes('https://adlerrochefort.com/'))
+  const pc = extractAnswer({ choices: [{ message: { role: 'assistant', content: 'Sonar answer' } }], citations: ['https://adlerrochefort.com/en/'] })
+  assert.equal(pc.text, 'Sonar answer')
+  assert.deepEqual(pc.citations, ['https://adlerrochefort.com/en/'])
+  assert.deepEqual(configuredEngines({ ANTHROPIC_API_KEY: 'x', PERPLEXITY_API_KEY: 'y' }), ['CLAUDE', 'PERPLEXITY'])
+})
