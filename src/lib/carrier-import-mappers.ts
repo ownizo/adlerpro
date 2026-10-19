@@ -186,9 +186,20 @@ const HISCOX_FIELD_MAP: Partial<Record<string, keyof ParsedImportRow>> = {
   'nipc/nif': 'taxIdRaw',
   data_de_efeito: 'effectiveDate',
   premio_total: 'premium',
+  // Export "exportPortfolio" (outubro 2026, 17 colunas): o portal grava o
+  // cabeçalho da coluna do tomador como um SEGUNDO "Área de Negócio" — a
+  // SheetJS chama-lhe "Área de Negócio_1". Os valores são nomes de
+  // tomadores, por isso mapeia-se como customerName. Traz também o e-mail
+  // do tomador, a data de término e o fracionamento.
+  area_de_negocio_1: 'customerName',
+  'e-mail_do_tomador': 'email',
+  data_de_termino: 'endDate',
+  fracionamento_do_pagamento: 'paymentFrequency',
 }
 
-const HISCOX_CORE_REQUIRED_KEYS = ['referencia', 'tomador', 'nipc/nif']
+// Basta um destes cabeçalhos para identificar a coluna do tomador.
+const HISCOX_CUSTOMER_KEYS = ['tomador', 'area_de_negocio_1']
+const HISCOX_CORE_REQUIRED_KEYS = ['referencia', 'nipc/nif']
 const HISCOX_STRUCTURAL_KEYS = ['area_de_negocio', 'data_de_efeito', 'premio_total']
 
 // O MyHiscox usa "-" como marcador de célula vazia (ex.: tomador/NIF de
@@ -234,7 +245,11 @@ export const hiscoxMapper: ProviderMapper = (normalizedRows) => {
   }
 
   const firstRowKeys = new Set(Object.keys(normalizedRows[0]!))
-  const hasCore = HISCOX_CORE_REQUIRED_KEYS.every((key) => firstRowKeys.has(key))
+  // As chaves vêm de todas as linhas: sheet_to_json omite células vazias se
+  // a primeira linha não tiver tomador.
+  const allKeys = new Set(normalizedRows.flatMap((r) => Object.keys(r)))
+  for (const k of allKeys) firstRowKeys.add(k)
+  const hasCore = HISCOX_CORE_REQUIRED_KEYS.every((key) => firstRowKeys.has(key)) && HISCOX_CUSTOMER_KEYS.some((key) => firstRowKeys.has(key))
   const hasStructural = HISCOX_STRUCTURAL_KEYS.some((key) => firstRowKeys.has(key))
   if (!hasCore || !hasStructural) {
     return { recognized: false, rows: [], error: 'File format not yet recognised for Hiscox' }
@@ -258,6 +273,12 @@ export const hiscoxMapper: ProviderMapper = (normalizedRows) => {
         if (text !== '') (parsed as any)[targetField] = text
       }
     }
+
+    // Com "Data de Término" o export traz o período atual completo
+    // (efeito → término, um ano), por isso a data de efeito é também o
+    // início do período. Sem término (export antigo) mantém-se só
+    // effectiveDate, como antes.
+    if (parsed.endDate && parsed.effectiveDate && parsed.effectiveDate < parsed.endDate) parsed.startDate = parsed.effectiveDate
 
     const status = normalizeHiscoxStatus(rawRow['estado'])
     if (status !== undefined) parsed.carrierStatus = status

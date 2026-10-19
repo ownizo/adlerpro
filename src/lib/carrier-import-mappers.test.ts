@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { mapPortfolioRows } from './carrier-import-mappers.ts'
+import { normalizeRowKeys } from './carrier-import-parsing.ts'
 
 function mgenRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -459,4 +460,21 @@ test('HISCOX MAPPING: an MGEN- or Allianz-shaped row is never accepted as Hiscox
 test('HISCOX MAPPING: a MyHiscox row is never accepted for another provider', () => {
   assert.equal(mapPortfolioRows('mgen', [hiscoxRow()]).recognized, false)
   assert.equal(mapPortfolioRows('allianz', [hiscoxRow()]).recognized, false)
+})
+
+test('HISCOX exportPortfolio (Oct 2026): tomador under a duplicated "Área de Negócio" header, period dates, e-mail', () => {
+  const header = { 'Referência': '1047983', 'Mediador de Seguros': 'OWNIZO UNIPESSOAL LDA (Adler & Rochefort)', 'Área de Negócio': 'Arte e clientes privados', 'Produto': 'Holiday Homes', 'Área de Negócio_1': 'Hein Example', 'E-mail do tomador': 'hein@example.com', 'NIPC/NIF': '307499995', 'Data de Efeito': '10/10/2026', 'Data de Término': '09/10/2027', 'Data de cancelamento': '-', 'Prémio total': '445,96', 'Commissão': '98,75', 'Fracionamento do Pagamento': 'Annual', 'Estado': 'Ativa' }
+  const blank = { 'Referência': '151084', 'Área de Negócio': 'Arte e clientes privados', 'Produto': 'Holiday Homes', 'Data de Efeito': '18/09/2026', 'Data de Término': '17/09/2027', 'Prémio total': '395,16', 'Estado': 'Ativa' }
+  const result = mapPortfolioRows('hiscox', [blank, header].map(normalizeRowKeys))
+  assert.equal(result.recognized, true)
+  const r = result.rows[1]!
+  assert.equal(r.customerName, 'Hein Example')
+  assert.equal(r.email, 'hein@example.com')
+  assert.equal(r.carrierSegment, 'Arte e clientes privados')
+  assert.equal(r.startDate, '2026-10-10')
+  assert.equal(r.endDate, '2027-10-09')
+  assert.equal(r.premium, 445.96)
+  assert.equal(r.paymentFrequency, 'Annual')
+  assert.equal(r.carrierStatus, 'active')
+  assert.equal(result.rows[0]!.customerName, undefined)
 })
