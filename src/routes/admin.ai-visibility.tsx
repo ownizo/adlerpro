@@ -115,6 +115,7 @@ function AiVisibilityPage() {
                   <div className="flex items-baseline justify-between text-sm"><strong>{ENGINE_LABEL[e.engine]}</strong><span className="tabular-nums">{e.visibility}% · {e.mentioned}/{e.runs}{e.avgPosition ? ` · posição ${e.avgPosition}` : ''}</span></div>
                   <div className="aiv-bar"><span style={{ width: `${Math.max(2, e.visibility)}%` }} /></div>
                   <p className="text-xs text-[var(--admin-muted)] mt-1">Último: {fmtDay(e.lastDay)} · {e.cited} com citação do site</p>
+                  {e.errors > 0 && <p className="aiv-engine-error">{e.errors} pergunta(s) sem resposta no último teste: {e.lastError}</p>}
                 </li>)}
               </ul>
             )}

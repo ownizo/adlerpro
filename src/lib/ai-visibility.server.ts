@@ -5,7 +5,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { analyseAnswer, summariseVisibility, ENGINE_LABEL, type Engine, type PromptRow, type ResultRow, type VisibilitySummary } from './ai-visibility.ts'
-import { askEngine } from './ai-visibility-engines.ts'
+import { askEngine, ENGINE_CONCURRENCY } from './ai-visibility-engines.ts'
 
 let client: SupabaseClient | null = null
 function sb(): SupabaseClient {
@@ -48,12 +48,14 @@ export async function runEngineForPrompt(engine: Engine, p: { id: string; prompt
   }
 }
 
-/** Runs every active prompt on one engine, a few at a time. */
+/** Runs every active prompt on one engine, a few at a time. Prompts already answered successfully today are skipped. */
 export async function runActivePrompts(engine: Engine): Promise<{ total: number; ok: number; mentioned: number }> {
   const { data, error } = await sb().from('ai_vis_prompts').select('id, prompt, market').eq('active', true).order('created_at')
   if (error) throw new Error(error.message)
-  const prompts = (data ?? []) as Array<{ id: string; prompt: string; market: string | null }>
   const day = lisbonDay()
+  const { data: doneRows } = await sb().from('ai_vis_results').select('prompt_id').eq('engine', engine).eq('run_day', day).is('error', null)
+  const done = new Set((doneRows ?? []).map((r: { prompt_id: string }) => r.prompt_id))
+  const prompts = ((data ?? []) as Array<{ id: string; prompt: string; market: string | null }>).filter((p) => !done.has(p.id))
   let ok = 0
   let mentioned = 0
   const queue = [...prompts]
@@ -64,7 +66,7 @@ export async function runActivePrompts(engine: Engine): Promise<{ total: number;
       if (r.mentioned) mentioned++
     }
   }
-  await Promise.all([worker(), worker(), worker()])
+  await Promise.all(Array.from({ length: ENGINE_CONCURRENCY[engine] ?? 2 }, () => worker()))
   await sb().from('crm_activity').insert({ actor: 'system', action: 'ai_visibility_run', entity: 'ai_vis', summary: `Visibilidade em IA (${ENGINE_LABEL[engine]}): ${mentioned}/${prompts.length} respostas mencionam a Adler & Rochefort${ok < prompts.length ? ` · ${prompts.length - ok} com erro` : ''}` })
   return { total: prompts.length, ok, mentioned }
 }
