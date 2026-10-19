@@ -1,11 +1,11 @@
-// Server side of "Visibilidade em IA": runs the tracked prompts on Claude
-// (with web search, like a person asking on claude.ai), stores the analysis,
-// and aggregates results for the backoffice page. ChatGPT / Gemini /
-// Perplexity results are imported from HubSpot AEO through the CRM connector
-// (recordExternalResult).
+// Server side of "Visibilidade em IA": runs the tracked prompts directly on
+// Claude, ChatGPT, Gemini and Perplexity (their own APIs, web search on —
+// see ai-visibility-engines.ts), stores the analysis and aggregates results
+// for the backoffice page. No third-party AEO tool involved.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { analyseAnswer, summariseVisibility, type Engine, type PromptRow, type ResultRow, type VisibilitySummary } from './ai-visibility.ts'
+import { analyseAnswer, summariseVisibility, ENGINE_LABEL, type Engine, type PromptRow, type ResultRow, type VisibilitySummary } from './ai-visibility.ts'
+import { askEngine } from './ai-visibility-engines.ts'
 
 let client: SupabaseClient | null = null
 function sb(): SupabaseClient {
@@ -23,83 +23,33 @@ export async function internalSecret(): Promise<string> {
   return Buffer.from(digest).toString('hex')
 }
 
-const MODEL = () => process.env.AI_VISIBILITY_MODEL || 'claude-sonnet-5-5'
-const TOOL_VERSIONS = ['web_search_20260318', 'web_search_20250305']
+export { configuredEngines } from './ai-visibility-engines.ts'
 
 function lisbonDay(d = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon' }).format(d)
 }
 
-function location(market: string | null) {
-  if (market === 'ES') return { type: 'approximate', country: 'ES', city: 'Madrid', timezone: 'Europe/Madrid' }
-  return { type: 'approximate', country: 'PT', city: 'Lisbon', timezone: 'Europe/Lisbon' }
-}
-
-type Block = { type: string; text?: string; citations?: Array<{ url?: string }>; content?: Array<{ url?: string }> | { error_code?: string } }
-
-async function askClaude(prompt: string, market: string | null): Promise<{ text: string; citations: string[]; sources: string[]; model: string }> {
-  const key = process.env.ANTHROPIC_API_KEY
-  if (!key) throw new Error('ANTHROPIC_API_KEY em falta')
-  let lastErr = ''
-  for (const toolType of TOOL_VERSIONS) {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 120_000)
-    try {
-      const res = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        signal: ctrl.signal,
-        headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: MODEL(),
-          max_tokens: 1600,
-          messages: [{ role: 'user', content: prompt }],
-          tools: [{ type: toolType, name: 'web_search', max_uses: 5, user_location: location(market) }],
-        }),
-      })
-      const body = await res.json() as { content?: Block[]; model?: string; error?: { message?: string } }
-      if (!res.ok) {
-        lastErr = body.error?.message ?? `HTTP ${res.status}`
-        if (res.status === 400 && /tool|web_search/i.test(lastErr)) continue // try the older tool version
-        throw new Error(lastErr)
-      }
-      let text = ''
-      const citations: string[] = []
-      const sources: string[] = []
-      for (const b of body.content ?? []) {
-        if (b.type === 'text' && b.text) {
-          text += b.text
-          for (const c of b.citations ?? []) if (c.url) citations.push(c.url)
-        } else if (b.type === 'web_search_tool_result' && Array.isArray(b.content)) {
-          for (const r of b.content) if (r.url) sources.push(r.url)
-        }
-      }
-      return { text, citations, sources, model: body.model ?? MODEL() }
-    } finally {
-      clearTimeout(timer)
-    }
-  }
-  throw new Error(lastErr || 'web search indisponível')
-}
-
-export async function runClaudeForPrompt(p: { id: string; prompt: string; market: string | null }, day = lisbonDay()) {
-  const base = { prompt_id: p.id, engine: 'CLAUDE' as Engine, run_day: day, run_at: new Date().toISOString(), source: 'native' }
+/** Ask one engine one prompt and store the analysed answer (one row per prompt × engine × day). */
+export async function runEngineForPrompt(engine: Engine, p: { id: string; prompt: string; market: string | null }, day = lisbonDay()) {
+  const base = { prompt_id: p.id, engine, run_day: day, run_at: new Date().toISOString(), source: 'native' }
   try {
-    const { text, citations, sources, model } = await askClaude(p.prompt, p.market)
+    const { text, citations, sources, model } = await askEngine(engine, p.prompt, p.market)
     const a = analyseAnswer(text, citations, sources)
-    await sb().from('ai_vis_results').upsert({
+    const { error } = await sb().from('ai_vis_results').upsert({
       ...base, model, error: null,
       mentioned: a.mentioned, cited: a.cited, in_sources: a.inSources, position: a.position,
       competitors: a.competitors, cited_urls: a.citedUrls, answer_excerpt: text.slice(0, 3000),
     }, { onConflict: 'prompt_id,engine,run_day' })
+    if (error) throw new Error(error.message)
     return { ok: true, mentioned: a.mentioned }
   } catch (err) {
-    await sb().from('ai_vis_results').upsert({ ...base, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) }, { onConflict: 'prompt_id,engine,run_day' })
-    return { ok: false }
+    await sb().from('ai_vis_results').upsert({ ...base, mentioned: false, cited: false, in_sources: false, position: null, competitors: [], cited_urls: [], answer_excerpt: null, error: (err instanceof Error ? err.message : String(err)).slice(0, 300) }, { onConflict: 'prompt_id,engine,run_day' })
+    return { ok: false, mentioned: false }
   }
 }
 
-/** Runs every active prompt on Claude, a few at a time. */
-export async function runActivePromptsOnClaude(): Promise<{ total: number; ok: number; mentioned: number }> {
+/** Runs every active prompt on one engine, a few at a time. */
+export async function runActivePrompts(engine: Engine): Promise<{ total: number; ok: number; mentioned: number }> {
   const { data, error } = await sb().from('ai_vis_prompts').select('id, prompt, market').eq('active', true).order('created_at')
   if (error) throw new Error(error.message)
   const prompts = (data ?? []) as Array<{ id: string; prompt: string; market: string | null }>
@@ -109,24 +59,42 @@ export async function runActivePromptsOnClaude(): Promise<{ total: number; ok: n
   const queue = [...prompts]
   const worker = async () => {
     for (let p = queue.shift(); p; p = queue.shift()) {
-      const r = await runClaudeForPrompt(p, day)
+      const r = await runEngineForPrompt(engine, p, day)
       if (r.ok) ok++
       if (r.mentioned) mentioned++
     }
   }
   await Promise.all([worker(), worker(), worker()])
-  await sb().from('crm_activity').insert({ actor: 'system', action: 'ai_visibility_run', entity: 'ai_vis', summary: `Teste de visibilidade no Claude: ${mentioned}/${prompts.length} respostas mencionam a Adler & Rochefort` })
+  await sb().from('crm_activity').insert({ actor: 'system', action: 'ai_visibility_run', entity: 'ai_vis', summary: `Visibilidade em IA (${ENGINE_LABEL[engine]}): ${mentioned}/${prompts.length} respostas mencionam a Adler & Rochefort${ok < prompts.length ? ` · ${prompts.length - ok} com erro` : ''}` })
   return { total: prompts.length, ok, mentioned }
 }
 
-export async function getVisibilitySummary(days: number): Promise<VisibilitySummary & { since: string }> {
+/** Starts background runs (one per engine, so each fits the 15-minute limit). */
+export async function startBackgroundRuns(opts: { engines?: Engine[]; promptId?: string } = {}) {
+  const { configuredEngines } = await import('./ai-visibility-engines.ts')
+  const engines = (opts.engines ?? configuredEngines()).filter((e) => configuredEngines().includes(e))
+  const base = process.env.URL || 'https://admin.adlerrochefort.com'
+  const secret = await internalSecret()
+  const started: Engine[] = []
+  await Promise.all(engines.map(async (engine) => {
+    const res = await fetch(`${base}/.netlify/functions/ai-visibility-run-background`, {
+      method: 'POST', headers: { 'x-internal-secret': secret, 'content-type': 'application/json' },
+      body: JSON.stringify({ engine, prompt_id: opts.promptId }),
+    }).catch(() => null)
+    if (res && (res.status === 202 || res.status === 200)) started.push(engine)
+  }))
+  return { started }
+}
+
+export async function getVisibilitySummary(days: number): Promise<VisibilitySummary & { since: string; configured: Engine[] }> {
   const since = lisbonDay(new Date(Date.now() - days * 86400000))
   const [{ data: prompts, error: e1 }, { data: results, error: e2 }] = await Promise.all([
     sb().from('ai_vis_prompts').select('id, prompt, language, market, topic, active, source').order('created_at'),
     sb().from('ai_vis_results').select('prompt_id, engine, run_day, source, mentioned, cited, in_sources, position, competitors, cited_urls, answer_excerpt, error').gte('run_day', since).limit(10000),
   ])
   if (e1 || e2) throw new Error('Não foi possível ler os testes de visibilidade.')
-  return { ...summariseVisibility((prompts ?? []) as PromptRow[], (results ?? []) as ResultRow[]), since }
+  const { configuredEngines } = await import('./ai-visibility-engines.ts')
+  return { ...summariseVisibility((prompts ?? []) as PromptRow[], (results ?? []) as ResultRow[]), since, configured: configuredEngines() }
 }
 
 export async function getPrompt(id: string) {

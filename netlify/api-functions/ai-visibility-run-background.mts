@@ -1,25 +1,30 @@
-// Background function (up to 15 min): runs every active "Visibilidade em IA"
-// prompt on Claude with web search. Started by the weekly schedule
-// (ai-visibility-weekly) or by the "Testar agora" button in the backoffice.
-// Internal only: requires the derived internal secret header.
+// Background function (up to 15 min): runs the "Visibilidade em IA" prompts
+// on one AI engine (Claude, ChatGPT, Gemini or Perplexity) via its own API.
+// Body: { engine, prompt_id? } — prompt_id runs just that prompt.
+// Started by the weekly schedule, the "Testar agora" button or when a prompt
+// is added. Internal only: requires the derived internal secret header.
 
-import { runActivePromptsOnClaude, runClaudeForPrompt, internalSecret, getPrompt } from '../../src/lib/ai-visibility.server.ts'
+import { runActivePrompts, runEngineForPrompt, internalSecret, getPrompt, configuredEngines } from '../../src/lib/ai-visibility.server.ts'
+import type { Engine } from '../../src/lib/ai-visibility.ts'
 
 export default async (req: Request) => {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || req.headers.get('x-internal-secret') !== (await internalSecret())) return new Response('unauthorized', { status: 401 })
-  try {
-    // {"prompt_id": "..."} runs just that prompt (used right after adding one)
-    let promptId: string | undefined
-    try { promptId = ((await req.json()) as { prompt_id?: string }).prompt_id } catch { /* no body */ }
-    if (promptId) {
-      const p = await getPrompt(promptId)
-      if (p) await runClaudeForPrompt(p)
-      return new Response(null, { status: 202 })
+  let body: { engine?: Engine; prompt_id?: string } = {}
+  try { body = (await req.json()) as typeof body } catch { /* no body */ }
+  const engines = body.engine ? [body.engine] : configuredEngines()
+  for (const engine of engines) {
+    if (!configuredEngines().includes(engine)) continue
+    try {
+      if (body.prompt_id) {
+        const p = await getPrompt(body.prompt_id)
+        if (p) await runEngineForPrompt(engine, p)
+      } else {
+        const r = await runActivePrompts(engine)
+        console.log(`[ai-visibility] ${engine}: ${r.ok}/${r.total} ok, ${r.mentioned} mention Adler & Rochefort`)
+      }
+    } catch (err) {
+      console.error(`[ai-visibility] ${engine} run failed`, err)
     }
-    const r = await runActivePromptsOnClaude()
-    console.log(`[ai-visibility] ${r.ok}/${r.total} ok, ${r.mentioned} mention Adler & Rochefort`)
-  } catch (err) {
-    console.error('[ai-visibility] run failed', err)
   }
   return new Response(null, { status: 202 })
 }

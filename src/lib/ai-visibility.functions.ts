@@ -1,6 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { requireRoleMiddleware } from '@/middleware/identity'
-import type { VisibilitySummary } from './ai-visibility'
+import type { Engine, VisibilitySummary } from './ai-visibility'
 
 const ALLOWED_DAYS = new Set([7, 30, 90])
 
@@ -13,7 +13,7 @@ export const fetchAiVisibility = createServerFn({ method: 'GET' })
   })
   .handler(async ({ data }) => {
     const { getVisibilitySummary } = await import('./ai-visibility.server')
-    return (await getVisibilitySummary(data.days)) as VisibilitySummary & { since: string }
+    return (await getVisibilitySummary(data.days)) as VisibilitySummary & { since: string; configured: Engine[] }
   })
 
 export const addAiPrompt = createServerFn({ method: 'POST' })
@@ -24,13 +24,10 @@ export const addAiPrompt = createServerFn({ method: 'POST' })
     return { prompt, market: d.market === 'ES' ? 'ES' : 'PT' }
   })
   .handler(async ({ data }) => {
-    const { addPrompt, internalSecret } = await import('./ai-visibility.server')
+    const { addPrompt, startBackgroundRuns } = await import('./ai-visibility.server')
     const p = await addPrompt(data)
-    // test it straight away on Claude, in the background (web search takes a while)
-    const base = process.env.URL || 'https://admin.adlerrochefort.com'
-    await fetch(`${base}/.netlify/functions/ai-visibility-run-background`, {
-      method: 'POST', headers: { 'x-internal-secret': await internalSecret(), 'content-type': 'application/json' }, body: JSON.stringify({ prompt_id: p.id }),
-    }).catch(() => undefined)
+    // test it straight away on every configured engine, in the background
+    await startBackgroundRuns({ promptId: p.id }).catch(() => undefined)
     return { id: p.id }
   })
 
@@ -49,9 +46,8 @@ export const setAiPromptActive = createServerFn({ method: 'POST' })
 export const startAiVisibilityRun = createServerFn({ method: 'POST' })
   .middleware([requireRoleMiddleware('admin')])
   .handler(async () => {
-    const { internalSecret } = await import('./ai-visibility.server')
-    const base = process.env.URL || 'https://admin.adlerrochefort.com'
-    const res = await fetch(`${base}/.netlify/functions/ai-visibility-run-background`, { method: 'POST', headers: { 'x-internal-secret': await internalSecret() } })
-    if (res.status !== 202 && res.status !== 200) throw new Error(`Não foi possível iniciar o teste (${res.status}).`)
-    return { started: true }
+    const { startBackgroundRuns } = await import('./ai-visibility.server')
+    const r = await startBackgroundRuns()
+    if (!r.started.length) throw new Error('Não foi possível iniciar o teste.')
+    return { started: r.started }
   })

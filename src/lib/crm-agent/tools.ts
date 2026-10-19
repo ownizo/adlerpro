@@ -7,7 +7,7 @@
 //    attachments) — health questionnaires and similar never land here.
 //  - Results are compact JSON so Claude can reason over them cheaply.
 
-import { recordExternalResult, getVisibilitySummary, internalSecret } from '../ai-visibility.server.ts'
+import { recordExternalResult, getVisibilitySummary, startBackgroundRuns } from '../ai-visibility.server.ts'
 import { ENGINES, type Engine } from '../ai-visibility.ts'
 import { sb, lisbonDate, addDays, isDate, cleanSearch, normalizeEmail, normalizePolicyNumber, logActivity, ToolError } from './core.ts'
 
@@ -616,11 +616,10 @@ async function aiVisibilityReport(args: Json) {
 }
 
 async function startAiVisibilityTest() {
-  const base = process.env.URL || 'https://admin.adlerrochefort.com'
-  const res = await fetch(`${base}/.netlify/functions/ai-visibility-run-background`, { method: 'POST', headers: { 'x-internal-secret': await internalSecret() } })
-  if (res.status !== 202 && res.status !== 200) throw new ToolError(`Could not start the test (${res.status})`)
-  await logActivity(ACTOR, 'start_ai_visibility_test', 'ai_vis', null, 'Teste de visibilidade no Claude iniciado')
-  return { started: true, note: 'Runs every active prompt on Claude with web search; results appear in 5–10 minutes (ai_visibility_report).' }
+  const r = await startBackgroundRuns()
+  if (!r.started.length) throw new ToolError('Could not start the test (no engine configured or the background run failed)')
+  await logActivity(ACTOR, 'start_ai_visibility_test', 'ai_vis', null, `Teste de visibilidade iniciado: ${r.started.join(', ')}`)
+  return { started: r.started, note: 'Runs every active prompt on each configured engine with web search; results appear in 5–15 minutes (ai_visibility_report).' }
 }
 
 // ---------------------------------------------------------------------------
@@ -694,13 +693,13 @@ export const CRM_TOOLS: CrmTool[] = [
   },
   {
     name: 'record_ai_visibility', title: 'Record AI visibility result', readOnly: false,
-    description: 'Save one AI-assistant answer measured elsewhere (e.g. HubSpot AEO runs for ChatGPT, Gemini, Perplexity) into the Visibilidade em IA module. One row per prompt × engine × day (re-sending the same day updates it). Unknown prompts are added as tracked prompts.',
+    description: 'Save one AI-assistant answer measured manually or by another tool into the Visibilidade em IA module (normally not needed: the module queries the assistants itself). One row per prompt × engine × day (re-sending the same day updates it). Unknown prompts are added as tracked prompts.',
     inputSchema: { type: 'object', properties: { prompt: { type: 'string' }, hubspot_prompt_id: { type: 'number' }, engine: { type: 'string', enum: ENGINES }, run_day: { type: 'string', description: 'YYYY-MM-DD' }, mentioned: { type: 'boolean' }, cited: { type: 'boolean', description: 'answer links to adlerrochefort.com' }, position: { type: 'number', description: 'rank of Adler & Rochefort among brands named (1 = first)' }, competitors: { type: 'array', items: { type: 'string' } }, cited_urls: { type: 'array', items: { type: 'string' } }, excerpt: { type: 'string', description: 'first part of the answer' }, language: { type: 'string' }, market: { type: 'string', enum: ['PT', 'ES'] } }, required: ['prompt', 'engine', 'run_day', 'mentioned'] },
     handler: recordAiVisibility,
   },
   {
     name: 'start_ai_visibility_test', title: 'Start AI visibility test', readOnly: false,
-    description: 'Start a new run of every active tracked prompt on Claude (with web search) in the background. Results appear in ai_visibility_report after 5–10 minutes.',
+    description: 'Start a new run of every active tracked prompt on every configured AI engine (Claude, ChatGPT, Gemini, Perplexity — their own APIs with web search) in the background. Results appear in ai_visibility_report after 5–15 minutes.',
     inputSchema: { type: 'object', properties: {} },
     handler: startAiVisibilityTest,
   },

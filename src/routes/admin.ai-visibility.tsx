@@ -10,7 +10,7 @@ export const Route = createFileRoute('/admin/ai-visibility')({
   head: () => ({ meta: [{ title: 'Visibilidade em IA · Adler & Rochefort Admin' }] }),
 })
 
-type Data = VisibilitySummary & { since: string }
+type Data = VisibilitySummary & { since: string; configured: Engine[] }
 const PERIODS = [7, 30, 90] as const
 const SHOWN: Engine[] = ['CLAUDE', 'CHATGPT', 'GEMINI', 'PERPLEXITY']
 const LANG: Record<string, string> = { en: 'EN', pt: 'PT', de: 'DE', es: 'ES', fr: 'FR', nl: 'NL' }
@@ -42,14 +42,14 @@ function AiVisibilityPage() {
 
   const runNow = async () => {
     setBusy('run'); setNotice('')
-    try { await startAiVisibilityRun(); setNotice('Teste iniciado no Claude. Demora 5 a 10 minutos — atualize a página depois.') }
+    try { const r = await startAiVisibilityRun(); setNotice(`Teste iniciado (${r.started.map((e) => ENGINE_LABEL[e]).join(', ')}). Demora 5 a 15 minutos — atualize a página depois.`) }
     catch (e) { setError(e instanceof Error ? e.message : 'Falhou.') }
     finally { setBusy(null) }
   }
   const add = async (e: React.FormEvent) => {
     e.preventDefault()
     setBusy('add'); setError('')
-    try { await addAiPrompt({ data: { prompt: newPrompt } }); setNewPrompt(''); setNotice('Pergunta adicionada. O teste no Claude demora 1 a 2 minutos — atualize a página depois.'); await load() }
+    try { await addAiPrompt({ data: { prompt: newPrompt } }); setNewPrompt(''); setNotice('Pergunta adicionada. O teste nos assistentes demora 1 a 2 minutos — atualize a página depois.'); await load() }
     catch (err) { setError(err instanceof Error ? err.message : 'Falhou.') }
     finally { setBusy(null) }
   }
@@ -63,7 +63,7 @@ function AiVisibilityPage() {
       <header className="admin-page-header">
         <div>
           <h1 className="admin-page-title">Visibilidade em IA</h1>
-          <p className="admin-page-subtitle">Com que frequência os assistentes de IA recomendam a Adler &amp; Rochefort quando alguém faz estas perguntas. Claude testado aqui com pesquisa web; ChatGPT, Gemini e Perplexity importados do HubSpot.</p>
+          <p className="admin-page-subtitle">Com que frequência os assistentes de IA recomendam a Adler &amp; Rochefort quando alguém faz estas perguntas. O backoffice pergunta diretamente ao Claude, ChatGPT, Gemini e Perplexity, com pesquisa web, todas as segundas de manhã.</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-sm">
@@ -72,7 +72,7 @@ function AiVisibilityPage() {
               {PERIODS.map((p) => <option key={p} value={p}>Últimos {p} dias</option>)}
             </select>
           </label>
-          <button type="button" className="admin-btn admin-btn-primary" onClick={runNow} disabled={busy === 'run'}>{busy === 'run' ? 'A iniciar…' : 'Testar agora no Claude'}</button>
+          <button type="button" className="admin-btn admin-btn-primary" onClick={runNow} disabled={busy === 'run'}>{busy === 'run' ? 'A iniciar…' : 'Testar agora'}</button>
         </div>
       </header>
 
@@ -80,6 +80,9 @@ function AiVisibilityPage() {
       {notice && <p className="sv-focus">{notice}</p>}
 
       {data && <>
+        <div className="aiv-engines" aria-label="Assistentes ligados">
+          {SHOWN.map((e) => <span key={e} className={`aiv-engine ${data.configured.includes(e) ? 'is-on' : ''}`}>{ENGINE_LABEL[e]} · {data.configured.includes(e) ? 'ligado' : 'falta chave da API'}</span>)}
+        </div>
         <section className="admin-kpi-grid" aria-label="Resumo">
           <div className="admin-kpi-card admin-kpi-card--strong">
             <p className="admin-kpi-label">Visibilidade</p>
@@ -99,14 +102,14 @@ function AiVisibilityPage() {
           <div className="admin-kpi-card">
             <p className="admin-kpi-label">Último teste</p>
             <p className="admin-kpi-value">{fmtDay(data.totals.lastDay)}</p>
-            <p className="admin-kpi-note">Claude todas as segundas de manhã</p>
+            <p className="admin-kpi-note">todas as segundas de manhã</p>
           </div>
         </section>
 
         <div className="grid gap-6 lg:grid-cols-2">
           <section className="admin-panel">
             <div className="admin-panel-head"><h2 className="admin-panel-title">Por assistente</h2></div>
-            {data.engines.length === 0 ? <p className="text-sm text-[var(--admin-muted)]">Ainda sem testes neste período. Carregue em "Testar agora no Claude".</p> : (
+            {data.engines.length === 0 ? <p className="text-sm text-[var(--admin-muted)]">Ainda sem testes neste período. Carregue em "Testar agora".</p> : (
               <ul className="space-y-3">
                 {data.engines.map((e) => <li key={e.engine}>
                   <div className="flex items-baseline justify-between text-sm"><strong>{ENGINE_LABEL[e.engine]}</strong><span className="tabular-nums">{e.visibility}% · {e.mentioned}/{e.runs}{e.avgPosition ? ` · posição ${e.avgPosition}` : ''}</span></div>
