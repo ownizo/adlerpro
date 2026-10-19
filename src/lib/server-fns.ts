@@ -3938,12 +3938,22 @@ export const adminAcceptSuggestedCarrierRecords = createServerFn({ method: 'POST
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { runId: string; recordId?: string; decisionNote?: string }) => d)
   .handler(async ({ data }) => {
-    const records = (await db.listCarrierImportRecords(data.runId, {})).filter((r) =>
+    const all = await db.listCarrierImportRecords(data.runId, {})
+    let prepared = 0
+    // uma linha pedida explicitamente que já está aceite e com ação (ou já
+    // aplicada) está pronta — não há nada a mudar, conta como feita
+    if (data.recordId) {
+      const own = all.find((r) => r.id === data.recordId)
+      if (own && (own.applyStatus === 'applied' || (own.decisionStatus === 'accepted' && own.customerApplyAction && own.policyApplyAction))) {
+        if (data.decisionNote) await db.updateCarrierImportDecision(own.id, { decisionStatus: 'accepted', decisionNote: data.decisionNote })
+        return { prepared: 1, skipped: [] as Array<{ recordId: string; policyNumber: string; reason: string }> }
+      }
+    }
+    const records = all.filter((r) =>
       (data.recordId ? r.id === data.recordId : true) &&
       r.applyStatus !== 'applied' &&
       (r.decisionStatus === 'pending' || (r.decisionStatus === 'accepted' && (!r.customerApplyAction || !r.policyApplyAction))),
     )
-    let prepared = 0
     const skipped: Array<{ recordId: string; policyNumber: string; reason: string }> = []
     for (const r of records) {
       const mapped = mapPortfolioRows(r.provider as CarrierProviderId, [r.rawPayload as Record<string, unknown>])

@@ -725,7 +725,11 @@ function ImportRecordReviewPanel({
         },
       })
       setApplyActionSaved(true)
-      onApplyActionsChanged()
+      // com a ação gravada numa linha aceite, a linha fica "Ready": fecha
+      // o painel (a tabela mostra o estado), em vez de deixar o Admin à
+      // procura de mais um botão para confirmar
+      if (record.decisionStatus === 'accepted') onChanged()
+      else onApplyActionsChanged()
     } catch (err) {
       setApplyActionError(err instanceof Error ? err.message : 'Could not save this apply action')
     } finally {
@@ -1038,7 +1042,7 @@ function ImportRecordReviewPanel({
                 const r = await adminAcceptSuggestedCarrierRecords({ data: { runId: record.syncRunId, recordId: record.id, decisionNote: note || undefined } })
                 if (r.prepared > 0) onChanged()
                 else {
-                  setError(r.skipped[0]?.reason ? `Aceite. Escolha a ação: ${r.skipped[0].reason}` : 'Aceite. Escolha a ação abaixo.')
+                  setError(r.skipped[0]?.reason ? `Aceite. Falta escolher o cliente/apólice em "Apply action" e carregar em "Save apply action": ${r.skipped[0].reason}` : 'Aceite. Falta escolher o cliente/apólice em "Apply action" e carregar em "Save apply action".')
                   onApplyActionsChanged()
                 }
               } catch (err) {
