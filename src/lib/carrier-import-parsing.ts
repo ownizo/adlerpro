@@ -193,6 +193,10 @@ export interface ParsedImportRow {
   paymentFrequency?: string
   carrierStatus?: string
   carrierSegment?: string
+  /** Seguradora da apólice quando o ficheiro vem de uma plataforma com
+   * várias seguradoras (ex.: Seguramos). Sem isto, a apólice criada fica
+   * com o nome da plataforma escolhida no upload. */
+  insurerName?: string
   /** Linha original, JÁ sem campos bancários e JÁ redigida de chaves
    * médicas — é isto, e SÓ isto, que pode ir para
    * carrier_import_records.raw_payload. */

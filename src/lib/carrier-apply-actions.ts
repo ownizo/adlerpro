@@ -253,6 +253,12 @@ export function looksLikeCompanyTaxId(taxId: string | undefined): boolean {
   return /^(5|6|71|72|9)/.test(digits)
 }
 
+/** Nome com forma jurídica de empresa (LDA, S.A., Unipessoal…). */
+export function looksLikeCompanyName(name: string | undefined): boolean {
+  const n = ` ${(name ?? '').toUpperCase().replace(/[.,]/g, ' ')} `
+  return /\s(LDA|LIMITADA|S\s?A|SA|SGPS|UNIPESSOAL|SOCIEDADE|COMPANY|LTD|LIMITED|GMBH|BV|SL|HOTELEIRA|HOTELEIRAS|TURISTICAS|ASSOCIACAO|ASSOCIAÇÃO|CONDOMINIO|CONDOMÍNIO)\s/.test(n)
+}
+
 export function suggestApplyActions(input: SuggestApplyActionsInput): SuggestedApplyActions {
   let customer: { action: CustomerApplyAction; individual?: string; company?: string }
   if (input.customerMatchStatus === 'exact' || input.customerMatchStatus === 'linked') {
@@ -261,7 +267,9 @@ export function suggestApplyActions(input: SuggestApplyActionsInput): SuggestedA
     else return { ok: false, reason: 'Cliente encontrado mas sem ficha associada — rever.' }
   } else if (input.customerMatchStatus === 'new' || input.customerMatchStatus === 'unmatched') {
     if (!input.customerName?.trim()) return { ok: false, reason: 'O ficheiro não traz o nome do tomador — escolher o cliente manualmente.' }
-    customer = looksLikeCompanyTaxId(input.taxId) ? { action: 'create_company' } : { action: 'create_individual' }
+    const isCompany = looksLikeCompanyTaxId(input.taxId) || (!input.taxId && looksLikeCompanyName(input.customerName))
+    if (isCompany && !input.taxId?.trim()) return { ok: false, reason: 'Parece uma empresa e o ficheiro não traz o NIF — escolher ou criar a empresa manualmente.' }
+    customer = isCompany ? { action: 'create_company' } : { action: 'create_individual' }
   } else {
     return { ok: false, reason: 'Cliente com correspondência incerta — rever.' }
   }

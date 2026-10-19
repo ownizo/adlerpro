@@ -395,6 +395,109 @@ export const innovariskMapper: ProviderMapper = (normalizedRows) => {
   return { recognized: true, rows }
 }
 
+// ── Seguramos — export "apolices_*.csv" (plataforma de mediação) ────────
+//
+// Formato confirmado contra o export real (outubro 2026): CSV com ";",
+// colunas Apólice | Adesão | Tomador | Companhia | Produto | Data de Início
+// | Estado | Comercial | Angariador | Canal Cobrança. Uma plataforma com
+// VÁRIAS seguradoras: a seguradora de cada apólice vem em "Companhia" e vai
+// para insurerName (a apólice criada fica com a seguradora real, nunca
+// "Seguramos").
+//
+// O export não traz NIF, contactos, prémio nem data de fim. Período: as
+// apólices destes ramos (automóvel, multirriscos) são anuais e renovam no
+// aniversário da "Data de Início" — o período atual é calculado a partir
+// desse aniversário (início = último aniversário até hoje, fim = véspera
+// do seguinte). A data original fica em effectiveDate e em sanitizedRaw.
+
+const SEGURAMOS_CORE_REQUIRED_KEYS = ['apolice', 'tomador', 'companhia']
+const SEGURAMOS_STRUCTURAL_KEYS = ['produto', 'data_de_inicio', 'estado']
+
+const SEGURAMOS_INSURER_NAMES: Array<[RegExp, string]> = [
+  [/generali|tranquilidade/i, 'Generali Tranquilidade'],
+  [/allianz/i, 'Allianz'],
+  [/fidelidade/i, 'Fidelidade'],
+  [/ageas/i, 'Ageas'],
+  [/zurich/i, 'Zurich'],
+  [/lusit[aâ]nia/i, 'Lusitania'],
+  [/ok!? ?teleseguros/i, 'OK! Teleseguros'],
+  [/mapfre/i, 'MAPFRE'],
+  [/caravela/i, 'Caravela'],
+  [/victoria/i, 'Victoria'],
+  [/liberty/i, 'Liberty Seguros'],
+  [/una seguros/i, 'UNA Seguros'],
+  [/real vida/i, 'Real Vida'],
+  [/mgen/i, 'MGEN'],
+  [/hiscox/i, 'Hiscox'],
+]
+
+/** "ALLIANZ PORTUGAL S A" → "Allianz"; desconhecida → texto original. */
+export function cleanInsurerName(raw: string): string {
+  for (const [re, name] of SEGURAMOS_INSURER_NAMES) if (re.test(raw)) return name
+  return raw.trim()
+}
+
+/** Período anual atual a partir da data de início original. */
+export function currentAnnualPeriod(originalStart: string, now = new Date()): { startDate: string; endDate: string } {
+  const [y, m, d] = originalStart.split('-').map(Number)
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  let year = Math.max(y!, now.getUTCFullYear())
+  const at = (yy: number) => {
+    // 29/02 em ano não bissexto → 28/02
+    const dt = new Date(Date.UTC(yy, m! - 1, d!))
+    if (dt.getUTCMonth() !== m! - 1) dt.setUTCDate(0)
+    return dt
+  }
+  while (year > y! && at(year).getTime() > today) year--
+  const start = at(year)
+  const next = at(year + 1)
+  next.setUTCDate(next.getUTCDate() - 1)
+  return { startDate: start.toISOString().slice(0, 10), endDate: next.toISOString().slice(0, 10) }
+}
+
+export const seguramosMapper: ProviderMapper = (normalizedRows) => {
+  const unrecognized = { recognized: false, rows: [], error: 'File format not yet recognised for Seguramos' }
+  if (normalizedRows.length === 0) return unrecognized
+  const keys = new Set(normalizedRows.flatMap((r) => Object.keys(r)))
+  if (!SEGURAMOS_CORE_REQUIRED_KEYS.every((k) => keys.has(k)) || !SEGURAMOS_STRUCTURAL_KEYS.some((k) => keys.has(k))) return unrecognized
+
+  const text = (v: unknown) => {
+    if (v === null || v === undefined) return undefined
+    const t = String(v).trim()
+    return t === '' ? undefined : t
+  }
+
+  const rows: ParsedImportRow[] = normalizedRows
+    .filter((raw) => text(raw['apolice']) !== undefined)
+    .map((raw) => {
+      const parsed: ParsedImportRow = { sanitizedRaw: {} }
+      // número exatamente como no ficheiro (mantém zeros à esquerda)
+      parsed.externalPolicyNumber = text(raw['apolice'])
+      const name = text(raw['tomador'])
+      if (name) parsed.customerName = name
+      const insurer = text(raw['companhia'])
+      if (insurer) parsed.insurerName = cleanInsurerName(insurer)
+      const product = text(raw['produto'])
+      if (product) parsed.productDescription = product
+      const original = parseHiscoxDate(raw['data_de_inicio'])
+      if (original) {
+        parsed.effectiveDate = original
+        Object.assign(parsed, currentAnnualPeriod(original))
+      }
+      const status = text(raw['estado'])
+      if (status) {
+        const key = status.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        parsed.carrierStatus = key === 'em vigor' || key === 'ativa' || key === 'activa' ? 'active'
+          : /anulad|cancelad|terminad|vencid/.test(key) ? 'cancelled' : status
+      }
+      const jsonSafeRow: Record<string, unknown> = {}
+      for (const [key, value] of Object.entries(raw)) jsonSafeRow[key] = toJsonSafeValue(value)
+      parsed.sanitizedRaw = sanitizeRawRowForStaging(jsonSafeRow)
+      return parsed
+    })
+  return { recognized: true, rows }
+}
+
 // ── Allianz — POLRES, primeiro mapper real (CRM3 Block 3) ───────────────
 //
 // Este mapper é DELIBERADAMENTE parcial: só mapeia campos cujo significado
@@ -496,6 +599,7 @@ export const PROVIDER_MAPPERS: Record<CarrierProviderId, ProviderMapper> = {
   zurich: zurichMapper,
   hiscox: hiscoxMapper,
   innovarisk: innovariskMapper,
+  seguramos: seguramosMapper,
 }
 
 /** Aplica normalizeHeaderName às chaves de cada linha e despacha para o

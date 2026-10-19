@@ -32,6 +32,7 @@ const PROVIDER_PLACEHOLDERS: ProviderPlaceholder[] = [
   { key: 'mgen', name: 'MGEN' },
   { key: 'hiscox', name: 'Hiscox' },
   { key: 'innovarisk', name: 'Innovarisk' },
+  { key: 'seguramos', name: 'Seguramos' },
   { key: 'asisa', name: 'ASISA' },
   { key: 'other', name: 'Other' },
 ]

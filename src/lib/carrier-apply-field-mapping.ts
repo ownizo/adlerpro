@@ -116,7 +116,7 @@ export function mapParsedRowToNewPolicyFields(row: ParsedImportRow, insurer: str
  * saúde, resto → 'other' (nunca inventa um ramo). */
 export function inferPolicyType(row: ParsedImportRow, insurer: string): NewPolicyFields['type'] {
   const text = `${row.productDescription ?? ''} ${row.carrierSegment ?? ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-  if (/\b(home|house|holiday|casa|habita|multirrisco|recheio|property|propriedade|imovel|condominio)/.test(text)) return 'property'
+  if (/\b(home|house|holiday|casa|habita|multirrisco|m\\.?\\s?riscos|riscos|recheio|property|propriedade|imovel|condominio)/.test(text)) return 'property'
   if (/\b(art|arte|jewel|joia|valuables|colec)/.test(text)) return 'property'
   if (/\b(auto|motor|car|automovel|viatura)/.test(text)) return 'auto'
   if (/\b(liability|responsabilidade)/.test(text)) return 'liability'
