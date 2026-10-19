@@ -41,6 +41,7 @@ function SiteVisitsPage() {
   const { user, ready } = useIdentity()
   const isAdmin = ready && !!user?.roles?.includes('admin')
   const [days, setDays] = useState<(typeof PERIODS)[number]>(30)
+  const [focusDay, setFocusDay] = useState<string | null>(null)
   const [data, setData] = useState<SiteVisitsSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -49,13 +50,13 @@ function SiteVisitsPage() {
     setLoading(true)
     setError('')
     try {
-      setData(await fetchSiteVisits({ data: { days } }))
+      setData(await fetchSiteVisits({ data: { days, day: focusDay ?? undefined } }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível carregar as visitas.')
     } finally {
       setLoading(false)
     }
-  }, [days])
+  }, [days, focusDay])
 
   useEffect(() => { if (isAdmin) void load() }, [isAdmin, load])
 
@@ -80,7 +81,7 @@ function SiteVisitsPage() {
           <label className="text-sm">
             <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)] mb-1">Período</span>
             <select className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] p-2 text-sm" value={days}
-              onChange={(e) => setDays(Number(e.target.value) as (typeof PERIODS)[number])}>
+              onChange={(e) => { setFocusDay(null); setDays(Number(e.target.value) as (typeof PERIODS)[number]) }}>
               {PERIODS.map((p) => <option key={p} value={p}>Últimos {p} dias</option>)}
             </select>
           </label>
@@ -91,6 +92,14 @@ function SiteVisitsPage() {
       {error && <p className="admin-chip admin-chip--danger">{error}</p>}
 
       {data && <>
+        {data.focusDay ? (
+          <div className="sv-focus" role="status">
+            <span>A mostrar só <strong>{dayLabel(data.focusDay)}</strong> — origens, páginas, países e línguas referem-se a este dia.</span>
+            <button type="button" onClick={() => setFocusDay(null)}>Ver os {days} dias</button>
+          </div>
+        ) : (
+          <p className="text-xs text-[var(--admin-muted)]">Toque num dia da tabela "Por dia" para ver só os resultados desse dia.</p>
+        )}
         <section className="admin-kpi-grid" aria-label="Resumo">
           <div className="admin-kpi-card admin-kpi-card--strong">
             <p className="admin-kpi-label">Visitas hoje</p>
@@ -98,12 +107,12 @@ function SiteVisitsPage() {
             <p className="admin-kpi-note">{today?.pageViews ?? 0} páginas vistas · ontem {yesterday?.visits ?? 0} visitas</p>
           </div>
           <div className="admin-kpi-card">
-            <p className="admin-kpi-label">Visitas · últimos {days} dias</p>
+            <p className="admin-kpi-label">{data.focusDay ? `Visitas · ${dayLabel(data.focusDay)}` : `Visitas · últimos ${days} dias`}</p>
             <p className="admin-kpi-value">{data.totals.visits}</p>
             <p className="admin-kpi-note">{data.totals.pageViews} páginas vistas</p>
           </div>
           <div className="admin-kpi-card">
-            <p className="admin-kpi-label">Leads · últimos {days} dias</p>
+            <p className="admin-kpi-label">{data.focusDay ? `Leads · ${dayLabel(data.focusDay)}` : `Leads · últimos ${days} dias`}</p>
             <p className="admin-kpi-value">{data.totals.leads}</p>
             <p className="admin-kpi-note">{data.totals.visits ? `${((data.totals.leads / data.totals.visits) * 100).toFixed(1)}% das visitas` : '—'}</p>
           </div>
@@ -120,7 +129,12 @@ function SiteVisitsPage() {
             <table className="admin-table w-full">
               <thead><tr><th>Dia</th><th className="w-[40%]">Visitas</th><th>Páginas</th><th>Do Google</th><th>De IA</th><th>Leads</th></tr></thead>
               <tbody>
-                {[...data.days].reverse().map((d) => <tr key={d.date}>
+                {[...data.days].reverse().map((d) => <tr key={d.date}
+                  className={`sv-day-row ${data.focusDay === d.date ? 'is-selected' : ''}`}
+                  tabIndex={0}
+                  aria-selected={data.focusDay === d.date}
+                  onClick={() => setFocusDay(focusDay === d.date ? null : d.date)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setFocusDay(focusDay === d.date ? null : d.date) } }}>
                   <td className="whitespace-nowrap">{dayLabel(d.date)}</td>
                   <td>
                     <div className="flex items-center gap-2">
@@ -140,7 +154,7 @@ function SiteVisitsPage() {
 
         <div className="grid gap-6 lg:grid-cols-2">
           <section className="admin-panel" aria-labelledby="sv-sources">
-            <div className="admin-panel-head"><h2 id="sv-sources" className="admin-panel-title">De onde vêm (entradas no site)</h2></div>
+            <div className="admin-panel-head"><h2 id="sv-sources" className="admin-panel-title">De onde vêm (entradas no site){data.focusDay ? ` · ${dayLabel(data.focusDay)}` : ''}</h2></div>
             <table className="admin-table w-full"><tbody>
               {data.sources.length ? data.sources.map((s) => <tr key={s.label}><td>{s.label}</td><td className="text-right tabular-nums">{s.visits}</td></tr>)
                 : <tr><td className="text-[var(--admin-muted)]">Ainda sem dados.</td></tr>}
@@ -157,7 +171,7 @@ function SiteVisitsPage() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <section className="admin-panel lg:col-span-2" aria-labelledby="sv-pages">
-            <div className="admin-panel-head"><h2 id="sv-pages" className="admin-panel-title">Páginas mais vistas</h2></div>
+            <div className="admin-panel-head"><h2 id="sv-pages" className="admin-panel-title">Páginas mais vistas{data.focusDay ? ` · ${dayLabel(data.focusDay)}` : ''}</h2></div>
             <div className="admin-table-wrap overflow-x-auto">
               <table className="admin-table w-full">
                 <thead><tr><th>Página</th><th className="text-right">Vistas</th><th className="text-right">Entradas</th></tr></thead>

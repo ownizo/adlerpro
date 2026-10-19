@@ -2291,3 +2291,34 @@ button.admin-user-avatar:focus-visible {
   .today-title { font-size: 23px; }
   .today-add input { font-size: 16px; }
 }
+
+/* ---------- Visitas do site: filtro por dia ---------- */
+.sv-day-row { cursor: pointer; }
+.sv-day-row:hover td { background: #F3F6FA; }
+.sv-day-row.is-selected td { background: #E8EDF5; font-weight: 600; }
+.sv-day-row:focus-visible { outline: 2px solid var(--admin-navy); outline-offset: -2px; }
+.sv-focus {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem;
+  padding: 0.7rem 0.9rem; border-radius: 12px; background: #E8EDF5; color: var(--admin-ink); font-size: 13.5px;
+}
+.sv-focus button {
+  border: 0; border-radius: 999px; padding: 0.35rem 0.8rem; background: var(--admin-navy); color: #FFFFFF;
+  font-size: 12.5px; font-weight: 600; cursor: pointer;
+}
+
+/* ---------- Visibilidade em IA ---------- */
+.aiv-bar { height: 8px; border-radius: 999px; background: #EEF1F5; overflow: hidden; margin-top: 6px; }
+.aiv-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--admin-navy); }
+.aiv-own td { font-weight: 700; color: var(--admin-navy); }
+.aiv-row { cursor: pointer; }
+.aiv-row:hover td { background: #F3F6FA; }
+.aiv-row.is-off td { opacity: 0.5; }
+.aiv-lang { display: inline-block; min-width: 24px; padding: 1px 5px; margin-right: 4px; border-radius: 5px; background: #EEF1F5; color: var(--admin-muted); font-size: 10.5px; font-weight: 700; text-align: center; }
+.aiv-dot { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--admin-muted); }
+.aiv-dot.is-yes { background: #E3F4EA; color: #146C3A; }
+.aiv-dot.is-no { background: #F6EDEE; color: var(--admin-red); }
+.aiv-dot.is-err { background: #FFF4DB; color: #8A5A00; }
+.aiv-detail td { background: #FAFBFC; }
+.aiv-answer + .aiv-answer { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--admin-border); }
+.aiv-answer-head { font-size: 13px; color: var(--admin-ink); }
+.aiv-answer-text { margin-top: 0.4rem; font-size: 13px; line-height: 1.5; color: var(--admin-muted); white-space: pre-wrap; max-height: 260px; overflow-y: auto; }

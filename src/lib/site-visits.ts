@@ -28,6 +28,7 @@ export type SiteVisitsSummary = {
   countries: Array<{ country: string; visits: number }>
   languages: Array<{ lang: string; views: number }>
   devices: Array<{ device: string; views: number }>
+  focusDay?: string
 }
 
 const TZ = 'Europe/Lisbon'
@@ -65,7 +66,21 @@ function top<T>(map: Map<string, T>, score: (v: T) => number, n: number): Array<
   return [...map.entries()].sort((a, b) => score(b[1]) - score(a[1])).slice(0, n)
 }
 
-export function summarise(rows: SiteVisitRow[], leadDates: string[], days: number, now = new Date()): SiteVisitsSummary {
+/**
+ * `focusDay` (YYYY-MM-DD, Lisbon) keeps the per-day table for the whole
+ * period but restricts every other figure (totals, sources, pages,
+ * countries, languages, devices) to that single day.
+ */
+export function summarise(rows: SiteVisitRow[], leadDates: string[], days: number, now = new Date(), focusDay?: string): SiteVisitsSummary {
+  const full = summariseAll(rows, leadDates, days, now)
+  if (!focusDay || !full.days.some((d) => d.date === focusDay)) return full
+  const dayRows = rows.filter((r) => lisbonDate(r.created_at) === focusDay)
+  const dayLeads = leadDates.filter((l) => lisbonDate(l) === focusDay)
+  const focused = summariseAll(dayRows, dayLeads, days, now)
+  return { ...focused, days: full.days, focusDay }
+}
+
+function summariseAll(rows: SiteVisitRow[], leadDates: string[], days: number, now: Date): SiteVisitsSummary {
   const range = dayRange(days, now)
   const byDay = new Map(range.map((d) => [d, { date: d, pageViews: 0, visits: 0, fromGoogle: 0, fromAi: 0, leads: 0 }]))
   const sessionsByDay = new Map<string, Set<string>>()

@@ -30,3 +30,20 @@ test('summary counts page views, sessions, sources and leads per day', () => {
   assert.equal(s.pages[0].path, '/en/')
   assert.equal(sourceLabel('google', 'organic'), 'Pesquisa · Google')
 })
+
+test('focus day keeps the daily table but narrows every other figure', () => {
+  const rows = [
+    row({ is_landing: true, source: 'google', medium: 'organic' }),
+    row({ session_id: 's2', is_landing: true, source: 'chatgpt.com', medium: 'ai-assistant', country: 'DE', path: '/de/', created_at: '2026-10-17T09:00:00Z' }),
+  ]
+  const s = summarise(rows, ['2026-10-17T08:00:00Z', '2026-10-18T08:00:00Z'], 3, now, '2026-10-17')
+  assert.equal(s.focusDay, '2026-10-17')
+  assert.equal(s.days.length, 3)
+  assert.equal(s.days.at(-1)!.pageViews, 1)
+  assert.equal(s.totals.visits, 1)
+  assert.equal(s.totals.leads, 1)
+  assert.deepEqual(s.countries.map((c) => c.country), ['DE'])
+  assert.equal(s.pages[0].path, '/de/')
+  // a day outside the period is ignored
+  assert.equal(summarise(rows, [], 3, now, '2026-01-01').focusDay, undefined)
+})

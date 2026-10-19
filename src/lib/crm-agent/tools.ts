@@ -7,6 +7,8 @@
 //    attachments) — health questionnaires and similar never land here.
 //  - Results are compact JSON so Claude can reason over them cheaply.
 
+import { recordExternalResult, getVisibilitySummary, internalSecret } from '../ai-visibility.server.ts'
+import { ENGINES, type Engine } from '../ai-visibility.ts'
 import { sb, lisbonDate, addDays, isDate, cleanSearch, normalizeEmail, normalizePolicyNumber, logActivity, ToolError } from './core.ts'
 
 type Json = Record<string, unknown>
@@ -588,6 +590,39 @@ async function recordCommission(args: Json) {
   return { recorded: true, id: row.id, policy_id: policyId }
 }
 
+async function recordAiVisibility(args: Json) {
+  const prompt = str(args.prompt, 500)
+  const engine = str(args.engine, 30) as Engine | undefined
+  if (!prompt) throw new ToolError('prompt is required')
+  if (!engine || !ENGINES.includes(engine)) throw new ToolError(`engine must be one of ${ENGINES.join(', ')}`)
+  if (!isDate(args.run_day)) throw new ToolError('run_day (YYYY-MM-DD) is required')
+  if (typeof args.mentioned !== 'boolean') throw new ToolError('mentioned (true/false) is required')
+  const r = await recordExternalResult({
+    prompt, engine, run_day: args.run_day, mentioned: args.mentioned,
+    hubspot_prompt_id: num(args.hubspot_prompt_id),
+    language: str(args.language, 5), market: str(args.market, 2),
+    cited: args.cited === true, position: num(args.position) ?? null,
+    competitors: Array.isArray(args.competitors) ? (args.competitors as unknown[]).map(String) : [],
+    cited_urls: Array.isArray(args.cited_urls) ? (args.cited_urls as unknown[]).map(String) : [],
+    excerpt: str(args.excerpt, 3000),
+  })
+  return { saved: true, ...r }
+}
+
+async function aiVisibilityReport(args: Json) {
+  const days = [7, 30, 90].includes(Number(args.days)) ? Number(args.days) : 30
+  const s = await getVisibilitySummary(days)
+  return { ...s, prompts: s.prompts.map((p) => ({ ...p, latest: Object.fromEntries(Object.entries(p.latest).map(([k, v]) => [k, v ? { ...v, excerpt: v.excerpt?.slice(0, 400) ?? null } : v])) })) }
+}
+
+async function startAiVisibilityTest() {
+  const base = process.env.URL || 'https://admin.adlerrochefort.com'
+  const res = await fetch(`${base}/.netlify/functions/ai-visibility-run-background`, { method: 'POST', headers: { 'x-internal-secret': await internalSecret() } })
+  if (res.status !== 202 && res.status !== 200) throw new ToolError(`Could not start the test (${res.status})`)
+  await logActivity(ACTOR, 'start_ai_visibility_test', 'ai_vis', null, 'Teste de visibilidade no Claude iniciado')
+  return { started: true, note: 'Runs every active prompt on Claude with web search; results appear in 5–10 minutes (ai_visibility_report).' }
+}
+
 // ---------------------------------------------------------------------------
 
 export const CRM_TOOLS: CrmTool[] = [
@@ -650,6 +685,24 @@ export const CRM_TOOLS: CrmTool[] = [
     description: 'What was changed recently through this connector (audit log).',
     inputSchema: { type: 'object', properties: { limit: { type: 'number' } } },
     handler: recentActivity,
+  },
+  {
+    name: 'ai_visibility_report', title: 'AI visibility report', readOnly: true,
+    description: 'How often AI assistants (Claude, ChatGPT, Gemini, Perplexity) mention Adler & Rochefort for the tracked prompts: visibility %, citations of the site, position, competitors and the latest answer per prompt and engine. days: 7, 30 (default) or 90.',
+    inputSchema: { type: 'object', properties: { days: { type: 'number', enum: [7, 30, 90] } } },
+    handler: aiVisibilityReport,
+  },
+  {
+    name: 'record_ai_visibility', title: 'Record AI visibility result', readOnly: false,
+    description: 'Save one AI-assistant answer measured elsewhere (e.g. HubSpot AEO runs for ChatGPT, Gemini, Perplexity) into the Visibilidade em IA module. One row per prompt × engine × day (re-sending the same day updates it). Unknown prompts are added as tracked prompts.',
+    inputSchema: { type: 'object', properties: { prompt: { type: 'string' }, hubspot_prompt_id: { type: 'number' }, engine: { type: 'string', enum: ENGINES }, run_day: { type: 'string', description: 'YYYY-MM-DD' }, mentioned: { type: 'boolean' }, cited: { type: 'boolean', description: 'answer links to adlerrochefort.com' }, position: { type: 'number', description: 'rank of Adler & Rochefort among brands named (1 = first)' }, competitors: { type: 'array', items: { type: 'string' } }, cited_urls: { type: 'array', items: { type: 'string' } }, excerpt: { type: 'string', description: 'first part of the answer' }, language: { type: 'string' }, market: { type: 'string', enum: ['PT', 'ES'] } }, required: ['prompt', 'engine', 'run_day', 'mentioned'] },
+    handler: recordAiVisibility,
+  },
+  {
+    name: 'start_ai_visibility_test', title: 'Start AI visibility test', readOnly: false,
+    description: 'Start a new run of every active tracked prompt on Claude (with web search) in the background. Results appear in ai_visibility_report after 5–10 minutes.',
+    inputSchema: { type: 'object', properties: {} },
+    handler: startAiVisibilityTest,
   },
   {
     name: 'upsert_person', title: 'Create or update person', readOnly: false,

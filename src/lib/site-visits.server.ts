@@ -4,7 +4,7 @@ import { dayRange, summarise, type SiteVisitRow, type SiteVisitsSummary } from '
 const COLUMNS = 'created_at, visit_id, session_id, path, lang, is_landing, source, medium, country, device, duration_seconds'
 const PAGE = 1000
 
-export async function getSiteVisitsSummary(days: number): Promise<SiteVisitsSummary> {
+export async function getSiteVisitsSummary(days: number, focusDay?: string): Promise<SiteVisitsSummary> {
   const db = supabaseAdmin
   // first day of the range at 00:00 Lisbon is at most 01:00 UTC; start a day early and let summarise() bucket
   const since = new Date(`${dayRange(days)[0]}T00:00:00Z`).getTime() - 2 * 3600000
@@ -22,5 +22,5 @@ export async function getSiteVisitsSummary(days: number): Promise<SiteVisitsSumm
   const { data: leads, error: leadsError } = await db.from('website_leads').select('created_at').gte('created_at', sinceIso)
   if (leadsError) throw new Error('Não foi possível ler os leads.')
 
-  return summarise(rows, (leads ?? []).map((l: { created_at: string }) => l.created_at), days)
+  return summarise(rows, (leads ?? []).map((l: { created_at: string }) => l.created_at), days, new Date(), focusDay)
 }
