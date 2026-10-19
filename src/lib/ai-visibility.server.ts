@@ -71,6 +71,20 @@ export async function runActivePrompts(engine: Engine): Promise<{ total: number;
   return { total: prompts.length, ok, mentioned }
 }
 
+/** Re-run the text analysis on stored answers (after the competitor list changes). Keeps link/citation flags. */
+export async function reanalyseStored(sinceDays = 90): Promise<number> {
+  const since = lisbonDay(new Date(Date.now() - sinceDays * 86400000))
+  const { data, error } = await sb().from('ai_vis_results').select('id, answer_excerpt, cited_urls').gte('run_day', since).is('error', null).not('answer_excerpt', 'is', null)
+  if (error) throw new Error(error.message)
+  let n = 0
+  for (const r of (data ?? []) as Array<{ id: string; answer_excerpt: string; cited_urls: string[] }>) {
+    const a = analyseAnswer(r.answer_excerpt, r.cited_urls, [])
+    await sb().from('ai_vis_results').update({ mentioned: a.mentioned || false, position: a.position, competitors: a.competitors }).eq('id', r.id)
+    n++
+  }
+  return n
+}
+
 /** Starts background runs (one per engine, so each fits the 15-minute limit). */
 export async function startBackgroundRuns(opts: { engines?: Engine[]; promptId?: string } = {}) {
   const { configuredEngines } = await import('./ai-visibility-engines.ts')

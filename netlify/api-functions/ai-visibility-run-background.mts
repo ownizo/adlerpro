@@ -4,13 +4,17 @@
 // Started by the weekly schedule, the "Testar agora" button or when a prompt
 // is added. Internal only: requires the derived internal secret header.
 
-import { runActivePrompts, runEngineForPrompt, internalSecret, getPrompt, configuredEngines } from '../../src/lib/ai-visibility.server.ts'
+import { runActivePrompts, runEngineForPrompt, internalSecret, getPrompt, configuredEngines, reanalyseStored } from '../../src/lib/ai-visibility.server.ts'
 import type { Engine } from '../../src/lib/ai-visibility.ts'
 
 export default async (req: Request) => {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || req.headers.get('x-internal-secret') !== (await internalSecret())) return new Response('unauthorized', { status: 401 })
-  let body: { engine?: Engine; prompt_id?: string } = {}
+  let body: { engine?: Engine; prompt_id?: string; reanalyse?: boolean } = {}
   try { body = (await req.json()) as typeof body } catch { /* no body */ }
+  if (body.reanalyse) {
+    console.log(`[ai-visibility] reanalysed ${await reanalyseStored()} answers`)
+    return new Response(null, { status: 202 })
+  }
   const engines = body.engine ? [body.engine] : configuredEngines()
   for (const engine of engines) {
     if (!configuredEngines().includes(engine)) continue

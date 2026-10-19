@@ -16,7 +16,7 @@ const OWN_DOMAIN = /(^|\.)adlerrochefort\.com$/i
 export const COMPETITORS: Array<{ name: string; re: RegExp }> = [
   ['Aon', /\baon\b/i], ['Howden', /\bhowden\b/i], ['Marsh', /\bmarsh\b/i], ['WTW', /\bwtw\b|willis towers watson/i],
   ['Lockton', /\blockton\b/i], ['Gallagher', /\bgallagher\b/i], ['MDS', /\bmds\b(?! *-)/], ['Kennedy', /\bkennedy (insurance|group)\b/i],
-  ['Medal Insurance', /\bmedal insurance\b/i], ['Pacific Prime', /\bpacific prime\b/i], ['William Russell', /\bwilliam russell\b/i],
+  ['C1 Broker', /\bc1[ -]?broker\b/i], ['Secose', /\bsecose\b/i], ['Medal Insurance', /\bmedal insurance\b/i], ['Algarve Insurance', /\balgarve insurance\b/i], ['Moneycorp', /\bmoneycorp\b/i], ['Pacific Prime', /\bpacific prime\b/i], ['William Russell', /\bwilliam russell\b/i],
   ['Expat Financial', /\bexpat financial\b/i], ['Now Health', /\bnow health\b/i], ['Anglo Portuguese', /\banglo[- ]portuguese\b/i],
   ['Allianz', /\ballianz\b/i], ['Zurich', /\bzurich\b/i], ['AXA', /\baxa\b/i], ['MAPFRE', /\bmapfre\b/i], ['Fidelidade', /\bfidelidade\b/i],
   ['Bupa', /\bbupa\b/i], ['Cigna', /\bcigna\b/i], ['April', /\bapril (international|portugal|seguros)\b/i], ['MGEN', /\bmgen\b/i],

@@ -95,3 +95,9 @@ test('engine errors are summarised and explained', async () => {
   assert.equal(g.errors, 1)
   assert.match(g.lastError!, /faturação/)
 })
+
+test('C1 Broker ranks ahead when named first', () => {
+  const a = analyseAnswer('Contact C1 Broker first; Adler & Rochefort is another option.')
+  assert.equal(a.position, 2)
+  assert.deepEqual(a.competitors, ['C1 Broker'])
+})
