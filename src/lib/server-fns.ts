@@ -33,12 +33,12 @@ import type {
   SalesOpportunityEditableUpdate,
   Json,
 } from './types'
-import { isValidCarrierProvider } from './carrier-providers'
+import { isValidCarrierProvider, type CarrierProviderId } from './carrier-providers'
 import { parsePortfolioWorkbook } from './carrier-excel-workbook'
 import { mapPortfolioRows } from './carrier-import-mappers'
 import { computeImportFingerprint } from './carrier-import-fingerprint'
 import { matchPortfolioRows, classifyStagedRowForCounts } from './carrier-import-matching'
-import { computeRunApplyReadiness, type ApplyActionRowState, type CustomerApplyAction, type PolicyApplyAction } from './carrier-apply-actions'
+import { computeRunApplyReadiness, suggestApplyActions, type ApplyActionRowState, type CustomerApplyAction, type PolicyApplyAction } from './carrier-apply-actions'
 import type { CarrierImportRecord, CarrierRunApplyStatus } from './types'
 import { buildOpportunityTitle, pickWebsiteLeadContextFields } from './sales-opportunity-rules'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
@@ -3926,6 +3926,67 @@ export const adminAcceptCarrierImportDecision = createServerFn({ method: 'POST' 
     return { success: true }
   })
 
+/**
+ * Aceitar num só passo: aceita os registos (todos os pendentes de uma run,
+ * ou um só) E grava a ação de aplicação sugerida por suggestApplyActions —
+ * só para os casos inequívocos (novo ou correspondência exata). Os outros
+ * ficam como estavam (um registo pedido explicitamente é aceite na mesma,
+ * ficando a ação por escolher). Não aplica nada ao CRM: isso continua a
+ * ser só o adminApplyCarrierSyncRun.
+ */
+export const adminAcceptSuggestedCarrierRecords = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
+  .inputValidator((d: { runId: string; recordId?: string; decisionNote?: string }) => d)
+  .handler(async ({ data }) => {
+    const records = (await db.listCarrierImportRecords(data.runId, {})).filter((r) =>
+      (data.recordId ? r.id === data.recordId : true) &&
+      r.applyStatus !== 'applied' &&
+      (r.decisionStatus === 'pending' || (r.decisionStatus === 'accepted' && (!r.customerApplyAction || !r.policyApplyAction))),
+    )
+    let prepared = 0
+    const skipped: Array<{ recordId: string; policyNumber: string; reason: string }> = []
+    for (const r of records) {
+      const mapped = mapPortfolioRows(r.provider as CarrierProviderId, [r.rawPayload as Record<string, unknown>])
+      const row = mapped.recognized ? mapped.rows[0] : undefined
+      const suggestion = suggestApplyActions({
+        customerMatchStatus: r.customerMatchStatus,
+        policyMatchStatus: r.policyMatchStatus,
+        matchedIndividualClientId: r.matchedIndividualClientId,
+        matchedCompanyId: r.matchedCompanyId,
+        matchedPolicyId: r.matchedPolicyId,
+        customerName: row?.customerName,
+        taxId: row?.taxIdRaw,
+        externalPolicyNumber: row?.externalPolicyNumber ?? r.externalPolicyNumber,
+        startDate: row?.startDate,
+        endDate: row?.endDate,
+      })
+      const policyNumber = r.externalPolicyNumber ?? r.externalPolicyId ?? r.id
+      if (!suggestion.ok) {
+        if (data.recordId && r.decisionStatus === 'pending') {
+          await db.updateCarrierImportDecision(r.id, { decisionStatus: 'accepted', decisionNote: data.decisionNote })
+        }
+        skipped.push({ recordId: r.id, policyNumber, reason: suggestion.reason })
+        continue
+      }
+      if (r.decisionStatus === 'pending') {
+        await db.updateCarrierImportDecision(r.id, { decisionStatus: 'accepted', decisionNote: data.decisionNote })
+      }
+      try {
+        await db.setCarrierImportRecordApplyActions(r.id, {
+          customerApplyAction: suggestion.customerApplyAction,
+          policyApplyAction: suggestion.policyApplyAction,
+          selectedIndividualClientId: suggestion.selectedIndividualClientId,
+          selectedCompanyId: suggestion.selectedCompanyId,
+          selectedPolicyId: suggestion.selectedPolicyId,
+        })
+        prepared++
+      } catch (err) {
+        skipped.push({ recordId: r.id, policyNumber, reason: err instanceof Error ? err.message.replace(/^setCarrierImportRecordApplyActions: /, '') : 'Erro' })
+      }
+    }
+    return { prepared, skipped }
+  })
+
 export const adminRejectCarrierImportDecision = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { recordId: string; decisionNote?: string }) => d)
@@ -4150,14 +4211,17 @@ export const adminApplyCarrierSyncRun = createServerFn({ method: 'POST' })
     if (run.mode !== 'dry_run') {
       throw new Error('adminApplyCarrierSyncRun: only a manual dry-run reconciliation run can be applied')
     }
-    if (run.applyStatus === 'applied') {
-      throw new Error('adminApplyCarrierSyncRun: this run has already been fully applied')
-    }
     if (run.applyStatus === 'applying') {
       throw new Error('adminApplyCarrierSyncRun: this run is already being applied')
     }
 
     const records = await db.listCarrierImportRecords(runId)
+    // Uma run já aplicada pode voltar a ser aplicada para as linhas aceites
+    // depois disso (ex.: aceitou-se uma linha, aplicou-se, e só depois as
+    // restantes) — as linhas já aplicadas são saltadas ("already_applied").
+    if (run.applyStatus === 'applied' && !records.some((r) => r.decisionStatus === 'accepted' && r.applyStatus !== 'applied')) {
+      throw new Error('adminApplyCarrierSyncRun: this run has already been fully applied')
+    }
     const readiness = computeRunApplyReadiness(records.map(recordToApplyActionRowState))
     if (readiness.unresolvedCount > 0) {
       throw new Error(`adminApplyCarrierSyncRun: ${readiness.unresolvedCount} accepted record(s) still need an apply action`)
