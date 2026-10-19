@@ -116,7 +116,7 @@ function buildTemplateVars(key: MarketingTemplateKey, v: WizardVars): Record<str
 function CampaignStatusBadge({ status }: { status: string }) {
   const cfg: Record<string, { label: string; cls: string }> = {
     draft:     { label: 'Draft',    cls: 'bg-navy-100 text-navy-500' },
-    sending:   { label: 'Sending…', cls: 'bg-[#EEF2F7] text-[#223553] animate-pulse' },
+    sending:   { label: 'Sending…', cls: 'bg-[#EEF2F7] text-[#333332] animate-pulse' },
     sent:      { label: 'Sent',     cls: 'bg-green-100 text-green-700' },
     cancelled: { label: 'Cancelled', cls: 'bg-red-100 text-red-600' },
   }
@@ -297,7 +297,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
       const n = preview?.afterDedup ?? 1
       return (
         <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
-          <div className="w-10 h-10 border-4 border-[#17243D] border-t-transparent rounded-full animate-spin" />
+          <div className="w-10 h-10 border-4 border-[#292929] border-t-transparent rounded-full animate-spin" />
           <p className="text-sm font-medium text-navy-700">
             Sending to {n} recipient{n === 1 ? '' : 's'}…
           </p>
@@ -348,7 +348,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                     <button key={opt.value} type="button"
                       className={`text-left px-3 py-2.5 rounded-[4px] border transition-colors ${
                         audience === opt.value
-                          ? 'border-[#223553] bg-[#EEF2F7] ring-1 ring-[#223553]'
+                          ? 'border-[#333332] bg-[#EEF2F7] ring-1 ring-[#333332]'
                           : 'border-navy-200 hover:border-navy-400'
                       }`}
                       onClick={() => setAudience(opt.value)}
@@ -364,7 +364,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
               {singleMode && (
                 <div className="flex flex-col gap-2">
                   {singleSelected ? (
-                    <div className="flex items-center gap-2 px-3 py-2 bg-[#EEF2F7] border border-[#223553] rounded-[4px]">
+                    <div className="flex items-center gap-2 px-3 py-2 bg-[#EEF2F7] border border-[#333332] rounded-[4px]">
                       <span className="text-green-600 font-bold flex-shrink-0">✓</span>
                       <span className="text-sm text-navy-700 flex-1 min-w-0 truncate">
                         {singleSelected.fullName && <span className="font-semibold">{singleSelected.fullName} </span>}
@@ -386,7 +386,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                         />
                         {singleSearching && (
                           <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                            <div className="w-4 h-4 border-2 border-[#17243D] border-t-transparent rounded-full animate-spin" />
+                            <div className="w-4 h-4 border-2 border-[#292929] border-t-transparent rounded-full animate-spin" />
                           </div>
                         )}
                       </div>
@@ -423,7 +423,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
               <button key={opt.value} type="button"
                 className={`text-left px-4 py-3 rounded-[4px] border transition-colors ${
                   templateKey === opt.value
-                    ? 'border-[#223553] bg-[#EEF2F7] ring-1 ring-[#223553]'
+                    ? 'border-[#333332] bg-[#EEF2F7] ring-1 ring-[#333332]'
                     : 'border-navy-200 hover:border-navy-400'
                 }`}
                 onClick={() => handleSelectTemplate(opt.value)}
@@ -553,7 +553,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
           <div className="flex flex-col gap-4">
             {previewLoading && (
               <div className="flex items-center justify-center py-10">
-                <div className="w-8 h-8 border-4 border-[#17243D] border-t-transparent rounded-full animate-spin" />
+                <div className="w-8 h-8 border-4 border-[#292929] border-t-transparent rounded-full animate-spin" />
               </div>
             )}
             {previewError && (
@@ -588,7 +588,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
                     : 'There are no valid recipients for this audience. Go back to Step 1 and choose another audience.'}
                 </div>
               ) : (
-                <div className="bg-[#EEF2F7] border border-[#D7E0EC] rounded-[4px] p-3 text-sm text-[#223553]">
+                <div className="bg-[#EEF2F7] border border-[#D7E0EC] rounded-[4px] p-3 text-sm text-[#333332]">
                   ⚠️ You are about to send REAL emails to <strong>{preview.afterDedup} recipients</strong>. Confirm before continuing.
                 </div>
               )}
@@ -694,7 +694,7 @@ function MarketingWizard({ onClose, onSuccess }: { onClose: () => void; onSucces
         {/* Progress bar */}
         <div className="flex h-1 bg-navy-100 flex-shrink-0">
           {[1, 2, 3, 4, 5].map((s) => (
-            <div key={s} className={`flex-1 transition-colors duration-300 ${s <= step ? 'bg-[#223553]' : ''}`} />
+            <div key={s} className={`flex-1 transition-colors duration-300 ${s <= step ? 'bg-[#333332]' : ''}`} />
           ))}
         </div>
 
@@ -803,7 +803,7 @@ export function AdminMarketingPanel() {
 
       {loading && (
         <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-4 border-[#17243D] border-t-transparent rounded-full animate-spin" />
+          <div className="w-8 h-8 border-4 border-[#292929] border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
@@ -856,7 +856,7 @@ export function AdminMarketingPanel() {
                     </div>
                     {sendsLoading ? (
                       <div className="flex items-center justify-center py-6">
-                        <div className="w-6 h-6 border-4 border-[#17243D] border-t-transparent rounded-full animate-spin" />
+                        <div className="w-6 h-6 border-4 border-[#292929] border-t-transparent rounded-full animate-spin" />
                       </div>
                     ) : sendsError ? (
                       <p className="text-sm text-red-500">{sendsError}</p>

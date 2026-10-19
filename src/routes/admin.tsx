@@ -572,7 +572,7 @@ function AdminDashboardContent() {
                             setSelectedCompanyIds(new Set())
                           }
                         }}
-                        className="w-4 h-4 accent-[#17243D]"
+                        className="w-4 h-4 accent-[#292929]"
                       />
                       Select all
                     </label>
@@ -634,7 +634,7 @@ function AdminDashboardContent() {
                                   return next
                                 })
                               }}
-                              className="w-4 h-4 accent-[#17243D] cursor-pointer"
+                              className="w-4 h-4 accent-[#292929] cursor-pointer"
                             />
                           </div>
                           <button
@@ -1033,7 +1033,7 @@ function AdminDashboardContent() {
                                 setSelectedIndividualClientIds(new Set())
                               }
                             }}
-                            className="w-4 h-4 accent-[#17243D] cursor-pointer"
+                            className="w-4 h-4 accent-[#292929] cursor-pointer"
                           />
                         </th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Name</th>
@@ -1070,7 +1070,7 @@ function AdminDashboardContent() {
                                       return next
                                     })
                                   }}
-                                  className="w-4 h-4 accent-[#17243D] cursor-pointer"
+                                  className="w-4 h-4 accent-[#292929] cursor-pointer"
                                 />
                               </td>
                               <td className="px-4 py-3 text-sm font-medium text-navy-700">
@@ -1201,7 +1201,7 @@ function AdminDashboardContent() {
                     <select
                       value={selectedCompanyId}
                       onChange={(e) => setSelectedCompanyId(e.target.value)}
-                      className="px-4 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553] min-w-48"
+                      className="px-4 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332] min-w-48"
                     >
                       <option value="">All clients</option>
                       {companies.length > 0 && (
@@ -1340,7 +1340,7 @@ function AdminDashboardContent() {
                             setSelectedPolicyIds(new Set())
                           }
                         }}
-                        className="w-4 h-4 accent-[#17243D]"
+                        className="w-4 h-4 accent-[#292929]"
                       />
                       Select all
                     </label>
@@ -1563,7 +1563,7 @@ function AdminDashboardContent() {
                   <div className="bg-white rounded-[4px] border border-navy-200 p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="flex items-center gap-3">
-                        <div style={{width:36,height:36,borderRadius:4,background:'#223553',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
+                        <div style={{width:36,height:36,borderRadius:4,background:'#333332',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
                           <span style={{color:'#fff',fontWeight:700,fontSize:13}}>BZ</span>
                         </div>
                         <div>
@@ -2197,7 +2197,7 @@ function AdminDashboardTab({
           <select
             value={drillMonthValue ?? ''}
             onChange={(e) => setDrillDownMonth(e.target.value ? Number(e.target.value) : null)}
-            className="px-3 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-[#223553]"
+            className="px-3 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-[#333332]"
           >
             <option value="">Select month</option>
             {monthSelectOptions.filter((item) => item.value).map((item) => (
@@ -2405,7 +2405,7 @@ function AdminRenewalsPage({
                 value={renewalRiskMinValue}
                 onChange={(event) => setRenewalRiskMinValue(event.target.value)}
                 placeholder="Top financial risk"
-                className="w-44 px-2 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-[#223553]"
+                className="w-44 px-2 py-1.5 border border-navy-200 rounded-[2px] text-xs focus:outline-none focus:ring-2 focus:ring-[#333332]"
               />
             </label>
           </div>
@@ -2648,7 +2648,7 @@ function AdminRenewalsPage({
                                           setAssigneeDraftByKey((current) => ({ ...current, [alert.key]: value }))
                                         }}
                                         placeholder="Owner's email"
-                                        className="flex-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-[#223553]"
+                                        className="flex-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-[#333332]"
                                       />
                                       <datalist id={`responsible_${alert.key}`}>
                                         {responsibleOptions.map((option) => (
@@ -2680,7 +2680,7 @@ function AdminRenewalsPage({
                                       }}
                                       placeholder="Set next action for this policy"
                                       rows={2}
-                                      className="w-full mt-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-[#223553] resize-y"
+                                      className="w-full mt-1 px-2 py-1 text-[11px] border border-navy-200 rounded-[2px] bg-white focus:outline-none focus:ring-2 focus:ring-[#333332] resize-y"
                                     />
                                     <div className="flex items-center justify-between mt-1">
                                       <p className="text-[11px] text-navy-500">
@@ -2821,7 +2821,7 @@ function FinancialTimelineChart({
     <div>
       <div className="flex flex-wrap items-center gap-5 text-xs text-navy-500 mb-3">
         <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-navy-700 inline-block" /> Premiums</span>
-        <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-[#223553] inline-block" /> Commissions</span>
+        <span className="inline-flex items-center gap-2"><span className="w-3 h-0.5 bg-[#333332] inline-block" /> Commissions</span>
       </div>
       <div className="overflow-x-auto">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full min-w-[760px]" role="img" aria-label="Monthly premiums and commissions chart">
@@ -2839,8 +2839,8 @@ function FinancialTimelineChart({
               />
             )
           })}
-          <polyline fill="none" stroke="#17243D" strokeWidth="3" points={premiumPath} />
-          <polyline fill="none" stroke="#223553" strokeWidth="3" points={commissionPath} />
+          <polyline fill="none" stroke="#292929" strokeWidth="3" points={premiumPath} />
+          <polyline fill="none" stroke="#333332" strokeWidth="3" points={commissionPath} />
           {timeline.map((point, index) => (
             <g
               key={point.monthKey}
@@ -2855,8 +2855,8 @@ function FinancialTimelineChart({
                 }
               }}
             >
-              <circle cx={x(index)} cy={y(point.premiums)} r={selectedMonth === point.month ? '5' : '3.5'} fill="#17243D" />
-              <circle cx={x(index)} cy={y(point.commissions)} r={selectedMonth === point.month ? '5' : '3.5'} fill="#223553" />
+              <circle cx={x(index)} cy={y(point.premiums)} r={selectedMonth === point.month ? '5' : '3.5'} fill="#292929" />
+              <circle cx={x(index)} cy={y(point.commissions)} r={selectedMonth === point.month ? '5' : '3.5'} fill="#333332" />
               <text x={x(index)} y={height - 10} textAnchor="middle" fontSize="10" fill="#6B7280">
                 {point.label}
               </text>
@@ -2940,7 +2940,7 @@ function SendRenewalAlertsButton() {
         disabled={sending}
         style={{
           fontFamily: "'Montserrat', sans-serif", fontWeight: 600, fontSize: '0.82rem',
-          padding: '0.55rem 1rem', background: sending ? '#cccccc' : '#17243D',
+          padding: '0.55rem 1rem', background: sending ? '#cccccc' : '#292929',
           color: '#ffffff', border: 'none', borderRadius: '4px',
           cursor: sending ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem',
         }}
@@ -3080,7 +3080,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
         <p className="text-xs font-semibold text-navy-500 uppercase tracking-wide">
           Documentos {docs.length > 0 ? `(${docs.length})` : ''}
         </p>
-        <label className={`text-xs font-semibold px-2.5 py-1 rounded-[6px] inline-flex items-center gap-1 ${uploading ? 'bg-navy-100 text-navy-400 cursor-not-allowed' : 'bg-[#17243D] text-white hover:bg-[#223553] cursor-pointer'}`}>
+        <label className={`text-xs font-semibold px-2.5 py-1 rounded-[6px] inline-flex items-center gap-1 ${uploading ? 'bg-navy-100 text-navy-400 cursor-not-allowed' : 'bg-[#292929] text-white hover:bg-[#333332] cursor-pointer'}`}>
           {uploading ? 'A carregar…' : '+ Carregar'}
           <input
             ref={inputRef}
@@ -3268,7 +3268,7 @@ function CompanyForm({
               type="checkbox"
               checked={form.marketingOptOut}
               onChange={(e) => setForm((f) => ({ ...f, marketingOptOut: e.target.checked }))}
-              className="mt-0.5 w-4 h-4 accent-[#17243D]"
+              className="mt-0.5 w-4 h-4 accent-[#292929]"
             />
             <div>
               <span className="text-sm font-medium text-navy-700">Do not send marketing communications</span>
@@ -3935,12 +3935,12 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
         <div>
           <label className="block text-sm font-medium text-navy-600 mb-1">{clientType === 'company' ? 'Company' : 'Individual Client'}</label>
           {clientType === 'company' ? (
-            <select value={form.companyId} onChange={(e) => update('companyId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]" required>
+            <select value={form.companyId} onChange={(e) => update('companyId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332]" required>
               <option value="">Select company</option>
               {companies.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </select>
           ) : (
-            <select value={form.individualClientId} onChange={(e) => update('individualClientId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]" required>
+            <select value={form.individualClientId} onChange={(e) => update('individualClientId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332]" required>
               <option value="">Select client</option>
               {individualClients.map((c) => (<option key={c.id} value={c.id}>{c.fullName}{c.nif ? ` · ${c.nif}` : ''}</option>))}
             </select>
@@ -3948,7 +3948,7 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
         </div>
         <div>
           <label className="block text-sm font-medium text-navy-600 mb-1">Type</label>
-          <select value={form.type} onChange={(e) => update('type', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]" required>
+          <select value={form.type} onChange={(e) => update('type', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332]" required>
             <option value="">Select…</option>
             {Object.entries(POLICY_TYPE_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
           </select>
@@ -3967,7 +3967,7 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
           <select
             value={form.paymentFrequency}
             onChange={(e) => update('paymentFrequency', e.target.value)}
-            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]"
+            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332]"
           >
             <option value="mensal">Monthly</option>
             <option value="trimestral">Quarterly</option>
@@ -4015,7 +4015,7 @@ function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClien
       value="individual"
       onChange={handleChange}
       disabled={promoting}
-      className="text-xs border border-navy-200 rounded px-1.5 py-1 bg-white text-navy-700 focus:outline-none focus:ring-1 focus:ring-[#223553] disabled:opacity-50"
+      className="text-xs border border-navy-200 rounded px-1.5 py-1 bg-white text-navy-700 focus:outline-none focus:ring-1 focus:ring-[#333332] disabled:opacity-50"
     >
       <option value="individual">Individual</option>
       <option value="company">→ Company</option>
@@ -4261,7 +4261,7 @@ function IndividualClientForm({
           <select
             value={form.status}
             onChange={(e) => update('status', e.target.value)}
-            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]"
+            className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332]"
           >
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
@@ -4273,7 +4273,7 @@ function IndividualClientForm({
               type="checkbox"
               checked={form.marketingOptOut}
               onChange={(e) => setForm((f) => ({ ...f, marketingOptOut: e.target.checked }))}
-              className="mt-0.5 w-4 h-4 accent-[#17243D]"
+              className="mt-0.5 w-4 h-4 accent-[#292929]"
             />
             <div>
               <span className="text-sm font-medium text-navy-700">Do not send marketing communications</span>
@@ -4348,7 +4348,7 @@ function AdminPolicyList({ policies, companies, individualClients, onReload, sel
                     return next
                   })
                 }}
-                className="w-4 h-4 accent-[#17243D] cursor-pointer"
+                className="w-4 h-4 accent-[#292929] cursor-pointer"
               />
               <button onClick={() => setExpandedId(isExpanded ? null : policy.id)} className="text-navy-400 hover:text-navy-600 text-xs">
                 {isExpanded ? '▾' : '▸'}
@@ -4472,7 +4472,7 @@ function SendDocumentModal({
         </h3>
 
         {/* Referência readonly */}
-        <div style={{ background: '#F4F6F9', borderLeft: '3px solid #223553', borderRadius: 3, padding: '10px 14px', marginBottom: '1.25rem' }}>
+        <div style={{ background: '#F4F6F9', borderLeft: '3px solid #333332', borderRadius: 3, padding: '10px 14px', marginBottom: '1.25rem' }}>
           <p style={{ margin: '0 0 2px', fontSize: '0.7rem', color: '#888', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Policy</p>
           <p style={{ margin: '0 0 2px', fontSize: '0.95rem', fontWeight: 700, color: '#1B2B4B', fontFamily: 'Courier New, monospace', letterSpacing: '0.08em' }}>{policyNumber}</p>
           <p style={{ margin: '0 0 4px', fontSize: '0.78rem', color: '#555' }}>{insurer}</p>
@@ -4549,7 +4549,7 @@ function SendDocumentModal({
           <button
             onClick={handleSend}
             disabled={sending || !recipients.length}
-            style={{ padding: '0.5rem 1.3rem', background: recipients.length ? '#17243D' : '#ddd', border: 'none', borderRadius: 4, fontSize: '0.83rem', fontWeight: 700, cursor: recipients.length ? 'pointer' : 'not-allowed', color: recipients.length ? '#fff' : '#999' }}
+            style={{ padding: '0.5rem 1.3rem', background: recipients.length ? '#292929' : '#ddd', border: 'none', borderRadius: 4, fontSize: '0.83rem', fontWeight: 700, cursor: recipients.length ? 'pointer' : 'not-allowed', color: recipients.length ? '#fff' : '#999' }}
           >
             {sending ? 'Sending…' : 'Send document'}
           </button>
@@ -4818,7 +4818,7 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
     setSaving(false)
   }
 
-  const inp = 'w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-1 focus:ring-[#223553]'
+  const inp = 'w-full px-3 py-2 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-1 focus:ring-[#333332]'
   const lbl = 'block text-xs font-semibold text-navy-500 uppercase tracking-wide mb-1'
 
   return (
@@ -4875,7 +4875,7 @@ function PolicyEditForm({ policy, onSave }: { policy: Policy; onSave: (updates: 
           <input className={inp} value={form.emergencyContacts} onChange={e => u('emergencyContacts', e.target.value)} placeholder="Assistance Line: 800 XXX XXX" />
         </div>
         <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-2">
-          <input type="checkbox" id={`vp-${policy.id}`} checked={form.visiblePortal} onChange={e => u('visiblePortal', e.target.checked)} className="accent-[#17243D]" />
+          <input type="checkbox" id={`vp-${policy.id}`} checked={form.visiblePortal} onChange={e => u('visiblePortal', e.target.checked)} className="accent-[#292929]" />
           <label htmlFor={`vp-${policy.id}`} className="text-sm text-navy-600 cursor-pointer">Visible in customer portal</label>
         </div>
       </div>
@@ -4931,7 +4931,7 @@ function FormField({
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]"
+        className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332]"
         required={required}
       />
     </div>

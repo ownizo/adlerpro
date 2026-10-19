@@ -12,7 +12,7 @@ function QrCode({ value }: { value: string }) {
   const [svg, setSvg] = useState('')
   useEffect(() => {
     let cancelled = false
-    void import('qrcode').then((QR) => QR.toString(value, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#17243D', light: '#FFFFFF' } }))
+    void import('qrcode').then((QR) => QR.toString(value, { type: 'svg', margin: 1, errorCorrectionLevel: 'M', color: { dark: '#292929', light: '#FFFFFF' } }))
       .then((out) => { if (!cancelled) setSvg(out) })
       .catch(() => {})
     return () => { cancelled = true }

@@ -108,15 +108,20 @@ code {
    ============================================================ */
 
 .admin-backoffice-shell {
-  --admin-navy: #17243D;
-  --admin-navy-light: #223553;
-  --admin-ink: #172033;
-  --admin-muted: #667085;
-  --admin-page: #F6F7F9;
+  /* Paleta do site adlerrochefort.com (outubro 2026): carvão + laranja.
+     Os nomes "navy" ficam por compatibilidade — o valor é carvão. */
+  --admin-navy: #292929;
+  --admin-navy-light: #333332;
+  --admin-ink: #161616;
+  --admin-muted: #6E6A67;
+  --admin-page: #F7F6F5;
   --admin-card: #FFFFFF;
-  --admin-border: #E3E7EC;
+  --admin-border: #E6E3E1;
   --admin-red: #B8323E;
   --admin-red-dark: #872733;
+  --admin-accent: #FF6300;
+  --admin-accent-hover: #E05600;
+  --admin-accent-soft: #FFF1E8;
   background: var(--admin-page);
   color: var(--admin-ink);
 
@@ -137,40 +142,40 @@ code {
      safety net for anything not already replaced by an explicit
      `.admin-btn-*` class below — never bright gold/amber in /admin.
      ---------------------------------------------------------------- */
-  --color-navy-50: #F6F7F9;
-  --color-navy-100: #ECEFF3;
-  --color-navy-200: #E3E7EC;
-  --color-navy-300: #C7CDD6;
-  --color-navy-400: #98A2B3;
-  --color-navy-500: #667085;
-  --color-navy-600: #475467;
-  --color-navy-700: #172033;
-  --color-navy-800: #17243D;
-  --color-navy-900: #17243D;
-  --color-navy-950: #0D1420;
+  --color-navy-50: #F7F6F5;
+  --color-navy-100: #EFEDEB;
+  --color-navy-200: #E6E3E1;
+  --color-navy-300: #D1CFCE;
+  --color-navy-400: #A39F9C;
+  --color-navy-500: #6E6A67;
+  --color-navy-600: #4F4C4A;
+  --color-navy-700: #292929;
+  --color-navy-800: #292929;
+  --color-navy-900: #1C1C1C;
+  --color-navy-950: #161616;
 
-  --color-gold: #17243D;
-  --color-gold-50: #EEF1F5;
-  --color-gold-100: #E3E7EC;
-  --color-gold-200: #D7DDE4;
-  --color-gold-300: #C7CDD6;
-  --color-gold-400: #E3E7EC;
-  --color-gold-500: #C7CDD6;
-  --color-gold-600: #98A2B3;
-  --color-gold-700: #667085;
-  --color-gold-800: #475467;
-  --color-gold-900: #172033;
+  --color-gold: #292929;
+  --color-gold-50: #F4F2F0;
+  --color-gold-100: #EBE9E8;
+  --color-gold-200: #E2DFDD;
+  --color-gold-300: #D1CFCE;
+  --color-gold-400: #EBE9E8;
+  --color-gold-500: #D1CFCE;
+  --color-gold-600: #A39F9C;
+  --color-gold-700: #6E6A67;
+  --color-gold-800: #4F4C4A;
+  --color-gold-900: #292929;
 
-  --color-amber-50: #EEF2F7;
-  --color-amber-100: #E1E7EF;
-  --color-amber-200: #C7D2E0;
-  --color-amber-300: #A9B8CC;
-  --color-amber-400: #8496AF;
-  --color-amber-500: #64758F;
-  --color-amber-600: #475467;
-  --color-amber-700: #223553;
-  --color-amber-800: #172033;
-  --color-amber-900: #101828;
+  --color-amber-50: #F4F2F0;
+  --color-amber-100: #EBE9E8;
+  --color-amber-200: #D9D6D4;
+  --color-amber-300: #BDB9B6;
+  --color-amber-400: #9A9693;
+  --color-amber-500: #75716E;
+  --color-amber-600: #4F4C4A;
+  --color-amber-700: #333332;
+  --color-amber-800: #292929;
+  --color-amber-900: #1C1C1C;
 }
 
 .admin-backoffice-shell,
@@ -207,7 +212,7 @@ code {
   font-size: 0.62rem;
   font-weight: 600;
   letter-spacing: 0.14em;
-  color: #D88991;
+  color: #FF8A3D;
 }
 
 .admin-brand-sub {
@@ -1206,7 +1211,7 @@ code {
   padding-bottom: 0.5rem;
   /* Thin, neutral scrollbar — scoped to the Pipeline Kanban only. */
   scrollbar-width: thin;
-  scrollbar-color: #C7CDD6 transparent;
+  scrollbar-color: #D1CFCE transparent;
 }
 
 .admin-kanban-scroll::-webkit-scrollbar {
@@ -1218,20 +1223,20 @@ code {
 }
 
 .admin-kanban-scroll::-webkit-scrollbar-thumb {
-  background-color: #C7CDD6;
+  background-color: #D1CFCE;
   border-radius: 9999px;
 }
 
 .admin-kanban-scroll::-webkit-scrollbar-thumb:hover {
-  background-color: #98A2B3;
+  background-color: #A39F9C;
 }
 
 .admin-kanban-column {
   flex-shrink: 0;
   width: 308px;
   border-radius: 9px;
-  border: 1px solid #DDE2E8;
-  background: #F3F5F7;
+  border: 1px solid #E2DFDD;
+  background: #F4F2F0;
   display: flex;
   flex-direction: column;
   max-height: calc(100vh - 320px);
@@ -1242,8 +1247,8 @@ code {
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #F3F5F7;
-  border-bottom: 1px solid #DDE2E8;
+  background: #F4F2F0;
+  border-bottom: 1px solid #E2DFDD;
   border-radius: 9px 9px 0 0;
 }
 
@@ -1343,7 +1348,7 @@ code {
 }
 
 .admin-table thead th {
-  background: #F8FAFC;
+  background: #FAF9F8;
 }
 
 /* ---------- Button system ---------- */
@@ -1394,7 +1399,7 @@ code {
 
 .admin-btn-secondary:hover:not(:disabled) {
   background: var(--admin-page);
-  border-color: #C7CDD6;
+  border-color: #D1CFCE;
 }
 
 .admin-btn-danger {
@@ -1445,7 +1450,7 @@ code {
 }
 
 .admin-chip--info {
-  background: #EEF2F7;
+  background: #F4F2F0;
   color: var(--admin-navy-light);
 }
 
@@ -1482,13 +1487,13 @@ code {
 }
 
 .admin-row-action--secondary {
-  background: #EEF2F7;
-  border-color: #D7E0EC;
+  background: #F4F2F0;
+  border-color: #E2DFDD;
   color: var(--admin-navy-light);
 }
 
 .admin-row-action--secondary:hover {
-  background: #E1E9F2;
+  background: #EBE9E8;
 }
 
 .admin-row-action--danger {
@@ -1516,8 +1521,8 @@ code {
 }
 
 .admin-selection-bar--active {
-  background: #EEF2F7;
-  border: 1px solid #D7E0EC;
+  background: #F4F2F0;
+  border: 1px solid #E2DFDD;
   color: var(--admin-ink);
 }
 
@@ -2060,7 +2065,7 @@ button.admin-user-avatar:focus-visible {
   }
 
   .admin-app .admin-bottom-nav-item.is-active svg {
-    background: #E8EDF5;
+    background: #FFF1E8;
   }
 }
 
@@ -2114,7 +2119,7 @@ button.admin-user-avatar:focus-visible {
   width: 38px;
   height: 5px;
   border-radius: 999px;
-  background: #D0D5DD;
+  background: #D1CFCE;
   margin: 8px auto 2px;
   flex-shrink: 0;
 }
@@ -2161,7 +2166,7 @@ button.admin-user-avatar:focus-visible {
   width: 48px;
   height: 48px;
   border-radius: 14px;
-  background: #F0F3F8;
+  background: #F4F2F0;
   color: var(--admin-navy);
   display: flex;
   align-items: center;
@@ -2267,7 +2272,7 @@ button.admin-user-avatar:focus-visible {
   border: 2px solid #C5CCD6; background: #FFFFFF; cursor: pointer;
   transition: border-color 120ms ease, background-color 120ms ease;
 }
-.today-check:hover { border-color: var(--admin-navy); background: #EEF2F7; }
+.today-check:hover { border-color: var(--admin-navy); background: #F4F2F0; }
 .today-snooze {
   flex-shrink: 0; font-size: 12px; font-weight: 600; color: var(--admin-muted);
   border: 1px solid var(--admin-border); background: #FFFFFF; border-radius: 999px; padding: 0.3rem 0.65rem;
@@ -2294,12 +2299,12 @@ button.admin-user-avatar:focus-visible {
 
 /* ---------- Visitas do site: filtro por dia ---------- */
 .sv-day-row { cursor: pointer; }
-.sv-day-row:hover td { background: #F3F6FA; }
-.sv-day-row.is-selected td { background: #E8EDF5; font-weight: 600; }
+.sv-day-row:hover td { background: #FAF9F8; }
+.sv-day-row.is-selected td { background: #FFF1E8; font-weight: 600; }
 .sv-day-row:focus-visible { outline: 2px solid var(--admin-navy); outline-offset: -2px; }
 .sv-focus {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.6rem;
-  padding: 0.7rem 0.9rem; border-radius: 12px; background: #E8EDF5; color: var(--admin-ink); font-size: 13.5px;
+  padding: 0.7rem 0.9rem; border-radius: 12px; background: #FFF1E8; color: var(--admin-ink); font-size: 13.5px;
 }
 .sv-focus button {
   border: 0; border-radius: 999px; padding: 0.35rem 0.8rem; background: var(--admin-navy); color: #FFFFFF;
@@ -2307,18 +2312,18 @@ button.admin-user-avatar:focus-visible {
 }
 
 /* ---------- Visibilidade em IA ---------- */
-.aiv-bar { height: 8px; border-radius: 999px; background: #EEF1F5; overflow: hidden; margin-top: 6px; }
+.aiv-bar { height: 8px; border-radius: 999px; background: #F0EEEC; overflow: hidden; margin-top: 6px; }
 .aiv-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--admin-navy); }
 .aiv-own td { font-weight: 700; color: var(--admin-navy); }
 .aiv-row { cursor: pointer; }
-.aiv-row:hover td { background: #F3F6FA; }
+.aiv-row:hover td { background: #FAF9F8; }
 .aiv-row.is-off td { opacity: 0.5; }
-.aiv-lang { display: inline-block; min-width: 24px; padding: 1px 5px; margin-right: 4px; border-radius: 5px; background: #EEF1F5; color: var(--admin-muted); font-size: 10.5px; font-weight: 700; text-align: center; }
+.aiv-lang { display: inline-block; min-width: 24px; padding: 1px 5px; margin-right: 4px; border-radius: 5px; background: #F0EEEC; color: var(--admin-muted); font-size: 10.5px; font-weight: 700; text-align: center; }
 .aiv-dot { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 24px; padding: 0 6px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--admin-muted); }
 .aiv-dot.is-yes { background: #E3F4EA; color: #146C3A; }
 .aiv-dot.is-no { background: #F6EDEE; color: var(--admin-red); }
 .aiv-dot.is-err { background: #FFF4DB; color: #8A5A00; }
-.aiv-detail td { background: #FAFBFC; }
+.aiv-detail td { background: #FAF9F8; }
 .aiv-answer + .aiv-answer { margin-top: 0.9rem; padding-top: 0.9rem; border-top: 1px solid var(--admin-border); }
 .aiv-answer-head { font-size: 13px; color: var(--admin-ink); }
 .aiv-answer-text { margin-top: 0.4rem; font-size: 13px; line-height: 1.5; color: var(--admin-muted); white-space: pre-wrap; max-height: 260px; overflow-y: auto; }
@@ -2391,7 +2396,7 @@ button.admin-user-avatar:focus-visible {
 }
 
 /* ---------- Visitas do site: período em segmentos + top 5 ---------- */
-.sv-periods { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; padding: 0.2rem; border-radius: 10px; background: #EEF1F6; }
+.sv-periods { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; padding: 0.2rem; border-radius: 10px; background: #EFEDEB; }
 .sv-period { border: 0; background: transparent; padding: 0.45rem 0.8rem; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--admin-muted); white-space: nowrap; }
 .sv-period.is-active { background: var(--admin-card); color: var(--admin-ink); box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12); }
 .sv-more-row td { border-bottom: 0 !important; padding-top: 0.5rem !important; }
@@ -2400,3 +2405,20 @@ button.admin-user-avatar:focus-visible {
   .sv-periods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
   .sv-period { padding: 0.55rem 0.2rem; font-size: 12.5px; white-space: normal; line-height: 1.2; }
 }
+
+/* ---------- Carvão + laranja: acentos laranja (como no site) ---------- */
+.admin-nav-item-active::before { background: var(--admin-accent) !important; }
+.admin-brand-tag { color: var(--admin-accent) !important; }
+.admin-nav-badge, .admin-header-icon-badge, .admin-sheet-tile-badge { background: var(--admin-accent) !important; }
+.admin-create-button { background: var(--admin-accent) !important; }
+.admin-create-button:hover { background: var(--admin-accent-hover) !important; }
+.admin-bottom-nav-item.is-active { color: var(--admin-accent) !important; }
+.admin-backoffice-shell a:not([class]):hover { color: var(--admin-accent); }
+.admin-backoffice-shell :is(input, select, textarea):focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 1px; }
+.admin-kpi-card--strong .admin-kpi-value { color: #FFFFFF; }
+.admin-kpi-card--strong::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--admin-accent); }
+.admin-kpi-card--strong { position: relative; overflow: hidden; }
+.sv-period.is-active { box-shadow: inset 0 -2px 0 var(--admin-accent), 0 1px 3px rgba(22, 22, 22, 0.12); }
+.sv-more, .today-add button:not(:disabled):hover { color: var(--admin-accent); }
+.aiv-own td { color: var(--admin-accent-hover); font-weight: 700; }
+.aiv-bar > span { background: var(--admin-accent) !important; }

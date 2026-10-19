@@ -130,7 +130,7 @@ export function ClientTasks({ companyId, individualClientId }: Props) {
       <div className="mb-4 space-y-2">
         <input
           type="text"
-          className="w-full rounded-[4px] border border-navy-200 px-3 py-2 text-sm text-navy-700 placeholder:text-navy-400 focus:outline-none focus:ring-1 focus:ring-[#223553]"
+          className="w-full rounded-[4px] border border-navy-200 px-3 py-2 text-sm text-navy-700 placeholder:text-navy-400 focus:outline-none focus:ring-1 focus:ring-[#333332]"
           placeholder="Task title…"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -139,7 +139,7 @@ export function ClientTasks({ companyId, individualClientId }: Props) {
         <div className="flex items-center gap-2">
           <input
             type="date"
-            className="flex-1 rounded-[4px] border border-navy-200 px-3 py-2 text-sm text-navy-700 focus:outline-none focus:ring-1 focus:ring-[#223553]"
+            className="flex-1 rounded-[4px] border border-navy-200 px-3 py-2 text-sm text-navy-700 focus:outline-none focus:ring-1 focus:ring-[#333332]"
             value={dueDate}
             onChange={(e) => setDueDate(e.target.value)}
             disabled={saving}
