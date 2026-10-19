@@ -142,10 +142,10 @@ function summariseAll(rows: SiteVisitRow[], leadDates: string[], days: number, n
       leads,
       avgSeconds: durN ? Math.round(durSum / durN) : 0,
     },
-    sources: top(sources, (v) => v, 15).map(([label, visits]) => ({ label, visits })),
-    pages: top(pages, (v) => v.views, 25).map(([path, v]) => ({ path, ...v })),
-    countries: top(countries, (v) => v.size, 15).map(([country, v]) => ({ country, visits: v.size })),
-    languages: top(languages, (v) => v, 12).map(([lang, views]) => ({ lang, views })),
+    sources: top(sources, (v) => v, 50).map(([label, visits]) => ({ label, visits })),
+    pages: top(pages, (v) => v.views, 200).map(([path, v]) => ({ path, ...v })),
+    countries: top(countries, (v) => v.size, 100).map(([country, v]) => ({ country, visits: v.size })),
+    languages: top(languages, (v) => v, 30).map(([lang, views]) => ({ lang, views })),
     devices: top(devices, (v) => v, 3).map(([device, views]) => ({ device, views })),
   }
 }

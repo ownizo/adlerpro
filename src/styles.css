@@ -2389,3 +2389,14 @@ button.admin-user-avatar:focus-visible {
   table.ar-stack tr.aiv-row.is-off { opacity: 0.55; }
   table.ar-stack td::before { overflow-wrap: normal; word-break: normal; white-space: nowrap; }
 }
+
+/* ---------- Visitas do site: período em segmentos + top 5 ---------- */
+.sv-periods { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; padding: 0.2rem; border-radius: 10px; background: #EEF1F6; }
+.sv-period { border: 0; background: transparent; padding: 0.45rem 0.8rem; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--admin-muted); white-space: nowrap; }
+.sv-period.is-active { background: var(--admin-card); color: var(--admin-ink); box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12); }
+.sv-more-row td { border-bottom: 0 !important; padding-top: 0.5rem !important; }
+.sv-more { border: 0; background: transparent; padding: 0; font-size: 13px; font-weight: 600; color: var(--admin-navy); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+@media (max-width: 639px) {
+  .sv-periods { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); width: 100%; }
+  .sv-period { padding: 0.55rem 0.2rem; font-size: 12.5px; white-space: normal; line-height: 1.2; }
+}
