@@ -90,7 +90,7 @@ export function ClientNotes({ companyId, individualClientId }: Props) {
       {/* Add note */}
       <div className="mb-4 space-y-2">
         <textarea
-          className="w-full rounded-[4px] border border-navy-200 px-3 py-2 text-sm text-navy-700 placeholder:text-navy-400 focus:outline-none focus:ring-1 focus:ring-[#223553] resize-none"
+          className="w-full rounded-[4px] border border-navy-200 px-3 py-2 text-sm text-navy-700 placeholder:text-navy-400 focus:outline-none focus:ring-1 focus:ring-[#333332] resize-none"
           rows={3}
           placeholder="Write a note…"
           value={body}

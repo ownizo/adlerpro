@@ -113,7 +113,7 @@ function ImportPortfolioPage() {
             <select
               value={provider}
               onChange={(e) => setProvider(e.target.value as CarrierProviderId | '')}
-              className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#223553]"
+              className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332]"
               disabled={submitting}
             >
               <option value="">Select insurer</option>

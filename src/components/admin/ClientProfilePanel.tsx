@@ -52,7 +52,7 @@ function buildClientTimeline(
 const KIND_DOT: Record<TimelineEntry['kind'], string> = {
   policy: 'bg-blue-400',
   claim: 'bg-red-400',
-  document: 'bg-[#223553]',
+  document: 'bg-[#333332]',
 }
 
 export function ClientProfilePanel({ subject, policies, claims, documents }: Props) {
