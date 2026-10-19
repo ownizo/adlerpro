@@ -45,8 +45,8 @@ const PORTFOLIO_SERVER_FN_NAMES = ['adminPreviewPortfolioImport', 'adminCancelCa
 
 // ── provider allowlist ────────────────────────────────────────────────
 
-test('PROVIDER ALLOWLIST: exactly mgen/allianz/zurich/hiscox/innovarisk, nothing else', () => {
-  assert.deepEqual([...CARRIER_PROVIDERS].sort(), ['allianz', 'hiscox', 'innovarisk', 'mgen', 'zurich'])
+test('PROVIDER ALLOWLIST: exactly mgen/allianz/zurich/hiscox/innovarisk/seguramos, nothing else', () => {
+  assert.deepEqual([...CARRIER_PROVIDERS].sort(), ['allianz', 'hiscox', 'innovarisk', 'mgen', 'seguramos', 'zurich'])
 })
 
 test('PROVIDER ALLOWLIST: isValidCarrierProvider accepts only allowlisted values, rejects everything else including case variants', () => {

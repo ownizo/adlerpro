@@ -2329,7 +2329,7 @@ export async function applyCarrierImportRecord(recordId: string): Promise<ApplyC
     newCompany = result.fields as unknown as Record<string, unknown>
   }
   if (record.policyApplyAction === 'create_policy') {
-    const insurer = CARRIER_PROVIDER_LABELS[record.provider as CarrierProviderId] ?? record.provider
+    const insurer = mappedRow?.insurerName ?? CARRIER_PROVIDER_LABELS[record.provider as CarrierProviderId] ?? record.provider
     const result = mapParsedRowToNewPolicyFields(mappedRow!, insurer)
     if (!result.ok) {
       await markCarrierImportRecordApplyFailed(recordId, result.error)

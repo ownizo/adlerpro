@@ -39,3 +39,13 @@ test('policy type from product', () => {
   assert.equal(inferPolicyType({ sanitizedRaw: {}, productDescription: 'Plano X' }, 'MGEN'), 'health')
   assert.equal(inferPolicyType({ sanitizedRaw: {}, productDescription: 'Plano X' }, 'Zurich'), 'other')
 })
+
+test('company name without NIF → review, never creates an individual', async () => {
+  const { looksLikeCompanyName } = await import('./carrier-apply-actions.ts')
+  assert.equal(looksLikeCompanyName('RODOPIO CHARME ATIVIDADES TURISTICAS HOTELEIRAS'), true)
+  assert.equal(looksLikeCompanyName('HUGO MIGUEL REBOLO GONÇALVES'), false)
+  const s = suggestApplyActions({ ...base, customerMatchStatus: 'new', policyMatchStatus: 'new', customerName: 'ACME LDA' })
+  assert.equal(s.ok, false)
+  assert.equal(inferPolicyType({ sanitizedRaw: {}, productDescription: 'M.RISCOS EMPRESA' }, 'Fidelidade'), 'property')
+  assert.equal(inferPolicyType({ sanitizedRaw: {}, productDescription: 'AUTOMOVEL' }, 'Allianz'), 'auto')
+})

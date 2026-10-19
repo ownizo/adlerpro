@@ -4244,8 +4244,35 @@ export const adminApplyCarrierSyncRun = createServerFn({ method: 'POST' })
     let updatedPolicies = 0
     const results: Array<{ recordId: string; status: string; error?: string }> = []
 
+    // O mesmo tomador em várias linhas (ex.: duas apólices do mesmo
+    // cliente): a primeira cria o cliente, as seguintes ligam-se a ele —
+    // nunca cria clientes duplicados dentro da mesma importação.
+    const createdCustomers = new Map<string, { individualClientId?: string; companyId?: string }>()
+    const customerKey = (r: typeof acceptedRecords[number]) => {
+      const mapped = mapPortfolioRows(r.provider as CarrierProviderId, [r.rawPayload as Record<string, unknown>])
+      const row = mapped.recognized ? mapped.rows[0] : undefined
+      const name = (row?.customerName ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, ' ').trim()
+      return name ? `${name}|${(row?.taxIdRaw ?? '').replace(/\D/g, '')}` : undefined
+    }
+
     for (const record of acceptedRecords) {
+      const isCreate = record.customerApplyAction === 'create_individual' || record.customerApplyAction === 'create_company'
+      const key = isCreate && record.applyStatus !== 'applied' ? customerKey(record) : undefined
+      const earlier = key ? createdCustomers.get(key) : undefined
+      if (earlier && record.policyApplyAction) {
+        await db.setCarrierImportRecordApplyActions(record.id, {
+          customerApplyAction: earlier.companyId ? 'link_existing_company' : 'link_existing_individual',
+          policyApplyAction: record.policyApplyAction,
+          selectedIndividualClientId: earlier.companyId ? undefined : earlier.individualClientId,
+          selectedCompanyId: earlier.companyId,
+          selectedPolicyId: record.selectedPolicyId,
+        })
+        record.customerApplyAction = earlier.companyId ? 'link_existing_company' : 'link_existing_individual'
+      }
       const result = await db.applyCarrierImportRecord(record.id)
+      if (key && !earlier && result.status === 'applied' && (result.individualClientId || result.companyId)) {
+        createdCustomers.set(key, { individualClientId: result.individualClientId, companyId: result.companyId })
+      }
       results.push({ recordId: record.id, status: result.status, error: result.error })
 
       if (result.status === 'applied') {

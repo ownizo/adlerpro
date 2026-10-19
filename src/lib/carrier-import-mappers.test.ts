@@ -497,3 +497,21 @@ test('INNOVARISK Policy List: policy, client, address, period (end = day before 
   assert.equal(r.carrierPlanId, 'EDR')
   assert.equal(mapPortfolioRows('innovarisk', [{ anything: 'x' }]).recognized, false)
 })
+
+test('SEGURAMOS apolices CSV: insurer per row, product, current annual period, leading zeros kept', async () => {
+  const { currentAnnualPeriod, cleanInsurerName } = await import('./carrier-import-mappers.ts')
+  const row = { 'Apólice': '0011084844', 'Adesão': '', 'Tomador': 'SERGIO EXEMPLO', 'Companhia': 'GENERALI SEGUROS S A (EX-TRANQUILIDADE S A)', 'Produto': 'AUTOMOVEL', 'Data de Início': '17/06/2026', 'Estado': 'Em Vigor', 'Comercial': 'X', 'Angariador': 'OWNIZO UNIPESSOAL LDA', 'Canal Cobrança': 'Companhia' }
+  const result = mapPortfolioRows('seguramos', [normalizeRowKeys(row)])
+  assert.equal(result.recognized, true)
+  const r = result.rows[0]!
+  assert.equal(r.externalPolicyNumber, '0011084844')
+  assert.equal(r.customerName, 'SERGIO EXEMPLO')
+  assert.equal(r.insurerName, 'Generali Tranquilidade')
+  assert.equal(r.productDescription, 'AUTOMOVEL')
+  assert.equal(r.effectiveDate, '2026-06-17')
+  assert.equal(r.carrierStatus, 'active')
+  assert.equal(cleanInsurerName('ALLIANZ PORTUGAL S A'), 'Allianz')
+  assert.deepEqual(currentAnnualPeriod('2025-09-11', new Date(Date.UTC(2026, 9, 19))), { startDate: '2026-09-11', endDate: '2027-09-10' })
+  assert.deepEqual(currentAnnualPeriod('2025-11-03', new Date(Date.UTC(2026, 9, 19))), { startDate: '2025-11-03', endDate: '2026-11-02' })
+  assert.deepEqual(currentAnnualPeriod('2026-06-17', new Date(Date.UTC(2026, 9, 19))), { startDate: '2026-06-17', endDate: '2027-06-16' })
+})
