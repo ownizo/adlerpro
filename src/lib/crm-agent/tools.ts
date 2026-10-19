@@ -7,7 +7,7 @@
 //    attachments) — health questionnaires and similar never land here.
 //  - Results are compact JSON so Claude can reason over them cheaply.
 
-import { recordExternalResult, getVisibilitySummary, startBackgroundRuns } from '../ai-visibility.server.ts'
+import { recordExternalResult, getVisibilitySummary, startBackgroundRuns, reanalyseStored } from '../ai-visibility.server.ts'
 import { ENGINES, type Engine } from '../ai-visibility.ts'
 import { sb, lisbonDate, addDays, isDate, cleanSearch, normalizeEmail, normalizePolicyNumber, logActivity, ToolError } from './core.ts'
 
@@ -615,7 +615,12 @@ async function aiVisibilityReport(args: Json) {
   return { ...s, prompts: s.prompts.map((p) => ({ ...p, latest: Object.fromEntries(Object.entries(p.latest).map(([k, v]) => [k, v ? { ...v, excerpt: v.excerpt?.slice(0, 400) ?? null } : v])) })) }
 }
 
-async function startAiVisibilityTest() {
+async function startAiVisibilityTest(args: Json) {
+  if (args.reanalyse_only === true) {
+    const n = await reanalyseStored()
+    await logActivity(ACTOR, 'reanalyse_ai_visibility', 'ai_vis', null, `Respostas reanalisadas: ${n}`)
+    return { reanalysed: n }
+  }
   const r = await startBackgroundRuns()
   if (!r.started.length) throw new ToolError('Could not start the test (no engine configured or the background run failed)')
   await logActivity(ACTOR, 'start_ai_visibility_test', 'ai_vis', null, `Teste de visibilidade iniciado: ${r.started.join(', ')}`)
@@ -700,7 +705,7 @@ export const CRM_TOOLS: CrmTool[] = [
   {
     name: 'start_ai_visibility_test', title: 'Start AI visibility test', readOnly: false,
     description: 'Start a new run of every active tracked prompt on every configured AI engine (Claude, ChatGPT, Gemini, Perplexity — their own APIs with web search) in the background. Results appear in ai_visibility_report after 5–15 minutes.',
-    inputSchema: { type: 'object', properties: {} },
+    inputSchema: { type: 'object', properties: { reanalyse_only: { type: 'boolean', description: 'true = do not call the assistants, only re-analyse stored answers (after the competitor list changed)' } } },
     handler: startAiVisibilityTest,
   },
   {
