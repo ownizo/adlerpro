@@ -83,18 +83,37 @@ function location(market: string | null) {
     : { country: 'PT', city: 'Lisbon', timezone: 'Europe/Lisbon' }
 }
 
-async function post(url: string, headers: Record<string, string>, body: unknown): Promise<{ ok: boolean; status: number; json: any }> {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), 150_000)
-  try {
-    const res = await fetch(url, { method: 'POST', signal: ctrl.signal, headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
-    let json: any = null
-    try { json = await res.json() } catch { /* empty */ }
-    return { ok: res.ok, status: res.status, json }
-  } finally {
-    clearTimeout(timer)
+const RETRY_STATUS = new Set([429, 500, 502, 503, 504, 529])
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+/** POST with retries on rate limits / overload (honours Retry-After, max ~2 min of waiting). */
+async function post(url: string, headers: Record<string, string>, body: unknown, attempts = 4): Promise<{ ok: boolean; status: number; json: any }> {
+  let last: { ok: boolean; status: number; json: any } = { ok: false, status: 0, json: null }
+  for (let i = 0; i < attempts; i++) {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 150_000)
+    let retryAfter = 0
+    try {
+      const res = await fetch(url, { method: 'POST', signal: ctrl.signal, headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify(body) })
+      let json: any = null
+      try { json = await res.json() } catch { /* empty */ }
+      last = { ok: res.ok, status: res.status, json }
+      retryAfter = Number(res.headers.get('retry-after')) || 0
+    } catch (err) {
+      last = { ok: false, status: 0, json: { error: { message: err instanceof Error ? err.message : String(err) } } }
+    } finally {
+      clearTimeout(timer)
+    }
+    if (last.ok || !(last.status === 0 || RETRY_STATUS.has(last.status))) return last
+    // a quota that is simply exhausted will not recover in seconds
+    if (last.status === 429 && /quota|billing|credit/i.test(JSON.stringify(last.json ?? ''))) return last
+    if (i < attempts - 1) await sleep(Math.min(60_000, retryAfter ? retryAfter * 1000 : 5_000 * 3 ** i))
   }
+  return last
 }
+
+/** How many prompts each engine runs in parallel (rate limits differ a lot). */
+export const ENGINE_CONCURRENCY: Partial<Record<Engine, number>> = { CLAUDE: 3, CHATGPT: 3, GEMINI: 1, PERPLEXITY: 1 }
 
 function errorOf(r: { status: number; json: any }) {
   const m = r.json?.error?.message ?? r.json?.error ?? r.json?.message ?? r.json?.detail
@@ -161,12 +180,10 @@ async function askPerplexity(prompt: string): Promise<Answer> {
   const key = process.env.PERPLEXITY_API_KEY!
   const preset = process.env.PERPLEXITY_VISIBILITY_PRESET || 'fast'
   const r = await post('https://api.perplexity.ai/v1/agent', { authorization: `Bearer ${key}` }, { preset, input: prompt })
-  if (r.ok) return done(r.json, `perplexity:${preset}`)
-  const c = await post('https://api.perplexity.ai/chat/completions', { authorization: `Bearer ${key}` }, {
-    model: 'sonar', messages: [{ role: 'user', content: prompt }],
-  })
-  if (c.ok) return done(c.json, 'sonar')
-  throw new Error(`${errorOf(r)} / ${errorOf(c)}`.slice(0, 300))
+  if (!r.ok) throw new Error(errorOf(r))
+  const a = done(r.json, `perplexity:${preset}`)
+  // Perplexity numbers its sources [1][2]… in the text: the search results are the citations
+  return { ...a, citations: [...new Set([...a.citations, ...a.sources])] }
 }
 
 export async function askEngine(engine: Engine, prompt: string, market: string | null): Promise<Answer> {

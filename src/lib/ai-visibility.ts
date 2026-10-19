@@ -72,7 +72,7 @@ export type ResultRow = {
   competitors: string[]; cited_urls: string[]; answer_excerpt: string | null; error: string | null
 }
 
-export type EngineStat = { engine: Engine; runs: number; mentioned: number; cited: number; visibility: number; avgPosition: number | null; lastDay: string | null }
+export type EngineStat = { engine: Engine; runs: number; mentioned: number; cited: number; visibility: number; avgPosition: number | null; lastDay: string | null; errors: number; lastError: string | null }
 export type PromptStat = {
   id: string; prompt: string; language: string | null; topic: string | null; active: boolean; source: string
   runs: number; visibility: number
@@ -84,6 +84,17 @@ export type VisibilitySummary = {
   prompts: PromptStat[]
   competitors: Array<{ name: string; mentions: number; share: number }>
   weeks: Array<{ week: string; visibility: number; runs: number }>
+}
+
+/** Turn provider error messages into something actionable. */
+export function explainError(err: string): string {
+  if (/credit balance is too low|purchase credits/i.test(err)) return 'Conta da API sem crédito — carregue saldo no painel de faturação do fornecedor.'
+  if (/exceeded your current quota|check your plan and billing/i.test(err)) return 'Chave sem quota — ative a faturação (billing) na conta do fornecedor.'
+  if (/rate limit/i.test(err) || /HTTP 429/.test(err)) return 'Limite de pedidos atingido — o próximo teste volta a tentar.'
+  if (/overloaded|HTTP 5\d\d/i.test(err)) return 'Serviço sobrecarregado no momento — o próximo teste volta a tentar.'
+  if (/invalid.*(api key|x-api-key)|unauthori[sz]ed|HTTP 401/i.test(err)) return 'Chave da API inválida — confirme a variável no Netlify.'
+  if (/não configurada/i.test(err)) return 'Chave da API não configurada.'
+  return err.slice(0, 160)
 }
 
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0)
@@ -103,9 +114,15 @@ export function summariseVisibility(prompts: PromptRow[], results: ResultRow[]):
 
   const engines: EngineStat[] = ENGINES.map((engine) => {
     const rs = ok.filter((r) => r.engine === engine)
+    const all = results.filter((r) => r.engine === engine)
+    const latestDay = lastDay(all)
+    const errs = all.filter((r) => r.error && r.run_day === latestDay)
     const mentioned = rs.filter((r) => r.mentioned).length
-    return { engine, runs: rs.length, mentioned, cited: rs.filter((r) => r.cited).length, visibility: pct(mentioned, rs.length), avgPosition: avg(positions(rs)), lastDay: lastDay(rs) }
-  }).filter((e) => e.runs > 0)
+    return {
+      engine, runs: rs.length, mentioned, cited: rs.filter((r) => r.cited).length, visibility: pct(mentioned, rs.length), avgPosition: avg(positions(rs)),
+      lastDay: lastDay(rs), errors: errs.length, lastError: errs.length ? explainError(errs[errs.length - 1].error as string) : null,
+    }
+  }).filter((e) => e.runs > 0 || e.errors > 0)
 
   const promptStats: PromptStat[] = prompts.map((p) => {
     const rs = ok.filter((r) => r.prompt_id === p.id)

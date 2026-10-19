@@ -2325,3 +2325,4 @@ button.admin-user-avatar:focus-visible {
 .aiv-engines { display: flex; flex-wrap: wrap; gap: 0.4rem; }
 .aiv-engine { font-size: 12px; font-weight: 600; padding: 0.3rem 0.7rem; border-radius: 999px; background: #F6EDEE; color: var(--admin-red); }
 .aiv-engine.is-on { background: #E3F4EA; color: #146C3A; }
+.aiv-engine-error { margin-top: 4px; font-size: 12px; color: #8A5A00; background: #FFF4DB; border-radius: 8px; padding: 0.35rem 0.6rem; }
