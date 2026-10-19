@@ -8,7 +8,8 @@
 //   OPENAI_API_KEY     → ChatGPT     (model: OPENAI_VISIBILITY_MODEL, default gpt-5.5)
 //   GEMINI_API_KEY     → Gemini      (model: GEMINI_VISIBILITY_MODEL, default gemini-3.8-flash)
 //   PERPLEXITY_API_KEY → Perplexity  (preset: PERPLEXITY_VISIBILITY_PRESET, default fast)
-// An engine without a key is simply skipped.
+// An engine without a key is simply skipped. Changing a key needs a new
+// deploy before functions see it (Netlify reads env vars at deploy time).
 //
 // The providers' response formats change; extractAnswer() walks any JSON
 // shape and picks up answer text and URLs, so a new format degrades
