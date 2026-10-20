@@ -22,7 +22,14 @@ import { Route as ClaimsRouteImport } from './routes/claims'
 import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PortalIndexRouteImport } from './routes/portal/index'
 import { Route as OneIndexRouteImport } from './routes/one/index'
+import { Route as PortalResetPasswordRouteImport } from './routes/portal/reset-password'
+import { Route as PortalProfileRouteImport } from './routes/portal/profile'
+import { Route as PortalPoliciesRouteImport } from './routes/portal/policies'
+import { Route as PortalLoginRouteImport } from './routes/portal/login'
+import { Route as PortalDocumentsRouteImport } from './routes/portal/documents'
+import { Route as PortalClaimsRouteImport } from './routes/portal/claims'
 import { Route as PCodeRouteImport } from './routes/p.$code'
 import { Route as OneTermsRouteImport } from './routes/one/terms'
 import { Route as OneResetPasswordRouteImport } from './routes/one/reset-password'
@@ -110,9 +117,44 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PortalIndexRoute = PortalIndexRouteImport.update({
+  id: '/portal/',
+  path: '/portal/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OneIndexRoute = OneIndexRouteImport.update({
   id: '/one/',
   path: '/one/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalResetPasswordRoute = PortalResetPasswordRouteImport.update({
+  id: '/portal/reset-password',
+  path: '/portal/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalProfileRoute = PortalProfileRouteImport.update({
+  id: '/portal/profile',
+  path: '/portal/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalPoliciesRoute = PortalPoliciesRouteImport.update({
+  id: '/portal/policies',
+  path: '/portal/policies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalLoginRoute = PortalLoginRouteImport.update({
+  id: '/portal/login',
+  path: '/portal/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalDocumentsRoute = PortalDocumentsRouteImport.update({
+  id: '/portal/documents',
+  path: '/portal/documents',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalClaimsRoute = PortalClaimsRouteImport.update({
+  id: '/portal/claims',
+  path: '/portal/claims',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PCodeRoute = PCodeRouteImport.update({
@@ -257,7 +299,14 @@ export interface FileRoutesByFullPath {
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
   '/p/$code': typeof PCodeRoute
+  '/portal/claims': typeof PortalClaimsRoute
+  '/portal/documents': typeof PortalDocumentsRoute
+  '/portal/login': typeof PortalLoginRoute
+  '/portal/policies': typeof PortalPoliciesRoute
+  '/portal/profile': typeof PortalProfileRoute
+  '/portal/reset-password': typeof PortalResetPasswordRoute
   '/one/': typeof OneIndexRoute
+  '/portal/': typeof PortalIndexRoute
   '/admin/carrier-integrations/import': typeof AdminCarrierIntegrationsImportRoute
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
@@ -294,7 +343,14 @@ export interface FileRoutesByTo {
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
   '/p/$code': typeof PCodeRoute
+  '/portal/claims': typeof PortalClaimsRoute
+  '/portal/documents': typeof PortalDocumentsRoute
+  '/portal/login': typeof PortalLoginRoute
+  '/portal/policies': typeof PortalPoliciesRoute
+  '/portal/profile': typeof PortalProfileRoute
+  '/portal/reset-password': typeof PortalResetPasswordRoute
   '/one': typeof OneIndexRoute
+  '/portal': typeof PortalIndexRoute
   '/admin/carrier-integrations/import': typeof AdminCarrierIntegrationsImportRoute
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
@@ -332,7 +388,14 @@ export interface FileRoutesById {
   '/one/reset-password': typeof OneResetPasswordRoute
   '/one/terms': typeof OneTermsRoute
   '/p/$code': typeof PCodeRoute
+  '/portal/claims': typeof PortalClaimsRoute
+  '/portal/documents': typeof PortalDocumentsRoute
+  '/portal/login': typeof PortalLoginRoute
+  '/portal/policies': typeof PortalPoliciesRoute
+  '/portal/profile': typeof PortalProfileRoute
+  '/portal/reset-password': typeof PortalResetPasswordRoute
   '/one/': typeof OneIndexRoute
+  '/portal/': typeof PortalIndexRoute
   '/admin/carrier-integrations/import': typeof AdminCarrierIntegrationsImportRoute
   '/admin/carrier-integrations/runs/$id': typeof AdminCarrierIntegrationsRunsIdRoute
 }
@@ -371,7 +434,14 @@ export interface FileRouteTypes {
     | '/one/reset-password'
     | '/one/terms'
     | '/p/$code'
+    | '/portal/claims'
+    | '/portal/documents'
+    | '/portal/login'
+    | '/portal/policies'
+    | '/portal/profile'
+    | '/portal/reset-password'
     | '/one/'
+    | '/portal/'
     | '/admin/carrier-integrations/import'
     | '/admin/carrier-integrations/runs/$id'
   fileRoutesByTo: FileRoutesByTo
@@ -408,7 +478,14 @@ export interface FileRouteTypes {
     | '/one/reset-password'
     | '/one/terms'
     | '/p/$code'
+    | '/portal/claims'
+    | '/portal/documents'
+    | '/portal/login'
+    | '/portal/policies'
+    | '/portal/profile'
+    | '/portal/reset-password'
     | '/one'
+    | '/portal'
     | '/admin/carrier-integrations/import'
     | '/admin/carrier-integrations/runs/$id'
   id:
@@ -445,7 +522,14 @@ export interface FileRouteTypes {
     | '/one/reset-password'
     | '/one/terms'
     | '/p/$code'
+    | '/portal/claims'
+    | '/portal/documents'
+    | '/portal/login'
+    | '/portal/policies'
+    | '/portal/profile'
+    | '/portal/reset-password'
     | '/one/'
+    | '/portal/'
     | '/admin/carrier-integrations/import'
     | '/admin/carrier-integrations/runs/$id'
   fileRoutesById: FileRoutesById
@@ -476,7 +560,14 @@ export interface RootRouteChildren {
   OneResetPasswordRoute: typeof OneResetPasswordRoute
   OneTermsRoute: typeof OneTermsRoute
   PCodeRoute: typeof PCodeRoute
+  PortalClaimsRoute: typeof PortalClaimsRoute
+  PortalDocumentsRoute: typeof PortalDocumentsRoute
+  PortalLoginRoute: typeof PortalLoginRoute
+  PortalPoliciesRoute: typeof PortalPoliciesRoute
+  PortalProfileRoute: typeof PortalProfileRoute
+  PortalResetPasswordRoute: typeof PortalResetPasswordRoute
   OneIndexRoute: typeof OneIndexRoute
+  PortalIndexRoute: typeof PortalIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -572,11 +663,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/portal/': {
+      id: '/portal/'
+      path: '/portal'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof PortalIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/one/': {
       id: '/one/'
       path: '/one'
       fullPath: '/one/'
       preLoaderRoute: typeof OneIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal/reset-password': {
+      id: '/portal/reset-password'
+      path: '/portal/reset-password'
+      fullPath: '/portal/reset-password'
+      preLoaderRoute: typeof PortalResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal/profile': {
+      id: '/portal/profile'
+      path: '/portal/profile'
+      fullPath: '/portal/profile'
+      preLoaderRoute: typeof PortalProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal/policies': {
+      id: '/portal/policies'
+      path: '/portal/policies'
+      fullPath: '/portal/policies'
+      preLoaderRoute: typeof PortalPoliciesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal/login': {
+      id: '/portal/login'
+      path: '/portal/login'
+      fullPath: '/portal/login'
+      preLoaderRoute: typeof PortalLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal/documents': {
+      id: '/portal/documents'
+      path: '/portal/documents'
+      fullPath: '/portal/documents'
+      preLoaderRoute: typeof PortalDocumentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal/claims': {
+      id: '/portal/claims'
+      path: '/portal/claims'
+      fullPath: '/portal/claims'
+      preLoaderRoute: typeof PortalClaimsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/p/$code': {
@@ -793,7 +933,14 @@ const rootRouteChildren: RootRouteChildren = {
   OneResetPasswordRoute: OneResetPasswordRoute,
   OneTermsRoute: OneTermsRoute,
   PCodeRoute: PCodeRoute,
+  PortalClaimsRoute: PortalClaimsRoute,
+  PortalDocumentsRoute: PortalDocumentsRoute,
+  PortalLoginRoute: PortalLoginRoute,
+  PortalPoliciesRoute: PortalPoliciesRoute,
+  PortalProfileRoute: PortalProfileRoute,
+  PortalResetPasswordRoute: PortalResetPasswordRoute,
   OneIndexRoute: OneIndexRoute,
+  PortalIndexRoute: PortalIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,14 +1,14 @@
 {
-  "name": "My Cover Vault",
-  "short_name": "My Cover Vault",
-  "description": "A secure insurance portal for international clients",
+  "name": "MillionGuard",
+  "short_name": "MillionGuard",
+  "description": "Your policies, claims and documents with Adler & Rochefort",
   "lang": "en-GB",
-  "start_url": "/",
+  "start_url": "/portal",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#ffffff",
-  "theme_color": "#0A1628",
+  "theme_color": "#FFFFFF",
   "icons": [
     {
       "src": "/pwa-192.png",

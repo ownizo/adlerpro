@@ -77,7 +77,7 @@ const POLICY_FIELD_LABELS: Record<PolicyProposalField, string> = {
  */
 export const Route = createFileRoute('/admin/carrier-integrations/runs/$id')({
   component: CarrierRunDetailPage,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros · Admin · Reconciliation Run' }] }),
+  head: () => ({ meta: [{ title: 'A&R Backoffice · Reconciliation Run' }] }),
 })
 
 const MATCH_STATUS_CHIP_CLASS: Record<string, string> = {

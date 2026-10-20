@@ -25,10 +25,10 @@ export const Route = createRootRoute({
   head: () => {
     const mcv = isMyCoverVault()
     const admin = isAdminSite()
-    const title = admin ? 'A&R Admin' : mcv ? 'My Cover Vault' : 'Os Meus Seguros'
+    const title = admin ? 'A&R Admin' : 'MillionGuard'
     const description = mcv
       ? 'Secure client portal for Adler & Rochefort insurance clients.'
-      : 'Portal seguro para clientes de corretagem de seguros empresariais'
+      : 'MillionGuard — secure client portal of Adler & Rochefort, insurance agent.'
     return {
       meta: [
         { charSet: 'utf-8' },
@@ -36,10 +36,10 @@ export const Route = createRootRoute({
         { name: 'viewport', content: admin ? 'width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover' : 'width=device-width, initial-scale=1, viewport-fit=cover' },
         { title },
         { name: 'description', content: description },
-        { name: 'theme-color', content: admin ? '#FFFFFF' : '#0A1628' },
+        { name: 'theme-color', content: '#FFFFFF' },
         { name: 'mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
-        { name: 'apple-mobile-web-app-status-bar-style', content: admin ? 'default' : 'black-translucent' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
         { name: 'apple-mobile-web-app-title', content: title },
       ],
       links: [

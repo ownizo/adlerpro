@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 const RESEND_API_KEY = process.env.RESEND_API_KEY!
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL!
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const FROM_EMAIL = 'Adler Pro <noreply@adlerrochefort.com>'
+const FROM_EMAIL = 'MillionGuard <noreply@adlerrochefort.com>'
 
 // Thresholds de alerta em dias
 const ALERT_THRESHOLDS = [90, 60, 30, 14, 7]
@@ -18,18 +18,18 @@ function daysUntil(dateStr: string): number {
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return '—'
-  return new Date(dateStr).toLocaleDateString('pt-PT', { day: '2-digit', month: 'long', year: 'numeric' })
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })
 }
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(value || 0)
+  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR' }).format(value || 0)
 }
 
 const POLICY_TYPE_LABELS: Record<string, string> = {
-  auto: 'Automóvel', health: 'Saúde', property: 'Propriedade',
-  liability: 'Responsabilidade Civil', workers_comp: 'Acidentes de Trabalho',
-  cyber: 'Cyber', directors_officers: 'D&O', business_interruption: 'Interrupção de Negócio',
-  life: 'Vida', other: 'Outro',
+  auto: 'Motor', health: 'Health', property: 'Property',
+  liability: 'Liability', workers_comp: 'Workers Compensation',
+  cyber: 'Cyber', directors_officers: 'D&O', business_interruption: 'Business Interruption',
+  life: 'Life', other: 'Other',
 }
 
 const POLICY_TYPE_COLORS: Record<string, string> = {
@@ -40,11 +40,11 @@ const POLICY_TYPE_COLORS: Record<string, string> = {
 }
 
 function urgencyConfig(days: number): { color: string; label: string; emoji: string } {
-  if (days <= 7)  return { color: '#dc2626', label: 'URGENTE', emoji: '🚨' }
-  if (days <= 14) return { color: '#dc2626', label: 'MUITO URGENTE', emoji: '⚠️' }
-  if (days <= 30) return { color: '#d97706', label: 'ATENÇÃO', emoji: '⏰' }
-  if (days <= 60) return { color: '#C8961A', label: 'AVISO', emoji: '📋' }
-  return { color: '#555555', label: 'INFORMAÇÃO', emoji: '📅' }
+  if (days <= 7)  return { color: '#dc2626', label: 'URGENT', emoji: '🚨' }
+  if (days <= 14) return { color: '#dc2626', label: 'VERY URGENT', emoji: '⚠️' }
+  if (days <= 30) return { color: '#d97706', label: 'ACTION NEEDED', emoji: '⏰' }
+  if (days <= 60) return { color: '#C8961A', label: 'REMINDER', emoji: '📋' }
+  return { color: '#555555', label: 'FOR INFORMATION', emoji: '📅' }
 }
 
 function buildEmailHTML(companyName: string, policies: any[]): string {
@@ -69,7 +69,7 @@ function buildEmailHTML(companyName: string, policies: any[]): string {
         </td>
         <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0;">
           <span style="display: inline-block; background: ${urg.color}22; color: ${urg.color}; font-weight: 700; font-size: 12px; padding: 3px 10px; border-radius: 20px;">
-            ${urg.emoji} ${days} dias
+            ${urg.emoji} ${days} days
           </span>
         </td>
         <td style="padding: 12px 16px; border-bottom: 1px solid #f0f0f0; font-size: 13px; font-weight: 600; color: #111111; text-align: right;">
@@ -83,11 +83,11 @@ function buildEmailHTML(companyName: string, policies: any[]): string {
   const topUrg = urgencyConfig(mostUrgentDays)
 
   return `<!DOCTYPE html>
-<html lang="pt">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Alertas de Renovação — Adler Pro</title>
+  <title>Renewal reminder — MillionGuard</title>
 </head>
 <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: 'Helvetica Neue', Arial, sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background: #f5f5f5; padding: 32px 16px;">
@@ -103,8 +103,8 @@ function buildEmailHTML(companyName: string, policies: any[]): string {
                   <span style="color: #ffffff; font-size: 20px; font-weight: 900;">A</span>
                 </div>
                 <div style="text-align: left;">
-                  <div style="color: #ffffff; font-size: 18px; font-weight: 700; letter-spacing: 0.05em;">ADLER PRO</div>
-                  <div style="color: #C8961A; font-size: 10px; font-weight: 300; letter-spacing: 0.15em; text-transform: uppercase;">Gestão de Seguros</div>
+                  <div style="color: #ffffff; font-size: 18px; font-weight: 700; letter-spacing: 0.05em;">MILLIONGUARD</div>
+                  <div style="color: #C8961A; font-size: 10px; font-weight: 300; letter-spacing: 0.15em; text-transform: uppercase;">by Adler &amp; Rochefort</div>
                 </div>
               </div>
             </td>
@@ -114,7 +114,7 @@ function buildEmailHTML(companyName: string, policies: any[]): string {
           <tr>
             <td style="background: ${topUrg.color}; padding: 14px 32px; text-align: center;">
               <span style="color: #ffffff; font-size: 13px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">
-                ${topUrg.emoji} ${topUrg.label} — Apólices a Renovar
+                ${topUrg.emoji} ${topUrg.label} — Policies due for renewal
               </span>
             </td>
           </tr>
@@ -123,20 +123,20 @@ function buildEmailHTML(companyName: string, policies: any[]): string {
           <tr>
             <td style="padding: 32px;">
               <p style="font-size: 15px; color: #333333; margin: 0 0 8px; font-weight: 600;">
-                Caro(a) ${companyName},
+                Dear ${companyName},
               </p>
               <p style="font-size: 14px; color: #666666; margin: 0 0 24px; line-height: 1.6;">
-                A sua equipa da <strong>Adler &amp; Rochefort</strong> identificou ${policies.length === 1 ? 'uma apólice que necessita' : `${policies.length} apólices que necessitam`} de renovação nos próximos meses. Recomendamos que contacte o seu mediador para iniciar o processo de renovação com antecedência.
+                Your team at <strong>Adler &amp; Rochefort</strong> has ${policies.length === 1 ? 'one policy' : `${policies.length} policies`} of yours coming up for renewal in the next few months. We will be in touch to review the terms in good time; you can also reply to this email.
               </p>
 
               <!-- Policies Table -->
               <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #eeeeee; border-radius: 4px; overflow: hidden; margin-bottom: 24px;">
                 <thead>
                   <tr style="background: #f8f8f8;">
-                    <th style="padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #888888; text-transform: uppercase; letter-spacing: 0.06em;">Apólice</th>
-                    <th style="padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #888888; text-transform: uppercase; letter-spacing: 0.06em;">Expira em</th>
-                    <th style="padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #888888; text-transform: uppercase; letter-spacing: 0.06em;">Prazo</th>
-                    <th style="padding: 10px 16px; text-align: right; font-size: 11px; font-weight: 700; color: #888888; text-transform: uppercase; letter-spacing: 0.06em;">Prémio</th>
+                    <th style="padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #888888; text-transform: uppercase; letter-spacing: 0.06em;">Policy</th>
+                    <th style="padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #888888; text-transform: uppercase; letter-spacing: 0.06em;">Ends on</th>
+                    <th style="padding: 10px 16px; text-align: left; font-size: 11px; font-weight: 700; color: #888888; text-transform: uppercase; letter-spacing: 0.06em;">Time left</th>
+                    <th style="padding: 10px 16px; text-align: right; font-size: 11px; font-weight: 700; color: #888888; text-transform: uppercase; letter-spacing: 0.06em;">Premium</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -146,13 +146,13 @@ function buildEmailHTML(companyName: string, policies: any[]): string {
 
               <!-- CTA -->
               <div style="text-align: center; margin-bottom: 24px;">
-                <a href="https://osmeusseguros.com/policies" style="display: inline-block; background: #C8961A; color: #ffffff; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 4px; text-decoration: none; letter-spacing: 0.03em;">
-                  Ver Apólices no Portal →
+                <a href="https://millionguard.com/portal/policies" style="display: inline-block; background: #C8961A; color: #ffffff; font-size: 14px; font-weight: 700; padding: 14px 32px; border-radius: 4px; text-decoration: none; letter-spacing: 0.03em;">
+                  View your policies in MillionGuard →
                 </a>
               </div>
 
               <p style="font-size: 13px; color: #888888; line-height: 1.6; margin: 0;">
-                Pode também utilizar o nosso <strong>Comparativo de Cotações IA</strong> para obter uma análise comparativa de propostas de diferentes seguradoras antes de renovar.
+                Planning a change of cover, sums insured or insurer? Tell us before the renewal date and we compare the options in writing.
               </p>
             </td>
           </tr>
@@ -164,9 +164,9 @@ function buildEmailHTML(companyName: string, policies: any[]): string {
                 <tr>
                   <td>
                     <p style="font-size: 11px; color: #aaaaaa; margin: 0; line-height: 1.6;">
-                      <strong style="color: #666666;">Adler &amp; Rochefort</strong> · Mediadores de Seguros<br>
-                      Este email foi enviado automaticamente pelo sistema Adler Pro.<br>
-                      Para deixar de receber estas notificações, contacte o seu mediador.
+                      <strong style="color: #666666;">Adler &amp; Rochefort</strong> · Ownizo Unipessoal Lda. · ASF reg. 425591790/3<br>
+                      This email was sent automatically by MillionGuard.<br>
+                      To stop receiving these reminders, please contact your agent.
                     </p>
                   </td>
                   <td style="text-align: right; vertical-align: middle;">
@@ -293,8 +293,8 @@ export default async function handler(req: Request, context: Context) {
     const urg = urgencyConfig(mostUrgentDays)
 
     const subject = companyPolicies.length === 1
-      ? `${urg.emoji} Apólice a expirar em ${mostUrgentDays} dias — ${companyPolicies[0].insurer}`
-      : `${urg.emoji} ${companyPolicies.length} apólices a renovar — Adler Pro`
+      ? `${urg.emoji} Policy ending in ${mostUrgentDays} days — ${companyPolicies[0].insurer}`
+      : `${urg.emoji} ${companyPolicies.length} policies due for renewal — MillionGuard`
 
     try {
       const emailList = Array.from(recipientEmails)

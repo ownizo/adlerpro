@@ -11,9 +11,9 @@ import netlify from '@netlify/vite-plugin-tanstack-start'
 // output is unchanged. Injected as a build-time constant so it is available
 // during SSR and in the client bundle without a runtime lookup.
 const IS_MYCOVERVAULT =
-  /mycovervault/i.test(process.env.URL ?? '') ||
-  /mycovervault/i.test(process.env.SITE_NAME ?? '') ||
-  /mycovervault/i.test(process.env.DEPLOY_PRIME_URL ?? '')
+  /mycovervault|millionguard/i.test(process.env.URL ?? '') ||
+  /mycovervault|millionguard/i.test(process.env.SITE_NAME ?? '') ||
+  /mycovervault|millionguard/i.test(process.env.DEPLOY_PRIME_URL ?? '')
 
 // The admin backoffice deploy (admin.adlerrochefort.com) is installed as its
 // own app: its own manifest, name and icon.
