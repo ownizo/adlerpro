@@ -19,6 +19,8 @@ function PortalLogin() {
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
+    // Coming from "Sign out": never bounce back into the portal.
+    if (new URLSearchParams(window.location.search).has('signedout')) { setChecking(false); return }
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) window.location.replace('/portal')
       else setChecking(false)
