@@ -3531,13 +3531,12 @@ export const getAdminNavBadgeCounts = createServerFn({ method: 'GET' })
     const tasksSeen = navView?.tasks_seen_at ?? new Date(0).toISOString()
     const alertsSeen = navView?.alerts_seen_at ?? new Date(0).toISOString()
 
-    const { count: tasksCount, error: tasksErr } = await supabaseAdmin
+    // Both counts only depend on navView, so they run in parallel.
+    const tasksQuery = supabaseAdmin
       .from('client_tasks')
       .select('id', { count: 'exact', head: true })
       .eq('status', 'pending')
       .gt('created_at', tasksSeen)
-
-    if (tasksErr) console.error('getAdminNavBadgeCounts tasks:', tasksErr.message)
 
     const today = new Date()
     today.setUTCHours(0, 0, 0, 0)
@@ -3551,7 +3550,7 @@ export const getAdminNavBadgeCounts = createServerFn({ method: 'GET' })
     alertsSeenDate.setUTCDate(alertsSeenDate.getUTCDate() + 60)
     const alertsSeenPlus60Str = alertsSeenDate.toISOString().slice(0, 10)
 
-    const { count: alertsCount, error: alertsErr } = await supabaseAdmin
+    const alertsQuery = supabaseAdmin
       .from('policies')
       .select('id', { count: 'exact', head: true })
       .in('status', ['active', 'expiring'])
@@ -3560,6 +3559,8 @@ export const getAdminNavBadgeCounts = createServerFn({ method: 'GET' })
       .lte('end_date', in60DaysStr)
       .gt('end_date', alertsSeenPlus60Str)
 
+    const [{ count: tasksCount, error: tasksErr }, { count: alertsCount, error: alertsErr }] = await Promise.all([tasksQuery, alertsQuery])
+    if (tasksErr) console.error('getAdminNavBadgeCounts tasks:', tasksErr.message)
     if (alertsErr) console.error('getAdminNavBadgeCounts alerts:', alertsErr.message)
 
     return {

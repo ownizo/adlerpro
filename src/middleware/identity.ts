@@ -59,10 +59,34 @@ function extractAccessToken(): string | null {
   }
 }
 
+// Every admin server function runs requireAuthMiddleware and then
+// requireRoleMiddleware, and each used to call Supabase Auth on its own: two
+// network round trips before any data was read, on every call. The validated
+// user is now shared for 30 seconds per access token (the same window the
+// viewer-scope cache in server-fns.ts already uses), and concurrent lookups for
+// the same token share one in-flight request.
+const USER_CACHE_TTL_MS = 30_000
+const _userCache = new Map<string, { ts: number; user: Promise<User | null> }>()
+
 async function getSupabaseUser(): Promise<User | null> {
   const token = extractAccessToken()
   if (!token) return null
 
+  const now = Date.now()
+  const cached = _userCache.get(token)
+  if (cached && now - cached.ts < USER_CACHE_TTL_MS) return cached.user
+
+  const user = resolveSupabaseUser(token)
+  _userCache.set(token, { ts: now, user })
+  // Failed lookups are not kept, so a transient error does not lock anyone out.
+  user.then((u) => { if (!u) _userCache.delete(token) }, () => _userCache.delete(token))
+  if (_userCache.size > 100) {
+    for (const [k, v] of _userCache) if (now - v.ts >= USER_CACHE_TTL_MS) _userCache.delete(k)
+  }
+  return user
+}
+
+async function resolveSupabaseUser(token: string): Promise<User | null> {
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token)
   if (error || !user) return null
 
