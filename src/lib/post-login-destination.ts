@@ -2,7 +2,7 @@ import type { ViewerSegment } from './server-fns'
 import { getMySegment } from './server-fns'
 
 /** Rotas existentes para onde se pode navegar após o login. */
-export type PostLoginRoute = '/admin' | '/dashboard' | '/one/dashboard'
+export type PostLoginRoute = '/admin' | '/portal'
 
 /**
  * Resultado da decisão de destino pós-login:
@@ -32,8 +32,8 @@ export type PostLoginDecision =
  */
 export function decidePostLogin(input: { isAdmin: boolean; segment: ViewerSegment }): PostLoginDecision {
   if (input.isAdmin) return { status: 'redirect', to: '/admin' }
-  if (input.segment === 'b2b') return { status: 'redirect', to: '/dashboard' }
-  if (input.segment === 'b2c') return { status: 'redirect', to: '/one/dashboard' }
+  // Business and personal clients share one portal (MillionGuard).
+  if (input.segment === 'b2b' || input.segment === 'b2c') return { status: 'redirect', to: '/portal' }
   return { status: 'unconfigured' }
 }
 

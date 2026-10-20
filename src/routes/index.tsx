@@ -12,9 +12,10 @@ export const Route = createFileRoute('/')({
       ? window.location.hostname
       : await getServerHostname()
 
-    // My Cover Vault has no landing page — its root IS the client login screen.
-    if (isMyCoverVault() || /mycovervault\.com$/i.test(hostname ?? '')) {
-      throw redirect({ to: '/one/login' })
+    // MillionGuard (and the old My Cover Vault address) has no landing page:
+    // its root IS the single client login, for businesses and individuals.
+    if (isMyCoverVault() || /(millionguard|mycovervault)\.com$/i.test(hostname ?? '')) {
+      throw redirect({ to: '/portal/login' })
     }
 
     if (hostname === 'admin.adlerrochefort.com') {

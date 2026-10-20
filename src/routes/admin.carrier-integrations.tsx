@@ -18,7 +18,7 @@ import type { CarrierSyncRun } from '@/lib/types'
  */
 export const Route = createFileRoute('/admin/carrier-integrations')({
   component: CarrierIntegrationsPage,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros · Admin · Carrier Integrations' }] }),
+  head: () => ({ meta: [{ title: 'A&R Backoffice · Carrier Integrations' }] }),
 })
 
 interface ProviderPlaceholder {

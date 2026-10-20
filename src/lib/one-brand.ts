@@ -22,7 +22,7 @@ declare const __IS_MYCOVERVAULT__: boolean
 
 export function isMyCoverVault(): boolean {
   if (typeof window !== 'undefined') {
-    return window.location.hostname.endsWith('mycovervault.com')
+    return /(mycovervault|millionguard)\.com$/.test(window.location.hostname)
   }
   return __IS_MYCOVERVAULT__
 }
@@ -78,10 +78,10 @@ const BRAND_PT: OneBrand = {
 }
 
 const BRAND_MCV: OneBrand = {
-  name: 'My Cover Vault',
+  name: 'MillionGuard',
   tagline: 'by Adler & Rochefort',
   portalSubtitle: 'Client Portal',
-  docTitle: 'My Cover Vault',
+  docTitle: 'MillionGuard',
   regulatoryFooter: 'Adler & Rochefort · Ownizo Unipessoal Lda. · ASF reg. 425591790/3',
 }
 

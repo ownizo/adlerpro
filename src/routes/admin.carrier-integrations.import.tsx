@@ -22,7 +22,7 @@ import { CARRIER_PROVIDERS, CARRIER_PROVIDER_LABELS, type CarrierProviderId } fr
  */
 export const Route = createFileRoute('/admin/carrier-integrations/import')({
   component: ImportPortfolioPage,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros · Admin · Import Portfolio' }] }),
+  head: () => ({ meta: [{ title: 'A&R Backoffice · Import Portfolio' }] }),
 })
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024

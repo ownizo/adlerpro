@@ -320,7 +320,7 @@ export const Route = createFileRoute('/admin')({
     overdue: search.overdue === '1' || search.overdue === true ? true : undefined,
   }),
   component: AdminPage,
-  head: () => ({ meta: [{ title: 'Os Meus Seguros · Admin' }] }),
+  head: () => ({ meta: [{ title: 'A&R Backoffice' }] }),
 })
 
 // AdminPage stays a thin wrapper so /admin's existing behaviour (the giant

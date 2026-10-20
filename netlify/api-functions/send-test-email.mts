@@ -32,15 +32,15 @@ export default async function handler(req: Request, _context: Context) {
   try {
     const result = await sendEmail({
       to,
-      subject: '✅ Email de teste — Adler Pro',
+      subject: '✅ Test email — MillionGuard',
       template: createElement(ConfirmationEmail, {
         recipientName: 'Utilizador de Teste',
         title: 'Integração Resend a funcionar',
         message:
           'Este é um email de confirmação gerado automaticamente para validar a integração com o Resend. Se o recebeu, o envio de emails transacionais está operacional.',
         referenceCode: `TEST-${Date.now()}`,
-        ctaLabel: 'Abrir Portal',
-        ctaUrl: 'https://osmeusseguros.com',
+        ctaLabel: 'Open MillionGuard',
+        ctaUrl: 'https://millionguard.com',
       }),
     })
 

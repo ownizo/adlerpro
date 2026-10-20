@@ -32,6 +32,10 @@ import type {
   SalesOpportunityStage,
   SalesOpportunityEditableUpdate,
   Json,
+  Policy,
+  PolicyType,
+  ClaimStatus,
+  Document as DocType,
 } from './types'
 import { isValidCarrierProvider, type CarrierProviderId } from './carrier-providers'
 import { parsePortfolioWorkbook } from './carrier-excel-workbook'
@@ -3340,7 +3344,7 @@ export const adminDeletePolicyDocument = createServerFn({ method: 'POST' })
   })
 
 /**
- * Cria acesso ao portal "Os Meus Seguros" para um cliente individual com
+ * Cria acesso ao MillionGuard para um cliente individual com
  * password gerada pelo sistema. Não envia email de convite.
  *
  * A password é devolvida UMA ÚNICA VEZ no retorno e nunca é persistida.
@@ -3365,7 +3369,7 @@ export const adminGrantIndividualClientAccess = createServerFn({ method: 'POST' 
       throw new Error('O cliente não tem email registado. Edite o cliente e adicione um email primeiro.')
     }
     if (client.auth_user_id) {
-      throw new Error('Este cliente já tem acesso ao portal Os Meus Seguros. Para repor o acesso, utilize a função de reset de password.')
+      throw new Error('Este cliente já tem acesso ao MillionGuard. Para repor o acesso, utilize a função de reset de password.')
     }
 
     const email     = (client.email as string).toLowerCase()
@@ -4343,3 +4347,356 @@ export const adminListPoliciesForOwner = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
   .inputValidator((d: { individualClientId?: string; companyId?: string }) => d)
   .handler(async ({ data }) => db.listPoliciesForOwner(data))
+
+// ============================================================================
+// MillionGuard — the single client portal (businesses and individuals).
+//
+// One login and one set of screens for both kinds of client. Every function
+// below resolves the viewer once (company user or individual client) and only
+// ever returns that client's own records. Internal fields (commission, internal
+// notes, team notes) are never sent to the browser, and policies the agency
+// marked as hidden from the portal are left out.
+// ============================================================================
+
+export type PortalAccountType = 'business' | 'personal' | 'none'
+
+export interface PortalPolicy {
+  id: string
+  type: PolicyType
+  insurer: string
+  policyNumber: string
+  description: string
+  startDate: string
+  endDate: string
+  annualPremium: number
+  insuredValue: number
+  status: Policy['status']
+  deductible?: number
+  coverages?: string[]
+  exclusions?: string[]
+  paymentFrequency?: string
+  emergencyContacts?: string
+}
+
+export interface PortalClaim {
+  id: string
+  policyId: string
+  title: string
+  description: string
+  claimDate: string
+  incidentDate: string
+  estimatedValue: number
+  status: ClaimStatus
+  createdAt: string
+}
+
+export interface PortalDocument {
+  id: string
+  name: string
+  category: string
+  size: number
+  uploadedAt: string
+}
+
+function toPortalPolicy(p: Policy): PortalPolicy {
+  return {
+    id: p.id,
+    type: p.type,
+    insurer: p.insurer,
+    policyNumber: p.policyNumber,
+    description: p.description,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    annualPremium: Number(p.annualPremium || 0),
+    insuredValue: Number(p.insuredValue || 0),
+    status: p.status,
+    deductible: p.deductible,
+    coverages: p.coverages,
+    exclusions: p.exclusions,
+    paymentFrequency: p.paymentFrequency,
+    emergencyContacts: p.emergencyContacts,
+  }
+}
+
+function toPortalClaim(c: Claim): PortalClaim {
+  return {
+    id: c.id,
+    policyId: c.policyId,
+    title: c.title,
+    description: c.description,
+    claimDate: c.claimDate,
+    incidentDate: c.incidentDate,
+    estimatedValue: Number(c.estimatedValue || 0),
+    status: c.status,
+    createdAt: c.createdAt,
+  }
+}
+
+async function portalContext() {
+  const ctx = await getViewerAccessContext()
+  const type: PortalAccountType = ctx.companyId ? 'business' : ctx.individualClientId ? 'personal' : 'none'
+  return { ...ctx, type }
+}
+
+async function portalPolicies(ctx: Awaited<ReturnType<typeof portalContext>>): Promise<Policy[]> {
+  const list = ctx.companyId
+    ? await db.getPolicies(ctx.companyId)
+    : ctx.individualClientId
+      ? await db.getPoliciesByIndividualClientId(ctx.individualClientId)
+      : []
+  return list.filter((p) => p.visiblePortal !== false)
+}
+
+async function portalClaims(ctx: Awaited<ReturnType<typeof portalContext>>): Promise<Claim[]> {
+  const list = ctx.companyId
+    ? await db.getClaims(ctx.companyId)
+    : ctx.individualClientId
+      ? await db.getClaimsByIndividualClientId(ctx.individualClientId)
+      : []
+  return normalizeClaimsByPolicy(list)
+}
+
+/** Account header and everything the overview screen needs, in one call. */
+export const fetchPortalHome = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    const ctx = await portalContext()
+    const [company, individual, policies, claims] = await Promise.all([
+      ctx.companyId ? db.getCompany(ctx.companyId) : Promise.resolve(undefined),
+      ctx.individualClientId && !ctx.companyId ? db.getIndividualClient(ctx.individualClientId) : Promise.resolve(undefined),
+      portalPolicies(ctx),
+      portalClaims(ctx),
+    ])
+    const now = new Date()
+    const in90 = new Date(now.getTime() + 90 * 86_400_000)
+    const live = policies.filter((p) => p.status === 'active' || p.status === 'expiring')
+    const renewals = live
+      .filter((p) => p.endDate && new Date(p.endDate) >= now && new Date(p.endDate) <= in90)
+      .sort((a, b) => a.endDate.localeCompare(b.endDate))
+    const openClaims = claims.filter((c) => !['approved', 'denied', 'paid'].includes(c.status))
+    return {
+      account: {
+        type: ctx.type,
+        isAdmin: ctx.isAdmin,
+        userName: ctx.user.name ?? '',
+        email: ctx.user.email ?? '',
+        accountName: company?.name ?? individual?.fullName ?? ctx.individualClientName ?? ctx.user.name ?? '',
+      },
+      stats: {
+        activePolicies: live.length,
+        annualPremiums: live.reduce((sum, p) => sum + Number(p.annualPremium || 0), 0),
+        renewalsIn90Days: renewals.length,
+        openClaims: openClaims.length,
+      },
+      renewals: renewals.slice(0, 5).map(toPortalPolicy),
+      recentClaims: claims
+        .slice()
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+        .slice(0, 5)
+        .map(toPortalClaim),
+    }
+  })
+
+export const fetchPortalPolicies = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    const ctx = await portalContext()
+    const policies = await portalPolicies(ctx)
+    return policies
+      .sort((a, b) => (a.endDate || '').localeCompare(b.endDate || ''))
+      .map(toPortalPolicy)
+  })
+
+export const fetchPortalClaims = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    const ctx = await portalContext()
+    const [claims, policies] = await Promise.all([portalClaims(ctx), portalPolicies(ctx)])
+    return {
+      claims: claims
+        .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+        .map(toPortalClaim),
+      policies: policies
+        .filter((p) => p.status === 'active' || p.status === 'expiring')
+        .map(toPortalPolicy),
+    }
+  })
+
+/** Messages and files of one claim, without the agency's internal notes. */
+export const fetchPortalClaim = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { claimId: string }) => d)
+  .handler(async ({ data }) => {
+    const ctx = await portalContext()
+    const claim = await db.getClaim(data.claimId)
+    if (!claim) throw new Error('Claim not found')
+    if (!canAccessClaimByContext(claim, ctx)) throw new Error('You do not have access to this claim')
+    const ops = await getCanonicalClaimOperationalData(claim)
+    return {
+      claim: toPortalClaim(claim),
+      responsibleName: ops.responsible?.name ?? null,
+      messages: ops.messages.map((m) => ({
+        id: m.id,
+        body: m.body,
+        createdAt: m.createdAt,
+        senderRole: m.senderRole,
+        senderName: m.senderName,
+      })),
+      documents: ops.documents.map((d) => ({
+        id: d.id,
+        name: d.name,
+        uploadedAt: d.uploadedAt,
+        uploadedByName: d.uploadedByName,
+        uploadedByRole: d.uploadedByRole,
+        size: d.size,
+      })),
+    }
+  })
+
+/** Reports a claim for either kind of client, on one of their own policies. */
+export const submitPortalClaim = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: {
+    policyId: string
+    title: string
+    description: string
+    incidentDate: string
+    estimatedValue?: number
+  }) => d)
+  .handler(async ({ data }) => {
+    const ctx = await portalContext()
+    if (ctx.type === 'none') throw new Error('Your account is not linked to a client record yet')
+    const policy = await db.getPolicy(data.policyId)
+    if (!policy) throw new Error('Policy not found')
+    const owns = ctx.companyId
+      ? policy.companyId === ctx.companyId
+      : policy.individualClientId === ctx.individualClientId
+    if (!owns) throw new Error('You do not have access to this policy')
+
+    const title = data.title.trim()
+    const description = data.description.trim()
+    if (!title || !description || !data.incidentDate) throw new Error('Please fill in every required field')
+    const estimatedValue = Number(data.estimatedValue || 0)
+    const owner = ctx.companyId
+      ? { companyId: ctx.companyId }
+      : { individualClientId: ctx.individualClientId ?? undefined }
+
+    const { claim, created } = await getOrCreateClaimByPolicy({
+      policyId: data.policyId,
+      buildNewClaim: (id, nowIso) => ({
+        id,
+        policyId: data.policyId,
+        ...owner,
+        title,
+        description,
+        claimDate: nowIso.split('T')[0],
+        incidentDate: data.incidentDate,
+        estimatedValue,
+        status: 'submitted',
+        steps: [{ status: 'submitted', date: nowIso.split('T')[0], notes: 'Claim reported by the client in MillionGuard' }],
+        createdAt: nowIso,
+      }),
+      updatesIfExisting: { ...owner, title, description, incidentDate: data.incidentDate, estimatedValue },
+    })
+    if (created) {
+      const now = new Date().toISOString()
+      await persistClaimMessage({
+        claim,
+        senderType: 'client',
+        senderName: ctx.user.name || ctx.user.email || 'Client',
+        senderUserId: ctx.user.id,
+        message: 'Claim reported by the client in MillionGuard.',
+        createdAt: now,
+        readAt: now,
+      })
+    }
+    return { id: claim.id, reused: !created }
+  })
+
+/** The client's own documents (policies, invoices, certificates, reports). */
+export const fetchPortalDocuments = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async (): Promise<PortalDocument[]> => {
+    const ctx = await portalContext()
+    let docs: DocType[] = []
+    if (ctx.companyId) {
+      docs = await db.getDocuments(ctx.companyId)
+    } else if (ctx.individualClientId) {
+      const { data, error } = await supabaseAdmin
+        .from('documents')
+        .select('id, name, category, size, uploaded_at, storage_path, individual_client_id, company_id')
+        .eq('individual_client_id', ctx.individualClientId)
+        .order('uploaded_at', { ascending: false })
+      if (error) console.error('fetchPortalDocuments:', error.message)
+      docs = (data ?? []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        category: r.category,
+        size: r.size ?? 0,
+        uploadedAt: r.uploaded_at,
+        storagePath: r.storage_path,
+        individualClientId: r.individual_client_id,
+        companyId: r.company_id,
+        uploadedBy: '',
+      }))
+    }
+    return docs.map((d) => ({ id: d.id, name: d.name, category: d.category, size: d.size ?? 0, uploadedAt: d.uploadedAt }))
+  })
+
+/** Short-lived download link for one of the client's own documents. */
+export const getPortalDocumentUrl = createServerFn({ method: 'POST' })
+  .middleware([requireAuthMiddleware])
+  .inputValidator((d: { documentId: string }) => d)
+  .handler(async ({ data }) => {
+    const ctx = await portalContext()
+    const doc = await db.getDocument(data.documentId)
+    if (!doc) throw new Error('Document not found')
+    const owns = ctx.isAdmin
+      || Boolean(ctx.companyId && doc.companyId === ctx.companyId)
+      || Boolean(ctx.individualClientId && !ctx.companyId && doc.individualClientId === ctx.individualClientId)
+    if (!owns) throw new Error('You do not have access to this document')
+    const { data: urlData, error } = await supabaseAdmin.storage.from('documents').createSignedUrl(doc.storagePath, 600)
+    if (error) throw new Error(error.message)
+    return { url: urlData.signedUrl, name: doc.name }
+  })
+
+/** Account details for the profile screen. */
+export const fetchPortalProfile = createServerFn({ method: 'GET' })
+  .middleware([requireAuthMiddleware])
+  .handler(async () => {
+    const ctx = await portalContext()
+    if (ctx.companyId) {
+      const company = await db.getCompany(ctx.companyId)
+      return {
+        type: 'business' as const,
+        email: ctx.user.email ?? '',
+        userName: ctx.user.name ?? '',
+        name: company?.name ?? '',
+        taxNumber: company?.nif ?? '',
+        phone: company?.contactPhone ?? '',
+        address: company?.address ?? '',
+        contactName: company?.contactName ?? '',
+        contactEmail: company?.contactEmail ?? '',
+      }
+    }
+    if (ctx.individualClientId) {
+      const client = await db.getIndividualClient(ctx.individualClientId)
+      return {
+        type: 'personal' as const,
+        email: ctx.user.email ?? '',
+        userName: ctx.user.name ?? '',
+        name: client?.fullName ?? ctx.individualClientName ?? '',
+        taxNumber: client?.nif ?? '',
+        phone: client?.phone ?? '',
+        address: client?.address ?? '',
+        contactName: '',
+        contactEmail: client?.email ?? '',
+      }
+    }
+    return {
+      type: 'none' as const,
+      email: ctx.user.email ?? '',
+      userName: ctx.user.name ?? '',
+      name: '', taxNumber: '', phone: '', address: '', contactName: '', contactEmail: '',
+    }
+  })

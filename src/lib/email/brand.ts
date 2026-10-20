@@ -17,19 +17,19 @@ export interface EmailBrand {
 }
 
 export const EMAIL_BRAND_PT: EmailBrand = {
-  name: 'Os Meus Seguros',
-  tagline: 'by Adler & Rochefort',
-  kicker: 'Gestão de Seguros',
-  footerName: 'Adler & Rochefort · Mediadores de Seguros',
-  footerNote:
-    'Este email foi enviado automaticamente pelo sistema Os Meus Seguros. Para deixar de receber estas notificações, contacte o seu mediador.',
-}
-
-export const EMAIL_BRAND_MCV: EmailBrand = {
-  name: 'My Cover Vault',
+  name: 'MillionGuard',
   tagline: 'by Adler & Rochefort',
   kicker: 'Insurance Management',
   footerName: 'Adler & Rochefort · Ownizo Unipessoal Lda. · ASF reg. 425591790/3',
   footerNote:
-    'This email was sent automatically by My Cover Vault. To stop receiving these notifications, please contact your broker.',
+    'This email was sent automatically by MillionGuard. To stop receiving these notifications, please contact your agent.',
+}
+
+export const EMAIL_BRAND_MCV: EmailBrand = {
+  name: 'MillionGuard',
+  tagline: 'by Adler & Rochefort',
+  kicker: 'Insurance Management',
+  footerName: 'Adler & Rochefort · Ownizo Unipessoal Lda. · ASF reg. 425591790/3',
+  footerNote:
+    'This email was sent automatically by MillionGuard. To stop receiving these notifications, please contact your broker.',
 }
