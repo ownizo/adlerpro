@@ -234,8 +234,20 @@ export function PortalLayout({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = async () => {
-    await supabase.auth.signOut()
-    window.location.replace('/portal/login')
+    // Local sign-out first (no network needed), then remove every Supabase
+    // cookie, including chunked ones, so the login screen cannot find a
+    // leftover session and bounce the user back in.
+    try { await supabase.auth.signOut({ scope: 'local' }) } catch { /* ignore */ }
+    try {
+      document.cookie.split(';').map((c) => c.split('=')[0].trim())
+        .filter((n) => n.startsWith('sb-'))
+        .forEach((n) => {
+          document.cookie = `${n}=; Max-Age=0; path=/`
+          document.cookie = `${n}=; Max-Age=0; path=/; domain=${window.location.hostname}`
+        })
+      Object.keys(window.localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => window.localStorage.removeItem(k))
+    } catch { /* ignore */ }
+    window.location.replace('/portal/login?signedout=1')
   }
 
   const isActive = (to: string, exact?: boolean) =>
