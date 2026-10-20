@@ -6,6 +6,8 @@ export const config: Config = {
 }
 
 export default async function handler(req: Request) {
+  // Several Netlify sites are built from this repo; only the backoffice runs the job.
+  if (!(process.env.URL || '').includes('admin.')) return new Response(null, { status: 204 })
   // Aceita o scheduler do Netlify (x-netlify-scheduled) ou bearer ADMIN_SECRET para testes manuais
   // Padrão de auth idêntico a send-renewal-alerts.mts
   const authHeader = req.headers.get('authorization')
