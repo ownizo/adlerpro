@@ -237,9 +237,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       })
     }
     label()
-    const obs = new MutationObserver(() => label())
+    // React re-renders fire many mutations in a burst (every keystroke in a
+    // form, every row of a long table). Re-scan at most once per frame instead
+    // of once per mutation, which kept the main thread busy on large lists.
+    let frame = 0
+    const schedule = () => {
+      if (frame) return
+      frame = window.requestAnimationFrame(() => { frame = 0; label() })
+    }
+    const obs = new MutationObserver(schedule)
     obs.observe(document.body, { childList: true, subtree: true })
-    return () => obs.disconnect()
+    return () => { obs.disconnect(); if (frame) window.cancelAnimationFrame(frame) }
   }, [isAdminRoute])
 
   useEffect(() => {
