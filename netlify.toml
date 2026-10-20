@@ -32,6 +32,22 @@
   port = 8888
 
 # ---------------------------------------------------------------------------
+# My Cover Vault became MillionGuard (October 2026): the old domain sends every
+# path to the same path on millionguard.com.
+# ---------------------------------------------------------------------------
+[[redirects]]
+  from = "https://mycovervault.com/*"
+  to = "https://millionguard.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.mycovervault.com/*"
+  to = "https://millionguard.com/:splat"
+  status = 301
+  force = true
+
+# ---------------------------------------------------------------------------
 # MillionGuard — the single client portal (businesses and individuals).
 # The old portal paths (B2B /dashboard…, B2C /one/*) lead to the unified
 # /portal screens on the client domains only; the admin site is untouched.
@@ -144,110 +160,3 @@
   status = 301
   force = true
 
-[[redirects]]
-  from = "https://mycovervault.com/one/*"
-  to = "/portal"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://mycovervault.com/one"
-  to = "/portal"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://mycovervault.com/dashboard"
-  to = "/portal"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://mycovervault.com/policies"
-  to = "/portal/policies"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://mycovervault.com/claims"
-  to = "/portal/claims"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://mycovervault.com/profile"
-  to = "/portal/profile"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://mycovervault.com/login"
-  to = "/portal/login"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://mycovervault.com/alerts"
-  to = "/portal"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://mycovervault.com/contact"
-  to = "/portal"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://www.mycovervault.com/one/*"
-  to = "/portal"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://www.mycovervault.com/one"
-  to = "/portal"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://www.mycovervault.com/dashboard"
-  to = "/portal"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://www.mycovervault.com/policies"
-  to = "/portal/policies"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://www.mycovervault.com/claims"
-  to = "/portal/claims"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://www.mycovervault.com/profile"
-  to = "/portal/profile"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://www.mycovervault.com/login"
-  to = "/portal/login"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://www.mycovervault.com/alerts"
-  to = "/portal"
-  status = 301
-  force = true
-
-[[redirects]]
-  from = "https://www.mycovervault.com/contact"
-  to = "/portal"
-  status = 301
-  force = true
