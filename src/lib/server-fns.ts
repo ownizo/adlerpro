@@ -12,6 +12,7 @@ import { netlifyDb } from '../../db/index'
 import { policyDocuments } from '../../db/schema'
 import { getClaimOperationalData, saveClaimOperationalData, updateClaimOperationalData } from './claim-ops'
 import { claimMessageToTicketMessage, mergeClaimMessages } from './claim-message-sync'
+import { claimStoragePrefix, mergeClaimDocuments } from './claim-documents'
 import { normalizeClaimsByPolicy, selectPreferredClaimForPolicy } from './claim-resolution'
 import type {
   DashboardStats,
@@ -348,10 +349,17 @@ async function getCanonicalClaimMessages(claim: Claim): Promise<ClaimMessage[]> 
 }
 
 async function getCanonicalClaimOperationalData(claim: Claim): Promise<ClaimOperationalData> {
-  const [ops, canonicalMessages] = await Promise.all([
+  const [ops, canonicalMessages, dbDocuments] = await Promise.all([
     getClaimOperationalData(claim.id),
     getCanonicalClaimMessages(claim),
+    db.getClaimDocumentsByStoragePath(claim.id),
   ])
+  const { documents, timeline } = mergeClaimDocuments({
+    claimId: claim.id,
+    documents: ops.documents,
+    timeline: ops.timeline,
+    dbDocuments,
+  })
 
   const mappedMessages = canonicalMessages.map(claimMessageToTicketMessage)
   const lastMessageAt = mappedMessages[mappedMessages.length - 1]?.createdAt
@@ -362,6 +370,8 @@ async function getCanonicalClaimOperationalData(claim: Claim): Promise<ClaimOper
 
   return {
     ...ops,
+    documents,
+    timeline,
     messages: mappedMessages,
     updatedAt,
   }
@@ -1984,6 +1994,8 @@ export const fetchClaimWorkspace = createServerFn({ method: 'GET' })
     if (!claim) throw new Error('Sinistro não encontrado')
     if (!canAccessClaimByContext(claim, ctx)) throw new Error('Sem acesso a este sinistro')
 
+    if (ctx.isAdmin) await db.markClaimMessagesReadForAdmin(claim.id)
+
     const [policy, company, individualClient, ops] = await Promise.all([
       db.getPolicy(claim.policyId),
       claim.companyId ? db.getCompany(claim.companyId) : Promise.resolve(undefined),
@@ -2158,7 +2170,7 @@ export const registerClaimDocument = createServerFn({ method: 'POST' })
 
     await db.createDocument({
       id: fileRef.id,
-      companyId: claim.companyId ?? '',
+      companyId: claim.companyId || undefined,
       individualClientId: claim.individualClientId,
       name: data.name,
       category: 'claim',
@@ -2182,6 +2194,19 @@ export const registerClaimDocument = createServerFn({ method: 'POST' })
       ],
     }))
 
+    // A client file goes into the claim's conversation too, so the agency
+    // sees it as unread activity in the backoffice.
+    if (uploadedByRole === 'client') {
+      await persistClaimMessage({
+        claim,
+        senderType: 'client',
+        senderName: uploadedByName,
+        senderUserId: ctx.user.id,
+        message: `Added a document: ${data.name}`,
+        createdAt: uploadedAt,
+      })
+    }
+
     return { success: true, operations: ops }
   })
 
@@ -2192,8 +2217,19 @@ export const removeClaimDocument = createServerFn({ method: 'POST' })
     const claim = await db.getClaim(data.claimId)
     if (!claim) throw new Error('Sinistro não encontrado')
 
+    // The file is listed from the shared documents table as well (see
+    // claim-documents.ts), so it has to go from there and from storage too.
+    const dbDocument = await db.getDocument(data.documentId)
+    let removedName: string | undefined
+    if (dbDocument?.storagePath?.startsWith(claimStoragePrefix(claim.id))) {
+      removedName = dbDocument.name
+      const { error: storageError } = await supabaseAdmin.storage.from('documents').remove([dbDocument.storagePath])
+      if (storageError) console.error('removeClaimDocument storage:', storageError.message)
+      await db.deleteDocument(dbDocument.id)
+    }
+
     const ops = await updateClaimOperationalData(data.claimId, (current) => {
-      const target = current.documents.find((item) => item.id === data.documentId)
+      const target = current.documents.find((item) => item.id === data.documentId) ?? (removedName ? { name: removedName } : undefined)
       const documents = current.documents.filter((item) => item.id !== data.documentId)
       const timeline = [...current.timeline]
       if (target) {
@@ -3499,7 +3535,7 @@ export const clientClearMustChangePassword = createServerFn({ method: 'POST' })
 
 export const getAdminNavBadgeCounts = createServerFn({ method: 'GET' })
   .middleware([requireAuthMiddleware, requireRoleMiddleware('admin')])
-  .handler(async (): Promise<{ tasksCount: number; alertsCount: number }> => {
+  .handler(async (): Promise<{ tasksCount: number; alertsCount: number; claimsCount: number; unreadClaimIds: string[] }> => {
     const scope = await getViewerScope()
     const adminUserId = scope.user.id
 
@@ -3540,13 +3576,22 @@ export const getAdminNavBadgeCounts = createServerFn({ method: 'GET' })
       .lte('end_date', in60DaysStr)
       .gt('end_date', alertsSeenPlus60Str)
 
-    const [{ count: tasksCount, error: tasksErr }, { count: alertsCount, error: alertsErr }] = await Promise.all([tasksQuery, alertsQuery])
+    const [{ count: tasksCount, error: tasksErr }, { count: alertsCount, error: alertsErr }, unreadClaims] = await Promise.all([
+      tasksQuery,
+      alertsQuery,
+      db.getUnreadClientClaimMessageCounts(),
+    ])
     if (tasksErr) console.error('getAdminNavBadgeCounts tasks:', tasksErr.message)
     if (alertsErr) console.error('getAdminNavBadgeCounts alerts:', alertsErr.message)
 
+    // Claims stay counted until each one is opened in the backoffice, not
+    // when the Claims tab is visited.
+    const unreadClaimIds = Object.keys(unreadClaims)
     return {
       tasksCount: tasksCount ?? 0,
       alertsCount: alertsCount ?? 0,
+      claimsCount: unreadClaimIds.length,
+      unreadClaimIds,
     }
   })
 

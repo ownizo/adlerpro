@@ -1,6 +1,6 @@
 import { createFileRoute, Navigate, Link, Outlet, useRouterState, useNavigate } from '@tanstack/react-router'
 import { BillingTab } from '@/components/billing/BillingTab'
-import { AppLayout } from '@/components/AppLayout'
+import { AppLayout, ADMIN_BADGES_REFRESH } from '@/components/AppLayout'
 import {
   fetchAdminAll,
   adminCreatePolicy,
@@ -23,6 +23,7 @@ import {
   adminDeletePolicyDocument,
   adminCreateClaim,
   fetchClaimWorkspace,
+  getAdminNavBadgeCounts,
   adminAssignClaimResponsible,
   adminAddClaimTeamNote,
   adminSendClaimMessage,
@@ -371,6 +372,7 @@ function AdminDashboardContent() {
     operations: ClaimOperationalData
   } | null>(null)
   const [loadingClaimWorkspace, setLoadingClaimWorkspace] = useState(false)
+  const [unreadClaimIds, setUnreadClaimIds] = useState<Set<string>>(new Set())
 
   const reload = async () => {
     const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, claimOperationalSummary: cos, documents: d, individualClients: ic, websiteLeadClientIds: wlc } = await fetchAdminAll()
@@ -405,6 +407,14 @@ function AdminDashboardContent() {
     fetchClaimWorkspace({ data: { claimId: selectedClaimId } })
       .then((payload) => {
         setClaimWorkspace(payload as any)
+        // Opening the claim marks the client's messages as read.
+        setUnreadClaimIds((prev) => {
+          if (!prev.has(selectedClaimId)) return prev
+          const next = new Set(prev)
+          next.delete(selectedClaimId)
+          return next
+        })
+        window.dispatchEvent(new Event(ADMIN_BADGES_REFRESH))
       })
       .catch((err) => {
         console.error('[AdminPage] fetchClaimWorkspace error:', err)
@@ -412,6 +422,15 @@ function AdminDashboardContent() {
       })
       .finally(() => setLoadingClaimWorkspace(false))
   }, [selectedClaimId, claims.length])
+
+  useEffect(() => {
+    if (!ready || !user?.roles?.includes('admin')) return
+    getAdminNavBadgeCounts()
+      .then(({ unreadClaimIds: ids }) => setUnreadClaimIds(new Set(ids.filter((id) => id !== selectedClaimId))))
+      .catch(console.error)
+    // selectedClaimId is left out on purpose: opening a claim clears it locally.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, user, claims])
 
   if (!ready) {
     return (
@@ -991,6 +1010,7 @@ function AdminDashboardContent() {
                   companies={companies}
                   individualClients={individualClients}
                   summaryMap={claimOperationalSummary}
+                  unreadClaimIds={unreadClaimIds}
                   selectedClaimId={selectedClaimId}
                   onSelectClaim={setSelectedClaimId}
                   onQuickStatusUpdate={async (claimId, status, notes) => {
@@ -2940,6 +2960,7 @@ function AdminClaimsBoard({
   companies,
   individualClients,
   summaryMap,
+  unreadClaimIds,
   selectedClaimId,
   onSelectClaim,
   onQuickStatusUpdate,
@@ -2949,6 +2970,7 @@ function AdminClaimsBoard({
   companies: Company[]
   individualClients: IndividualClient[]
   summaryMap: Record<string, { responsibleName?: string; messagesCount: number; documentsCount: number; lastMessageAt?: string; updatedAt?: string }>
+  unreadClaimIds: Set<string>
   selectedClaimId: string | null
   onSelectClaim: (claimId: string) => void
   onQuickStatusUpdate: (claimId: string, status: string, notes?: string) => Promise<void>
@@ -2986,7 +3008,14 @@ function AdminClaimsBoard({
                 onClick={() => onSelectClaim(claim.id)}
                 className={`border-t border-navy-100 cursor-pointer hover:bg-navy-50/40 ${selectedClaimId === claim.id ? 'bg-navy-50/70' : ''}`}
               >
-                <td className="px-3 py-2">{ownerLabel}</td>
+                <td className="px-3 py-2">
+                  <span className="inline-flex items-center gap-2">
+                    {unreadClaimIds.has(claim.id) && (
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: 'var(--admin-red)' }} title="New client activity" aria-label="New client activity" />
+                    )}
+                    <span className={unreadClaimIds.has(claim.id) ? 'font-semibold' : undefined}>{ownerLabel}</span>
+                  </span>
+                </td>
                 <td className="px-3 py-2">{policy ? `${policy.policyNumber}` : '—'}</td>
                 <td className="px-3 py-2">{claim.title}</td>
                 <td className="px-3 py-2">{formatDate(claim.incidentDate)}</td>

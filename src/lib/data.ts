@@ -405,6 +405,21 @@ export async function getClaimDocuments(claimId: string, companyId?: string): Pr
   return rowsToCamel<Document>(data ?? [])
 }
 
+/** Files of one claim, found by their storage folder `claims/<claimId>/`. */
+export async function getClaimDocumentsByStoragePath(claimId: string): Promise<Document[]> {
+  const sb = getSupabaseAdmin()
+  // `_` in claim ids is a LIKE wildcard, so this can match a little more;
+  // callers keep only the exact `claims/<claimId>/` prefix.
+  const prefix = `claims/${claimId}/`
+  const { data, error } = await sb
+    .from('documents')
+    .select('*')
+    .like('storage_path', `${prefix}%`)
+    .order('uploaded_at', { ascending: true })
+  if (error) { console.error('getClaimDocumentsByStoragePath error:', error); return [] }
+  return rowsToCamel<Document>(data ?? [])
+}
+
 // ============================================================
 // Claim Messages
 // ============================================================
@@ -440,6 +455,32 @@ export async function markClaimMessagesReadForClient(claimId: string): Promise<v
     .eq('sender_type', 'admin')
     .eq('is_read', false)
   if (error) console.error('markClaimMessagesReadForClient error:', error)
+}
+
+/** The agency has seen the client's messages on this claim. */
+export async function markClaimMessagesReadForAdmin(claimId: string): Promise<void> {
+  const sb = getSupabaseAdmin()
+  const { error } = await sb
+    .from('claim_messages')
+    .update({ is_read: true })
+    .eq('claim_id', claimId)
+    .eq('sender_type', 'client')
+    .eq('is_read', false)
+  if (error) console.error('markClaimMessagesReadForAdmin error:', error)
+}
+
+/** Claims with client messages the agency has not opened yet, with how many each. */
+export async function getUnreadClientClaimMessageCounts(): Promise<Record<string, number>> {
+  const sb = getSupabaseAdmin()
+  const { data, error } = await sb
+    .from('claim_messages')
+    .select('claim_id')
+    .eq('sender_type', 'client')
+    .eq('is_read', false)
+  if (error) { console.error('getUnreadClientClaimMessageCounts error:', error); return {} }
+  const counts: Record<string, number> = {}
+  for (const row of (data ?? []) as Array<{ claim_id: string }>) counts[row.claim_id] = (counts[row.claim_id] ?? 0) + 1
+  return counts
 }
 
 export async function markClaimMessagesReadForIndividualClient(claimId: string): Promise<void> {
