@@ -24,7 +24,6 @@ import {
   adminCreateClaim,
   fetchClaimWorkspace,
   getAdminNavBadgeCounts,
-  adminAssignClaimResponsible,
   adminAddClaimTeamNote,
   adminSendClaimMessage,
   registerClaimDocument,
@@ -344,7 +343,6 @@ function AdminDashboardContent() {
   const [apiConnections, setApiConnections] = useState<ApiConnection[]>([])
   const [policies, setPolicies] = useState<Policy[]>([])
   const [claims, setClaims] = useState<Claim[]>([])
-  const [claimOperationalSummary, setClaimOperationalSummary] = useState<Record<string, { responsibleName?: string; messagesCount: number; documentsCount: number; lastMessageAt?: string; updatedAt?: string }>>({})
   const [documents, setDocuments] = useState<DocType[]>([])
   const [individualClients, setIndividualClients] = useState<IndividualClient[]>([])
   const [websiteLeadClientIds, setWebsiteLeadClientIds] = useState<Set<string>>(new Set())
@@ -375,14 +373,13 @@ function AdminDashboardContent() {
   const [unreadClaimIds, setUnreadClaimIds] = useState<Set<string>>(new Set())
 
   const reload = async () => {
-    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, claimOperationalSummary: cos, documents: d, individualClients: ic, websiteLeadClientIds: wlc } = await fetchAdminAll()
+    const { companies: c, companyUsers: u, userEvents: e, apiConnections: a, policies: p, claims: cl, documents: d, individualClients: ic, websiteLeadClientIds: wlc } = await fetchAdminAll()
     setCompanies(c)
     setCompanyUsers(u)
     setUserEvents(e)
     setApiConnections(a)
     setPolicies(p)
     setClaims(cl)
-    setClaimOperationalSummary(cos ?? {})
     setDocuments(d)
     setIndividualClients(ic ?? [])
     setWebsiteLeadClientIds(new Set(wlc ?? []))
@@ -1009,7 +1006,6 @@ function AdminDashboardContent() {
                   policies={policies}
                   companies={companies}
                   individualClients={individualClients}
-                  summaryMap={claimOperationalSummary}
                   unreadClaimIds={unreadClaimIds}
                   selectedClaimId={selectedClaimId}
                   onSelectClaim={setSelectedClaimId}
@@ -1031,7 +1027,6 @@ function AdminDashboardContent() {
                   <AdminClaimWorkspace
                     key={claimWorkspace.claim.id}
                     workspace={claimWorkspace}
-                    companyUsers={companyUsers}
                     onUpdated={async () => {
                       await reload()
                       if (selectedClaimId) {
@@ -2959,7 +2954,6 @@ function AdminClaimsBoard({
   policies,
   companies,
   individualClients,
-  summaryMap,
   unreadClaimIds,
   selectedClaimId,
   onSelectClaim,
@@ -2969,7 +2963,6 @@ function AdminClaimsBoard({
   policies: Policy[]
   companies: Company[]
   individualClients: IndividualClient[]
-  summaryMap: Record<string, { responsibleName?: string; messagesCount: number; documentsCount: number; lastMessageAt?: string; updatedAt?: string }>
   unreadClaimIds: Set<string>
   selectedClaimId: string | null
   onSelectClaim: (claimId: string) => void
@@ -2992,7 +2985,6 @@ function AdminClaimsBoard({
             <th className="text-left px-3 py-2">Date</th>
             <th className="text-left px-3 py-2">Status</th>
             <th className="text-left px-3 py-2">Amount</th>
-            <th className="text-left px-3 py-2">Owner</th>
           </tr>
         </thead>
         <tbody>
@@ -3001,7 +2993,6 @@ function AdminClaimsBoard({
             const companyName = claim.companyId ? (companies.find((item) => item.id === claim.companyId)?.name || claim.companyId) : undefined
             const individualName = claim.individualClientId ? (individualClients.find((item) => item.id === claim.individualClientId)?.fullName || claim.individualClientId) : undefined
             const ownerLabel = companyName || individualName || '—'
-            const summary = summaryMap[claim.id]
             return (
               <tr
                 key={claim.id}
@@ -3036,7 +3027,6 @@ function AdminClaimsBoard({
                   {updatingId === claim.id && <span className="ml-2 text-xs text-navy-400">...</span>}
                 </td>
                 <td className="px-3 py-2">{formatCurrency(claim.estimatedValue || 0)}</td>
-                <td className="px-3 py-2">{summary?.responsibleName || '—'}</td>
               </tr>
             )
           })}
@@ -3048,7 +3038,6 @@ function AdminClaimsBoard({
 
 function AdminClaimWorkspace({
   workspace,
-  companyUsers,
   onUpdated,
 }: {
   workspace: {
@@ -3058,19 +3047,12 @@ function AdminClaimWorkspace({
     individualClient?: IndividualClient
     operations: ClaimOperationalData
   }
-  companyUsers: CompanyUser[]
   onUpdated: () => Promise<void>
 }) {
   const { claim, policy, company, individualClient, operations } = workspace
-  const [selectedResponsible, setSelectedResponsible] = useState(operations.responsible?.id || '')
   const [newNote, setNewNote] = useState('')
   const [newMessage, setNewMessage] = useState('')
   const [uploading, setUploading] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  const responsibleCandidates = claim.companyId
-    ? companyUsers.filter((user) => user.companyId === claim.companyId)
-    : []
 
   const handleUploadDocument = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -3112,35 +3094,7 @@ function AdminClaimWorkspace({
         </div>
       </div>
 
-      <div className="grid md:grid-cols-2 gap-4">
-        <div className="border border-navy-100 rounded p-3">
-          <p className="text-xs uppercase tracking-wide text-navy-500 mb-2">Owner</p>
-          <div className="flex gap-2">
-            <select value={selectedResponsible} onChange={(e) => setSelectedResponsible(e.target.value)} className="flex-1 px-2 py-2 border border-navy-200 rounded text-sm">
-              <option value="">No owner</option>
-              {responsibleCandidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-            </select>
-            <button
-              disabled={saving}
-              onClick={async () => {
-                setSaving(true)
-                const selected = responsibleCandidates.find((user) => user.id === selectedResponsible)
-                await adminAssignClaimResponsible({
-                  data: {
-                    claimId: claim.id,
-                    responsible: selected ? { id: selected.id, name: selected.name, email: selected.email } : undefined,
-                  },
-                })
-                await onUpdated()
-                setSaving(false)
-              }}
-              className="admin-btn admin-btn-primary admin-btn--sm"
-            >
-              Save
-            </button>
-          </div>
-        </div>
-
+      <div>
         <div className="border border-navy-100 rounded p-3">
           <p className="text-xs uppercase tracking-wide text-navy-500 mb-2">Links</p>
           <p className="text-sm text-navy-600">Policy: {policy ? `${policy.policyNumber} (${POLICY_TYPE_LABELS[policy.type] ?? policy.type})` : '—'}</p>

@@ -11,6 +11,9 @@ import { resolvePostLogin } from '@/lib/post-login-destination'
 type AuthMode = 'login' | 'forgot' | 'recovery'
 
 export const Route = createFileRoute('/login')({
+  head: () => ({
+    links: [{ rel: 'stylesheet', href: 'https://fonts.googleapis.com/css2?family=Ubuntu:wght@300;400;500;700&display=swap' }],
+  }),
   component: LoginPage,
 })
 
@@ -37,14 +40,17 @@ function LoginPage() {
   const redirectStartedRef = useRef(false)
 
   const font = "'Ubuntu', ui-sans-serif, -apple-system, sans-serif"
+  // Brand palette, the same as the backoffice sidebar: charcoal and orange.
+  const charcoal = '#292929'
+  const orange = '#FF6300'
   const langPill = (
-    <div style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 50, display: 'flex', alignItems: 'center', border: '1px solid #dddddd', borderRadius: '4px', overflow: 'hidden', fontFamily: font }}>
+    <div style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 50, display: 'flex', alignItems: 'center', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '6px', overflow: 'hidden', fontFamily: font }}>
       {(['pt', 'en'] as const).map((l) => (
         <button
           key={l}
           onClick={() => handleLang(l)}
           style={{
-            background: lang === l ? '#111111' : 'transparent',
+            background: lang === l ? orange : 'transparent',
             border: 'none',
             cursor: 'pointer',
             padding: '0.25rem 0.6rem',
@@ -52,7 +58,7 @@ function LoginPage() {
             fontSize: '0.7rem',
             fontWeight: 700,
             letterSpacing: '0.08em',
-            color: lang === l ? '#ffffff' : '#888888',
+            color: lang === l ? '#ffffff' : 'rgba(255,255,255,0.6)',
             transition: 'background 0.15s, color 0.15s',
           }}
         >
@@ -119,9 +125,9 @@ function LoginPage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div style={{ background: charcoal }} className="admin-backoffice-shell min-h-screen flex items-center justify-center">
         {langPill}
-        <div style={{ color: '#666666', fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif" }}>{t('common.loading')}</div>
+        <div style={{ color: 'rgba(255,255,255,0.6)', fontFamily: font }}>{t('common.loading')}</div>
       </div>
     )
   }
@@ -130,7 +136,7 @@ function LoginPage() {
      // Falha persistente a resolver o destino: estado explícito com retry.
     if (loadError) {
       return (
-        <div className="min-h-screen bg-white flex items-center justify-center px-4">
+        <div style={{ background: charcoal }} className="admin-backoffice-shell min-h-screen flex items-center justify-center px-4">
           {langPill}
           <div className="w-full max-w-md p-8 text-center" style={{ border: '1px solid #eeeeee', borderRadius: '4px' }}>
             <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4" style={{ background: '#FEE2E2', borderRadius: '50%' }}>
@@ -138,7 +144,7 @@ function LoginPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h2 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: '#111111', marginBottom: '0.75rem' }}>
+            <h2 style={{ fontFamily: font, fontWeight: 700, fontSize: '1.4rem', color: charcoal, marginBottom: '0.75rem' }}>
               {t('auth.profileLoadErrorTitle')}
             </h2>
             <p style={{ fontFamily: font, fontWeight: 300, fontSize: '0.85rem', color: '#555555', lineHeight: 1.6, marginBottom: '1.5rem' }}>
@@ -150,7 +156,7 @@ function LoginPage() {
                 redirectStartedRef.current = false
                 setRetryNonce((n) => n + 1)
               }}
-              style={{ fontFamily: font, fontWeight: 600, fontSize: '0.85rem', padding: '0.6rem 1.5rem', background: '#111111', color: '#ffffff', borderRadius: '2px', border: 'none', cursor: 'pointer' }}
+              style={{ fontFamily: font, fontWeight: 600, fontSize: '0.85rem', padding: '0.6rem 1.5rem', background: orange, color: '#ffffff', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
             >
               {t('common.retry')}
             </button>
@@ -160,9 +166,9 @@ function LoginPage() {
     }
     // Destino a ser resolvido pelo segmento — ecrã de transição.
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div style={{ background: charcoal }} className="admin-backoffice-shell min-h-screen flex items-center justify-center">
         {langPill}
-        <div style={{ color: '#666666', fontFamily: font }}>{t('common.redirecting')}</div>
+        <div style={{ color: 'rgba(255,255,255,0.6)', fontFamily: font }}>{t('common.redirecting')}</div>
       </div>
     )
   }
@@ -257,31 +263,29 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-4">
+    <div style={{ background: charcoal }} className="admin-backoffice-shell min-h-screen flex items-center justify-center px-4">
       {langPill}
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/logo-ar.png" alt="Adler & Rochefort" style={{ height: '110px', width: 'auto', margin: '0 auto 1.25rem', display: 'block' }} />
           <h1 style={{
-            fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif",
+            fontFamily: font,
             fontWeight: 700,
-            fontSize: '1.1rem',
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase' as const,
-            color: '#111111',
+            fontSize: '1.6rem',
+            letterSpacing: '0.02em',
+            color: '#ffffff',
           }}>
             Backoffice
           </h1>
-          <p style={{ fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", fontWeight: 300, fontSize: '0.7rem', color: '#C8961A', marginTop: '0.4rem', letterSpacing: '0.08em' }}>
+          <p style={{ fontFamily: font, fontWeight: 500, fontSize: '0.68rem', color: '#FF8A3D', marginTop: '0.35rem', letterSpacing: '0.14em', textTransform: 'uppercase' as const }}>
             Adler &amp; Rochefort
           </p>
         </div>
 
-        <div style={{ border: '1px solid #eeeeee', borderRadius: '4px', padding: '2rem' }}>
+        <div style={{ background: '#ffffff', borderRadius: '10px', padding: '2rem', boxShadow: '0 12px 32px rgba(0,0,0,0.25)' }}>
           {mode === 'login' && (
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label style={{ fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                <label style={{ fontFamily: font, fontWeight: 300, fontSize: '0.75rem', color: '#6E6A67', display: 'block', marginBottom: '0.25rem' }}>
                   {t('auth.email')}
                 </label>
                 <input
@@ -290,13 +294,13 @@ function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
-                  style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", outline: 'none' }}
+                  style={{ border: '1px solid #E6E3E1', borderRadius: '6px', fontFamily: font, outline: 'none' }}
                   placeholder={t('auth.emailPlaceholder')}
                   required
                 />
               </div>
               <div>
-                <label style={{ fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                <label style={{ fontFamily: font, fontWeight: 300, fontSize: '0.75rem', color: '#6E6A67', display: 'block', marginBottom: '0.25rem' }}>
                   {t('auth.password')}
                 </label>
                 <input
@@ -305,24 +309,24 @@ function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
-                  style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", outline: 'none' }}
+                  style={{ border: '1px solid #E6E3E1', borderRadius: '6px', fontFamily: font, outline: 'none' }}
                   placeholder={t('auth.passwordPlaceholder')}
                   required
                 />
               </div>
 
               {error && (
-                <div className="text-sm p-3" style={{ background: '#FAEEDA', color: '#854F0B', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: '#FAEEDA', color: '#854F0B', borderRadius: '6px' }}>
                   {error}
                 </div>
               )}
               {recoveryMessage && (
-                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '6px' }}>
                   {recoveryMessage}
                 </div>
               )}
               {confirmationMessage && (
-                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '6px' }}>
                   {confirmationMessage}
                 </div>
               )}
@@ -332,13 +336,13 @@ function LoginPage() {
                 disabled={loading}
                 className="w-full disabled:opacity-50"
                 style={{
-                  fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif",
+                  fontFamily: font,
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   padding: '0.7rem 1.75rem',
-                  background: '#111111',
+                  background: orange,
                   color: '#ffffff',
-                  borderRadius: '2px',
+                  borderRadius: '6px',
                   border: 'none',
                   cursor: 'pointer',
                 }}
@@ -354,7 +358,7 @@ function LoginPage() {
                     setError('')
                     setRecoveryMessage('')
                   }}
-                  style={{ fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", fontWeight: 600, fontSize: '0.8rem', color: '#C8961A', background: 'none', border: 'none', cursor: 'pointer' }}
+                  style={{ fontFamily: font, fontWeight: 600, fontSize: '0.8rem', color: orange, background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   {t('auth.forgotPassword')}
                 </button>
@@ -364,11 +368,11 @@ function LoginPage() {
 
           {mode === 'forgot' && (
             <form onSubmit={handlePasswordRecovery} className="space-y-4">
-              <p className="text-sm" style={{ color: '#666666', fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif" }}>
+              <p className="text-sm" style={{ color: '#666666', fontFamily: font }}>
                 {t('auth.forgotTitle')}
               </p>
               <div>
-                <label style={{ fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                <label style={{ fontFamily: font, fontWeight: 300, fontSize: '0.75rem', color: '#6E6A67', display: 'block', marginBottom: '0.25rem' }}>
                   {t('auth.email')}
                 </label>
                 <input
@@ -376,19 +380,19 @@ function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
-                  style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", outline: 'none' }}
+                  style={{ border: '1px solid #E6E3E1', borderRadius: '6px', fontFamily: font, outline: 'none' }}
                   placeholder={t('auth.emailPlaceholder')}
                   required
                 />
               </div>
 
               {error && (
-                <div className="text-sm p-3" style={{ background: '#FAEEDA', color: '#854F0B', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: '#FAEEDA', color: '#854F0B', borderRadius: '6px' }}>
                   {error}
                 </div>
               )}
               {recoveryMessage && (
-                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '6px' }}>
                   {recoveryMessage}
                 </div>
               )}
@@ -401,7 +405,7 @@ function LoginPage() {
                     setError('')
                     setRecoveryMessage('')
                   }}
-                  style={{ fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", fontWeight: 600, color: '#666666', background: 'none', border: 'none', cursor: 'pointer' }}
+                  style={{ fontFamily: font, fontWeight: 600, color: '#666666', background: 'none', border: 'none', cursor: 'pointer' }}
                 >
                   {t('auth.backToLogin')}
                 </button>
@@ -410,13 +414,13 @@ function LoginPage() {
                   disabled={recoveryLoading}
                   className="disabled:opacity-50"
                   style={{
-                    fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif",
+                    fontFamily: font,
                     fontWeight: 600,
                     fontSize: '0.85rem',
                     padding: '0.7rem 1.75rem',
-                    background: '#111111',
+                    background: orange,
                     color: '#ffffff',
-                    borderRadius: '2px',
+                    borderRadius: '6px',
                     border: 'none',
                     cursor: 'pointer',
                   }}
@@ -429,12 +433,12 @@ function LoginPage() {
 
           {isPasswordSetupMode && (
             <form onSubmit={handlePasswordSetup} className="space-y-4">
-              <p className="text-sm" style={{ color: '#666666', fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif" }}>
+              <p className="text-sm" style={{ color: '#666666', fontFamily: font }}>
                 {t('auth.recoveryTitle')}
               </p>
 
               <div>
-                <label style={{ fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                <label style={{ fontFamily: font, fontWeight: 300, fontSize: '0.75rem', color: '#6E6A67', display: 'block', marginBottom: '0.25rem' }}>
                   {t('auth.newPassword')}
                 </label>
                 <input
@@ -442,14 +446,14 @@ function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
-                  style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", outline: 'none' }}
+                  style={{ border: '1px solid #E6E3E1', borderRadius: '6px', fontFamily: font, outline: 'none' }}
                   placeholder={t('auth.passwordPlaceholder')}
                   required
                   minLength={6}
                 />
               </div>
               <div>
-                <label style={{ fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", fontWeight: 300, fontSize: '0.75rem', color: '#999999', display: 'block', marginBottom: '0.25rem' }}>
+                <label style={{ fontFamily: font, fontWeight: 300, fontSize: '0.75rem', color: '#6E6A67', display: 'block', marginBottom: '0.25rem' }}>
                   {t('auth.confirmPassword')}
                 </label>
                 <input
@@ -457,7 +461,7 @@ function LoginPage() {
                   value={passwordConfirmation}
                   onChange={(e) => setPasswordConfirmation(e.target.value)}
                   className="w-full px-4 py-2.5 text-sm"
-                  style={{ border: '1px solid #eeeeee', borderRadius: '2px', fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif", outline: 'none' }}
+                  style={{ border: '1px solid #E6E3E1', borderRadius: '6px', fontFamily: font, outline: 'none' }}
                   placeholder={t('auth.passwordPlaceholder')}
                   required
                   minLength={6}
@@ -465,12 +469,12 @@ function LoginPage() {
               </div>
 
               {error && (
-                <div className="text-sm p-3" style={{ background: '#FAEEDA', color: '#854F0B', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: '#FAEEDA', color: '#854F0B', borderRadius: '6px' }}>
                   {error}
                 </div>
               )}
               {recoveryMessage && (
-                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '2px' }}>
+                <div className="text-sm p-3" style={{ background: '#EAF3DE', color: '#3B6D11', borderRadius: '6px' }}>
                   {recoveryMessage}
                 </div>
               )}
@@ -480,13 +484,13 @@ function LoginPage() {
                 disabled={loading}
                 className="w-full disabled:opacity-50"
                 style={{
-                  fontFamily: "'Ubuntu', ui-sans-serif, -apple-system, sans-serif",
+                  fontFamily: font,
                   fontWeight: 600,
                   fontSize: '0.85rem',
                   padding: '0.7rem 1.75rem',
-                  background: '#111111',
+                  background: orange,
                   color: '#ffffff',
-                  borderRadius: '2px',
+                  borderRadius: '6px',
                   border: 'none',
                   cursor: 'pointer',
                 }}
