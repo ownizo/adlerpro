@@ -46,7 +46,7 @@ export const Route = createRootRoute({
         { name: 'apple-mobile-web-app-title', content: title },
       ],
       links: [
-      // MillionGuard has its own shield icon; the Adler & Rochefort site and the backoffice keep the lion
+      // MillionGuard has its own shield icon; the backoffice uses the charcoal lion on orange; the Adler & Rochefort site keeps its lion
       ...(mg
         ? [
             { rel: 'icon', type: 'image/x-icon', href: '/mg-favicon.ico' },
@@ -54,13 +54,19 @@ export const Route = createRootRoute({
             { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/mg-favicon-32.png' },
             { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/mg-favicon-192.png' },
           ]
+        : admin
+        ? [
+            { rel: 'icon', type: 'image/x-icon', href: '/admin-favicon.ico' },
+            { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/admin-favicon-32.png' },
+            { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/admin-favicon-192.png' },
+          ]
         : [
             { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
             { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon.png' },
             { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/favicon-192.png' },
           ]),
       { rel: 'manifest', href: admin ? '/admin.webmanifest' : '/manifest.webmanifest' },
-      { rel: 'apple-touch-icon', sizes: '180x180', href: admin ? '/admin-apple-touch-icon.png' : mg ? '/mg-apple-touch-icon.png' : '/apple-touch-icon.png' },
+      { rel: 'apple-touch-icon', sizes: '180x180', href: admin ? '/admin-apple-touch-icon.png?v=2' : mg ? '/mg-apple-touch-icon.png' : '/apple-touch-icon.png' },
       {
         rel: 'preconnect',
         href: 'https://fonts.googleapis.com',
