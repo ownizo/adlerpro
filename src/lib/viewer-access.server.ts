@@ -31,13 +31,20 @@ async function linkedId(
   if (!user.email || !user.email_confirmed_at) return null
   const byEmail = await sb
     .from(table)
-    .select(column)
+    .select(column === 'id' ? 'id' : 'id, company_id')
     .ilike('email', escapeLikePattern(user.email.trim()))
     .is('auth_user_id', null)
     .limit(2)
-  const rows = (byEmail.data ?? []) as Record<string, string>[]
+  const rows = (byEmail.data ?? []) as unknown as Record<string, string>[]
   // Two records with the same email: ambiguous, never guess.
-  return rows.length === 1 ? rows[0][column] ?? null : null
+  if (rows.length !== 1) return null
+
+  // First sign-in by email: store the internal id so later sign-ins no
+  // longer depend on the email. The `is null` guard keeps a concurrent
+  // link by another account from being overwritten.
+  const { error } = await sb.from(table).update({ auth_user_id: user.id }).eq('id', rows[0].id).is('auth_user_id', null)
+  if (error) console.error(`link ${table}.auth_user_id:`, error.message)
+  return rows[0][column] ?? null
 }
 
 export async function resolveViewerLinks(
