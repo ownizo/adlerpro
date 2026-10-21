@@ -84,16 +84,16 @@ test('extracts answers from every provider format', async () => {
 
 test('engine errors are summarised and explained', async () => {
   const { explainError } = await import('./ai-visibility.ts')
-  assert.match(explainError('HTTP 400: Your credit balance is too low to access the Anthropic API.'), /sem crédito/)
-  assert.match(explainError('HTTP 429: You exceeded your current quota, please check your plan and billing details.'), /faturação/)
-  assert.match(explainError('HTTP 503: Our servers are currently overloaded.'), /sobrecarregado/)
+  assert.match(explainError('HTTP 400: Your credit balance is too low to access the Anthropic API.'), /out of credit/)
+  assert.match(explainError('HTTP 429: You exceeded your current quota, please check your plan and billing details.'), /billing/)
+  assert.match(explainError('HTTP 503: Our servers are currently overloaded.'), /overloaded/)
   const s = summariseVisibility([{ id: 'p1', prompt: 'a', language: 'en', market: 'PT', topic: null, active: true, source: 'manual' }], [
     { prompt_id: 'p1', engine: 'GEMINI', run_day: '2026-10-19', source: 'native', mentioned: false, cited: false, in_sources: false, position: null, competitors: [], cited_urls: [], answer_excerpt: null, error: 'HTTP 429: You exceeded your current quota' },
   ])
   const g = s.engines.find((e) => e.engine === 'GEMINI')!
   assert.equal(g.runs, 0)
   assert.equal(g.errors, 1)
-  assert.match(g.lastError!, /faturação/)
+  assert.match(g.lastError!, /billing/)
 })
 
 test('C1 Broker ranks ahead when named first', () => {

@@ -14,13 +14,13 @@ export async function getSiteVisitsSummary(days: number, focusDay?: string): Pro
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await db.from('site_visits').select(COLUMNS)
       .gte('created_at', sinceIso).order('created_at', { ascending: true }).range(from, from + PAGE - 1)
-    if (error) throw new Error('Não foi possível ler as visitas do site.')
+    if (error) throw new Error('Could not read the site visits.')
     rows.push(...(data as SiteVisitRow[]))
     if (!data || data.length < PAGE) break
   }
 
   const { data: leads, error: leadsError } = await db.from('website_leads').select('created_at').gte('created_at', sinceIso)
-  if (leadsError) throw new Error('Não foi possível ler os leads.')
+  if (leadsError) throw new Error('Could not read the leads.')
 
   return summarise(rows, (leads ?? []).map((l: { created_at: string }) => l.created_at), days, new Date(), focusDay)
 }

@@ -187,13 +187,13 @@ export function completeExpenseFields(fields: ExpenseFields): ExpenseFields {
 /** Warnings shown to the reviewer before confirming (never blocks). */
 export function expenseWarnings(e: Pick<Expense, 'net_amount' | 'vat_amount' | 'total_amount' | 'invoice_date' | 'supplier_nif' | 'reference_month'>): string[] {
   const warnings: string[] = []
-  if (e.total_amount == null) warnings.push('Falta o valor total.')
-  if (!e.invoice_date) warnings.push('Falta a data da fatura.')
-  if (!e.reference_month) warnings.push('Falta o mês de referência.')
+  if (e.total_amount == null) warnings.push('Total amount missing.')
+  if (!e.invoice_date) warnings.push('Invoice date missing.')
+  if (!e.reference_month) warnings.push('Reference month missing.')
   if (e.net_amount != null && e.vat_amount != null && e.total_amount != null && Math.abs(e.net_amount + e.vat_amount - e.total_amount) > 0.02) {
-    warnings.push('Base + IVA não corresponde ao total.')
+    warnings.push('Net + VAT does not match the total.')
   }
-  if (e.supplier_nif && /^\d{9}$/.test(e.supplier_nif) && !isValidPtNif(e.supplier_nif)) warnings.push('O NIF do fornecedor não passa no dígito de controlo.')
+  if (e.supplier_nif && /^\d{9}$/.test(e.supplier_nif) && !isValidPtNif(e.supplier_nif)) warnings.push('The supplier NIF fails the check digit.')
   return warnings
 }
 

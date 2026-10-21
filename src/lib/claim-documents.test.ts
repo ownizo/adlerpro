@@ -22,7 +22,7 @@ test('a file uploaded on the other site is added to the claim with a timeline en
   assert.equal(merged.documents[0].contentType, 'application/pdf')
   assert.equal(merged.documents[0].uploadedByRole, 'client')
   assert.equal(merged.timeline.length, 1)
-  assert.equal(merged.timeline[0].message, 'Documento adicionado: Simulacao.pdf')
+  assert.equal(merged.timeline[0].message, 'Document added: Simulacao.pdf')
 })
 
 test('a file this site already knows is not listed twice', () => {

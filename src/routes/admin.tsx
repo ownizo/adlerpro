@@ -117,6 +117,26 @@ function renewalDisplayLabel(value: string): string {
   return RENEWAL_FALLBACK_LABEL_EN[value] ?? value
 }
 
+// Claim timeline entries written before the backoffice went English-only
+// are stored in Portuguese; show them in English. New entries are English.
+const CLAIM_TIMELINE_EN: Array<[RegExp, string]> = [
+  [/^Admin adicionou uma mensagem$/, 'Admin added a message'],
+  [/^Cliente adicionou uma mensagem$/, 'Client added a message'],
+  [/^Estado alterado de (.+?) para (.+)$/, 'Status changed from $1 to $2'],
+  [/^Sinistro criado \((.+)\)$/, 'Claim created ($1)'],
+  [/^Responsável definido: (.+)$/, 'Owner set: $1'],
+  [/^Responsável removido$/, 'Owner removed'],
+  [/^Nota interna adicionada$/, 'Internal note added'],
+  [/^Documento adicionado: (.+)$/, 'Document added: $1'],
+  [/^Documento removido: (.+)$/, 'Document removed: $1'],
+]
+function claimTimelineMessage(message: string): string {
+  for (const [pattern, english] of CLAIM_TIMELINE_EN) {
+    if (pattern.test(message)) return message.replace(pattern, english)
+  }
+  return message
+}
+
 function renewalColumnByStatus(status: RenewalAlertStatus): RenewalKanbanColumnId {
   if (status === 'negotiating') return 'negotiating'
   if (status === 'renewed') return 'renewed'
@@ -1749,7 +1769,7 @@ function AdminDashboardTab({
             </p>
           )
         ) : (
-          <p className="text-sm text-navy-400">{financialLoading ? 'A calcular cashflow...' : 'Sem dados financeiros para os filtros selecionados.'}</p>
+          <p className="text-sm text-navy-400">{financialLoading ? 'Calculating cashflow...' : 'No financial data for the selected filters.'}</p>
         )}
       </div>
       <div className="bg-white rounded-[4px] border border-navy-200 p-5 mb-6">
@@ -2603,10 +2623,10 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
         const res = await fetch('/api/upload', { method: 'POST', headers, body: fd })
         if (!res.ok) {
           const err = await res.json().catch(() => ({}))
-          errors.push(`${file.name}: ${err.error ?? 'Erro'}`)
+          errors.push(`${file.name}: ${err.error ?? 'Error'}`)
         }
       } catch {
-        errors.push(`${file.name}: Erro de rede`)
+        errors.push(`${file.name}: Network error`)
       }
     }
     if (inputRef.current) inputRef.current.value = ''
@@ -2627,7 +2647,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
       setPreviewName(doc.name)
       setPreviewUrl(url)
     } catch (e: any) {
-      alert('Erro ao obter URL: ' + (e?.message ?? ''))
+      alert('Could not get the URL: ' + (e?.message ?? ''))
     }
   }
 
@@ -2643,7 +2663,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
       a.click()
       a.remove()
     } catch (e: any) {
-      alert('Erro ao descarregar: ' + (e?.message ?? ''))
+      alert('Download failed: ' + (e?.message ?? ''))
     }
   }
 
@@ -2653,7 +2673,7 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
       await adminDeletePolicyDocument({ data: { storagePath: doc.storagePath } })
       setDocs((prev) => prev.filter((d) => d.id !== doc.id))
     } catch (e: any) {
-      alert('Erro ao eliminar: ' + (e?.message ?? ''))
+      alert('Delete failed: ' + (e?.message ?? ''))
     }
   }
 
@@ -2661,10 +2681,10 @@ function PolicyDocumentsPanel({ policy }: { policy: Policy }) {
     <div className="bg-white rounded border border-navy-100 p-3">
       <div className="flex items-center justify-between mb-2 gap-2">
         <p className="text-xs font-semibold text-navy-500 uppercase tracking-wide">
-          Documentos {docs.length > 0 ? `(${docs.length})` : ''}
+          Documents {docs.length > 0 ? `(${docs.length})` : ''}
         </p>
         <label className={`text-xs font-semibold px-2.5 py-1 rounded-[6px] inline-flex items-center gap-1 ${uploading ? 'bg-navy-100 text-navy-400 cursor-not-allowed' : 'bg-[#292929] text-white hover:bg-[#333332] cursor-pointer'}`}>
-          {uploading ? 'A carregar…' : '+ Carregar'}
+          {uploading ? 'Uploading…' : '+ Upload'}
           <input
             ref={inputRef}
             type="file"
@@ -3108,7 +3128,7 @@ function AdminClaimWorkspace({
           <div className="max-h-56 overflow-auto space-y-2">
             {operations.timeline.length === 0 ? <p className="text-sm text-navy-400">No events.</p> : operations.timeline.slice().reverse().map((event) => (
               <div key={event.id} className="text-sm border border-navy-100 rounded p-2">
-                <p className="text-navy-700">{event.message}</p>
+                <p className="text-navy-700">{claimTimelineMessage(event.message)}</p>
                 <p className="text-xs text-navy-400 mt-1">{event.actorName} · {formatDateTime(event.createdAt)}</p>
               </div>
             ))}
@@ -3229,7 +3249,7 @@ function getStatusColor(status: string): string {
 
 function formatDateTime(value?: string) {
   if (!value) return '—'
-  return new Date(value).toLocaleString('pt-PT', {
+  return new Date(value).toLocaleString('en-GB', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',

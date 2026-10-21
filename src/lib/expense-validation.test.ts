@@ -61,7 +61,7 @@ test('completeExpenseFields derives month and missing amounts', () => {
 
 test('expenseWarnings flags inconsistent totals', () => {
   const w = expenseWarnings({ net_amount: 100, vat_amount: 23, total_amount: 130, invoice_date: '2026-10-01', supplier_nif: '503504564', reference_month: '2026-10-01' })
-  assert.deepEqual(w, ['Base + IVA não corresponde ao total.'])
+  assert.deepEqual(w, ['Net + VAT does not match the total.'])
 })
 
 test('parseExtractionReply keeps valid fields when one is invalid', () => {

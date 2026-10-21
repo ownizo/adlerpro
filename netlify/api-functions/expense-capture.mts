@@ -16,17 +16,17 @@ export default async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405)
 
   let body: Record<string, unknown>
-  try { body = await req.json() as Record<string, unknown> } catch { return json({ error: 'Pedido inválido.' }, 400) }
-  if (!isCaptureToken(body.token)) return json({ error: 'Link inválido.' }, 404)
+  try { body = await req.json() as Record<string, unknown> } catch { return json({ error: 'Invalid request.' }, 400) }
+  if (!isCaptureToken(body.token)) return json({ error: 'Invalid link.' }, 404)
 
   const supabase = expenseAdminClient()
   const tokenHash = createHash('sha256').update(body.token).digest('hex')
   const { data: link } = await supabase.from('expense_capture_links')
     .select('id, label, created_by, expires_at, revoked_at')
     .eq('token_hash', tokenHash).maybeSingle()
-  if (!link) return json({ error: 'Link inválido.' }, 404)
-  if (link.revoked_at) return json({ error: 'Este link foi desativado. Peça um novo no backoffice.' }, 410)
-  if (Date.parse(link.expires_at) < Date.now()) return json({ error: 'Este link expirou. Peça um novo no backoffice.' }, 410)
+  if (!link) return json({ error: 'Invalid link.' }, 404)
+  if (link.revoked_at) return json({ error: 'This link was deactivated. Create a new one in the backoffice.' }, 410)
+  if (Date.parse(link.expires_at) < Date.now()) return json({ error: 'This link has expired. Create a new one in the backoffice.' }, 410)
 
   const action = body.action
 
@@ -44,7 +44,7 @@ export default async (req: Request) => {
     const { count } = await supabase.from('company_expenses')
       .select('id', { count: 'exact', head: true })
       .eq('capture_link_id', link.id).gte('created_at', since)
-    if ((count ?? 0) >= CAPTURE_DAILY_LIMIT) return json({ error: 'Limite diário de envios atingido. Tente amanhã.' }, 429)
+    if ((count ?? 0) >= CAPTURE_DAILY_LIMIT) return json({ error: 'Daily upload limit reached. Try again tomorrow.' }, 429)
 
     const id = crypto.randomUUID()
     const now = new Date()
@@ -61,21 +61,21 @@ export default async (req: Request) => {
       reference_month: monthOf(now.toISOString().slice(0, 10)),
       created_by: link.created_by,
     })
-    if (insertError) return json({ error: 'Não foi possível registar a despesa.' }, 500)
+    if (insertError) return json({ error: 'Could not register the expense.' }, 500)
     const { data: signed, error: signError } = await supabase.storage.from(EXPENSE_BUCKET).createSignedUploadUrl(path)
     if (signError || !signed) {
       await supabase.from('company_expenses').delete().eq('id', id)
-      return json({ error: 'Não foi possível preparar o envio.' }, 500)
+      return json({ error: 'Could not prepare the upload.' }, 500)
     }
     return json({ id, path, token: signed.token })
   }
 
   if (action === 'process') {
     const id = typeof body.id === 'string' ? body.id : ''
-    if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'Despesa inválida.' }, 400)
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'Invalid expense.' }, 400)
     const { data: owned } = await supabase.from('company_expenses')
       .select('id').eq('id', id).eq('capture_link_id', link.id).maybeSingle()
-    if (!owned) return json({ error: 'Despesa não encontrada.' }, 404)
+    if (!owned) return json({ error: 'Expense not found.' }, 404)
 
     const now = new Date().toISOString()
     const { data: usage } = await supabase.from('expense_capture_links').select('uploads_count').eq('id', link.id).single()
@@ -101,13 +101,13 @@ export default async (req: Request) => {
   if (action === 'cancel') {
     // Upload to storage failed on the phone: remove the empty placeholder row.
     const id = typeof body.id === 'string' ? body.id : ''
-    if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'Despesa inválida.' }, 400)
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return json({ error: 'Invalid expense.' }, 400)
     await supabase.from('company_expenses').delete()
       .eq('id', id).eq('capture_link_id', link.id).eq('status', 'processing').is('extracted_at', null)
     return json({ ok: true })
   }
 
-  return json({ error: 'Ação desconhecida.' }, 400)
+  return json({ error: 'Unknown action.' }, 400)
 }
 
 export const config: Config = {

@@ -10,9 +10,9 @@ export const fetchExpenses = createServerFn({ method: 'GET' })
   .middleware([requireRoleMiddleware('admin')])
   .inputValidator((data: { from?: string; to?: string; category?: string }) => {
     const d = data ?? {}
-    if (d.from !== undefined && !MONTH.test(d.from)) throw new Error('Período inválido.')
-    if (d.to !== undefined && !MONTH.test(d.to)) throw new Error('Período inválido.')
-    if (d.category !== undefined && !isExpenseCategory(d.category)) throw new Error('Categoria inválida.')
+    if (d.from !== undefined && !MONTH.test(d.from)) throw new Error('Invalid period.')
+    if (d.to !== undefined && !MONTH.test(d.to)) throw new Error('Invalid period.')
+    if (d.category !== undefined && !isExpenseCategory(d.category)) throw new Error('Invalid category.')
     return { from: d.from, to: d.to, category: d.category }
   })
   .handler(async ({ data }) => {
@@ -39,7 +39,7 @@ export const beginExpenseUpload = createServerFn({ method: 'POST' })
 export const saveExpense = createServerFn({ method: 'POST' })
   .middleware([requireRoleMiddleware('admin')])
   .inputValidator((data: { id: string; fields: Record<string, unknown>; confirm?: boolean }) => {
-    if (!data || typeof data.fields !== 'object' || data.fields === null || Array.isArray(data.fields)) throw new Error('Dados inválidos.')
+    if (!data || typeof data.fields !== 'object' || data.fields === null || Array.isArray(data.fields)) throw new Error('Invalid data.')
     return { id: assertExpenseId(data.id), fields: data.fields, confirm: data.confirm === true }
   })
   .handler(async ({ data }) => {
@@ -75,10 +75,10 @@ export const createCaptureLinkFn = createServerFn({ method: 'POST' })
   .middleware([requireRoleMiddleware('admin')])
   .inputValidator((data: { label: string; email?: string | null; expiryDays: number }) => {
     const label = typeof data?.label === 'string' ? data.label.trim() : ''
-    if (!label || label.length > 120) throw new Error('Indique um nome para o link (ex.: Telemóvel Hugo).')
+    if (!label || label.length > 120) throw new Error('Give the link a name (e.g. Hugo phone).')
     const email = typeof data.email === 'string' ? data.email.trim().toLowerCase() : ''
-    if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error('Email inválido.')
-    if (![30, 90, 365].includes(data.expiryDays)) throw new Error('Validade inválida.')
+    if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error('Invalid email.')
+    if (![30, 90, 365].includes(data.expiryDays)) throw new Error('Invalid validity.')
     return { label, email: email || null, expiryDays: data.expiryDays }
   })
   .handler(async ({ data, context }) => {

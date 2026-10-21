@@ -28,7 +28,7 @@ test('summary counts page views, sessions, sources and leads per day', () => {
   assert.equal(s.days[1].fromAi, 1)
   assert.equal(s.totals.visits, 2)
   assert.equal(s.pages[0].path, '/en/')
-  assert.equal(sourceLabel('google', 'organic'), 'Pesquisa · Google')
+  assert.equal(sourceLabel('google', 'organic'), 'Search · Google')
 })
 
 test('focus day keeps the daily table but narrows every other figure', () => {

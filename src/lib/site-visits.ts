@@ -53,12 +53,12 @@ export function dayRange(days: number, now = new Date()): string[] {
 export function sourceLabel(source: string | null, medium: string | null): string {
   const s = source || '(direct)'
   const m = medium || '(none)'
-  if (s === '(direct)') return 'Direto (sem origem)'
-  if (m === 'organic') return `Pesquisa · ${s.charAt(0).toUpperCase()}${s.slice(1)}`
-  if (m === 'ai-assistant') return `Assistente de IA · ${s}`
-  if (m === 'cpc') return `Anúncios · ${s}`
-  if (m === 'social') return `Redes sociais · ${s}`
-  if (m === 'referral') return `Outro site · ${s}`
+  if (s === '(direct)') return 'Direct (no source)'
+  if (m === 'organic') return `Search · ${s.charAt(0).toUpperCase()}${s.slice(1)}`
+  if (m === 'ai-assistant') return `AI assistant · ${s}`
+  if (m === 'cpc') return `Ads · ${s}`
+  if (m === 'social') return `Social media · ${s}`
+  if (m === 'referral') return `Other site · ${s}`
   return `${s} / ${m}`
 }
 

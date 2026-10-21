@@ -188,7 +188,7 @@ function CarrierRunDetailPage() {
   /** Um só passo: aceita as linhas inequívocas com a ação sugerida e, se
    * `andApply`, aplica-as logo ao CRM. */
   async function acceptSuggestions(andApply: boolean) {
-    if (andApply && !confirm(`Aceitar e aplicar ao CRM as ${pendingRecords.length} linha(s) por decidir?\n\nClientes e apólices novos são criados; os que já existem são ligados. Linhas com dúvidas ficam para rever.`)) return
+    if (andApply && !confirm(`Accept and apply the ${pendingRecords.length} undecided row${pendingRecords.length === 1 ? '' : 's'} to the CRM?\n\nNew clients and policies are created; existing ones are linked. Rows with doubts are left for review.`)) return
     setBulkBusy(true)
     setApplyError(null)
     setBulkResult(null)
@@ -205,7 +205,7 @@ function CarrierRunDetailPage() {
       setBulkResult({ prepared: prep.prepared, applied, failed, skipped: prep.skipped })
       reload()
     } catch (err) {
-      setApplyError(err instanceof Error ? err.message : 'Não foi possível aceitar as sugestões')
+      setApplyError(err instanceof Error ? err.message : 'Could not accept the suggestions')
     } finally {
       setBulkBusy(false)
     }
@@ -301,16 +301,16 @@ function CarrierRunDetailPage() {
 
             {(pendingRecords.length > 0 || bulkResult) && (
               <div className="admin-panel" style={{ marginBottom: '1rem', padding: '1rem' }}>
-                <h3 className="admin-panel-title" style={{ marginBottom: '0.35rem' }}>Importar num só passo</h3>
+                <h3 className="admin-panel-title" style={{ marginBottom: '0.35rem' }}>Import in one step</h3>
                 {pendingRecords.length > 0 && (
                   <p className="text-sm text-navy-600">
-                    {pendingRecords.length} linha(s) por decidir. As linhas novas criam o cliente e a apólice; as que já existem no CRM são ligadas. As que tiverem dúvidas ficam para rever com "Review".
+                    {pendingRecords.length} undecided row{pendingRecords.length === 1 ? '' : 's'}. New rows create the client and the policy; rows already in the CRM are linked. Rows with doubts are left to review with "Review".
                   </p>
                 )}
                 {bulkResult && (
                   <div className="text-sm" style={{ marginTop: '0.5rem' }}>
                     <p className="text-navy-600">
-                      {bulkResult.prepared} linha(s) aceites{bulkResult.applied !== undefined ? ` · ${bulkResult.applied} aplicadas ao CRM` : ''}{bulkResult.failed ? ` · ${bulkResult.failed} com erro` : ''}{bulkResult.skipped.length ? ` · ${bulkResult.skipped.length} para rever` : ''}.
+                      {bulkResult.prepared} row{bulkResult.prepared === 1 ? '' : 's'} accepted{bulkResult.applied !== undefined ? ` · ${bulkResult.applied} applied to the CRM` : ''}{bulkResult.failed ? ` · ${bulkResult.failed} with errors` : ''}{bulkResult.skipped.length ? ` · ${bulkResult.skipped.length} to review` : ''}.
                     </p>
                     {bulkResult.skipped.length > 0 && (
                       <ul style={{ marginLeft: '1rem', listStyle: 'disc', marginTop: '0.3rem' }} className="text-navy-500">
@@ -322,10 +322,10 @@ function CarrierRunDetailPage() {
                 {pendingRecords.length > 0 && (
                   <div className="flex flex-wrap gap-2" style={{ marginTop: '0.75rem' }}>
                     <button type="button" className="admin-btn admin-btn-primary admin-btn--sm" disabled={bulkBusy} onClick={() => acceptSuggestions(true)}>
-                      {bulkBusy ? 'A processar…' : `Aceitar e aplicar (${pendingRecords.length})`}
+                      {bulkBusy ? 'Processing…' : `Accept and apply (${pendingRecords.length})`}
                     </button>
                     <button type="button" className="admin-btn admin-btn-secondary admin-btn--sm" disabled={bulkBusy} onClick={() => acceptSuggestions(false)}>
-                      Só aceitar (aplicar depois)
+                      Accept only (apply later)
                     </button>
                   </div>
                 )}
@@ -1042,7 +1042,7 @@ function ImportRecordReviewPanel({
                 const r = await adminAcceptSuggestedCarrierRecords({ data: { runId: record.syncRunId, recordId: record.id, decisionNote: note || undefined } })
                 if (r.prepared > 0) onChanged()
                 else {
-                  setError(r.skipped[0]?.reason ? `Aceite. Falta escolher o cliente/apólice em "Apply action" e carregar em "Save apply action": ${r.skipped[0].reason}` : 'Aceite. Falta escolher o cliente/apólice em "Apply action" e carregar em "Save apply action".')
+                  setError(r.skipped[0]?.reason ? `Accepted. Still need to choose the client/policy in "Apply action" and click "Save apply action": ${r.skipped[0].reason}` : 'Accepted. Still need to choose the client/policy in "Apply action" and click "Save apply action".')
                   onApplyActionsChanged()
                 }
               } catch (err) {
@@ -1052,7 +1052,7 @@ function ImportRecordReviewPanel({
               }
             }}
           >
-            {record.decisionStatus === 'accepted' ? 'Accept decision' : 'Aceitar'}
+            {record.decisionStatus === 'accepted' ? 'Accept decision' : 'Accept'}
           </button>
           <button
             type="button"

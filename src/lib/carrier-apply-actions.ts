@@ -264,26 +264,26 @@ export function suggestApplyActions(input: SuggestApplyActionsInput): SuggestedA
   if (input.customerMatchStatus === 'exact' || input.customerMatchStatus === 'linked') {
     if (input.matchedIndividualClientId) customer = { action: 'link_existing_individual', individual: input.matchedIndividualClientId }
     else if (input.matchedCompanyId) customer = { action: 'link_existing_company', company: input.matchedCompanyId }
-    else return { ok: false, reason: 'Cliente encontrado mas sem ficha associada — rever.' }
+    else return { ok: false, reason: 'Client found but without a linked record: review.' }
   } else if (input.customerMatchStatus === 'new' || input.customerMatchStatus === 'unmatched') {
-    if (!input.customerName?.trim()) return { ok: false, reason: 'O ficheiro não traz o nome do tomador — escolher o cliente manualmente.' }
+    if (!input.customerName?.trim()) return { ok: false, reason: 'The file has no policyholder name: choose the client manually.' }
     const isCompany = looksLikeCompanyTaxId(input.taxId) || (!input.taxId && looksLikeCompanyName(input.customerName))
-    if (isCompany && !input.taxId?.trim()) return { ok: false, reason: 'Parece uma empresa e o ficheiro não traz o NIF — escolher ou criar a empresa manualmente.' }
+    if (isCompany && !input.taxId?.trim()) return { ok: false, reason: 'Looks like a company and the file has no NIF: choose or create the company manually.' }
     customer = isCompany ? { action: 'create_company' } : { action: 'create_individual' }
   } else {
-    return { ok: false, reason: 'Cliente com correspondência incerta — rever.' }
+    return { ok: false, reason: 'Client match uncertain: review.' }
   }
 
   let policy: { action: PolicyApplyAction; policy?: string }
   if (input.policyMatchStatus === 'exact' || input.policyMatchStatus === 'linked') {
-    if (!input.matchedPolicyId) return { ok: false, reason: 'Apólice encontrada mas sem ficha associada — rever.' }
+    if (!input.matchedPolicyId) return { ok: false, reason: 'Policy found but without a linked record: review.' }
     policy = { action: 'link_existing_policy', policy: input.matchedPolicyId }
   } else if (input.policyMatchStatus === 'new' || input.policyMatchStatus === 'unmatched') {
-    if (!input.externalPolicyNumber?.trim()) return { ok: false, reason: 'Sem número de apólice.' }
-    if (!input.startDate || !input.endDate) return { ok: false, reason: 'O ficheiro não traz as datas do período — criar a apólice manualmente.' }
+    if (!input.externalPolicyNumber?.trim()) return { ok: false, reason: 'No policy number.' }
+    if (!input.startDate || !input.endDate) return { ok: false, reason: 'The file has no period dates: create the policy manually.' }
     policy = { action: 'create_policy' }
   } else {
-    return { ok: false, reason: 'Apólice com correspondência incerta — rever.' }
+    return { ok: false, reason: 'Policy match uncertain: review.' }
   }
 
   return {

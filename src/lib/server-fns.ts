@@ -568,7 +568,7 @@ export const submitClaim = createServerFn({ method: 'POST' })
         senderType: 'client',
         senderName: scope.user.name || scope.user.email || 'Cliente',
         senderUserId: scope.user.id,
-        message: 'Sinistro submetido pelo cliente.',
+        message: 'Claim submitted by the client.',
         createdAt: now,
         readAt: now,
       })
@@ -700,7 +700,7 @@ export const sendClaimMessage = createServerFn({ method: 'POST' })
         ...current.timeline,
         buildTimelineEvent({
           type: 'message',
-          message: `${senderType === 'admin' ? 'Admin' : 'Cliente'} adicionou uma mensagem`,
+          message: `${senderType === 'admin' ? 'Admin' : 'Client'} added a message`,
           actorName: senderName,
           actorRole: senderType,
         }),
@@ -1782,7 +1782,7 @@ export const adminUpdateClaimStatus = createServerFn({ method: 'POST' })
         ...current.timeline,
         buildTimelineEvent({
           type: 'status',
-          message: `Estado alterado de ${currentStatus} para ${data.status}${data.notes ? ` (${data.notes})` : ''}`,
+          message: `Status changed from ${currentStatus} to ${data.status}${data.notes ? ` (${data.notes})` : ''}`,
           actorName: scope.user.name || scope.user.email || 'Admin',
           actorRole: 'admin',
         }),
@@ -1842,7 +1842,7 @@ export const adminSendClaimMessage = createServerFn({ method: 'POST' })
         ...current.timeline,
         buildTimelineEvent({
           type: 'message',
-          message: 'Admin adicionou uma mensagem',
+          message: 'Admin added a message',
           actorName: senderName,
           actorRole: 'admin',
         }),
@@ -1956,7 +1956,7 @@ export const adminCreateClaim = createServerFn({ method: 'POST' })
         timeline: [
           buildTimelineEvent({
             type: 'created',
-            message: `Sinistro criado (${data.type})`,
+            message: `Claim created (${data.type})`,
             actorName: 'Admin',
             actorRole: 'admin',
           }),
@@ -2032,7 +2032,7 @@ export const adminAssignClaimResponsible = createServerFn({ method: 'POST' })
       timeline.push(
         buildTimelineEvent({
           type: 'assignment',
-          message: nextResponsible ? `Responsável definido: ${nextResponsible.name}` : 'Responsável removido',
+          message: nextResponsible ? `Owner set: ${nextResponsible.name}` : 'Owner removed',
           actorName: 'Admin',
           actorRole: 'admin',
         }),
@@ -2067,7 +2067,7 @@ export const adminAddClaimTeamNote = createServerFn({ method: 'POST' })
         ...current.timeline,
         buildTimelineEvent({
           type: 'note',
-          message: 'Nota interna adicionada',
+          message: 'Internal note added',
           actorName: data.authorName || 'Admin',
           actorRole: 'admin',
         }),
@@ -2109,7 +2109,7 @@ export const addClaimMessage = createServerFn({ method: 'POST' })
         ...current.timeline,
         buildTimelineEvent({
           type: 'message',
-          message: `${senderRole === 'admin' ? 'Admin' : 'Cliente'} adicionou uma mensagem`,
+          message: `${senderRole === 'admin' ? 'Admin' : 'Client'} added a message`,
           actorName: senderName,
           actorRole: senderRole,
         }),
@@ -2187,7 +2187,7 @@ export const registerClaimDocument = createServerFn({ method: 'POST' })
         ...current.timeline,
         buildTimelineEvent({
           type: 'document',
-          message: `Documento adicionado: ${data.name}`,
+          message: `Document added: ${data.name}`,
           actorName: uploadedByName,
           actorRole: uploadedByRole,
         }),
@@ -2236,7 +2236,7 @@ export const removeClaimDocument = createServerFn({ method: 'POST' })
         timeline.push(
           buildTimelineEvent({
             type: 'document',
-            message: `Documento removido: ${target.name}`,
+            message: `Document removed: ${target.name}`,
             actorName: 'Admin',
             actorRole: 'admin',
           }),

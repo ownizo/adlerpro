@@ -9,7 +9,7 @@ export async function uploadInvoice(original: File): Promise<string> {
   const file = await prepareInvoiceFile(original)
   const { id, path, token } = await beginExpenseUpload({ data: { fileName: file.name, mime: invoiceMime(file), size: file.size } })
   const { error } = await supabase.storage.from('expenses').uploadToSignedUrl(path, token, file, { contentType: invoiceMime(file) })
-  if (error) throw new Error('O envio do ficheiro falhou. Verifique a ligação e tente novamente.')
+  if (error) throw new Error('The file upload failed. Check your connection and try again.')
   return id
 }
 
@@ -21,7 +21,7 @@ export async function extractInvoice(id: string): Promise<Expense> {
   const res = await fetch('/api/expense-extract', { method: 'POST', headers, body: JSON.stringify({ id }) })
   const isJson = (res.headers.get('content-type') ?? '').includes('application/json')
   const body = isJson ? await res.json() : null
-  if (!res.ok || !body?.expense) throw new Error(body?.error || 'A leitura automática falhou. Pode preencher os dados manualmente.')
+  if (!res.ok || !body?.expense) throw new Error(body?.error || 'Automatic reading failed. You can fill in the data manually.')
   return body.expense as Expense
 }
 

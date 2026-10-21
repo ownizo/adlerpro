@@ -72,7 +72,7 @@ export function mergeClaimDocuments(input: {
     ...added.map((doc): ClaimTimelineEvent => ({
       id: `doc_${doc.id}`,
       type: 'document',
-      message: `Documento adicionado: ${doc.name}`,
+      message: `Document added: ${doc.name}`,
       createdAt: doc.uploadedAt,
       actorName: doc.uploadedByName,
       actorRole: doc.uploadedByRole,
