@@ -42,7 +42,7 @@ export async function listExpenses(filter: ExpenseListFilter): Promise<Expense[]
   if (filter.to) query = query.or(`reference_month.lte.${filter.to},reference_month.is.null`)
   if (filter.category) query = query.eq('category', filter.category)
   const { data, error } = await query
-  if (error) throw new Error('Não foi possível carregar as despesas.')
+  if (error) throw new Error('Could not load the expenses.')
   return (data ?? []).map(mapRow)
 }
 
@@ -60,18 +60,18 @@ export async function startExpenseUpload(input: StartUploadInput, userId: string
     reference_month: monthOf(now.toISOString().slice(0, 10)),
     created_by: userId,
   })
-  if (insertError) throw new Error('Não foi possível registar a despesa.')
+  if (insertError) throw new Error('Could not register the expense.')
   const { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUploadUrl(path)
   if (error || !data) {
     await supabaseAdmin.from(TABLE).delete().eq('id', id)
-    throw new Error('Não foi possível preparar o envio do ficheiro.')
+    throw new Error('Could not prepare the file upload.')
   }
   return { id, path, token: data.token }
 }
 
 export async function getExpense(id: string): Promise<Expense> {
   const { data, error } = await supabaseAdmin.from(TABLE).select('*').eq('id', id).maybeSingle()
-  if (error || !data) throw new Error('Despesa não encontrada.')
+  if (error || !data) throw new Error('Expense not found.')
   return mapRow(data)
 }
 
@@ -88,7 +88,7 @@ export async function updateExpense(id: string, input: Record<string, unknown>, 
     patch.status = 'review'
   }
   const { data, error } = await supabaseAdmin.from(TABLE).update(patch).eq('id', id).select('*').maybeSingle()
-  if (error || !data) throw new Error('Não foi possível guardar a despesa.')
+  if (error || !data) throw new Error('Could not save the expense.')
   return mapRow(data)
 }
 
@@ -96,16 +96,16 @@ export async function reopenExpense(id: string): Promise<Expense> {
   const { data, error } = await supabaseAdmin.from(TABLE)
     .update({ status: 'review', confirmed_at: null, updated_at: new Date().toISOString() })
     .eq('id', id).select('*').maybeSingle()
-  if (error || !data) throw new Error('Não foi possível reabrir a despesa.')
+  if (error || !data) throw new Error('Could not reopen the expense.')
   return mapRow(data)
 }
 
 export async function deleteExpense(id: string) {
   const expense = await getExpense(id)
   const { error: storageError } = await supabaseAdmin.storage.from(BUCKET).remove([expense.file_path])
-  if (storageError) throw new Error('Não foi possível apagar o ficheiro da fatura.')
+  if (storageError) throw new Error('Could not delete the invoice file.')
   const { error } = await supabaseAdmin.from(TABLE).delete().eq('id', id)
-  if (error) throw new Error('Não foi possível apagar a despesa.')
+  if (error) throw new Error('Could not delete the expense.')
   return { id }
 }
 
@@ -113,7 +113,7 @@ export async function expenseFileUrl(id: string, download: boolean) {
   const expense = await getExpense(id)
   const { data, error } = await supabaseAdmin.storage.from(BUCKET)
     .createSignedUrl(expense.file_path, 600, download ? { download: expense.file_name } : undefined)
-  if (error || !data) throw new Error('Não foi possível abrir o ficheiro.')
+  if (error || !data) throw new Error('Could not open the file.')
   return { url: data.signedUrl, mime: expense.file_mime, name: expense.file_name }
 }
 
@@ -142,24 +142,24 @@ function escapeHtml(s: string) {
 
 async function emailCaptureLink(to: string, label: string, url: string, expiresAt: Date) {
   const { resendClient, FROM_EMAIL } = await import('./email/client')
-  if (!process.env.RESEND_API_KEY) throw new Error('Email não configurado.')
-  const until = expiresAt.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  if (!process.env.RESEND_API_KEY) throw new Error('Email not configured.')
+  const until = expiresAt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const html = `<!doctype html><html><body style="margin:0;background:#F6F4EF;font-family:Montserrat,Arial,sans-serif;color:#17243D">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#fff;border-radius:12px">
-  <tr><td style="background:#17243D;border-radius:12px 12px 0 0;padding:20px 24px;color:#fff;font-weight:700">Adler &amp; Rochefort <span style="color:#C8961A;font-weight:400">· Despesas</span></td></tr>
+  <tr><td style="background:#17243D;border-radius:12px 12px 0 0;padding:20px 24px;color:#fff;font-weight:700">Adler &amp; Rochefort <span style="color:#C8961A;font-weight:400">· Expenses</span></td></tr>
   <tr><td style="padding:24px">
-  <p style="margin:0 0 12px;font-size:16px;font-weight:700">Link para fotografar faturas</p>
-  <p style="margin:0 0 20px;font-size:14px;line-height:1.5">Abra este email no telemóvel e toque no botão. Abre-se uma página para tirar a foto da fatura, que é lida automaticamente e arquivada no backoffice. Pode usar o link sempre que precisar.</p>
-  <p style="margin:0 0 24px;text-align:center"><a href="${escapeHtml(url)}" style="display:inline-block;background:#17243D;color:#fff;text-decoration:none;font-weight:700;padding:16px 28px;border-radius:10px;font-size:16px">📷 Fotografar fatura</a></p>
-  <p style="margin:0;font-size:12px;color:#667085;line-height:1.5">Link «${escapeHtml(label)}», válido até ${until}. Não reencaminhe este email: quem tiver o link pode enviar faturas. Pode desativá-lo no backoffice em Despesas.</p>
+  <p style="margin:0 0 12px;font-size:16px;font-weight:700">Link to photograph invoices</p>
+  <p style="margin:0 0 20px;font-size:14px;line-height:1.5">Open this email on your phone and tap the button. A page opens to take a photo of the invoice, which is read automatically and filed in the backoffice. You can use the link whenever you need.</p>
+  <p style="margin:0 0 24px;text-align:center"><a href="${escapeHtml(url)}" style="display:inline-block;background:#17243D;color:#fff;text-decoration:none;font-weight:700;padding:16px 28px;border-radius:10px;font-size:16px">📷 Photograph invoice</a></p>
+  <p style="margin:0;font-size:12px;color:#667085;line-height:1.5">Link «${escapeHtml(label)}», valid until ${until}. Do not forward this email: anyone with the link can send invoices. You can deactivate it in the backoffice under Expenses.</p>
   </td></tr></table></td></tr></table></body></html>`
   const { error } = await resendClient.emails.send({
     from: FROM_EMAIL.replace(/^[^<]*</, 'Adler & Rochefort <'),
     to: [to],
-    subject: 'Link para fotografar faturas — Despesas',
+    subject: 'Link to photograph invoices · Expenses',
     html,
-    text: `Link para fotografar faturas (válido até ${until}):\n${url}`,
+    text: `Link to photograph invoices (valid until ${until}):\n${url}`,
   })
   if (error) throw new Error(error.message)
 }
@@ -174,13 +174,13 @@ export async function createCaptureLink(input: { label: string; email: string | 
     created_by: userId,
     expires_at: expires.toISOString(),
   }).select(LINK_COLUMNS).single()
-  if (error || !data) throw new Error('Não foi possível criar o link.')
+  if (error || !data) throw new Error('Could not create the link.')
   const url = captureUrl(origin, token)
   let emailError: string | null = null
   if (input.email) {
     try { await emailCaptureLink(input.email, input.label, url, expires) } catch (err) {
       console.error('[capture-link] email failed', err)
-      emailError = 'Não foi possível enviar o email. Use o código QR ou copie o link.'
+      emailError = 'Could not send the email. Use the QR code or copy the link.'
     }
   }
   return { link: data as CaptureLink, url, emailed: !!input.email && !emailError, emailError }
@@ -190,13 +190,13 @@ export async function listCaptureLinks(): Promise<CaptureLink[]> {
   const { data, error } = await supabaseAdmin.from('expense_capture_links')
     .select(LINK_COLUMNS)
     .order('created_at', { ascending: false }).limit(50)
-  if (error) throw new Error('Não foi possível carregar os links.')
+  if (error) throw new Error('Could not load the links.')
   return (data ?? []) as CaptureLink[]
 }
 
 export async function revokeCaptureLink(id: string) {
   const { error } = await supabaseAdmin.from('expense_capture_links')
     .update({ revoked_at: new Date().toISOString() }).eq('id', id).is('revoked_at', null)
-  if (error) throw new Error('Não foi possível desativar o link.')
+  if (error) throw new Error('Could not deactivate the link.')
   return { id }
 }

@@ -108,7 +108,7 @@ export async function getVisibilitySummary(days: number): Promise<VisibilitySumm
     sb().from('ai_vis_prompts').select('id, prompt, language, market, topic, active, source').order('created_at'),
     sb().from('ai_vis_results').select('prompt_id, engine, run_day, source, mentioned, cited, in_sources, position, competitors, cited_urls, answer_excerpt, error').gte('run_day', since).limit(10000),
   ])
-  if (e1 || e2) throw new Error('Não foi possível ler os testes de visibilidade.')
+  if (e1 || e2) throw new Error('Could not read the visibility tests.')
   const { configuredEngines } = await import('./ai-visibility-engines.ts')
   return { ...summariseVisibility((prompts ?? []) as PromptRow[], (results ?? []) as ResultRow[]), since, configured: configuredEngines() }
 }
@@ -122,7 +122,7 @@ export async function addPrompt(input: { prompt: string; language?: string; mark
   const { data, error } = await sb().from('ai_vis_prompts').insert({
     prompt: input.prompt, language: input.language ?? null, market: input.market ?? 'PT', topic: input.topic ?? null, source: 'manual',
   }).select('id, prompt, market').single()
-  if (error) throw new Error(error.code === '23505' ? 'Essa pergunta já existe.' : error.message)
+  if (error) throw new Error(error.code === '23505' ? 'That question already exists.' : error.message)
   return data as { id: string; prompt: string; market: string | null }
 }
 

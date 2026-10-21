@@ -12,6 +12,18 @@ export function expenseStatusLabel(status: Expense['status']): string {
   return STATUS_LABELS[status] ?? status
 }
 
+// The backoffice is English; the exports for the accountant stay Portuguese.
+const STATUS_LABELS_EN: Record<Expense['status'], string> = {
+  processing: 'Processing',
+  review: 'To review',
+  confirmed: 'Confirmed',
+  failed: 'Reading failed',
+}
+
+export function expenseStatusLabelEn(status: Expense['status']): string {
+  return STATUS_LABELS_EN[status] ?? status
+}
+
 function cell(value: unknown): string {
   const s = value === null || value === undefined ? '' : String(value)
   return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s

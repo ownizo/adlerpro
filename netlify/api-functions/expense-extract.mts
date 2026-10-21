@@ -13,17 +13,17 @@ export default async (req: Request) => {
     user = await authenticateRequest(req)
   } catch (res) {
     if (res instanceof Response) return res
-    return Response.json({ error: 'Não autenticado' }, { status: 401 })
+    return Response.json({ error: 'Not authenticated' }, { status: 401 })
   }
   const roles = Array.isArray(user.app_metadata?.roles) ? user.app_metadata.roles : []
-  if (!roles.includes('admin')) return Response.json({ error: 'Sem permissão' }, { status: 403 })
+  if (!roles.includes('admin')) return Response.json({ error: 'Not allowed' }, { status: 403 })
 
   let id = ''
   try {
     const body = await req.json() as { id?: unknown }
     id = typeof body.id === 'string' ? body.id : ''
   } catch { /* handled below */ }
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return Response.json({ error: 'Despesa inválida' }, { status: 400 })
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return Response.json({ error: 'Invalid expense' }, { status: 400 })
 
   const result = await extractExpense(expenseAdminClient(), id)
   if (!result.ok) return Response.json({ error: result.error }, { status: result.status })

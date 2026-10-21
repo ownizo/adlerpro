@@ -48,7 +48,7 @@ Rules:
 /** Extracts the first JSON object from a model reply and normalises it. */
 export function parseExtractionReply(reply: string): { fields: ExpenseFields; raw: Record<string, unknown> } {
   const match = reply.match(/\{[\s\S]*\}/)
-  if (!match) throw new Error('A resposta da IA não contém JSON.')
+  if (!match) throw new Error('The AI answer contains no JSON.')
   const raw = JSON.parse(match[0]) as Record<string, unknown>
   const safe: Record<string, unknown> = {}
   // Normalise field by field so one unreadable value never discards the rest.

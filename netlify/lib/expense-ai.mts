@@ -33,8 +33,8 @@ export type ExtractionResult =
 export async function extractExpense(supabase: SupabaseClient, id: string, options: { autoConfirm?: boolean } = {}): Promise<ExtractionResult> {
   const { data: expense, error: loadError } = await supabase
     .from('company_expenses').select('id, status, file_path, file_mime').eq('id', id).maybeSingle()
-  if (loadError || !expense) return { ok: false, status: 404, error: 'Despesa não encontrada.' }
-  if (expense.status === 'confirmed') return { ok: false, status: 409, error: 'A despesa já está confirmada.' }
+  if (loadError || !expense) return { ok: false, status: 404, error: 'Expense not found.' }
+  if (expense.status === 'confirmed') return { ok: false, status: 409, error: 'The expense is already confirmed.' }
 
   const fail = async (status: number, message: string, detail: string): Promise<ExtractionResult> => {
     console.error('[expense-ai]', id, detail)
@@ -45,14 +45,14 @@ export async function extractExpense(supabase: SupabaseClient, id: string, optio
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) return fail(500, 'O serviço de IA não está configurado.', 'ANTHROPIC_API_KEY missing')
+  if (!apiKey) return fail(500, 'The AI service is not configured.', 'ANTHROPIC_API_KEY missing')
 
   await supabase.from('company_expenses')
     .update({ status: 'processing', ai_error: null, updated_at: new Date().toISOString() })
     .eq('id', id).neq('status', 'confirmed')
 
   const { data: blob, error: downloadError } = await supabase.storage.from(EXPENSE_BUCKET).download(expense.file_path)
-  if (downloadError || !blob) return fail(502, 'Não foi possível ler o ficheiro enviado.', downloadError?.message ?? 'download failed')
+  if (downloadError || !blob) return fail(502, 'Could not read the uploaded file.', downloadError?.message ?? 'download failed')
 
   const bytes = Buffer.from(await blob.arrayBuffer())
   const base64 = bytes.toString('base64')
@@ -71,7 +71,7 @@ export async function extractExpense(supabase: SupabaseClient, id: string, optio
       { type: 'text', text: prompt },
     ]
   } else {
-    return fail(415, 'Formato de imagem não suportado pela leitura automática. Use JPG ou PDF.', `unsupported mime ${expense.file_mime}`)
+    return fail(415, 'Image format not supported by automatic reading. Use JPG or PDF.', `unsupported mime ${expense.file_mime}`)
   }
 
   const client = new Anthropic({ apiKey })
@@ -85,11 +85,11 @@ export async function extractExpense(supabase: SupabaseClient, id: string, optio
         modelUsed = FALLBACK_MODEL
         reply = await readWithClaude(client, FALLBACK_MODEL, content)
       } catch (fallbackError: any) {
-        return fail(502, 'A leitura automática falhou. Tente novamente.', String(fallbackError?.message ?? fallbackError))
+        return fail(502, 'Automatic reading failed. Please try again.', String(fallbackError?.message ?? fallbackError))
       }
     } else {
       const busy = /rate.?limit|overloaded/i.test(String(error?.message))
-      return fail(502, busy ? 'O serviço de IA está ocupado. Tente novamente dentro de momentos.' : 'A leitura automática falhou. Tente novamente.', String(error?.message ?? error))
+      return fail(502, busy ? 'The AI service is busy. Please try again in a moment.' : 'Automatic reading failed. Please try again.', String(error?.message ?? error))
     }
   }
 
@@ -97,7 +97,7 @@ export async function extractExpense(supabase: SupabaseClient, id: string, optio
   try {
     parsed = parseExtractionReply(reply)
   } catch (error: any) {
-    return fail(422, 'Não foi possível interpretar a fatura.', `${error?.message}: ${reply.slice(0, 500)}`)
+    return fail(422, 'Could not interpret the invoice.', `${error?.message}: ${reply.slice(0, 500)}`)
   }
 
   const fields = parsed.fields
@@ -125,6 +125,6 @@ export async function extractExpense(supabase: SupabaseClient, id: string, optio
     })
     .eq('id', id).neq('status', 'confirmed')
     .select('*').maybeSingle()
-  if (updateError || !updated) return fail(500, 'Não foi possível guardar os dados extraídos.', updateError?.message ?? 'update returned no row')
+  if (updateError || !updated) return fail(500, 'Could not save the extracted data.', updateError?.message ?? 'update returned no row')
   return { ok: true, expense: updated }
 }

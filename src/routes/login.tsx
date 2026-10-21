@@ -30,8 +30,8 @@ function LoginPage() {
   const [recoveryMessage, setRecoveryMessage] = useState('')
   const [recoveryLoading, setRecoveryLoading] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [lang, setLang] = useState(i18n.language)
-  const handleLang = (l: string) => { i18n.changeLanguage(l); setLang(l) }
+  // The backoffice is English only: no language switcher.
+  useEffect(() => { if (i18n.language !== 'en') void i18n.changeLanguage('en') }, [])
   // Estado "não foi possível concluir a entrada" (falha persistente).
   const [loadError, setLoadError] = useState(false)
   // Bump para re-correr a decisão de destino (botão "tentar novamente").
@@ -43,30 +43,6 @@ function LoginPage() {
   // Brand palette, the same as the backoffice sidebar: charcoal and orange.
   const charcoal = '#292929'
   const orange = '#FF6300'
-  const langPill = (
-    <div style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 50, display: 'flex', alignItems: 'center', border: '1px solid rgba(255,255,255,0.18)', borderRadius: '6px', overflow: 'hidden', fontFamily: font }}>
-      {(['pt', 'en'] as const).map((l) => (
-        <button
-          key={l}
-          onClick={() => handleLang(l)}
-          style={{
-            background: lang === l ? orange : 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '0.25rem 0.6rem',
-            fontFamily: font,
-            fontSize: '0.7rem',
-            fontWeight: 700,
-            letterSpacing: '0.08em',
-            color: lang === l ? '#ffffff' : 'rgba(255,255,255,0.6)',
-            transition: 'background 0.15s, color 0.15s',
-          }}
-        >
-          {l.toUpperCase()}
-        </button>
-      ))}
-    </div>
-  )
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -126,7 +102,6 @@ function LoginPage() {
   if (!ready) {
     return (
       <div style={{ background: charcoal }} className="admin-backoffice-shell min-h-screen flex items-center justify-center">
-        {langPill}
         <div style={{ color: 'rgba(255,255,255,0.6)', fontFamily: font }}>{t('common.loading')}</div>
       </div>
     )
@@ -137,7 +112,6 @@ function LoginPage() {
     if (loadError) {
       return (
         <div style={{ background: charcoal }} className="admin-backoffice-shell min-h-screen flex items-center justify-center px-4">
-          {langPill}
           <div className="w-full max-w-md p-8 text-center" style={{ border: '1px solid #eeeeee', borderRadius: '4px' }}>
             <div className="w-16 h-16 flex items-center justify-center mx-auto mb-4" style={{ background: '#FEE2E2', borderRadius: '50%' }}>
               <svg className="w-8 h-8" style={{ color: '#991B1B' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -167,7 +141,6 @@ function LoginPage() {
     // Destino a ser resolvido pelo segmento — ecrã de transição.
     return (
       <div style={{ background: charcoal }} className="admin-backoffice-shell min-h-screen flex items-center justify-center">
-        {langPill}
         <div style={{ color: 'rgba(255,255,255,0.6)', fontFamily: font }}>{t('common.redirecting')}</div>
       </div>
     )
@@ -264,7 +237,6 @@ function LoginPage() {
 
   return (
     <div style={{ background: charcoal }} className="admin-backoffice-shell min-h-screen flex items-center justify-center px-4">
-      {langPill}
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 style={{

@@ -79,7 +79,7 @@ type AdminNavItem = { label: string; tab: AdminTab } | { label: string; to: Admi
 // values as before, plus one real route (Carrier Integrations) — this is
 // still additive navigation, no reordering of unrelated groups/items.
 const ADMIN_NAV_GROUPS: Array<{ label: string; items: AdminNavItem[] }> = [
-  { label: 'Overview', items: [{ label: 'Hoje', to: '/admin/today' }, { label: 'Dashboard', tab: 'dashboard' }] },
+  { label: 'Overview', items: [{ label: 'Today', to: '/admin/today' }, { label: 'Dashboard', tab: 'dashboard' }] },
   { label: 'Sales', items: [
     { label: 'Pipeline', tab: 'sales' },
     { label: 'Tasks', tab: 'tasks' },
@@ -94,12 +94,12 @@ const ADMIN_NAV_GROUPS: Array<{ label: string; items: AdminNavItem[] }> = [
   ] },
   { label: 'Finance', items: [
     { label: 'Payment Link', to: '/admin/payment-links' },
-    { label: 'Despesas', to: '/admin/expenses' },
+    { label: 'Expenses', to: '/admin/expenses' },
   ] },
   { label: 'Growth', items: [
     { label: 'Marketing', tab: 'marketing' },
-    { label: 'Visitas do site', to: '/admin/site-visits' },
-    { label: 'Visibilidade em IA', to: '/admin/ai-visibility' },
+    { label: 'Site visits', to: '/admin/site-visits' },
+    { label: 'AI visibility', to: '/admin/ai-visibility' },
   ] },
   { label: 'System', items: [
     { label: 'Billing', tab: 'billing' },
@@ -113,11 +113,11 @@ const ADMIN_NAV_GROUPS: Array<{ label: string; items: AdminNavItem[] }> = [
 // Breadcrumb shown in the admin topbar, derived from the current ?tab —
 // no backend/routing change, just a label lookup for the same AdminTab.
 const ROUTE_CRUMBS: Record<string, [string, string]> = {
-  '/admin/today': ['Overview', 'Hoje'],
+  '/admin/today': ['Overview', 'Today'],
   '/admin/payment-links': ['Finance', 'Payment Link'],
-  '/admin/expenses': ['Finance', 'Despesas'],
-  '/admin/site-visits': ['Growth', 'Visitas do site'],
-  '/admin/ai-visibility': ['Growth', 'Visibilidade em IA'],
+  '/admin/expenses': ['Finance', 'Expenses'],
+  '/admin/site-visits': ['Growth', 'Site visits'],
+  '/admin/ai-visibility': ['Growth', 'AI visibility'],
   '/admin/carrier-integrations': ['System', 'Carrier Integrations'],
   '/admin/claude': ['System', 'Claude'],
 }
@@ -639,7 +639,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d={TODAY_ICON} />
             </svg>
-            <span>Hoje</span>
+            <span>Today</span>
           </Link>
           {ADMIN_BOTTOM_NAV.filter((item) => item.tab !== 'dashboard').map((item) => {
             const active = location.pathname === '/admin' && activeAdminTab === item.tab

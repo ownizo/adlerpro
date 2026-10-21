@@ -88,12 +88,12 @@ export type VisibilitySummary = {
 
 /** Turn provider error messages into something actionable. */
 export function explainError(err: string): string {
-  if (/credit balance is too low|purchase credits/i.test(err)) return 'Conta da API sem crédito — carregue saldo no painel de faturação do fornecedor.'
-  if (/exceeded your current quota|check your plan and billing/i.test(err)) return 'Chave sem quota — ative a faturação (billing) na conta do fornecedor.'
-  if (/rate limit/i.test(err) || /HTTP 429/.test(err)) return 'Limite de pedidos atingido — o próximo teste volta a tentar.'
-  if (/overloaded|HTTP 5\d\d/i.test(err)) return 'Serviço sobrecarregado no momento — o próximo teste volta a tentar.'
-  if (/invalid.*(api key|x-api-key)|unauthori[sz]ed|HTTP 401/i.test(err)) return 'Chave da API inválida — confirme a variável no Netlify.'
-  if (/não configurada/i.test(err)) return 'Chave da API não configurada.'
+  if (/credit balance is too low|purchase credits/i.test(err)) return 'API account out of credit: top up the balance in the provider billing panel.'
+  if (/exceeded your current quota|check your plan and billing/i.test(err)) return 'Key without quota: enable billing in the provider account.'
+  if (/rate limit/i.test(err) || /HTTP 429/.test(err)) return 'Rate limit reached: the next test will try again.'
+  if (/overloaded|HTTP 5\d\d/i.test(err)) return 'Service overloaded right now: the next test will try again.'
+  if (/invalid.*(api key|x-api-key)|unauthori[sz]ed|HTTP 401/i.test(err)) return 'Invalid API key: check the variable in Netlify.'
+  if (/not configured/i.test(err)) return 'API key not configured.'
   return err.slice(0, 160)
 }
 

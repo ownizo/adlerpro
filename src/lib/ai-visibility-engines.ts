@@ -188,12 +188,12 @@ async function askPerplexity(prompt: string): Promise<Answer> {
 
 export async function askEngine(engine: Engine, prompt: string, market: string | null): Promise<Answer> {
   const env = ENGINE_ENV[engine]
-  if (!env || !process.env[env]) throw new Error(`${env ?? engine} não configurada`)
+  if (!env || !process.env[env]) throw new Error(`${env ?? engine} not configured`)
   switch (engine) {
     case 'CLAUDE': return askClaude(prompt, market)
     case 'CHATGPT': return askChatGPT(prompt, market)
     case 'GEMINI': return askGemini(prompt)
     case 'PERPLEXITY': return askPerplexity(prompt)
-    default: throw new Error(`Motor não suportado: ${engine}`)
+    default: throw new Error(`Unsupported engine: ${engine}`)
   }
 }
