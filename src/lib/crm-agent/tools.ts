@@ -298,27 +298,34 @@ async function upsertPerson(args: Json) {
   return { created: true, person: row }
 }
 
+// Companies are ordinary clients now (one individual_clients row each); the
+// tool keeps its name so existing connector prompts keep working.
 async function upsertCompany(args: Json) {
-  const id = str(args.company_id, 64)
-  const map: Array<[string, number]> = [['name', 200], ['nif', 30], ['sector', 120], ['contact_name', 200], ['contact_email', 200], ['contact_phone', 60], ['address', 400]]
+  const id = str(args.company_id, 64) ?? str(args.individual_client_id, 64)
   const fields: Json = {}
-  for (const [k, max] of map) { const v = str(args[k], max); if (v) fields[k] = k === 'contact_email' ? normalizeEmail(v) : v }
+  const name = str(args.name, 200); if (name) fields.full_name = name
+  const nif = str(args.nif, 30); if (nif) fields.nif = nif.replace(/\s+/g, '')
+  const email = str(args.contact_email, 200); if (email) fields.email = normalizeEmail(email)
+  const phone = str(args.contact_phone, 60); if (phone) fields.phone = phone
+  const address = str(args.address, 400); if (address) fields.address = address
+  const extra = [str(args.contact_name, 200) && `Pessoa de contacto: ${str(args.contact_name, 200)}`, str(args.sector, 120) && `Setor: ${str(args.sector, 120)}`].filter(Boolean).join('\n')
+
+  let row: Json
+  let created = false
   if (id) {
     fields.updated_at = new Date().toISOString()
-    const row = await q<Json>(sb().from('companies').update(fields).eq('id', id).select('id, name').single())
-    await logActivity(ACTOR, 'update_company', 'company', id, `Atualizou empresa ${row.name}`)
-    return { updated: true, company: row }
+    row = await q<Json>(sb().from('individual_clients').update(fields).eq('id', id).select('id, full_name, nif').single())
+    await logActivity(ACTOR, 'update_company', 'individual_client', id, `Atualizou ${row.full_name}`)
+  } else {
+    if (!fields.full_name || !fields.nif) throw new ToolError('name and nif are required to create a company client.')
+    const dup = await q<Json[]>(sb().from('individual_clients').select('id, full_name, nif').eq('nif', fields.nif as string).limit(1))
+    if (dup[0]) return { created: false, existing: true, client: dup[0], hint: 'Already exists — pass company_id (the client id) to update it.' }
+    row = await q<Json>(sb().from('individual_clients').insert(fields).select('id, full_name, nif').single())
+    created = true
+    await logActivity(ACTOR, 'create_company', 'individual_client', String(row.id), `Criou cliente ${row.full_name}`)
   }
-  if (!fields.name || !fields.nif) throw new ToolError('name and nif are required to create a company.')
-  const dup = await q<Json[]>(sb().from('companies').select('id, name, nif').eq('nif', fields.nif as string).limit(1))
-  if (dup[0]) return { created: false, existing: true, company: dup[0] }
-  const row = await q<Json>(sb().from('companies').insert({
-    id: `comp_${Date.now()}`,
-    sector: '', contact_name: '', contact_email: '', contact_phone: '', address: '',
-    ...fields,
-  }).select('id, name').single())
-  await logActivity(ACTOR, 'create_company', 'company', String(row.id), `Criou empresa ${row.name}`)
-  return { created: true, company: row }
+  if (extra) await q(sb().from('client_notes').insert({ id: crypto.randomUUID(), individual_client_id: row.id, company_id: null, body: extra, category: 'general', author_name: 'Claude' }).select('id'))
+  return created ? { created: true, client: row } : { updated: true, client: row }
 }
 
 async function createLead(args: Json) {
@@ -464,8 +471,6 @@ async function resolveOwnerByHints(args: Json) {
   if (nif) {
     const p = await q<Json[]>(sb().from('individual_clients').select('id').eq('nif', nif).limit(1))
     if (p[0]) return { individual_client_id: String(p[0].id), company_id: null }
-    const c = await q<Json[]>(sb().from('companies').select('id').eq('nif', nif).limit(1))
-    if (c[0]) return { individual_client_id: null, company_id: String(c[0].id) }
   }
   if (email) {
     const p = await q<Json[]>(sb().from('individual_clients').select('id').eq('email', normalizeEmail(email)).limit(1))
@@ -716,7 +721,7 @@ export const CRM_TOOLS: CrmTool[] = [
   },
   {
     name: 'upsert_company', title: 'Create or update company', readOnly: false,
-    description: 'Create a company client (name + nif required; deduplicated by NIF) or update one by company_id.',
+    description: 'Create a client that is a company (name + nif required; deduplicated by NIF) or update one by company_id (the client id). Companies are stored as ordinary clients; contact name and sector are kept as a note.',
     inputSchema: { type: 'object', properties: { company_id: { type: 'string' }, name: { type: 'string' }, nif: { type: 'string' }, sector: { type: 'string' }, contact_name: { type: 'string' }, contact_email: { type: 'string' }, contact_phone: { type: 'string' }, address: { type: 'string' } } },
     handler: upsertCompany,
   },

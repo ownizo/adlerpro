@@ -66,7 +66,7 @@ function HomeContent({ data }: { data: Home }) {
     <>
       <PageTitle
         title={firstName ? `Welcome, ${firstName}` : 'Welcome'}
-        subtitle={`${account.type === 'business' ? 'Business account' : 'Personal account'} · ${account.accountName}`}
+        subtitle={account.accountName}
       />
 
       <div className="mg-stats" style={{ marginBottom: 16 }}>
