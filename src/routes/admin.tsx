@@ -68,6 +68,7 @@ import { ClientProfilePanel } from '@/components/admin/ClientProfilePanel'
 import { AdminTasksPanel } from '@/components/admin/AdminTasksPanel'
 import { AdminMarketingPanel } from '@/components/admin/AdminMarketingPanel'
 import { SalesWorkspace } from '@/components/admin/sales/SalesWorkspace'
+import { StorageCleanupCard } from '@/components/admin/StorageCleanupCard'
 import { SALES_OPPORTUNITY_STAGES } from '@/lib/sales-opportunity-rules'
 import {
   getCompanyDuplicateWarnings,
@@ -1512,6 +1513,7 @@ function AdminDashboardContent() {
                 </div>
 
                 <InvoiceExpressStatus apiConnections={apiConnections} />
+                <StorageCleanupCard />
 
                 <div className="grid gap-4 mt-6">
 
