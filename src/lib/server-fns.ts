@@ -46,7 +46,7 @@ import { computeRunApplyReadiness, suggestApplyActions, type ApplyActionRowState
 import type { CarrierImportRecord, CarrierRunApplyStatus } from './types'
 import { buildOpportunityTitle, pickWebsiteLeadContextFields } from './sales-opportunity-rules'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
-import { canAccessStoragePath } from './viewer-access.server'
+import { canAccessStoragePath, resolveViewerLinks } from './viewer-access.server'
 import { classifyStoragePath, ownsRecord } from './storage-access'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser, generateStrongPassword, deleteIdentityUserById } from './identity-admin'
 
@@ -130,15 +130,12 @@ async function _resolveScope(token: string) {
     }
   }
 
-  const [companyUser, individualClient] = await Promise.all([
-    user.email ? db.getCompanyUserByEmail(user.email) : Promise.resolve(undefined),
-    resolveIndividualClientScope(user),
-  ])
+  const links = await resolveViewerLinks(supabaseAdmin, supaUser)
   return {
     user,
     isAdmin: false as const,
-    companyId: companyUser?.companyId ?? null,
-    individualClientId: individualClient?.id ?? null,
+    companyId: links.companyId,
+    individualClientId: links.individualClientId,
   }
 }
 
@@ -160,27 +157,6 @@ async function getViewerScope() {
     }
   }
   return scope
-}
-
-async function resolveIndividualClientScope(user: { id: string; email?: string | null }) {
-  const byAuthId = await supabaseAdmin
-    .from('individual_clients')
-    .select('id, full_name, email')
-    .eq('auth_user_id', user.id)
-    .maybeSingle()
-
-  if (byAuthId.data?.id) return byAuthId.data
-
-  if (user.email) {
-    const byEmail = await supabaseAdmin
-      .from('individual_clients')
-      .select('id, full_name, email')
-      .ilike('email', user.email)
-      .maybeSingle()
-    if (byEmail.data?.id) return byEmail.data
-  }
-
-  return null
 }
 
 /**
@@ -217,11 +193,12 @@ async function getViewerAccessContext() {
   }
 
   const isAdmin = Boolean(user.roles?.includes('admin'))
-  const companyUser = user.email ? await db.getCompanyUserByEmail(user.email) : undefined
-  const individualClient = await resolveIndividualClientScope(user)
-
-  const companyId = companyUser?.companyId ?? null
-  const individualClientId = individualClient?.id ?? null
+  const links = isAdmin ? { companyId: null, individualClientId: null } : await resolveViewerLinks(supabaseAdmin, supaUser)
+  const companyId = links.companyId
+  const individualClientId = links.individualClientId
+  const individualClient = individualClientId
+    ? (await supabaseAdmin.from('individual_clients').select('full_name, email').eq('id', individualClientId).maybeSingle()).data
+    : null
 
   return {
     user,
@@ -619,7 +596,7 @@ export const submitIndividualClaim = createServerFn({ method: 'POST' })
       buildNewClaim: (id, nowIso) => ({
         id,
         policyId: data.policyId,
-        individualClientId: ctx.individualClientId,
+        individualClientId: ctx.individualClientId ?? undefined,
         title: data.title,
         description: data.description,
         claimDate: nowIso.split('T')[0],
@@ -869,8 +846,8 @@ export const fetchCurrentUserCompanyProfile = createServerFn({ method: 'GET' })
   .handler(async () => {
     const scope = await getViewerScope()
     const email = scope.user.email?.toLowerCase()
-    const companyUser = email ? await db.getCompanyUserByEmail(email) : undefined
-    const company = companyUser ? await db.getCompany(companyUser.companyId) : undefined
+    const companyUser = scope.companyId && email ? await db.getCompanyUserByEmail(email) : undefined
+    const company = scope.companyId ? await db.getCompany(scope.companyId) : undefined
     return {
       company,
       companyUser,
@@ -2352,6 +2329,7 @@ export const adminCreateCompanyUser = createServerFn({ method: 'POST' })
       if (result.created) {
         await db.updateCompanyUser(id, {
           identityStatus: 'active',
+          authUserId: result.userId,
           updatedAt: new Date().toISOString(),
         })
       } else if (result.reason === 'already_exists') {

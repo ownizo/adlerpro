@@ -22,6 +22,8 @@ export interface CompanyUser {
   identityStatus?: 'pending_confirmation' | 'confirmed' | 'already_registered' | 'not_found'
   invitationSentAt?: string
   lastLoginAt?: string
+  /** Supabase auth user linked to this company user (set at creation or first sign-in). */
+  authUserId?: string
   createdAt: string
   updatedAt?: string
 }
