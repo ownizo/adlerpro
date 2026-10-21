@@ -148,6 +148,16 @@ const ADMIN_QUICK_CREATE_ITEMS: Array<{ label: string; tab: AdminTab }> = [
   { label: 'Policy', tab: 'policies' },
 ]
 
+/** Fired by the claims screen after a claim is opened, so the counters update at once. */
+export const ADMIN_BADGES_REFRESH = 'admin-badges-refresh'
+
+function navBadgeFor(tab: AdminTab, badges: { tasks: number; alerts: number; claims: number }) {
+  if (tab === 'tasks') return badges.tasks
+  if (tab === 'alerts') return badges.alerts
+  if (tab === 'claims') return badges.claims
+  return 0
+}
+
 function isAdminTabValue(value: unknown): value is AdminTab {
   return typeof value === 'string' && value in ADMIN_BREADCRUMBS
 }
@@ -188,7 +198,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [lang, setLangState] = useState<LangCode>((i18n.language as LangCode) ?? 'pt')
   const isAdmin = user?.roles?.includes('admin')
   const isAdminRoute = location.pathname.startsWith('/admin')
-  const [navBadges, setNavBadges] = useState({ tasks: 0, alerts: 0 })
+  const [navBadges, setNavBadges] = useState({ tasks: 0, alerts: 0, claims: 0 })
   const [quickCreateOpen, setQuickCreateOpen] = useState(false)
   const quickCreateRef = useRef<HTMLDivElement>(null)
   // App-style shell (admin): bottom sheet with every section on phones,
@@ -248,11 +258,24 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     return () => { obs.disconnect(); if (frame) window.cancelAnimationFrame(frame) }
   }, [isAdminRoute])
 
+  // Claims with unread client activity are re-checked every minute, when the
+  // window regains focus, and when a claim is opened (ADMIN_BADGES_REFRESH).
   useEffect(() => {
     if (!isAdmin || !ready) return
-    getAdminNavBadgeCounts()
-      .then(({ tasksCount, alertsCount }) => setNavBadges({ tasks: tasksCount, alerts: alertsCount }))
-      .catch(console.error)
+    const load = () => {
+      getAdminNavBadgeCounts()
+        .then(({ tasksCount, alertsCount, claimsCount }) => setNavBadges({ tasks: tasksCount, alerts: alertsCount, claims: claimsCount }))
+        .catch(console.error)
+    }
+    load()
+    const timer = window.setInterval(load, 60_000)
+    window.addEventListener('focus', load)
+    window.addEventListener(ADMIN_BADGES_REFRESH, load)
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener('focus', load)
+      window.removeEventListener(ADMIN_BADGES_REFRESH, load)
+    }
   }, [isAdmin, ready])
 
   useEffect(() => {
@@ -389,7 +412,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                         </Link>
                       )
                     }
-                    const badge = item.tab === 'tasks' ? navBadges.tasks : item.tab === 'alerts' ? navBadges.alerts : 0
+                    const badge = navBadgeFor(item.tab, navBadges)
                     return (
                       <Link
                         key={item.tab}
@@ -504,11 +527,19 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 )}
               </div>
 
-              <Link to="/admin" search={{ tab: 'alerts' }} className="admin-header-icon-btn" title="Renewals">
+              <Link
+                to="/admin"
+                search={{ tab: navBadges.claims > 0 ? 'claims' : 'alerts' }}
+                className="admin-header-icon-btn"
+                title={navBadges.claims > 0 ? `${navBadges.claims} claim${navBadges.claims === 1 ? '' : 's'} with new client activity` : 'Renewals'}
+                aria-label={navBadges.claims > 0 ? `${navBadges.claims} claim${navBadges.claims === 1 ? '' : 's'} with new client activity` : 'Renewals'}
+              >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
-                {navBadges.alerts > 0 && <span className="admin-header-icon-badge" />}
+                {navBadges.claims > 0
+                  ? <span className="admin-header-icon-count">{navBadges.claims > 9 ? '9+' : navBadges.claims}</span>
+                  : navBadges.alerts > 0 && <span className="admin-header-icon-badge" />}
               </Link>
 
               {ready && user && (
@@ -642,7 +673,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <div className="admin-sheet-grid">
                     {group.items.map((item) => {
                       const active = 'tab' in item ? location.pathname === '/admin' && activeAdminTab === item.tab : location.pathname === item.to
-                      const badge = 'tab' in item ? (item.tab === 'tasks' ? navBadges.tasks : item.tab === 'alerts' ? navBadges.alerts : 0) : 0
+                      const badge = 'tab' in item ? navBadgeFor(item.tab, navBadges) : 0
                       const inner = <>
                         <span className="admin-sheet-tile-icon">
                           <svg className="w-[22px] h-[22px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6} aria-hidden="true">
