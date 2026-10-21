@@ -46,6 +46,7 @@ import { computeRunApplyReadiness, suggestApplyActions, type ApplyActionRowState
 import type { CarrierImportRecord, CarrierRunApplyStatus } from './types'
 import { buildOpportunityTitle, pickWebsiteLeadContextFields } from './sales-opportunity-rules'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
+import { effectivePolicyStatus, lisbonToday } from './policy-status'
 import { canAccessStoragePath, resolveViewerLinks } from './viewer-access.server'
 import { classifyStoragePath, ownsRecord } from './storage-access'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser, generateStrongPassword, deleteIdentityUserById } from './identity-admin'
@@ -4414,7 +4415,11 @@ async function portalPolicies(ctx: Awaited<ReturnType<typeof portalContext>>): P
     : ctx.individualClientId
       ? await db.getPoliciesByIndividualClientId(ctx.individualClientId)
       : []
-  return list.filter((p) => p.visiblePortal !== false)
+  // Status as the client should see it today (renewal due / expired by date).
+  const today = lisbonToday()
+  return list
+    .filter((p) => p.visiblePortal !== false)
+    .map((p) => ({ ...p, status: effectivePolicyStatus(p.status, p.endDate, today) }))
 }
 
 async function portalClaims(ctx: Awaited<ReturnType<typeof portalContext>>): Promise<Claim[]> {
@@ -4437,11 +4442,11 @@ export const fetchPortalHome = createServerFn({ method: 'GET' })
       portalPolicies(ctx),
       portalClaims(ctx),
     ])
-    const now = new Date()
-    const in90 = new Date(now.getTime() + 90 * 86_400_000)
+    const today = lisbonToday()
+    const in90 = lisbonToday(new Date(Date.now() + 90 * 86_400_000))
     const live = policies.filter((p) => p.status === 'active' || p.status === 'expiring')
     const renewals = live
-      .filter((p) => p.endDate && new Date(p.endDate) >= now && new Date(p.endDate) <= in90)
+      .filter((p) => p.endDate && p.endDate.slice(0, 10) >= today && p.endDate.slice(0, 10) <= in90)
       .sort((a, b) => a.endDate.localeCompare(b.endDate))
     const openClaims = claims.filter((c) => !['approved', 'denied', 'paid'].includes(c.status))
     return {
