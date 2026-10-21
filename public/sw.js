@@ -1,12 +1,14 @@
 /*
- * Service worker for the "Os Meus Seguros" PWA.
+ * Service worker for the client portal PWA (MillionGuard).
  *
  * Strategy is intentionally conservative because the app is authenticated and
  * data-heavy: we never cache API/auth traffic, and for everything else we go to
  * the network first and only fall back to the cache when the device is offline.
  * This keeps the portal installable without ever serving stale account data.
  */
-const CACHE = 'oms-cache-v2'
+// v3: earlier versions also cached server-function responses (client data);
+// bumping the name deletes those caches on activate.
+const CACHE = 'oms-cache-v3'
 
 // Precache the app shell so a previously visited install opens while offline.
 const PRECACHE_URLS = [
@@ -40,15 +42,24 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url)
   if (url.origin !== self.location.origin) return
 
-  // Never cache server endpoints or auth callbacks — always live.
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/.netlify/')) {
+  // Never cache server endpoints, server functions (they return the client's
+  // policies, claims and profile) or auth callbacks: always live, never kept
+  // on the device.
+  if (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/.netlify/') ||
+    url.pathname.startsWith('/_serverFn') ||
+    url.search.includes('code=') ||
+    request.headers.has('authorization')
+  ) {
     return
   }
 
   event.respondWith(
     fetch(request)
       .then((response) => {
-        if (response && response.ok && response.type === 'basic') {
+        const noStore = /no-store|private/.test(response?.headers.get('cache-control') || '')
+        if (response && response.ok && response.type === 'basic' && !noStore) {
           const copy = response.clone()
           caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {})
         }

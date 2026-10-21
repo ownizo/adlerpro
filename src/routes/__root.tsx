@@ -18,8 +18,10 @@ function isAdminSite(): boolean {
 const THEME_BOOTSTRAP = `(function(){try{var r=document.documentElement;var s=function(k,v){r.style.setProperty(k,v)};var raw=localStorage.getItem('adlerpro-ui-theme');if(!raw)return;var t=JSON.parse(raw);if(t.baseFontSize)r.style.fontSize=t.baseFontSize+'px';var m={fontFamily:'--ui-font-family',pageBg:'--ui-page-bg',surfaceBg:'--ui-surface-bg',textPrimary:'--ui-text-primary',textSecondary:'--ui-text-secondary',textMuted:'--ui-text-muted',accent:'--ui-accent',border:'--ui-border',menuText:'--ui-menu-text',menuActiveBg:'--ui-menu-active-bg',menuActiveText:'--ui-menu-active-text'};for(var k in m){if(t[k]!=null)s(m[k],t[k])}if(t.textPrimary){s('--color-primary',t.textPrimary)}if(t.textSecondary){s('--color-body',t.textSecondary);s('--color-muted',t.textSecondary)}if(t.textMuted){s('--color-label',t.textMuted);s('--color-label-light',t.textMuted)}if(t.border)s('--color-border',t.border);if(t.accent){s('--color-gold',t.accent);s('--color-gold-400',t.accent)}}catch(e){}})();`
 
 // Register the PWA service worker once the page is loaded, so the portal can be
-// installed to a phone home screen and opened offline.
-const SW_REGISTER = `(function(){if('serviceWorker'in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}})();`
+// installed to a phone home screen and opened offline. Chrome fires
+// beforeinstallprompt before React mounts, so it is kept on window for the
+// install invitation (components/portal/InstallPrompt.tsx) to pick up.
+const SW_REGISTER = `(function(){if('serviceWorker'in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){})})}window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__mgInstallPrompt=e;window.dispatchEvent(new Event('mg-installable'))})})();`
 
 export const Route = createRootRoute({
   head: () => {

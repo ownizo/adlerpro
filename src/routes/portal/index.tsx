@@ -18,7 +18,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   return (
     <Card style={{ padding: 18 }}>
       <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: C.muted, letterSpacing: '0.04em', textTransform: 'uppercase' }}>{label}</p>
-      <p style={{ margin: '8px 0 0', fontSize: 26, fontWeight: 700, color: C.ink }}>{value}</p>
+      <p className="mg-stat-value" style={{ margin: '8px 0 0', fontSize: 26, fontWeight: 700, color: C.ink }}>{value}</p>
       {hint && <p style={{ margin: '4px 0 0', fontSize: 12, color: C.body }}>{hint}</p>}
     </Card>
   )
@@ -28,13 +28,15 @@ function PortalHome() {
   const [data, setData] = useState<Home | null>(null)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    fetchPortalHome().then(setData).catch(() => setError('We could not load your account. Please refresh the page.'))
-  }, [])
+  const load = () => {
+    setError('')
+    fetchPortalHome().then(setData).catch(() => setError('We could not load your account.'))
+  }
+  useEffect(load, [])
 
   return (
     <PortalLayout>
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <ErrorNote onRetry={load}>{error}</ErrorNote>}
       {!data && !error && <Spinner />}
       {data && <HomeContent data={data} />}
     </PortalLayout>

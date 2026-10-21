@@ -46,6 +46,9 @@ import { computeRunApplyReadiness, suggestApplyActions, type ApplyActionRowState
 import type { CarrierImportRecord, CarrierRunApplyStatus } from './types'
 import { buildOpportunityTitle, pickWebsiteLeadContextFields } from './sales-opportunity-rules'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
+import { effectivePolicyStatus, lisbonToday } from './policy-status'
+import { canAccessStoragePath, resolveViewerLinks } from './viewer-access.server'
+import { classifyStoragePath, ownsRecord } from './storage-access'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser, generateStrongPassword, deleteIdentityUserById } from './identity-admin'
 
 function extractAccessToken(): string | null {
@@ -128,15 +131,12 @@ async function _resolveScope(token: string) {
     }
   }
 
-  const [companyUser, individualClient] = await Promise.all([
-    user.email ? db.getCompanyUserByEmail(user.email) : Promise.resolve(undefined),
-    resolveIndividualClientScope(user),
-  ])
+  const links = await resolveViewerLinks(supabaseAdmin, supaUser)
   return {
     user,
     isAdmin: false as const,
-    companyId: companyUser?.companyId ?? null,
-    individualClientId: individualClient?.id ?? null,
+    companyId: links.companyId,
+    individualClientId: links.individualClientId,
   }
 }
 
@@ -158,27 +158,6 @@ async function getViewerScope() {
     }
   }
   return scope
-}
-
-async function resolveIndividualClientScope(user: { id: string; email?: string | null }) {
-  const byAuthId = await supabaseAdmin
-    .from('individual_clients')
-    .select('id, full_name, email')
-    .eq('auth_user_id', user.id)
-    .maybeSingle()
-
-  if (byAuthId.data?.id) return byAuthId.data
-
-  if (user.email) {
-    const byEmail = await supabaseAdmin
-      .from('individual_clients')
-      .select('id, full_name, email')
-      .ilike('email', user.email)
-      .maybeSingle()
-    if (byEmail.data?.id) return byEmail.data
-  }
-
-  return null
 }
 
 /**
@@ -215,11 +194,12 @@ async function getViewerAccessContext() {
   }
 
   const isAdmin = Boolean(user.roles?.includes('admin'))
-  const companyUser = user.email ? await db.getCompanyUserByEmail(user.email) : undefined
-  const individualClient = await resolveIndividualClientScope(user)
-
-  const companyId = companyUser?.companyId ?? null
-  const individualClientId = individualClient?.id ?? null
+  const links = isAdmin ? { companyId: null, individualClientId: null } : await resolveViewerLinks(supabaseAdmin, supaUser)
+  const companyId = links.companyId
+  const individualClientId = links.individualClientId
+  const individualClient = individualClientId
+    ? (await supabaseAdmin.from('individual_clients').select('full_name, email').eq('id', individualClientId).maybeSingle()).data
+    : null
 
   return {
     user,
@@ -617,7 +597,7 @@ export const submitIndividualClaim = createServerFn({ method: 'POST' })
       buildNewClaim: (id, nowIso) => ({
         id,
         policyId: data.policyId,
-        individualClientId: ctx.individualClientId,
+        individualClientId: ctx.individualClientId ?? undefined,
         title: data.title,
         description: data.description,
         claimDate: nowIso.split('T')[0],
@@ -867,8 +847,8 @@ export const fetchCurrentUserCompanyProfile = createServerFn({ method: 'GET' })
   .handler(async () => {
     const scope = await getViewerScope()
     const email = scope.user.email?.toLowerCase()
-    const companyUser = email ? await db.getCompanyUserByEmail(email) : undefined
-    const company = companyUser ? await db.getCompany(companyUser.companyId) : undefined
+    const companyUser = scope.companyId && email ? await db.getCompanyUserByEmail(email) : undefined
+    const company = scope.companyId ? await db.getCompany(scope.companyId) : undefined
     return {
       company,
       companyUser,
@@ -1714,13 +1694,13 @@ export const getDocumentUrl = createServerFn({ method: 'POST' })
       }
       return { url: `/api/policy-document?documentId=${encodeURIComponent(documentId)}` }
     }
-    const policyId = data.storagePath.split('/policies/')[1]?.split('/')[0]
-    if (policyId && !(await fetchAccessiblePolicy(policyId))) {
+    const scope = await getViewerScope()
+    if (!(await canAccessStoragePath(supabaseAdmin, scope, data.storagePath))) {
       throw new Error('Sem acesso a este documento')
     }
     const { data: urlData, error } = await supabaseAdmin.storage
       .from('documents')
-      .createSignedUrl(data.storagePath, 3600)
+      .createSignedUrl(data.storagePath, 600)
     if (error) throw new Error(error.message)
     return { url: urlData.signedUrl }
   })
@@ -1729,25 +1709,15 @@ export const getStorageUploadUrl = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: { storagePath: string }) => d)
   .handler(async ({ data }) => {
-    const parts = data.storagePath.split('/')
-    const allowedTypes = ['claims', 'policies']
-    // Reject empty first segment (leading slash), path traversal, and paths where neither
-    // parts[0] nor parts[1] is a known type (covers both old format and companyId-prefix format)
-    if (
-      data.storagePath.includes('..') ||
-      parts[0] === '' ||
-      (!allowedTypes.includes(parts[0]) && !allowedTypes.includes(parts[1]))
-    ) {
+    // Uploads only go into a policy or claim folder the viewer owns
+    // (agency staff may write to any of them).
+    const target = classifyStoragePath(data.storagePath)
+    if (!target || (target.kind !== 'policy' && target.kind !== 'claim')) {
       throw new Error('Invalid storage path')
     }
-    // For companyId-prefixed paths ({companyId}/policies/... or {companyId}/claims/...),
-    // validate the companyId against the user's scope — admins may write to any company prefix
-    if (!allowedTypes.includes(parts[0])) {
-      const scope = await getViewerScope()
-      if (!scope.isAdmin) {
-        const expectedCompanyId = scope.companyId ?? 'general'
-        if (parts[0] !== expectedCompanyId) throw new Error('Invalid storage path')
-      }
+    const scope = await getViewerScope()
+    if (!(await canAccessStoragePath(supabaseAdmin, scope, data.storagePath))) {
+      throw new Error('Invalid storage path')
     }
     const { data: urlData, error } = await supabaseAdmin.storage
       .from('documents')
@@ -2250,13 +2220,13 @@ export const getClaimDocumentUrl = createServerFn({ method: 'POST' })
 
     const dbDocument = await db.getDocument(data.documentId)
     if (dbDocument?.storagePath) {
-      if (ctx.companyId && dbDocument.companyId && dbDocument.companyId !== ctx.companyId) {
+      if (!ctx.isAdmin && !ownsRecord(ctx, { company_id: dbDocument.companyId, individual_client_id: dbDocument.individualClientId })) {
         throw new Error('Sem permissões para este documento')
       }
 
       const { data: urlData, error } = await supabaseAdmin.storage
         .from('documents')
-        .createSignedUrl(dbDocument.storagePath, 3600)
+        .createSignedUrl(dbDocument.storagePath, 600)
       if (error) throw new Error(error.message)
       return { url: urlData.signedUrl, name: dbDocument.name }
     }
@@ -2361,6 +2331,7 @@ export const adminCreateCompanyUser = createServerFn({ method: 'POST' })
       if (result.created) {
         await db.updateCompanyUser(id, {
           identityStatus: 'active',
+          authUserId: result.userId,
           updatedAt: new Date().toISOString(),
         })
       } else if (result.reason === 'already_exists') {
@@ -4445,7 +4416,11 @@ async function portalPolicies(ctx: Awaited<ReturnType<typeof portalContext>>): P
     : ctx.individualClientId
       ? await db.getPoliciesByIndividualClientId(ctx.individualClientId)
       : []
-  return list.filter((p) => p.visiblePortal !== false)
+  // Status as the client should see it today (renewal due / expired by date).
+  const today = lisbonToday()
+  return list
+    .filter((p) => p.visiblePortal !== false)
+    .map((p) => ({ ...p, status: effectivePolicyStatus(p.status, p.endDate, today) }))
 }
 
 async function portalClaims(ctx: Awaited<ReturnType<typeof portalContext>>): Promise<Claim[]> {
@@ -4468,11 +4443,11 @@ export const fetchPortalHome = createServerFn({ method: 'GET' })
       portalPolicies(ctx),
       portalClaims(ctx),
     ])
-    const now = new Date()
-    const in90 = new Date(now.getTime() + 90 * 86_400_000)
+    const today = lisbonToday()
+    const in90 = lisbonToday(new Date(Date.now() + 90 * 86_400_000))
     const live = policies.filter((p) => p.status === 'active' || p.status === 'expiring')
     const renewals = live
-      .filter((p) => p.endDate && new Date(p.endDate) >= now && new Date(p.endDate) <= in90)
+      .filter((p) => p.endDate && p.endDate.slice(0, 10) >= today && p.endDate.slice(0, 10) <= in90)
       .sort((a, b) => a.endDate.localeCompare(b.endDate))
     const openClaims = claims.filter((c) => !['approved', 'denied', 'paid'].includes(c.status))
     return {

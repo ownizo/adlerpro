@@ -8,7 +8,7 @@ import {
 import type { PortalClaim, PortalPolicy } from '@/lib/server-fns'
 import {
   PortalLayout, PageTitle, Card, Pill, Empty, Spinner, ErrorNote, C,
-  money, date, dateTime, fileSize, policyType, claimStatus, claimTone, button, input, label,
+  money, date, dateTime, fileSize, policyType, claimStatus, claimTone, button, input, label, openDocument, FileButton, todayIso,
 } from '@/components/portal/portal-ui'
 
 export const Route = createFileRoute('/portal/claims')({
@@ -24,10 +24,12 @@ function PortalClaims() {
   const [showNew, setShowNew] = useState(false)
   const [openId, setOpenId] = useState<string | null>(null)
 
-  const load = () =>
-    fetchPortalClaims()
+  const load = () => {
+    setError('')
+    return fetchPortalClaims()
       .then((r) => { setClaims(r.claims); setPolicies(r.policies) })
-      .catch(() => setError('We could not load your claims. Please refresh the page.'))
+      .catch(() => setError('We could not load your claims.'))
+  }
 
   useEffect(() => { load() }, [])
 
@@ -43,7 +45,7 @@ function PortalClaims() {
         subtitle="Report a claim and follow it with us, message by message."
         action={!showNew && policies.length > 0 ? <button style={button()} onClick={() => setShowNew(true)}>Report a claim</button> : undefined}
       />
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <ErrorNote onRetry={load}>{error}</ErrorNote>}
       {showNew && (
         <NewClaim
           policies={policies}
@@ -124,7 +126,7 @@ function NewClaim({ policies, onCancel, onCreated }: { policies: PortalPolicy[];
           </div>
           <div>
             <label style={label} htmlFor="mg-date">Date of the incident</label>
-            <input id="mg-date" type="date" value={incidentDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setIncidentDate(e.target.value)} style={input} required />
+            <input id="mg-date" type="date" value={incidentDate} max={todayIso()} onChange={(e) => setIncidentDate(e.target.value)} style={input} required />
           </div>
         </div>
         <div>
@@ -151,7 +153,10 @@ function ClaimDetail({ claimId }: { claimId: string }) {
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
 
-  const load = () => fetchPortalClaim({ data: { claimId } }).then(setData).catch(() => setError('This claim could not be loaded.'))
+  const load = () => {
+    setError('')
+    return fetchPortalClaim({ data: { claimId } }).then(setData).catch(() => setError('This claim could not be loaded.'))
+  }
   useEffect(() => { load() }, [claimId])
 
   async function send(e: React.FormEvent) {
@@ -188,15 +193,15 @@ function ClaimDetail({ claimId }: { claimId: string }) {
   }
 
   async function open(documentId: string) {
+    setError('')
     try {
-      const { url } = await getClaimDocumentUrl({ data: { claimId, documentId } })
-      window.open(url, '_blank', 'noopener')
+      await openDocument(async () => (await getClaimDocumentUrl({ data: { claimId, documentId } })).url)
     } catch {
       setError('This file could not be opened.')
     }
   }
 
-  if (!data) return <div style={{ borderTop: `1px solid ${C.line}`, padding: 18 }}>{error ? <ErrorNote>{error}</ErrorNote> : <Spinner />}</div>
+  if (!data) return <div style={{ borderTop: `1px solid ${C.line}`, padding: 18 }}>{error ? <ErrorNote onRetry={load}>{error}</ErrorNote> : <Spinner />}</div>
 
   const c = data.claim
   return (
@@ -235,10 +240,7 @@ function ClaimDetail({ claimId }: { claimId: string }) {
         {data.documents.length > 0 && (
           <div style={{ display: 'grid', gap: 8, marginBottom: 10 }}>
             {data.documents.map((d) => (
-              <button key={d.id} onClick={() => open(d.id)} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 12px', border: `1px solid ${C.line}`, borderRadius: 10, background: '#fff', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
-                <span style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</span>
-                <span style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }}>{fileSize(d.size)} · {date(d.uploadedAt)}</span>
-              </button>
+              <FileButton key={d.id} name={d.name} meta={[fileSize(d.size), date(d.uploadedAt)].filter(Boolean).join(' · ')} onClick={() => open(d.id)} />
             ))}
           </div>
         )}
