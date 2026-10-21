@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { fetchPortalProfile } from '@/lib/server-fns'
+import { GOOGLE_SIGNIN_ENABLED, GoogleIcon } from '@/components/portal/SignInMethods'
 import { BRAND, C, GLOBAL_CSS, Wordmark, button, font, input, label, ErrorNote, Spinner } from '@/components/portal/portal-ui'
 import { InstallPrompt } from '@/components/portal/InstallPrompt'
 
@@ -21,12 +23,39 @@ function PortalLogin() {
 
   useEffect(() => {
     // Coming from "Sign out": never bounce back into the portal.
-    if (new URLSearchParams(window.location.search).has('signedout')) { setChecking(false); return }
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) window.location.replace('/portal')
-      else setChecking(false)
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('signedout')) { setChecking(false); return }
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!session) { setChecking(false); return }
+      // Back from Google: only a Google account the client connected in their
+      // Profile reaches a client record. Any other Google account is signed out.
+      if (params.get('oauth') === 'google') {
+        const profile = await fetchPortalProfile().catch(() => null)
+        if (!profile || profile.type === 'none') {
+          await supabase.auth.signOut()
+          window.history.replaceState(null, '', window.location.pathname)
+          setError('This Google account is not connected to MillionGuard. Sign in with your email, then connect Google in your Profile.')
+          setChecking(false)
+          return
+        }
+      }
+      window.location.replace('/portal')
     })
   }, [])
+
+  async function signInWithGoogle() {
+    setError('')
+    setBusy(true)
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/portal/login?oauth=google` },
+    })
+    // On success the browser leaves for Google, so we only get here on failure.
+    if (err) {
+      setBusy(false)
+      setError('Google sign-in is not available right now. Please use your email and password.')
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -95,6 +124,16 @@ function PortalLogin() {
                 </button>
               )}
             </form>
+            {GOOGLE_SIGNIN_ENABLED && mode === 'signin' && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0', color: C.muted, fontSize: 12 }}>
+                  <span style={{ flex: 1, height: 1, background: C.line }} />or<span style={{ flex: 1, height: 1, background: C.line }} />
+                </div>
+                <button type="button" disabled={busy} onClick={signInWithGoogle} style={{ ...button('ghost'), width: '100%', opacity: busy ? 0.6 : 1 }}>
+                  <GoogleIcon /> Continue with Google
+                </button>
+              </>
+            )}
           </div>
           <InstallPrompt />
           <p style={{ maxWidth: 400, textAlign: 'center', color: C.muted, fontSize: 12, lineHeight: 1.6, marginTop: 22 }}>
