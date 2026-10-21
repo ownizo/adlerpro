@@ -55,7 +55,7 @@ function ImportPortfolioPage() {
     )
   }
   if (!user) return <Navigate to="/login" />
-  if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
+  if (!user.roles?.includes('admin')) return <Navigate to="/login" />
 
   const canPreview = provider !== '' && file !== null && !submitting
 

@@ -85,7 +85,7 @@ function CarrierIntegrationsContent() {
     )
   }
   if (!user) return <Navigate to="/login" />
-  if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
+  if (!user.roles?.includes('admin')) return <Navigate to="/login" />
 
   return (
     <AppLayout>

@@ -173,7 +173,7 @@ function CarrierRunDetailPage() {
     )
   }
   if (!user) return <Navigate to="/login" />
-  if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
+  if (!user.roles?.includes('admin')) return <Navigate to="/login" />
 
   const reviewingRecord = records.find((r) => r.id === reviewingId) ?? null
 

@@ -108,6 +108,7 @@
     "profileLoadErrorTitle": "Could not load your profile",
     "profileLoadErrorBody": "There was a problem loading your account data. Please check your connection and try again.",
     "errors": {
+      "adminOnly": "This sign-in is reserved for Adler & Rochefort administration.",
       "invalidCredentials": "Invalid email or password.",
       "emailNotConfirmed": "Email not yet confirmed. Open the confirmation link sent to your email.",
       "termsRequired": "You must accept the Terms & Conditions to create an account.",
