@@ -1662,7 +1662,8 @@ export const adminCreatePolicy = createServerFn({ method: 'POST' })
     await db.createPolicy({
       id,
       ...data,
-      companyId: data.companyId || '',
+      // Every holder is a client now; store NULL rather than an empty company id.
+      companyId: (data.companyId || null) as unknown as string,
       individualClientId: data.individualClientId || undefined,
       type: data.type as any,
       status: 'active',

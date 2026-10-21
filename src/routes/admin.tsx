@@ -6,12 +6,6 @@ import {
   adminCreatePolicy,
   deletePolicy,
   adminUpdateClaimStatus,
-  adminCreateCompany,
-  adminUpdateCompany,
-  adminDeleteCompany,
-  adminCreateCompanyUser,
-  adminDeleteCompanyUser,
-  adminUpdateCompanyUser,
   adminRefreshApiConnection,
   adminUpdateApiConnection,
   adminCreateIndividualClient,
@@ -21,7 +15,6 @@ import {
   adminGrantIndividualClientAccess,
   adminResetIndividualClientPassword,
   adminRevokeIndividualClientAccess,
-  adminPromoteToCompany,
   adminUpdatePolicy,
   adminUploadPolicyDocument,
   adminGetDocumentUrl,
@@ -70,7 +63,6 @@ import { AdminMarketingPanel } from '@/components/admin/AdminMarketingPanel'
 import { SalesWorkspace } from '@/components/admin/sales/SalesWorkspace'
 import { SALES_OPPORTUNITY_STAGES } from '@/lib/sales-opportunity-rules'
 import {
-  getCompanyDuplicateWarnings,
   getPersonDuplicateWarnings,
   getPolicyDuplicateWarnings,
   type DuplicateWarning,
@@ -342,7 +334,8 @@ function AdminDashboardContent() {
   const { user, ready } = useIdentity()
   const navigate = useNavigate()
   const { tab: searchTab, stage: searchStage, overdue: searchOverdue } = Route.useSearch()
-  const tab: AdminTab = searchTab ?? 'dashboard'
+  // Companies were merged into clients; old links land on the clients list.
+  const tab: AdminTab = searchTab === 'companies' ? 'individual_clients' : searchTab ?? 'dashboard'
   const [companies, setCompanies] = useState<Company[]>([])
   const [companyUsers, setCompanyUsers] = useState<CompanyUser[]>([])
   const [userEvents, setUserEvents] = useState<UserMetricEvent[]>([])
@@ -354,25 +347,18 @@ function AdminDashboardContent() {
   const [individualClients, setIndividualClients] = useState<IndividualClient[]>([])
   const [websiteLeadClientIds, setWebsiteLeadClientIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
-  const [showNewCompany, setShowNewCompany] = useState(false)
   const [showNewPolicy, setShowNewPolicy] = useState(false)
   const [showNewIndividualClient, setShowNewIndividualClient] = useState(false)
   // CRM3 Block 2 — pending create payload while a duplicate-warning
   // confirmation panel is shown; never a block, just a pause for a choice.
-  const [pendingCompanyCreate, setPendingCompanyCreate] = useState<{ data: any; warnings: DuplicateWarning[] } | null>(null)
   const [pendingIndividualClientCreate, setPendingIndividualClientCreate] = useState<{ data: any; warnings: DuplicateWarning[] } | null>(null)
   const [pendingPolicyCreate, setPendingPolicyCreate] = useState<{ data: any; warnings: DuplicateWarning[] } | null>(null)
   const [editingIndividualClientId, setEditingIndividualClientId] = useState<string | null>(null)
   const [expandedIndividualClientId, setExpandedIndividualClientId] = useState<string | null>(null)
-  const [editingCompanyId, setEditingCompanyId] = useState<string | null>(null)
-  const [expandedCompanyId, setExpandedCompanyId] = useState<string | null>(null)
   const [selectedIndividualClientIds, setSelectedIndividualClientIds] = useState<Set<string>>(new Set())
-  const [selectedCompanyIds, setSelectedCompanyIds] = useState<Set<string>>(new Set())
   const [bulkDeletingClients, setBulkDeletingClients] = useState(false)
-  const [bulkDeletingCompanies, setBulkDeletingCompanies] = useState(false)
   const [selectedPolicyIds, setSelectedPolicyIds] = useState<Set<string>>(new Set())
   const [bulkDeletingPolicies, setBulkDeletingPolicies] = useState(false)
-  const [showUserFormForCompanyId, setShowUserFormForCompanyId] = useState<string | null>(null)
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('')
   const [showNewClaim, setShowNewClaim] = useState(false)
   const [selectedClaimId, setSelectedClaimId] = useState<string | null>(null)
@@ -475,428 +461,13 @@ function AdminDashboardContent() {
               />
             )}
 
-            {tab === 'companies' && (
-              <div>
-                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-                  <h2 className="text-lg font-semibold text-navy-700 whitespace-nowrap">Companies ({companies.length})</h2>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={async () => {
-                        await exportToExcel(companies.map((c) => ({
-                          Name: c.name,
-                          NIF: c.nif,
-                          Sector: c.sector,
-                          'Contact Person': c.contactName,
-                          Email: c.contactEmail,
-                          Phone: c.contactPhone,
-                          Address: c.address,
-                          'Access Email': c.accessEmail || '',
-                          'Created At': c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '',
-                        })), 'companies')
-                      }}
-                      disabled={companies.length === 0}
-                      className="px-4 py-2 border border-navy-300 text-navy-700 font-medium rounded-[2px] hover:bg-navy-50 transition-colors text-sm disabled:opacity-50"
-                    >
-                      Export Excel
-                    </button>
-                    <button
-                      onClick={() => {
-                        setEditingCompanyId(null)
-                        setShowNewCompany(!showNewCompany)
-                      }}
-                      className="admin-btn admin-btn-primary"
-                  >
-                    {showNewCompany ? 'Cancel' : 'New company'}
-                  </button>
-                  </div>
-                </div>
-
-                {showNewCompany && (
-                  <CompanyForm
-                    title={editingCompanyId ? 'Edit company' : 'New company'}
-                    initial={editingCompanyId ? companies.find((c) => c.id === editingCompanyId) : undefined}
-                    onSubmit={async (data) => {
-                      if (editingCompanyId) {
-                        await adminUpdateCompany({ data: { id: editingCompanyId, updates: data } })
-                        await reload()
-                        setShowNewCompany(false)
-                        setEditingCompanyId(null)
-                        return
-                      }
-                      const warnings = getCompanyDuplicateWarnings(
-                        { nif: data.nif, name: data.name, contactEmail: data.contactEmail, contactPhone: data.contactPhone },
-                        companies.map((c) => ({ id: c.id, nif: c.nif, name: c.name, contactEmail: c.contactEmail, contactPhone: c.contactPhone })),
-                      )
-                      if (warnings.length > 0) {
-                        setPendingCompanyCreate({ data, warnings })
-                        return
-                      }
-                      await adminCreateCompany({ data })
-                      await reload()
-                      setShowNewCompany(false)
-                      setEditingCompanyId(null)
-                    }}
-                  />
-                )}
-
-                {pendingCompanyCreate && (
-                  <DuplicateWarningDialog
-                    warnings={pendingCompanyCreate.warnings}
-                    onCancel={() => setPendingCompanyCreate(null)}
-                    onReview={(id) => {
-                      setPendingCompanyCreate(null)
-                      setShowNewCompany(false)
-                      setExpandedCompanyId(id)
-                    }}
-                    onContinue={async () => {
-                      const data = pendingCompanyCreate.data
-                      setPendingCompanyCreate(null)
-                      await adminCreateCompany({ data })
-                      await reload()
-                      setShowNewCompany(false)
-                      setEditingCompanyId(null)
-                    }}
-                  />
-                )}
-
-                {companies.length > 0 && (
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3 px-3 py-2 bg-navy-50 border border-navy-200 rounded-[4px]">
-                    <label className="flex items-center gap-2 text-sm text-navy-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={companies.length > 0 && selectedCompanyIds.size === companies.length}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedCompanyIds(new Set(companies.map((c) => c.id)))
-                          } else {
-                            setSelectedCompanyIds(new Set())
-                          }
-                        }}
-                        className="w-4 h-4 accent-[#292929]"
-                      />
-                      Select all
-                    </label>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-navy-500">
-                        {selectedCompanyIds.size} selected
-                      </span>
-                      <button
-                        disabled={selectedCompanyIds.size === 0 || bulkDeletingCompanies}
-                        onClick={async () => {
-                          if (selectedCompanyIds.size === 0) return
-                          if (!confirm(`Delete ${selectedCompanyIds.size} compan${selectedCompanyIds.size === 1 ? 'y' : 'ies'} and their data? This action cannot be undone.`)) return
-                          setBulkDeletingCompanies(true)
-                          try {
-                            const ids = Array.from(selectedCompanyIds)
-                            const results = await Promise.allSettled(ids.map((id) => adminDeleteCompany({ data: id })))
-                            const failed = results.filter((r) => r.status === 'rejected')
-                            if (failed.length > 0) {
-                              alert(`Failed to delete ${failed.length} of ${ids.length} compan${ids.length === 1 ? 'y' : 'ies'}. Please check and try again.`)
-                            }
-                            setSelectedCompanyIds(new Set())
-                            setExpandedCompanyId(null)
-                            await reload()
-                          } catch (err) {
-                            alert(`Error deleting companies: ${err instanceof Error ? err.message : 'Unknown error'}`)
-                          } finally {
-                            setBulkDeletingCompanies(false)
-                          }
-                        }}
-                        className="px-3 py-1.5 text-xs bg-red-50 text-red-600 border border-red-200 rounded hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {bulkDeletingCompanies ? 'Deleting…' : 'Delete selected'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid gap-4">
-                  {companies.map((company) => {
-                    const companyPolicies = policies.filter((policy) => policy.companyId === company.id)
-                    const companyDocs = documents.filter((doc) => doc.companyId === company.id)
-                    const users = companyUsers.filter((user) => user.companyId === company.id)
-                    const isExpanded = expandedCompanyId === company.id
-                    const isSelected = selectedCompanyIds.has(company.id)
-
-                    return (
-                      <div key={company.id} className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-                        <div className="flex items-stretch flex-wrap sm:flex-nowrap">
-                          <div className="flex items-start pl-4 pt-5 sm:pt-6">
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => {
-                                setSelectedCompanyIds((prev) => {
-                                  const next = new Set(prev)
-                                  if (e.target.checked) next.add(company.id)
-                                  else next.delete(company.id)
-                                  return next
-                                })
-                              }}
-                              className="w-4 h-4 accent-[#292929] cursor-pointer"
-                            />
-                          </div>
-                          <button
-                            onClick={() => setExpandedCompanyId(isExpanded ? null : company.id)}
-                            className="flex-1 min-w-0 p-4 sm:p-6 text-left hover:bg-navy-50/50 transition-colors"
-                          >
-                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
-                              <div className="min-w-0">
-                                <h3 className="text-base sm:text-lg font-semibold text-navy-700">{company.name}</h3>
-                                <p className="text-sm text-navy-500 mt-1">NIF {company.nif} · {company.sector}</p>
-                                <p className="text-xs text-navy-400 mt-1">{company.address}</p>
-                                <p className="text-xs text-navy-500 mt-2">Company access: {company.accessEmail || '-'}</p>
-                              </div>
-                              <div className="flex flex-wrap gap-x-3 sm:block sm:text-right shrink-0">
-                                <p className="text-sm font-medium text-navy-700">{users.length} users</p>
-                                <p className="text-sm text-navy-500">{companyPolicies.length} policies</p>
-                                <p className="text-sm text-navy-500">{companyDocs.length} documents</p>
-                              </div>
-                            </div>
-                          </button>
-                          <div className="flex sm:flex-col gap-2 sm:gap-1 p-3 sm:p-4 w-full sm:w-auto justify-end border-t sm:border-t-0 sm:border-l border-navy-100" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => {
-                                setEditingCompanyId(company.id)
-                                setShowNewCompany(true)
-                              }}
-                              className="px-3 py-1.5 text-xs border border-navy-300 rounded hover:bg-navy-50"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={async () => {
-                                if (!confirm(`Delete company ${company.name} and its data?`)) return
-                                try {
-                                  await adminDeleteCompany({ data: company.id })
-                                  setSelectedCompanyIds((prev) => {
-                                    const next = new Set(prev)
-                                    next.delete(company.id)
-                                    return next
-                                  })
-                                  if (expandedCompanyId === company.id) setExpandedCompanyId(null)
-                                  await reload()
-                                } catch (err) {
-                                  alert(`Error deleting company: ${err instanceof Error ? err.message : 'Unknown error'}`)
-                                }
-                              }}
-                              className="admin-row-action admin-row-action--danger"
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-
-                        {isExpanded && (
-                          <div className="border-t border-navy-100 bg-navy-50/50 p-4 sm:p-6 space-y-6">
-                            <div>
-                              <h4 className="text-sm font-semibold text-navy-700 mb-3">Contact Details</h4>
-                              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-white rounded border border-navy-200 p-4">
-                                <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Contact Person</p>
-                                  <p className="text-sm text-navy-700">{company.contactName || '—'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Email</p>
-                                  <p className="text-sm text-navy-700 break-all">{company.contactEmail || '—'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Phone</p>
-                                  <p className="text-sm text-navy-700">{company.contactPhone || '—'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">NIF</p>
-                                  <p className="text-sm text-navy-700">{company.nif || '—'}</p>
-                                </div>
-                                <div className="sm:col-span-2 lg:col-span-2">
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Address</p>
-                                  <p className="text-sm text-navy-700">{company.address || '—'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Sector</p>
-                                  <p className="text-sm text-navy-700">{company.sector || '—'}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[11px] uppercase tracking-wide text-navy-400">Access Email</p>
-                                  <p className="text-sm text-navy-700 break-all">{company.accessEmail || '—'}</p>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                onClick={() => {
-                                  setEditingCompanyId(company.id)
-                                  setShowNewCompany(true)
-                                }}
-                                className="admin-btn admin-btn-secondary admin-btn--sm"
-                              >
-                                Edit company
-                              </button>
-                              <button
-                                onClick={async () => {
-                                  if (!confirm(`Delete company ${company.name} and its data?`)) return
-                                  try {
-                                    await adminDeleteCompany({ data: company.id })
-                                    await reload()
-                                    setExpandedCompanyId(null)
-                                  } catch (err) {
-                                    alert(`Error deleting company: ${err instanceof Error ? err.message : 'Unknown error'}`)
-                                  }
-                                }}
-                                className="admin-btn admin-btn-danger admin-btn--sm"
-                              >
-                                Delete company
-                              </button>
-                              <button
-                                onClick={() => setShowUserFormForCompanyId(showUserFormForCompanyId === company.id ? null : company.id)}
-                                className="admin-btn admin-btn-primary admin-btn--sm"
-                              >
-                                {showUserFormForCompanyId === company.id ? 'Cancel new user' : 'Add user'}
-                              </button>
-                            </div>
-
-                            {showUserFormForCompanyId === company.id && (
-                              <CompanyUserForm
-                                companyId={company.id}
-                                companyName={company.name}
-                                onSubmit={async (payload) => {
-                                  await adminCreateCompanyUser({ data: payload })
-                                  await reload()
-                                  setShowUserFormForCompanyId(null)
-                                }}
-                              />
-                            )}
-
-                            <div className="grid lg:grid-cols-2 gap-6">
-                              <div>
-                                <h4 className="text-sm font-semibold text-navy-700 mb-3">Company Users</h4>
-                                <div className="bg-white rounded-[4px] border border-navy-200 overflow-hidden">
-                                  <table className="ar-stack w-full">
-                                    <thead>
-                                      <tr className="bg-navy-50 border-b border-navy-200">
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Name</th>
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Email</th>
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Role</th>
-                                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Actions</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-navy-100">
-                                      {users.map((user) => (
-                                        <tr key={user.id}>
-                                          <td className="px-4 py-3 text-sm text-navy-700">{user.name}</td>
-                                          <td className="px-4 py-3 text-sm text-navy-500">{user.email}</td>
-                                          <td className="px-4 py-3 text-sm text-navy-500 capitalize">{user.role}</td>
-                                          <td className="px-4 py-3">
-                                            <div className="flex gap-1">
-                                              <button
-                                                onClick={async () => {
-                                                  const newPassword = prompt('New access password (Identity):')
-                                                  if (!newPassword) return
-                                                  await adminUpdateCompanyUser({
-                                                    data: { id: user.id, updates: { accessPassword: newPassword } },
-                                                  })
-                                                  await reload()
-                                                }}
-                                                className="admin-row-action"
-                                              >
-                                                Reset password
-                                              </button>
-                                              <button
-                                                onClick={async () => {
-                                                  if (!confirm(`Delete user ${user.name}?`)) return
-                                                  try {
-                                                    await adminDeleteCompanyUser({ data: user.id })
-                                                    await reload()
-                                                  } catch (err) {
-                                                    alert(`Error deleting user: ${err instanceof Error ? err.message : 'Unknown error'}`)
-                                                  }
-                                                }}
-                                                className="admin-row-action admin-row-action--danger"
-                                              >
-                                                Delete
-                                              </button>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                      {users.length === 0 && (
-                                        <tr>
-                                          <td colSpan={4} className="px-4 py-4 text-sm text-navy-400 text-center">
-                                            No users registered for this company.
-                                          </td>
-                                        </tr>
-                                      )}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </div>
-
-                              <div>
-                                <h4 className="text-sm font-semibold text-navy-700 mb-3">Metrics &amp; History</h4>
-                                <div className="space-y-3">
-                                  {users.map((user) => {
-                                    const events = userEvents.filter((event) => event.userId === user.id)
-                                    const loginsThisMonth = events.filter((event) => {
-                                      if (event.type !== 'login') return false
-                                      const eventDate = new Date(event.timestamp)
-                                      const now = new Date()
-                                      return eventDate.getMonth() === now.getMonth() && eventDate.getFullYear() === now.getFullYear()
-                                    }).length
-
-                                    return (
-                                      <div key={user.id} className="bg-white rounded-[4px] border border-navy-200 p-4">
-                                        <p className="text-sm font-semibold text-navy-700">{user.name}</p>
-                                        <p className="text-xs text-navy-500">Last login: {user.lastLoginAt ? formatDate(user.lastLoginAt) : '-'}</p>
-                                        <p className="text-xs text-navy-500">Logins this month: {loginsThisMonth}</p>
-                                        <p className="text-xs text-navy-500">Total events: {events.length}</p>
-                                        <div className="mt-2 text-xs text-navy-500 space-y-1 max-h-24 overflow-y-auto">
-                                          {events.slice(-5).reverse().map((event) => (
-                                            <p key={event.id}>• {formatDate(event.timestamp)} · {event.description}</p>
-                                          ))}
-                                          {events.length === 0 && <p>No history.</p>}
-                                        </div>
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              </div>
-                            </div>
-
-                            <div>
-                              <h4 className="text-sm font-semibold text-navy-700 mb-3">Company Policies ({companyPolicies.length})</h4>
-                              {companyPolicies.length === 0 ? (
-                                <p className="text-sm text-navy-400">No policies linked.</p>
-                              ) : (
-                                <div className="grid gap-2">
-                                  {companyPolicies.map((policy) => (
-                                    <PolicyExpandableCard key={policy.id} policy={policy} />
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <ClientProfilePanel
-                              subject={{ kind: 'company', company }}
-                              policies={policies}
-                              claims={claims}
-                              documents={documents}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
 
             {tab === 'individual_clients' && (
               <div>
                 <div className="admin-page-header" style={{ marginBottom: '1rem' }}>
                   <div>
-                    <h1 className="admin-page-title">People</h1>
-                    <p className="admin-page-subtitle">{individualClients.length} individual client{individualClients.length !== 1 ? 's' : ''}</p>
+                    <h1 className="admin-page-title">Clients</h1>
+                    <p className="admin-page-subtitle">{individualClients.length} client{individualClients.length !== 1 ? 's' : ''}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
@@ -909,7 +480,7 @@ function AdminDashboardContent() {
                           Address: c.address || '',
                           Status: c.status === 'active' ? 'Active' : c.status,
                           'Created At': c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-GB') : '',
-                        })), 'people')
+                        })), 'clients')
                       }}
                       disabled={individualClients.length === 0}
                       className="admin-btn admin-btn-secondary"
@@ -929,14 +500,14 @@ function AdminDashboardContent() {
                       }}
                       className="admin-btn admin-btn-primary"
                     >
-                      {showNewIndividualClient ? 'Cancel' : 'New person'}
+                      {showNewIndividualClient ? 'Cancel' : 'New client'}
                     </button>
                   </div>
                 </div>
 
                 {showNewIndividualClient && (
                   <IndividualClientForm
-                    title={editingIndividualClientId ? 'Edit person' : 'New person'}
+                    title={editingIndividualClientId ? 'Edit client' : 'New client'}
                     initial={editingIndividualClientId ? individualClients.find((c) => c.id === editingIndividualClientId) : undefined}
                     onSubmit={async (data) => {
                       if (editingIndividualClientId) {
@@ -1041,7 +612,6 @@ function AdminDashboardContent() {
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Email</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Phone</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Status</th>
-                        <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Type</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Portal</th>
                         <th className="text-left px-4 py-3 text-xs font-semibold text-navy-500 uppercase">Actions</th>
                       </tr>
@@ -1092,9 +662,6 @@ function AdminDashboardContent() {
                                 <span className={`admin-chip ${client.status === 'active' ? 'admin-chip--success' : 'admin-chip--neutral'}`}>
                                   {client.status === 'active' ? 'Active' : client.status}
                                 </span>
-                              </td>
-                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                <PromoteToCompanySelect client={client} onSuccess={async () => { setIndividualClients([]); await reload(); setExpandedIndividualClientId(null) }} />
                               </td>
                               <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                 <ActivateAdlerOneButton client={client} onSuccess={reload} />
@@ -1256,7 +823,6 @@ function AdminDashboardContent() {
 
                 {showNewPolicy && (
                   <NewPolicyForm
-                    companies={companies}
                     individualClients={individualClients}
                     onSubmit={async (data) => {
                       try {
@@ -3217,158 +2783,6 @@ function PolicyExpandableCard({ policy, defaultOpen = false }: { policy: Policy;
   )
 }
 
-function CompanyForm({
-  title,
-  initial,
-  onSubmit,
-}: {
-  title: string
-  initial?: Partial<Company>
-  onSubmit: (data: any) => Promise<void>
-}) {
-  const [form, setForm] = useState({
-    name: initial?.name || '',
-    nif: initial?.nif || '',
-    sector: initial?.sector || '',
-    contactName: initial?.contactName || '',
-    contactEmail: initial?.contactEmail || '',
-    contactPhone: initial?.contactPhone || '',
-    accessEmail: initial?.accessEmail || '',
-    address: initial?.address || '',
-    marketingOptOut: initial?.marketingOptOut ?? false,
-  })
-  const [submitting, setSubmitting] = useState(false)
-
-  const update = (key: string, value: string) => setForm((f) => ({ ...f, [key]: value }))
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
-    await onSubmit(form)
-    setSubmitting(false)
-  }
-
-  return (
-    <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
-      <h3 className="text-lg font-semibold text-navy-700 mb-4">{title}</h3>
-      <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-4">
-        <FormField label="Name" value={form.name} onChange={(v) => update('name', v)} required />
-        <FormField label="NIF" value={form.nif} onChange={(v) => update('nif', v)} required />
-        <FormField label="Sector" value={form.sector} onChange={(v) => update('sector', v)} required />
-        <FormField label="Contact Name" value={form.contactName} onChange={(v) => update('contactName', v)} required />
-        <FormField label="Contact Email" value={form.contactEmail} onChange={(v) => update('contactEmail', v)} type="email" required />
-        <FormField label="Phone" value={form.contactPhone} onChange={(v) => update('contactPhone', v)} required />
-        <FormField label="Company Access Email" value={form.accessEmail} onChange={(v) => update('accessEmail', v)} type="email" required />
-        <div className="sm:col-span-2">
-          <FormField label="Address" value={form.address} onChange={(v) => update('address', v)} required />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={form.marketingOptOut}
-              onChange={(e) => setForm((f) => ({ ...f, marketingOptOut: e.target.checked }))}
-              className="mt-0.5 w-4 h-4 accent-[#292929]"
-            />
-            <div>
-              <span className="text-sm font-medium text-navy-700">Do not send marketing communications</span>
-              <p className="text-xs text-navy-400 mt-0.5">
-                When enabled, this company does not receive marketing campaigns. Check this when a client asks to be removed (reply "Remove").
-              </p>
-            </div>
-          </label>
-        </div>
-        <div className="sm:col-span-2">
-          <button type="submit" disabled={submitting} className="admin-btn admin-btn-primary">
-            {submitting ? 'Saving…' : 'Save company'}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
-}
-
-function CompanyUserForm({
-  companyId,
-  companyName,
-  onSubmit,
-}: {
-  companyId: string
-  companyName: string
-  onSubmit: (data: {
-    companyId: string
-    name: string
-    email: string
-    role: 'owner' | 'manager' | 'employee'
-    accessPassword: string
-  }) => Promise<void>
-}) {
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    role: 'employee' as 'owner' | 'manager' | 'employee',
-    accessPassword: '',
-  })
-  const [submitting, setSubmitting] = useState(false)
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
-    await onSubmit({ ...form, companyId })
-    setSubmitting(false)
-    setForm({ name: '', email: '', role: 'employee', accessPassword: '' })
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="grid md:grid-cols-5 gap-3 bg-white border border-navy-200 rounded-[4px] p-4">
-      <input
-        value={companyName}
-        readOnly
-        className="px-3 py-2 border border-navy-200 rounded text-sm bg-navy-50 text-navy-600"
-        aria-label="Associated company"
-      />
-      <input
-        value={form.name}
-        onChange={(e) => setForm((old) => ({ ...old, name: e.target.value }))}
-        placeholder="Name"
-        className="px-3 py-2 border border-navy-200 rounded text-sm"
-        required
-      />
-      <input
-        type="email"
-        value={form.email}
-        onChange={(e) => setForm((old) => ({ ...old, email: e.target.value }))}
-        placeholder="email@company.com"
-        className="px-3 py-2 border border-navy-200 rounded text-sm"
-        required
-      />
-      <select
-        value={form.role}
-        onChange={(e) => setForm((old) => ({ ...old, role: e.target.value as any }))}
-        className="px-3 py-2 border border-navy-200 rounded text-sm"
-      >
-        <option value="owner">Owner</option>
-        <option value="manager">Manager</option>
-        <option value="employee">Employee</option>
-      </select>
-      <input
-        type="password"
-        value={form.accessPassword}
-        onChange={(e) => setForm((old) => ({ ...old, accessPassword: e.target.value }))}
-        placeholder="Initial password"
-        className="px-3 py-2 border border-navy-200 rounded text-sm"
-        required
-        minLength={6}
-      />
-      <div className="md:col-span-5">
-        <button type="submit" disabled={submitting} className="admin-btn admin-btn-primary">
-          {submitting ? 'Creating…' : 'Create company user'}
-        </button>
-      </div>
-    </form>
-  )
-}
-
 function NewAdminClaimForm({
   companies,
   companyUsers,
@@ -3392,7 +2806,7 @@ function NewAdminClaimForm({
     estimatedValue?: number
   }) => Promise<void>
 }) {
-  const [targetType, setTargetType] = useState<'company' | 'individual'>('company')
+  const [targetType] = useState<'company' | 'individual'>('individual')
   const [companyId, setCompanyId] = useState('')
   const [clientUserId, setClientUserId] = useState('')
   const [individualClientId, setIndividualClientId] = useState('')
@@ -3440,13 +2854,6 @@ function NewAdminClaimForm({
 
   return (
     <form onSubmit={handleSubmit} className="bg-white border border-navy-200 rounded-[4px] p-5 mb-4 grid md:grid-cols-2 gap-4">
-      <div>
-        <label className="block text-sm text-navy-600 mb-1">Client type</label>
-        <select value={targetType} onChange={(e) => setTargetType(e.target.value as 'company' | 'individual')} className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
-          <option value="company">Company</option>
-          <option value="individual">Individual client</option>
-        </select>
-      </div>
 
       {targetType === 'company' ? (
         <div>
@@ -3458,7 +2865,7 @@ function NewAdminClaimForm({
         </div>
       ) : (
         <div>
-          <label className="block text-sm text-navy-600 mb-1">Individual client</label>
+          <label className="block text-sm text-navy-600 mb-1">Client</label>
           <select value={individualClientId} onChange={(e) => { setIndividualClientId(e.target.value); setPolicyId('') }} required className="w-full px-3 py-2 border border-navy-200 rounded text-sm">
             <option value="">Select…</option>
             {individualClients.map((client) => <option key={client.id} value={client.id}>{client.fullName}</option>)}
@@ -3846,8 +3253,7 @@ function formatDateTime(value?: string) {
   })
 }
 
-function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: Company[]; individualClients: IndividualClient[]; onSubmit: (data: any) => Promise<void> }) {
-  const [clientType, setClientType] = useState<'company' | 'individual'>('company')
+function NewPolicyForm({ individualClients, onSubmit }: { individualClients: IndividualClient[]; onSubmit: (data: any) => Promise<void> }) {
   const [form, setForm] = useState({
     companyId: '', individualClientId: '', type: '', insurer: '', policyNumber: '', description: '', startDate: '', endDate: '', annualPremium: '', insuredValue: '',
     paymentFrequency: 'anual', commissionPercentage: '', commissionValue: '',
@@ -3894,8 +3300,8 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
     try {
       await onSubmit({
         ...form,
-        companyId: clientType === 'company' ? form.companyId : undefined,
-        individualClientId: clientType === 'individual' ? form.individualClientId : undefined,
+        companyId: undefined,
+        individualClientId: form.individualClientId,
         annualPremium: Number(form.annualPremium),
         insuredValue: Number(form.insuredValue),
         paymentFrequency: form.paymentFrequency || undefined,
@@ -3913,38 +3319,12 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
     <div className="bg-white rounded-[4px] border border-navy-200 p-6 mb-6">
       <h3 className="text-lg font-semibold text-navy-700 mb-4">New Policy</h3>
       <form onSubmit={handleSubmit} className="grid sm:grid-cols-2 gap-4">
-        <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-navy-600 mb-1">Client Type</label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setClientType('company')}
-              className={`px-4 py-2 rounded-[2px] text-sm font-medium border transition-colors ${clientType === 'company' ? 'bg-navy-700 text-white border-navy-700' : 'bg-white text-navy-600 border-navy-200 hover:border-navy-400'}`}
-            >
-              Company
-            </button>
-            <button
-              type="button"
-              onClick={() => setClientType('individual')}
-              className={`px-4 py-2 rounded-[2px] text-sm font-medium border transition-colors ${clientType === 'individual' ? 'bg-navy-700 text-white border-navy-700' : 'bg-white text-navy-600 border-navy-200 hover:border-navy-400'}`}
-            >
-              Individual Client
-            </button>
-          </div>
-        </div>
         <div>
-          <label className="block text-sm font-medium text-navy-600 mb-1">{clientType === 'company' ? 'Company' : 'Individual Client'}</label>
-          {clientType === 'company' ? (
-            <select value={form.companyId} onChange={(e) => update('companyId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332]" required>
-              <option value="">Select company</option>
-              {companies.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-            </select>
-          ) : (
-            <select value={form.individualClientId} onChange={(e) => update('individualClientId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332]" required>
-              <option value="">Select client</option>
-              {individualClients.map((c) => (<option key={c.id} value={c.id}>{c.fullName}{c.nif ? ` · ${c.nif}` : ''}</option>))}
-            </select>
-          )}
+          <label className="block text-sm font-medium text-navy-600 mb-1">Client</label>
+          <select value={form.individualClientId} onChange={(e) => update('individualClientId', e.target.value)} className="w-full px-4 py-2.5 border border-navy-200 rounded-[2px] text-sm focus:outline-none focus:ring-2 focus:ring-[#333332]" required>
+            <option value="">Select client</option>
+            {individualClients.map((c) => (<option key={c.id} value={c.id}>{c.fullName}{c.nif ? ` · ${c.nif}` : ''}</option>))}
+          </select>
         </div>
         <div>
           <label className="block text-sm font-medium text-navy-600 mb-1">Type</label>
@@ -3985,41 +3365,6 @@ function NewPolicyForm({ companies, individualClients, onSubmit }: { companies: 
         </div>
       </form>
     </div>
-  )
-}
-
-function PromoteToCompanySelect({ client, onSuccess }: { client: IndividualClient; onSuccess: () => Promise<void> }) {
-  const [promoting, setPromoting] = useState(false)
-
-  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    if (e.target.value !== 'company') return
-    e.target.value = 'individual' // reset immediately
-
-    const hasPolicies = true // we don't have the count here, warn generically
-    const authWarning = client.authUserId ? '\n⚠️ This client has portal access — access will be disabled.' : ''
-    if (!confirm(`Convert "${client.fullName}" to a company?\n\nThis will:\n• Create a company record\n• Move the linked policies\n• Delete the individual client record${authWarning}`)) return
-
-    setPromoting(true)
-    try {
-      await adminPromoteToCompany({ data: { clientId: client.id } })
-      await onSuccess()
-    } catch (err: any) {
-      alert(`Error converting: ${err?.message ?? 'unknown failure'}`)
-    } finally {
-      setPromoting(false)
-    }
-  }
-
-  return (
-    <select
-      value="individual"
-      onChange={handleChange}
-      disabled={promoting}
-      className="text-xs border border-navy-200 rounded px-1.5 py-1 bg-white text-navy-700 focus:outline-none focus:ring-1 focus:ring-[#333332] disabled:opacity-50"
-    >
-      <option value="individual">Individual</option>
-      <option value="company">→ Company</option>
-    </select>
   )
 }
 
