@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { fetchPortalDocuments, getPortalDocumentUrl } from '@/lib/server-fns'
 import type { PortalDocument } from '@/lib/server-fns'
-import { PortalLayout, PageTitle, Card, Empty, Spinner, ErrorNote, C, date, fileSize } from '@/components/portal/portal-ui'
+import { PortalLayout, PageTitle, Card, Empty, Spinner, ErrorNote, C, date, fileSize, openDocument } from '@/components/portal/portal-ui'
 
 export const Route = createFileRoute('/portal/documents')({
   component: PortalDocuments,
@@ -22,16 +22,19 @@ const CATEGORY: Record<string, string> = {
 function PortalDocuments() {
   const [docs, setDocs] = useState<PortalDocument[] | null>(null)
   const [error, setError] = useState('')
+  const [loadFailed, setLoadFailed] = useState(false)
 
-  useEffect(() => {
-    fetchPortalDocuments().then(setDocs).catch(() => setError('We could not load your documents. Please refresh the page.'))
-  }, [])
+  const load = () => {
+    setError('')
+    setLoadFailed(false)
+    fetchPortalDocuments().then(setDocs).catch(() => { setLoadFailed(true); setError('We could not load your documents.') })
+  }
+  useEffect(load, [])
 
   async function open(id: string) {
     setError('')
     try {
-      const { url } = await getPortalDocumentUrl({ data: { documentId: id } })
-      window.open(url, '_blank', 'noopener')
+      await openDocument(async () => (await getPortalDocumentUrl({ data: { documentId: id } })).url)
     } catch {
       setError('This document could not be opened. Please try again.')
     }
@@ -40,7 +43,7 @@ function PortalDocuments() {
   return (
     <PortalLayout>
       <PageTitle title="Documents" subtitle="Certificates, invoices and reports we shared with you. Policy documents are also inside each policy." />
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <ErrorNote onRetry={loadFailed ? load : undefined}>{error}</ErrorNote>}
       {!docs && !error && <Spinner />}
       {docs && (
         <Card style={{ padding: '6px 20px' }}>
