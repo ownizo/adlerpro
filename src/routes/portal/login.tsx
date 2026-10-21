@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { fetchPortalProfile } from '@/lib/server-fns'
-import { GoogleIcon } from '@/components/portal/SignInMethods'
+import { GOOGLE_SIGNIN_ENABLED, GoogleIcon } from '@/components/portal/SignInMethods'
 import { BRAND, C, GLOBAL_CSS, Wordmark, button, font, input, label, ErrorNote, Spinner } from '@/components/portal/portal-ui'
 import { InstallPrompt } from '@/components/portal/InstallPrompt'
 
@@ -124,7 +124,7 @@ function PortalLogin() {
                 </button>
               )}
             </form>
-            {mode === 'signin' && (
+            {GOOGLE_SIGNIN_ENABLED && mode === 'signin' && (
               <>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '18px 0', color: C.muted, fontSize: 12 }}>
                   <span style={{ flex: 1, height: 1, background: C.line }} />or<span style={{ flex: 1, height: 1, background: C.line }} />

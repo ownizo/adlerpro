@@ -8,6 +8,10 @@ import { C, ErrorNote, button } from './portal-ui'
 // an existing session, never by matching emails, so a Google account can only
 // ever reach the client record it was linked from.
 
+// Off until the Google provider and manual linking are enabled in Supabase
+// (Authentication → Providers / Manual linking); set VITE_GOOGLE_SIGNIN=true then.
+export const GOOGLE_SIGNIN_ENABLED = import.meta.env.VITE_GOOGLE_SIGNIN === 'true'
+
 const PROVIDER_LABELS: Record<string, string> = { email: 'Email and password', google: 'Google' }
 
 export function GoogleIcon() {
@@ -93,7 +97,7 @@ export function SignInMethods() {
           )}
         </div>
       ))}
-      {!google && (
+      {GOOGLE_SIGNIN_ENABLED && !google && (
         <button type="button" disabled={busy} onClick={connectGoogle} style={{ ...button('ghost'), width: '100%', marginTop: 14, opacity: busy ? 0.6 : 1 }}>
           <GoogleIcon /> Connect Google
         </button>
