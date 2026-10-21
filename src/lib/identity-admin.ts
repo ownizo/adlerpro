@@ -52,7 +52,7 @@ export async function createIdentityUserWithConfirmation(
 export async function updateIdentityUserPasswordByEmail(email: string, password: string): Promise<void> {
   const normalizedEmail = email.toLowerCase()
 
-  const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+  const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
   if (listError) throw new Error('Falha ao listar utilizadores.')
 
   const user = data.users.find((u) => u.email?.toLowerCase() === normalizedEmail)
@@ -67,14 +67,16 @@ export async function updateIdentityUserPasswordByEmail(email: string, password:
     return
   }
 
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, { password })
+  // Setting a password from the backoffice also confirms the email, so an
+  // unaccepted invite cannot block the sign-in.
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(user.id, { password, email_confirm: true })
   if (error) throw new Error('Falha ao atualizar password: ' + error.message)
 }
 
 export async function deleteIdentityUserByEmail(email: string): Promise<void> {
   const normalizedEmail = email.toLowerCase()
 
-  const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers()
+  const { data, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
   if (listError) throw new Error('Falha ao listar utilizadores.')
 
   const user = data.users.find((u) => u.email?.toLowerCase() === normalizedEmail)

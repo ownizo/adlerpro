@@ -3348,7 +3348,7 @@ export const adminGrantIndividualClientAccess = createServerFn({ method: 'POST' 
     const fullName  = client.full_name as string | undefined
 
     // b) Verificar se o email já existe no Auth (ex: convite órfão de tentativa anterior)
-    const { data: usersData, error: listErr } = await supabaseAdmin.auth.admin.listUsers()
+    const { data: usersData, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 })
     if (listErr) {
       throw new Error(`Falha ao verificar utilizadores no Auth: ${listErr.message}`)
     }
@@ -3364,8 +3364,11 @@ export const adminGrantIndividualClientAccess = createServerFn({ method: 'POST' 
       // d-edge) Email já existe no Auth (orphaned de tentativa anterior):
       //   reutilizar o user existente, actualizar a password. NÃO criar duplicado.
       userId = existingAuthUser.id
+      // email_confirm: an earlier unaccepted invite leaves the email
+      // unconfirmed, and Supabase then refuses the password sign-in.
       const { error: updatePwErr } = await supabaseAdmin.auth.admin.updateUserById(userId, {
         password,
+        email_confirm: true,
         app_metadata: { must_change_password: true },
       })
       if (updatePwErr) {
@@ -3425,7 +3428,9 @@ export const adminResetIndividualClientPassword = createServerFn({ method: 'POST
     // c) Actualizar password directamente pelo UUID — seguro, não cria user novo
     const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
       client.auth_user_id as string,
-      { password, app_metadata: { must_change_password: true } },
+      // email_confirm: a client who was invited first and never opened the
+      // invite link is still unconfirmed and could not sign in otherwise.
+      { password, email_confirm: true, app_metadata: { must_change_password: true } },
     )
     if (updateErr) {
       if (updateErr.message.toLowerCase().includes('not found') || updateErr.status === 404) {
