@@ -28,6 +28,7 @@ export const Route = createRootRoute({
     const mcv = isMyCoverVault()
     const admin = isAdminSite()
     const title = admin ? 'A&R Admin' : 'MillionGuard'
+    const mg = mcv && !admin
     const description = mcv
       ? 'Secure client portal for Adler & Rochefort insurance clients.'
       : 'MillionGuard — secure client portal of Adler & Rochefort, insurance agent.'
@@ -45,11 +46,21 @@ export const Route = createRootRoute({
         { name: 'apple-mobile-web-app-title', content: title },
       ],
       links: [
-      { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
-      { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon.png' },
-      { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/favicon-192.png' },
+      // MillionGuard has its own shield icon; the Adler & Rochefort site and the backoffice keep the lion
+      ...(mg
+        ? [
+            { rel: 'icon', type: 'image/x-icon', href: '/mg-favicon.ico' },
+            { rel: 'icon', type: 'image/svg+xml', href: '/millionguard-mark.svg' },
+            { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/mg-favicon-32.png' },
+            { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/mg-favicon-192.png' },
+          ]
+        : [
+            { rel: 'icon', type: 'image/x-icon', href: '/favicon.ico' },
+            { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/favicon.png' },
+            { rel: 'icon', type: 'image/png', sizes: '192x192', href: '/favicon-192.png' },
+          ]),
       { rel: 'manifest', href: admin ? '/admin.webmanifest' : '/manifest.webmanifest' },
-      { rel: 'apple-touch-icon', sizes: '180x180', href: admin ? '/admin-apple-touch-icon.png' : '/apple-touch-icon.png' },
+      { rel: 'apple-touch-icon', sizes: '180x180', href: admin ? '/admin-apple-touch-icon.png' : mg ? '/mg-apple-touch-icon.png' : '/apple-touch-icon.png' },
       {
         rel: 'preconnect',
         href: 'https://fonts.googleapis.com',

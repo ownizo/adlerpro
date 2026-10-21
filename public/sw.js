@@ -6,9 +6,9 @@
  * the network first and only fall back to the cache when the device is offline.
  * This keeps the portal installable without ever serving stale account data.
  */
-// v3: earlier versions also cached server-function responses (client data);
+// v4: new MillionGuard icons. v3: earlier versions also cached server-function responses (client data);
 // bumping the name deletes those caches on activate.
-const CACHE = 'oms-cache-v3'
+const CACHE = 'oms-cache-v4'
 
 // Precache the app shell so a previously visited install opens while offline.
 const PRECACHE_URLS = [

@@ -124,14 +124,28 @@ export const POLICY_STATUS_EN: Record<string, string> = {
   cancelled: 'Cancelled',
 }
 
+/** The MillionGuard shield: orange half and ink half (white on dark backgrounds). Same drawing as public/millionguard-mark.svg. */
+export function BrandMark({ size = 24, light = false }: { size?: number; light?: boolean }) {
+  const right = light ? '#fff' : C.ink
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" aria-hidden="true" style={{ flexShrink: 0 }}>
+      <path d="M46.5,4 L9,4 L9,49.1 C9,77 30.7,88.1 46.5,94.2 Z" fill={C.accent} stroke={C.accent} strokeWidth={3.3} strokeLinejoin="round" />
+      <path d="M53.5,4 L91,4 L91,49.1 C91,77 69.3,88.1 53.5,94.2 Z" fill={right} stroke={right} strokeWidth={3.3} strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function Wordmark({ size = 20, light = false }: { size?: number; light?: boolean }) {
   return (
-    <span style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.05 }}>
-      <span style={{ fontFamily: font, fontWeight: 800, fontSize: size, letterSpacing: '-0.02em', color: light ? '#fff' : C.ink }}>
-        Million<span style={{ color: C.accent }}>Guard</span>
-      </span>
-      <span style={{ fontFamily: font, fontWeight: 500, fontSize: Math.max(9, size * 0.45), letterSpacing: '0.08em', color: light ? 'rgba(255,255,255,.7)' : C.muted, marginTop: 2 }}>
-        {BRAND.tagline}
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: size * 0.45 }}>
+      <BrandMark size={size * 1.9} light={light} />
+      <span style={{ display: 'inline-flex', flexDirection: 'column', lineHeight: 1.05 }}>
+        <span style={{ fontFamily: font, fontWeight: 800, fontSize: size, letterSpacing: '-0.02em', color: light ? '#fff' : C.ink }}>
+          Million<span style={{ color: C.accent }}>Guard</span>
+        </span>
+        <span style={{ fontFamily: font, fontWeight: 500, fontSize: Math.max(9, size * 0.45), letterSpacing: '0.08em', color: light ? 'rgba(255,255,255,.7)' : C.muted, marginTop: 2 }}>
+          {BRAND.tagline}
+        </span>
       </span>
     </span>
   )
