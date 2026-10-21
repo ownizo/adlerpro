@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { fetchPortalPolicies, fetchPolicyDocuments, getDocumentUrl } from '@/lib/server-fns'
 import {
   PortalLayout, PageTitle, Card, Pill, Empty, Spinner, ErrorNote, C,
-  money, date, fileSize, policyType, policyTone, POLICY_STATUS_EN,
+  money, date, fileSize, policyType, policyTone, POLICY_STATUS_EN, openDocument, FileButton,
 } from '@/components/portal/portal-ui'
 import type { PortalPolicy } from '@/lib/server-fns'
 
@@ -21,9 +21,11 @@ function PortalPolicies() {
   const [filter, setFilter] = useState<Filter>('current')
   const [openId, setOpenId] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchPortalPolicies().then(setPolicies).catch(() => setError('We could not load your policies. Please refresh the page.'))
-  }, [])
+  const load = () => {
+    setError('')
+    fetchPortalPolicies().then(setPolicies).catch(() => setError('We could not load your policies.'))
+  }
+  useEffect(load, [])
 
   const shown = (policies ?? []).filter((p) => filter === 'all' || p.status === 'active' || p.status === 'expiring')
 
@@ -42,7 +44,7 @@ function PortalPolicies() {
           </div>
         }
       />
-      {error && <ErrorNote>{error}</ErrorNote>}
+      {error && <ErrorNote onRetry={load}>{error}</ErrorNote>}
       {!policies && !error && <Spinner />}
       {policies && (
         shown.length === 0 ? <Card><Empty>No policies to show.</Empty></Card> : (
@@ -100,9 +102,9 @@ function PolicyDetail({ policy: p }: { policy: PortalPolicy }) {
   }, [p.id])
 
   async function download(storagePath: string) {
+    setDocError('')
     try {
-      const { url } = await getDocumentUrl({ data: { storagePath } })
-      window.open(url, '_blank', 'noopener')
+      await openDocument(async () => (await getDocumentUrl({ data: { storagePath } })).url)
     } catch {
       setDocError('This document could not be opened. Please try again.')
     }
@@ -136,10 +138,7 @@ function PolicyDetail({ policy: p }: { policy: PortalPolicy }) {
         ) : (
           <div style={{ display: 'grid', gap: 8 }}>
             {docs.map((d) => (
-              <button key={d.id} onClick={() => download(d.storagePath)} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '10px 12px', border: `1px solid ${C.line}`, borderRadius: 10, background: '#fff', cursor: 'pointer', textAlign: 'left', font: 'inherit' }}>
-                <span style={{ fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</span>
-                <span style={{ fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }}>{fileSize(d.size)} · Open</span>
-              </button>
+              <FileButton key={d.id} name={d.name} meta={`${fileSize(d.size) ? `${fileSize(d.size)} · ` : ''}Open`} onClick={() => download(d.storagePath)} />
             ))}
           </div>
         )}
