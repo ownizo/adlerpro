@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { fetchPortalProfile } from '@/lib/server-fns'
 import { PortalLayout, PageTitle, Card, Spinner, ErrorNote, ChangePasswordForm, C, BRAND } from '@/components/portal/portal-ui'
+import { SignInMethods } from '@/components/portal/SignInMethods'
 
 export const Route = createFileRoute('/portal/profile')({
   component: PortalProfile,
@@ -50,6 +51,10 @@ function PortalProfile() {
           <Card>
             <h2 style={{ margin: '0 0 14px', fontSize: 17 }}>Change password</h2>
             <ChangePasswordForm />
+          </Card>
+          <Card>
+            <h2 style={{ margin: '0 0 6px', fontSize: 17 }}>Sign-in methods</h2>
+            <SignInMethods />
           </Card>
         </div>
       )}

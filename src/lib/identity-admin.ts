@@ -12,6 +12,8 @@ interface IdentitySignupPayload {
 interface IdentitySignupResult {
   created: boolean
   reason?: string
+  /** Id of the new auth user, stored as company_users.auth_user_id. */
+  userId?: string
 }
 
 export async function createIdentityUserWithConfirmation(
@@ -30,7 +32,7 @@ export async function createIdentityUserWithConfirmation(
   })
 
   if (data?.user) {
-    return { created: true }
+    return { created: true, userId: data.user.id }
   }
 
   if (error) {

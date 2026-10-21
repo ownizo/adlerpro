@@ -1,7 +1,18 @@
 import type { Config } from '@netlify/functions'
 import { getStore } from '@netlify/blobs'
+import { authorizeAdminRequest } from '../lib/policy-auth.mts'
+
+// Legacy file store (Netlify Blobs "portal-files"). Keys carry no owner, so
+// only agency staff may read from it.
 
 export default async (req: Request) => {
+  try {
+    await authorizeAdminRequest(req)
+  } catch (error) {
+    if (error instanceof Response) return error
+    throw error
+  }
+
   const url = new URL(req.url)
   const key = url.searchParams.get('key')
 
@@ -23,7 +34,8 @@ export default async (req: Request) => {
   return new Response(blob.data, {
     headers: {
       'Content-Type': contentType,
-      'Content-Disposition': `inline; filename="${fileName}"`
+      'Content-Disposition': `inline; filename="${fileName.replace(/["\r\n]/g, '_')}"`,
+      'Cache-Control': 'private, no-store',
     }
   })
 }

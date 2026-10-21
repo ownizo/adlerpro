@@ -39,15 +39,55 @@ export const font = "'Montserrat', system-ui, -apple-system, 'Segoe UI', sans-se
 
 const eur = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
 export const money = (n: number) => eur.format(Number(n || 0))
+/**
+ * Policy and claim dates are calendar days ("2026-12-31"). `new Date()` reads
+ * those as UTC midnight, which shows the previous day west of Greenwich, so
+ * they are read as local days instead.
+ */
+export const parseDay = (s: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s)
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(s)
+}
+/** Today as YYYY-MM-DD in the device's time zone (for date input limits). */
+export const todayIso = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 export const date = (s?: string) =>
-  s ? new Date(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
+  s ? parseDay(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'
 export const dateTime = (s?: string) =>
   s ? new Date(s).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 export const fileSize = (b: number) =>
   !b ? '' : b < 1024 * 1024 ? `${Math.max(1, Math.round(b / 1024))} KB` : `${(b / 1024 / 1024).toFixed(1)} MB`
 export const policyType = (t: string) => POLICY_TYPE_LABELS_EN[t as PolicyType] ?? 'Other'
 export const claimStatus = (s: string) => CLAIM_STATUS_LABELS_EN[s as ClaimStatus] ?? s
-export const daysUntil = (s: string) => Math.ceil((new Date(s).getTime() - Date.now()) / 86_400_000)
+export const daysUntil = (s: string) => {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return Math.round((parseDay(s).getTime() - today.getTime()) / 86_400_000)
+}
+
+/**
+ * Opens a document whose link must first be fetched from the server.
+ * Safari (iPhone and iPad) blocks a new tab opened after an `await`, so the
+ * tab is opened during the tap and pointed at the link once it arrives. If the
+ * browser refuses a new tab (installed app), the link opens in place.
+ */
+export async function openDocument(getUrl: () => Promise<string>): Promise<void> {
+  const tab = window.open('', '_blank')
+  try {
+    const url = await getUrl()
+    if (tab && !tab.closed) {
+      tab.opener = null
+      tab.location.href = url
+    } else {
+      window.location.assign(url)
+    }
+  } catch (err) {
+    tab?.close()
+    throw err
+  }
+}
 
 /** Pill for policy and claim states. */
 export function Pill({ tone, children }: { tone: 'good' | 'warn' | 'bad' | 'neutral'; children: ReactNode }) {
@@ -129,11 +169,30 @@ export function Spinner() {
   )
 }
 
-export function ErrorNote({ children }: { children: ReactNode }) {
+/**
+ * Error message. With `onRetry` it carries a "Try again" button: the installed
+ * app on iPhone has no reload button or pull-to-refresh.
+ */
+export function ErrorNote({ children, onRetry }: { children: ReactNode; onRetry?: () => void }) {
   return (
-    <div role="alert" style={{ padding: '10px 14px', background: '#FDECEA', border: '1px solid #F5C2BC', borderRadius: 10, color: C.bad, fontSize: 13, marginBottom: 16 }}>
-      {children}
+    <div role="alert" style={{ padding: '10px 14px', background: '#FDECEA', border: '1px solid #F5C2BC', borderRadius: 10, color: C.bad, fontSize: 13, marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+      <span>{children}</span>
+      {onRetry && (
+        <button type="button" onClick={onRetry} style={{ border: `1px solid ${C.bad}`, background: '#fff', color: C.bad, borderRadius: 8, padding: '6px 12px', minHeight: 36, font: `600 13px ${font}`, cursor: 'pointer' }}>
+          Try again
+        </button>
+      )}
     </div>
+  )
+}
+
+/** A tappable file row: the name is cut with an ellipsis instead of widening the page. */
+export function FileButton({ name, meta, onClick }: { name: string; meta: string; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} style={{ display: 'flex', width: '100%', boxSizing: 'border-box', justifyContent: 'space-between', gap: 12, alignItems: 'center', padding: '10px 12px', minHeight: 44, border: `1px solid ${C.line}`, borderRadius: 10, background: '#fff', cursor: 'pointer', textAlign: 'left', font: 'inherit', color: C.ink }}>
+      <span style={{ flex: '1 1 0', width: 0, minWidth: 0, fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+      <span style={{ flex: '0 0 auto', fontSize: 12, color: C.muted, whiteSpace: 'nowrap' }}>{meta}</span>
+    </button>
   )
 }
 
@@ -157,7 +216,8 @@ export const input: CSSProperties = {
   border: `1px solid ${C.line}`,
   borderRadius: 10,
   fontFamily: font,
-  fontSize: 15,
+  // 16px or more: below that, Safari on iPhone zooms the page when a field is tapped.
+  fontSize: 16,
   color: C.ink,
   background: '#fff',
   outline: 'none',
@@ -182,16 +242,18 @@ const NAV = [
 
 export const GLOBAL_CSS = `
 @keyframes mg-spin { to { transform: rotate(360deg) } }
-.mg-shell { min-height: 100vh; background: ${C.bg}; font-family: ${font}; color: ${C.ink}; }
+.mg-shell { min-height: 100vh; min-height: 100dvh; background: ${C.bg}; font-family: ${font}; color: ${C.ink}; }
 .mg-top { position: sticky; top: 0; z-index: 30; background: #fff; border-bottom: 1px solid ${C.line}; }
-.mg-top-inner { max-width: 1120px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 24px; }
+.mg-top { padding-top: env(safe-area-inset-top); }
+.mg-top-inner { max-width: 1120px; margin: 0 auto; padding: 12px max(20px, env(safe-area-inset-right)) 12px max(20px, env(safe-area-inset-left)); display: flex; align-items: center; gap: 24px; }
 .mg-nav { display: flex; gap: 4px; flex: 1; }
 .mg-nav a { display: inline-flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: 10px; color: ${C.body}; text-decoration: none; font-size: 14px; font-weight: 600; }
 .mg-nav a:hover { background: ${C.bg}; color: ${C.ink}; }
 .mg-nav a.active { background: ${C.ink}; color: #fff; }
 .mg-out { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; background: none; border: 0; color: ${C.body}; font: 600 13px ${font}; cursor: pointer; padding: 9px 10px; border-radius: 10px; }
 .mg-out:hover { background: ${C.bg}; }
-.mg-main { max-width: 1120px; margin: 0 auto; padding: 28px 20px 110px; }
+.mg-main { max-width: 1120px; margin: 0 auto; padding: 28px max(20px, env(safe-area-inset-right)) 110px max(20px, env(safe-area-inset-left)); }
+.mg-stat-value { overflow-wrap: anywhere; }
 .mg-grid { display: grid; gap: 16px; }
 .mg-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; }
 .mg-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -204,14 +266,23 @@ input:focus, textarea:focus, select:focus { border-color: ${C.ink} !important; }
   .mg-stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
   .mg-two { grid-template-columns: 1fr; }
 }
-@media (max-width: 720px) {
+/* Phones and tablets in portrait (iPad mini 744, iPad 768-834, Android 800): bottom bar. */
+@media (max-width: 900px) {
   .mg-nav, .mg-out-label { display: none; }
-  .mg-top-inner { padding: 10px 16px; }
-  .mg-main { padding: 20px 16px 110px; }
-  .mg-bottom { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #fff; border-top: 1px solid ${C.line}; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); }
+  .mg-top-inner { padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); }
+  .mg-main { padding: 20px max(16px, env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  .mg-bottom { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: #fff; border-top: 1px solid ${C.line}; padding: 6px max(4px, env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) max(4px, env(safe-area-inset-left)); }
   .mg-bottom a { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; color: ${C.muted}; text-decoration: none; font-size: 11px; font-weight: 600; border-radius: 10px; }
   .mg-bottom a.active { color: ${C.ink}; }
   .mg-bottom a.active svg { color: ${C.accent}; }
+}
+@media (min-width: 600px) and (max-width: 900px) {
+  .mg-bottom { justify-content: center; grid-template-columns: repeat(5, minmax(0, 120px)); }
+}
+@media (max-width: 380px) {
+  .mg-stats { gap: 8px; }
+  .mg-stat-value { font-size: 21px !important; }
+  .mg-bottom a { font-size: 10px; }
 }
 `
 
@@ -246,6 +317,10 @@ export function PortalLayout({ children }: { children: ReactNode }) {
           document.cookie = `${n}=; Max-Age=0; path=/; domain=${window.location.hostname}`
         })
       Object.keys(window.localStorage).filter((k) => k.startsWith('sb-')).forEach((k) => window.localStorage.removeItem(k))
+    } catch { /* ignore */ }
+    // Nothing of this account may stay on a shared device.
+    try {
+      if ('caches' in window) await Promise.all((await caches.keys()).map((k) => caches.delete(k)))
     } catch { /* ignore */ }
     window.location.replace('/portal/login?signedout=1')
   }
