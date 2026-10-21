@@ -57,7 +57,7 @@ function PaymentLinkPage() {
 
   if (!ready) return <AppLayout><p>Loading…</p></AppLayout>
   if (!user) return <Navigate to="/login" />
-  if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
+  if (!user.roles?.includes('admin')) return <Navigate to="/login" />
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()

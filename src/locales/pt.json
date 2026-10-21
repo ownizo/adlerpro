@@ -108,6 +108,7 @@
     "profileLoadErrorTitle": "Não foi possível carregar o perfil",
     "profileLoadErrorBody": "Ocorreu um problema a carregar os dados da sua conta. Verifique a ligação e tente novamente.",
     "errors": {
+      "adminOnly": "Este acesso é reservado à administração da Adler & Rochefort.",
       "invalidCredentials": "Email ou palavra-passe inválidos.",
       "emailNotConfirmed": "O email ainda não foi confirmado. Abra o link de confirmação enviado para o seu email.",
       "termsRequired": "Deve aceitar os Termos e Condições para criar conta.",

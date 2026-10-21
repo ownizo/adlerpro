@@ -441,7 +441,7 @@ function AdminDashboardContent() {
   }
 
   if (!user) return <Navigate to="/login" />
-  if (!user.roles?.includes('admin')) return <Navigate to="/dashboard" />
+  if (!user.roles?.includes('admin')) return <Navigate to="/login" />
 
   const metricsByUser = companyUsers.map((user) => {
     const events = userEvents.filter((event) => event.userId === user.id)
