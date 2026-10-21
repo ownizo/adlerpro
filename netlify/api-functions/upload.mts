@@ -1,5 +1,7 @@
 import type { Config } from '@netlify/functions'
 import { createClient } from '@supabase/supabase-js'
+import { resolveViewerLinks } from '../../src/lib/viewer-access.server.ts'
+import { ownsRecord } from '../../src/lib/storage-access.ts'
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL || ''
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -60,6 +62,13 @@ export default async (req: Request) => {
     const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
     const maxSizeBytes = 10 * 1024 * 1024
 
+    if (!['avatar', 'document', 'claim_document', 'policy_document'].includes(uploadType)) {
+      return Response.json({ error: 'Tipo de upload inválido' }, { status: 400 })
+    }
+    if (file.size > 15 * 1024 * 1024) {
+      return Response.json({ error: 'Ficheiro excede o tamanho máximo de 15MB' }, { status: 400 })
+    }
+
     if (uploadType === 'claim_document') {
       if (file.size > maxSizeBytes) {
         return Response.json({ error: 'Ficheiro excede o tamanho máximo de 10MB' }, { status: 400 })
@@ -84,33 +93,54 @@ export default async (req: Request) => {
       }
     }
 
-    // Resolve companyId: from user metadata (company users) or from policy lookup (individual clients)
-    let companyId = user.user_metadata?.company_id || ''
-    let individualClientId: string | null = null
+    // The folder and the owner come from the records the viewer is linked to,
+    // never from the request or from user_metadata (which the user can edit).
+    const links = await resolveViewerLinks(supabase, user)
+    let companyId = links.companyId || ''
+    let individualClientId: string | null = links.individualClientId
 
-    if (uploadType === 'policy_document' && policyId) {
-      // Look up the policy to get its companyId and individualClientId
+    if (uploadType === 'policy_document') {
       const { data: policy } = await supabase
         .from('policies')
         .select('company_id, individual_client_id')
         .eq('id', policyId)
         .maybeSingle()
-      if (policy) {
-        companyId = policy.company_id || companyId
-        individualClientId = policy.individual_client_id || null
+      if (!policy) return Response.json({ error: 'Apólice não encontrada' }, { status: 404 })
+      if (!links.isAdmin && !ownsRecord(links, policy)) {
+        return Response.json({ error: 'Sem acesso a esta apólice' }, { status: 403 })
       }
+      companyId = policy.company_id || ''
+      individualClientId = policy.individual_client_id || null
+    }
+
+    if (uploadType === 'claim_document') {
+      const { data: claim } = await supabase
+        .from('claims')
+        .select('company_id, individual_client_id')
+        .eq('id', claimId)
+        .maybeSingle()
+      if (!claim) return Response.json({ error: 'Sinistro não encontrado' }, { status: 404 })
+      if (!links.isAdmin && !ownsRecord(links, claim)) {
+        return Response.json({ error: 'Sem acesso a este sinistro' }, { status: 403 })
+      }
+      companyId = claim.company_id || ''
+    }
+
+    if (uploadType === 'document' && !links.isAdmin && !links.companyId && !links.individualClientId) {
+      return Response.json({ error: 'Conta sem cliente associado' }, { status: 403 })
     }
 
     if (!companyId) companyId = 'general'
+    const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-180) || 'ficheiro'
 
     const bucket = uploadType === 'avatar' ? 'avatars' : 'documents'
     const path = uploadType === 'avatar'
       ? `${user.id}/avatar.${ext}`
       : uploadType === 'claim_document'
-      ? `${companyId}/claims/${claimId}/${Date.now()}_${file.name}`
+      ? `${companyId}/claims/${claimId}/${Date.now()}_${safeName}`
       : uploadType === 'policy_document'
-      ? `${companyId}/policies/${policyId}/${Date.now()}_${file.name}`
-      : `${companyId}/${Date.now()}_${file.name}`
+      ? `${companyId}/policies/${policyId}/${Date.now()}_${safeName}`
+      : `${companyId}/${Date.now()}_${safeName}`
 
     const buffer = await file.arrayBuffer()
     const { data: uploadData, error: uploadError } = await supabase.storage
@@ -143,11 +173,8 @@ export default async (req: Request) => {
     }
 
     if (uploadType === 'document') {
-      // Generic document upload — link to individual client if authenticated as one
-      let clientId: string | null = null
-      const { data: byAuthId } = await supabase
-        .from('individual_clients').select('id').eq('auth_user_id', user.id).maybeSingle()
-      clientId = byAuthId?.id ?? null
+      // Generic document upload, linked to the viewer's own client record
+      const clientId = individualClientId
 
       const docRecord = {
         id: crypto.randomUUID(),

@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js'
+import { canAccessStoragePath, isAdminUser, resolveViewerLinks } from '../../src/lib/viewer-access.server.ts'
+import { ownsRecord } from '../../src/lib/storage-access.ts'
 
-const supabase = createClient(
+export const supabase = createClient(
   process.env.VITE_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || '',
   { auth: { autoRefreshToken: false, persistSession: false } },
@@ -48,30 +50,27 @@ export async function authorizePolicyRequest(req: Request, policyId: string) {
     .single()
   if (policyError || !policy) throw new Response('Apólice não encontrada', { status: 404 })
 
-  const isAdmin = Array.isArray(user.app_metadata?.roles) && user.app_metadata.roles.includes('admin')
-  if (isAdmin) return { user, policy, isAdmin }
-
-  if (policy.individual_client_id) {
-    const { data: client } = await supabase
-      .from('individual_clients')
-      .select('id')
-      .eq('id', policy.individual_client_id)
-      .or(`auth_user_id.eq.${user.id}${user.email ? `,email.ilike.${user.email}` : ''}`)
-      .maybeSingle()
-    if (client) return { user, policy, isAdmin }
-  }
-
-  if (policy.company_id && user.email) {
-    const { data: companyUser } = await supabase
-      .from('company_users')
-      .select('id')
-      .eq('company_id', policy.company_id)
-      .ilike('email', user.email)
-      .maybeSingle()
-    if (companyUser) return { user, policy, isAdmin }
-  }
+  const links = await resolveViewerLinks(supabase, user)
+  if (links.isAdmin || ownsRecord(links, policy)) return { user, policy, isAdmin: links.isAdmin, links }
 
   throw new Response('Sem acesso a esta apólice', { status: 403 })
+}
+
+/** Authenticates the request and checks the viewer may use this path of the `documents` bucket. */
+export async function authorizeStoragePath(req: Request, path: unknown) {
+  const user = await authenticateRequest(req)
+  const links = await resolveViewerLinks(supabase, user)
+  if (!(await canAccessStoragePath(supabase, links, path))) {
+    throw new Response('Sem acesso a este documento', { status: 403 })
+  }
+  return { user, links }
+}
+
+/** Authenticates the request and requires an agency (admin) account. */
+export async function authorizeAdminRequest(req: Request) {
+  const user = await authenticateRequest(req)
+  if (!isAdminUser(user)) throw new Response('Sem acesso', { status: 403 })
+  return user
 }
 
 export async function authenticateRequest(req: Request) {
