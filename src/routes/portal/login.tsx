@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { fetchPortalProfile } from '@/lib/server-fns'
 import { GoogleIcon } from '@/components/portal/SignInMethods'
 import { BRAND, C, GLOBAL_CSS, Wordmark, button, font, input, label, ErrorNote, Spinner } from '@/components/portal/portal-ui'
+import { InstallPrompt } from '@/components/portal/InstallPrompt'
 
 export const Route = createFileRoute('/portal/login')({
   component: PortalLogin,
@@ -134,6 +135,7 @@ function PortalLogin() {
               </>
             )}
           </div>
+          <InstallPrompt />
           <p style={{ maxWidth: 400, textAlign: 'center', color: C.muted, fontSize: 12, lineHeight: 1.6, marginTop: 22 }}>
             Access is set up by Adler &amp; Rochefort for its clients. Need access? Write to{' '}
             <a href={`mailto:${BRAND.contactEmail}`} style={{ color: C.ink }}>{BRAND.contactEmail}</a>.

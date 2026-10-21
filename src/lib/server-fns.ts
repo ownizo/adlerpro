@@ -46,6 +46,8 @@ import { computeRunApplyReadiness, suggestApplyActions, type ApplyActionRowState
 import type { CarrierImportRecord, CarrierRunApplyStatus } from './types'
 import { buildOpportunityTitle, pickWebsiteLeadContextFields } from './sales-opportunity-rules'
 import { requireAuthMiddleware, requireRoleMiddleware } from '@/middleware/identity'
+import { canAccessStoragePath } from './viewer-access.server'
+import { classifyStoragePath, ownsRecord } from './storage-access'
 import { createIdentityUserWithConfirmation, updateIdentityUserPasswordByEmail, deleteIdentityUserByEmail, createIndividualIdentityUser, generateStrongPassword, deleteIdentityUserById } from './identity-admin'
 
 function extractAccessToken(): string | null {
@@ -1713,13 +1715,13 @@ export const getDocumentUrl = createServerFn({ method: 'POST' })
       }
       return { url: `/api/policy-document?documentId=${encodeURIComponent(documentId)}` }
     }
-    const policyId = data.storagePath.split('/policies/')[1]?.split('/')[0]
-    if (policyId && !(await fetchAccessiblePolicy(policyId))) {
+    const scope = await getViewerScope()
+    if (!(await canAccessStoragePath(supabaseAdmin, scope, data.storagePath))) {
       throw new Error('Sem acesso a este documento')
     }
     const { data: urlData, error } = await supabaseAdmin.storage
       .from('documents')
-      .createSignedUrl(data.storagePath, 3600)
+      .createSignedUrl(data.storagePath, 600)
     if (error) throw new Error(error.message)
     return { url: urlData.signedUrl }
   })
@@ -1728,25 +1730,15 @@ export const getStorageUploadUrl = createServerFn({ method: 'POST' })
   .middleware([requireAuthMiddleware])
   .inputValidator((d: { storagePath: string }) => d)
   .handler(async ({ data }) => {
-    const parts = data.storagePath.split('/')
-    const allowedTypes = ['claims', 'policies']
-    // Reject empty first segment (leading slash), path traversal, and paths where neither
-    // parts[0] nor parts[1] is a known type (covers both old format and companyId-prefix format)
-    if (
-      data.storagePath.includes('..') ||
-      parts[0] === '' ||
-      (!allowedTypes.includes(parts[0]) && !allowedTypes.includes(parts[1]))
-    ) {
+    // Uploads only go into a policy or claim folder the viewer owns
+    // (agency staff may write to any of them).
+    const target = classifyStoragePath(data.storagePath)
+    if (!target || (target.kind !== 'policy' && target.kind !== 'claim')) {
       throw new Error('Invalid storage path')
     }
-    // For companyId-prefixed paths ({companyId}/policies/... or {companyId}/claims/...),
-    // validate the companyId against the user's scope — admins may write to any company prefix
-    if (!allowedTypes.includes(parts[0])) {
-      const scope = await getViewerScope()
-      if (!scope.isAdmin) {
-        const expectedCompanyId = scope.companyId ?? 'general'
-        if (parts[0] !== expectedCompanyId) throw new Error('Invalid storage path')
-      }
+    const scope = await getViewerScope()
+    if (!(await canAccessStoragePath(supabaseAdmin, scope, data.storagePath))) {
+      throw new Error('Invalid storage path')
     }
     const { data: urlData, error } = await supabaseAdmin.storage
       .from('documents')
@@ -2249,13 +2241,13 @@ export const getClaimDocumentUrl = createServerFn({ method: 'POST' })
 
     const dbDocument = await db.getDocument(data.documentId)
     if (dbDocument?.storagePath) {
-      if (ctx.companyId && dbDocument.companyId && dbDocument.companyId !== ctx.companyId) {
+      if (!ctx.isAdmin && !ownsRecord(ctx, { company_id: dbDocument.companyId, individual_client_id: dbDocument.individualClientId })) {
         throw new Error('Sem permissões para este documento')
       }
 
       const { data: urlData, error } = await supabaseAdmin.storage
         .from('documents')
-        .createSignedUrl(dbDocument.storagePath, 3600)
+        .createSignedUrl(dbDocument.storagePath, 600)
       if (error) throw new Error(error.message)
       return { url: urlData.signedUrl, name: dbDocument.name }
     }
