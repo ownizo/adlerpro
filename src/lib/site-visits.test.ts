@@ -47,3 +47,15 @@ test('focus day keeps the daily table but narrows every other figure', () => {
   // a day outside the period is ignored
   assert.equal(summarise(rows, [], 3, now, '2026-01-01').focusDay, undefined)
 })
+
+test('ChatGPT links without utm_medium still count as AI', () => {
+  const rows = [
+    row({ is_landing: true, source: 'chatgpt.com', medium: null }),
+    row({ session_id: 's2', is_landing: true, source: 'perplexity.ai', medium: 'referral' }),
+    row({ session_id: 's3', is_landing: true, source: 'chatgpt.com', medium: 'cpc' }),
+    row({ session_id: 's4', is_landing: true, source: 'newsletter', medium: null }),
+  ]
+  const s = summarise(rows, [], 1, now)
+  assert.equal(s.days[0].fromAi, 2)
+  assert.equal(sourceLabel('chatgpt.com', null), 'AI assistant · chatgpt.com')
+})

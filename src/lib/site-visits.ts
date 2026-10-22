@@ -50,9 +50,18 @@ export function dayRange(days: number, now = new Date()): string[] {
   return out
 }
 
+// ChatGPT adds ?utm_source=chatgpt.com with no utm_medium, so until 22 Oct 2026
+// those visits were stored with medium null. Recognise AI assistants by source too.
+const AI_SOURCES = /^(www\.)?(chatgpt(\.com)?|chat\.openai\.com|openai\.com|perplexity(\.ai)?|gemini(\.google\.com)?|claude(\.ai)?|copilot(\.microsoft\.com|\.com)?|chat\.deepseek\.com|deepseek|chat\.mistral\.ai|mistral|grok(\.com)?|meta\.ai|meta-ai)$/i
+
+export function isAiVisit(source: string | null, medium: string | null): boolean {
+  if (medium === 'ai-assistant') return true
+  return !!source && (!medium || medium === 'referral') && AI_SOURCES.test(source)
+}
+
 export function sourceLabel(source: string | null, medium: string | null): string {
   const s = source || '(direct)'
-  const m = medium || '(none)'
+  const m = isAiVisit(source, medium) ? 'ai-assistant' : medium || '(none)'
   if (s === '(direct)') return 'Direct (no source)'
   if (m === 'organic') return `Search · ${s.charAt(0).toUpperCase()}${s.slice(1)}`
   if (m === 'ai-assistant') return `AI assistant · ${s}`
@@ -104,7 +113,7 @@ function summariseAll(rows: SiteVisitRow[], leadDates: string[], days: number, n
     allSessions.add(sid)
     if (r.is_landing) {
       if (r.source === 'google' && r.medium === 'organic') day.fromGoogle++
-      if (r.medium === 'ai-assistant') day.fromAi++
+      if (isAiVisit(r.source, r.medium)) day.fromAi++
       const label = sourceLabel(r.source, r.medium)
       sources.set(label, (sources.get(label) || 0) + 1)
     }
