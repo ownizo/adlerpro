@@ -364,7 +364,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       >
         {isAdminRoute ? (
           <Link to="/admin/today" className="admin-brand" onClick={() => setSidebarOpen(false)}>
-            <img src="/logo-ar-horizontal-white.png" alt="Adler & Rochefort" className="admin-brand-logo" />
+            <img src="/logo-ar-horizontal-white.svg" alt="Adler & Rochefort" className="admin-brand-logo" />
             <img src="/lion-white.png" alt="Adler & Rochefort" className="admin-brand-lion" />
             <span className="admin-brand-tag">BACKOFFICE</span>
           </Link>
