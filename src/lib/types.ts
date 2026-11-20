@@ -347,6 +347,10 @@ export interface AdminFinancialDashboardData {
     totalCommissions: number
     projectedCommissions: number
     activePolicies: number
+    /** Sum of annual premiums of policies in force in the reference month. */
+    portfolioAnnualPremium: number
+    /** Sum of annual commissions of policies in force in the reference month. */
+    portfolioAnnualCommission: number
     comparisons: {
       totalPremiums: AdminFinancialKpiComparison
       totalCommissions: AdminFinancialKpiComparison

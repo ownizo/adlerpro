@@ -1574,9 +1574,9 @@ function AdminDashboardTab({
           note={salesStats ? `${formatCurrency(salesStats.wonRevenueThisMonth)} won this month` : undefined}
         />
         <KpiTile
-          label="Written premium"
-          value={financialLoading || !financialData ? '…' : formatCurrency(financialData.summary.totalPremiums)}
-          note={financialData ? `MoM ${formatPct(financialData.summary.comparisons.totalPremiums.momDeltaPct)}` : undefined}
+          label="Portfolio premium"
+          value={financialLoading || !financialData ? '…' : formatCurrency(financialData.summary.portfolioAnnualPremium)}
+          note={financialData ? `${formatCurrency(financialData.summary.totalPremiums)} written in ${selectedYear}` : undefined}
         />
         <KpiTile
           label="Active policies"
@@ -1682,11 +1682,19 @@ function AdminDashboardTab({
           </div>
           <div className="admin-portfolio-rows">
             <div className="admin-portfolio-row">
-              <span>Total premiums</span>
+              <span>Annual premium in force</span>
+              <strong>{financialLoading || !financialData ? '…' : formatCurrency(financialData.summary.portfolioAnnualPremium)}</strong>
+            </div>
+            <div className="admin-portfolio-row">
+              <span>Annual commission in force</span>
+              <strong>{financialLoading || !financialData ? '…' : formatCurrency(financialData.summary.portfolioAnnualCommission)}</strong>
+            </div>
+            <div className="admin-portfolio-row">
+              <span>Premiums written ({selectedYear})</span>
               <strong>{financialLoading || !financialData ? '…' : formatCurrency(financialData.summary.totalPremiums)}</strong>
             </div>
             <div className="admin-portfolio-row">
-              <span>Total commissions</span>
+              <span>Commissions ({selectedYear})</span>
               <strong>{financialLoading || !financialData ? '…' : formatCurrency(financialData.summary.totalCommissions)}</strong>
             </div>
             <div className="admin-portfolio-row">

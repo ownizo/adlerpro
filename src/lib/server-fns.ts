@@ -1386,6 +1386,8 @@ export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
     ) => {
       const timelineByKey = new Map(timeline.map((point) => [point.monthKey, point]))
       for (const policy of filteredPolicies) {
+        // Cancelled policies never generate premium/commission cashflow.
+        if (policy.status === 'cancelled') continue
         const start = parseDateToUtc(policy.startDate)
         if (!start) continue
 
@@ -1437,9 +1439,27 @@ export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
     const referenceMonth = selectedMonth
       ?? (selectedYear < now.getUTCFullYear() ? 12 : selectedYear > now.getUTCFullYear() ? 1 : now.getUTCMonth() + 1)
 
-    const activePolicies = filteredPolicies.filter((policy) =>
+    const activePolicyList = filteredPolicies.filter((policy) =>
       isPolicyActiveInMonth(policy, selectedYear, referenceMonth)
-    ).length
+    )
+    const activePolicies = activePolicyList.length
+
+    // Annualised in-force portfolio (policies active in the reference month),
+    // independent of when each instalment falls in the calendar year.
+    const policyAnnualCommission = (policy: (typeof filteredPolicies)[number]) =>
+      typeof policy.commissionValue === 'number' && Number.isFinite(policy.commissionValue)
+        ? policy.commissionValue
+        : typeof policy.commissionPercentage === 'number' && Number.isFinite(policy.commissionPercentage)
+          ? ((policy.annualPremium || 0) * policy.commissionPercentage) / 100
+          : 0
+    const portfolioAnnualPremiumCents = activePolicyList.reduce(
+      (sum, policy) => sum + Math.round((policy.annualPremium || 0) * 100),
+      0
+    )
+    const portfolioAnnualCommissionCents = activePolicyList.reduce(
+      (sum, policy) => sum + Math.round(policyAnnualCommission(policy) * 100),
+      0
+    )
 
     const totalPremiumsCents = selectedMonth
       ? timeline[selectedMonth - 1]?.premiumsCents ?? 0
@@ -1535,6 +1555,8 @@ export const fetchAdminFinancialDashboard = createServerFn({ method: 'POST' })
         totalCommissions: currentCommissionBase,
         projectedCommissions: currentProjectedBase,
         activePolicies: currentActiveBase,
+        portfolioAnnualPremium: portfolioAnnualPremiumCents / 100,
+        portfolioAnnualCommission: portfolioAnnualCommissionCents / 100,
         comparisons: {
           totalPremiums: {
             current: currentPremiumBase,

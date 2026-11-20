@@ -1589,9 +1589,9 @@ code {
 .admin-brand-logo {
   display: block;
   width: 100%;
-  max-width: 196px;
+  max-width: 216px;
   height: auto;
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.55rem;
 }
 
 /* ---------- Phone layout (October 2026) ---------- */
@@ -1959,7 +1959,7 @@ button.admin-user-avatar:focus-visible {
 
 .admin-brand-lion {
   display: none;
-  width: 34px;
+  width: 38px;
   height: auto;
 }
 
