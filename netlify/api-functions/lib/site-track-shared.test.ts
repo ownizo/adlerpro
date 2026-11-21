@@ -34,3 +34,12 @@ test('visit-end carries the duration', () => {
   const v = buildTrackedVisit({ action: 'visit-end', visitId: 'v1', durationSeconds: 42.4, url: 'https://viagemgarantida.com/' }, { userAgent: UA })
   assert.deepEqual(v, { kind: 'end', site: 'viagemgarantida.com', visitId: 'v1', duration: 42 })
 })
+
+test('guardemar.com is tracked as an English site', () => {
+  const v = buildTrackedVisit({ action: 'visit-start', visitId: 'g1', path: '/home-watch-algarve/', url: 'https://guardemar.com/home-watch-algarve/', referrer: 'https://www.google.com/' }, { userAgent: UA, country: 'GB' })
+  assert.equal(v?.kind, 'start')
+  if (v?.kind !== 'start') return
+  assert.equal(v.row.site, 'guardemar.com')
+  assert.equal(v.row.lang, 'en')
+  assert.equal(v.row.source, 'google')
+})

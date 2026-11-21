@@ -1,12 +1,16 @@
 // Turns a beacon from viagemgarantida.com (src/components/VisitTracker.astro in
-// ownizo/viagem-garantida) into a public.site_visits row with site = the host.
+// ownizo/viagem-garantida) or guardemar.com (src/components/site-visit-counter.tsx in
+// ownizo/guardemar_site) into a public.site_visits row with site = the host.
 //
 // Same rules as the adlerrochefort.com counter (ownizo/adlerrochefort,
 // netlify/functions/lib/site-visit.mjs): nothing personal is kept — no IP, no
 // user-agent string. The user agent is only read to drop bots and classify the
 // device; the country comes from Netlify's geolocation.
 
-export const TRACKED_SITES = ['viagemgarantida.com'] as const
+export const TRACKED_SITES = ['viagemgarantida.com', 'guardemar.com'] as const
+
+// Main language of each site (Guardemar is in British English, Viagem Garantida in Portuguese)
+const SITE_LANG: Record<TrackedSite, string> = { 'viagemgarantida.com': 'pt', 'guardemar.com': 'en' }
 export type TrackedSite = (typeof TRACKED_SITES)[number]
 
 const BOT_UA = /bot|crawl|spider|slurp|headless|lighthouse|pagespeed|gtmetrix|pingdom|uptime|monitor|python|curl|wget|httpclient|okhttp|java\/|go-http|axios|node-fetch|undici|phantom|puppeteer|playwright|selenium|preview|facebookexternalhit|whatsapp|telegram|semrush|ahrefs|mj12|petal|bytespider|yandex|baidu|gpt|claude|anthropic|perplexity|cohere|ccbot|scrapy|dataprovider|screenshot/i
@@ -107,7 +111,7 @@ export function buildTrackedVisit(body: unknown, { userAgent, country }: { userA
       visit_id: visitId,
       session_id: clean(b.sessionId, 80),
       path,
-      lang: 'pt',
+      lang: SITE_LANG[site],
       is_landing: c.is_landing,
       referrer_host: c.referrer_host,
       source: c.source,

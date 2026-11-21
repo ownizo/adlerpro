@@ -4,7 +4,7 @@ import { buildTrackedVisit, TRACKED_SITES } from './lib/site-track-shared'
 
 // -----------------------------------------------------------------------------
 // /api/site-track — contador de visitas sem cookies para os outros sites do
-// grupo (hoje: viagemgarantida.com). Grava em public.site_visits com a coluna
+// grupo (hoje: viagemgarantida.com e guardemar.com). Grava em public.site_visits com a coluna
 // `site`, que o módulo Site visits do admin filtra.
 //
 // O adlerrochefort.com continua a usar o seu próprio /api/metrics/track.
