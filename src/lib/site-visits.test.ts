@@ -59,3 +59,10 @@ test('ChatGPT links without utm_medium still count as AI', () => {
   assert.equal(s.days[0].fromAi, 2)
   assert.equal(sourceLabel('chatgpt.com', null), 'AI assistant · chatgpt.com')
 })
+
+test('summary carries the site and only Adler & Rochefort has leads', () => {
+  const s = summarise([row({ is_landing: true, source: 'google', medium: 'organic' })], [], 3, now, undefined, 'viagemgarantida.com')
+  assert.equal(s.site, 'viagemgarantida.com')
+  assert.equal(s.hasLeads, false)
+  assert.equal(summarise([], [], 3, now).hasLeads, true)
+})

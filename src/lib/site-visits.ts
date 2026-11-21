@@ -1,9 +1,14 @@
-// "Visitas do site" — aggregation of public.site_visits (adlerrochefort.com).
+// "Visitas do site" — aggregation of public.site_visits, one site at a time.
 //
-// Rows are written by the public site's /api/metrics/track function
-// (ownizo/adlerrochefort, netlify/functions/metrics-track.mjs): one row per
-// page view by a real browser, cookieless, no IP and no user-agent string.
+// Rows are written by:
+// - adlerrochefort.com: /api/metrics/track (ownizo/adlerrochefort, netlify/functions/metrics-track.mjs)
+// - viagemgarantida.com: /api/site-track in this repo (netlify/api-functions/site-track.mts)
+// One row per page view by a real browser, cookieless, no IP and no user-agent string.
 // Pure functions here so they can be tested without Supabase.
+
+export const SITES = ['adlerrochefort.com', 'viagemgarantida.com'] as const
+export type SiteKey = (typeof SITES)[number]
+export const isSiteKey = (v: unknown): v is SiteKey => typeof v === 'string' && (SITES as readonly string[]).includes(v)
 
 export type SiteVisitRow = {
   created_at: string
@@ -29,6 +34,8 @@ export type SiteVisitsSummary = {
   languages: Array<{ lang: string; views: number }>
   devices: Array<{ device: string; views: number }>
   focusDay?: string
+  site: SiteKey
+  hasLeads: boolean
 }
 
 const TZ = 'Europe/Lisbon'
@@ -80,16 +87,16 @@ function top<T>(map: Map<string, T>, score: (v: T) => number, n: number): Array<
  * period but restricts every other figure (totals, sources, pages,
  * countries, languages, devices) to that single day.
  */
-export function summarise(rows: SiteVisitRow[], leadDates: string[], days: number, now = new Date(), focusDay?: string): SiteVisitsSummary {
-  const full = summariseAll(rows, leadDates, days, now)
+export function summarise(rows: SiteVisitRow[], leadDates: string[], days: number, now = new Date(), focusDay?: string, site: SiteKey = 'adlerrochefort.com'): SiteVisitsSummary {
+  const full = { ...summariseAll(rows, leadDates, days, now), site, hasLeads: site === 'adlerrochefort.com' }
   if (!focusDay || !full.days.some((d) => d.date === focusDay)) return full
   const dayRows = rows.filter((r) => lisbonDate(r.created_at) === focusDay)
   const dayLeads = leadDates.filter((l) => lisbonDate(l) === focusDay)
   const focused = summariseAll(dayRows, dayLeads, days, now)
-  return { ...focused, days: full.days, focusDay }
+  return { ...focused, days: full.days, focusDay, site, hasLeads: full.hasLeads }
 }
 
-function summariseAll(rows: SiteVisitRow[], leadDates: string[], days: number, now: Date): SiteVisitsSummary {
+function summariseAll(rows: SiteVisitRow[], leadDates: string[], days: number, now: Date): Omit<SiteVisitsSummary, 'site' | 'hasLeads'> {
   const range = dayRange(days, now)
   const byDay = new Map(range.map((d) => [d, { date: d, pageViews: 0, visits: 0, fromGoogle: 0, fromAi: 0, leads: 0 }]))
   const sessionsByDay = new Map<string, Set<string>>()
