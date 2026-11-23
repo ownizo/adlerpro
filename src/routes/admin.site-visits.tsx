@@ -3,7 +3,7 @@ import { createFileRoute, Navigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { useIdentity } from '@/lib/identity-context'
 import { fetchSiteVisits } from '@/lib/site-visits.functions'
-import type { SiteVisitsSummary } from '@/lib/site-visits'
+import { SITES, isSiteKey, type SiteKey, type SiteVisitsSummary } from '@/lib/site-visits'
 
 export const Route = createFileRoute('/admin/site-visits')({
   component: SiteVisitsPage,
@@ -14,6 +14,17 @@ export const Route = createFileRoute('/admin/site-visits')({
 const PERIODS = [1, 7, 30, 90] as const
 const PERIOD_LABEL: Record<number, string> = { 1: 'Today', 7: 'Last 7 days', 30: 'Last 30 days', 90: 'Last 3 months' }
 const TOP = 5
+const SITE_LABEL: Record<SiteKey, string> = { 'adlerrochefort.com': 'Adler & Rochefort', 'viagemgarantida.com': 'Viagem Garantida', 'guardemar.com': 'Guardemar' }
+const SITE_STORAGE = 'admin-site-visits-site'
+
+function initialSite(): SiteKey {
+  try {
+    const v = typeof window !== 'undefined' ? window.localStorage.getItem(SITE_STORAGE) : null
+    return isSiteKey(v) ? v : 'adlerrochefort.com'
+  } catch {
+    return 'adlerrochefort.com'
+  }
+}
 
 function lisbonToday() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Lisbon' }).format(new Date())
@@ -59,6 +70,13 @@ function seconds(n: number) {
 function SiteVisitsPage() {
   const { user, ready } = useIdentity()
   const isAdmin = ready && !!user?.roles?.includes('admin')
+  const [site, setSiteState] = useState<SiteKey>('adlerrochefort.com')
+  const setSite = (s: SiteKey) => {
+    setSiteState(s)
+    setFocusDay(null)
+    setData(null)
+    try { window.localStorage.setItem(SITE_STORAGE, s) } catch { /* ignore */ }
+  }
   const [days, setDays] = useState<(typeof PERIODS)[number]>(1)
   const [focusDay, setFocusDay] = useState<string | null>(null)
   const [data, setData] = useState<SiteVisitsSummary | null>(null)
@@ -71,14 +89,16 @@ function SiteVisitsPage() {
     try {
       // "Hoje" = the last 7 days focused on today (gives yesterday for comparison)
       const isToday = days === 1
-      setData(await fetchSiteVisits({ data: { days: isToday ? 7 : days, day: isToday ? lisbonToday() : focusDay ?? undefined } }))
+      setData(await fetchSiteVisits({ data: { site, days: isToday ? 7 : days, day: isToday ? lisbonToday() : focusDay ?? undefined } }))
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not load the visits.')
     } finally {
       setLoading(false)
     }
-  }, [days, focusDay])
+  }, [site, days, focusDay])
 
+  // Remember the last site chosen (read after mount to keep SSR and client in step)
+  useEffect(() => { const s = initialSite(); if (s !== 'adlerrochefort.com') setSiteState(s) }, [])
   useEffect(() => { if (isAdmin) void load() }, [isAdmin, load])
 
   const isToday = days === 1
@@ -86,6 +106,8 @@ function SiteVisitsPage() {
   const maxDay = useMemo(() => Math.max(1, ...(data?.days ?? []).map((d) => d.visits)), [data])
   const today = data?.days.at(-1)
   const yesterday = data?.days.at(-2)
+  // Days the KPI cards refer to: today, the selected day, or the whole period
+  const scopedDays = !data ? [] : isToday ? data.days.slice(-1) : data.focusDay ? data.days.filter((d) => d.date === data.focusDay) : data.days
 
   if (!ready) return <AppLayout><p>Loading…</p></AppLayout>
   if (!user) return <Navigate to="/login" />
@@ -97,10 +119,16 @@ function SiteVisitsPage() {
         <div>
           <h1 className="admin-page-title">Site visits</h1>
           <p className="admin-page-subtitle">
-            Our own count for adlerrochefort.com, without cookies: it counts everyone, whether or not they accept cookies (Google Analytics only counts those who accept). Bots excluded.
+            Our own count for {site}, without cookies: it counts everyone, whether or not they accept cookies (Google Analytics only counts those who accept). Bots excluded.
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
+          <label className="text-sm w-full sm:w-auto">
+            <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)] mb-1">Site</span>
+            <select className="rounded-lg border border-[var(--admin-border)] bg-[var(--admin-card)] p-2 text-sm" value={site} onChange={(e) => { if (isSiteKey(e.target.value)) setSite(e.target.value) }} aria-label="Site">
+              {SITES.map((s) => <option key={s} value={s}>{SITE_LABEL[s]} · {s}</option>)}
+            </select>
+          </label>
           <div className="text-sm w-full sm:w-auto">
             <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--admin-muted)] mb-1">Period</span>
             <div className="sv-periods" role="tablist" aria-label="Period">
@@ -134,11 +162,15 @@ function SiteVisitsPage() {
             <p className="admin-kpi-value">{isToday ? data.totals.pageViews : data.totals.visits}</p>
             <p className="admin-kpi-note">{isToday ? `${today?.fromGoogle ?? 0} from Google · ${today?.fromAi ?? 0} from AI` : `${data.totals.pageViews} page views`}</p>
           </div>
-          <div className="admin-kpi-card">
+          {data.hasLeads ? <div className="admin-kpi-card">
             <p className="admin-kpi-label">{`Leads · ${scope}`}</p>
             <p className="admin-kpi-value">{data.totals.leads}</p>
             <p className="admin-kpi-note">{data.totals.visits ? `${((data.totals.leads / data.totals.visits) * 100).toFixed(1)}% of visits` : '—'}</p>
-          </div>
+          </div> : <div className="admin-kpi-card">
+            <p className="admin-kpi-label">{`From Google · ${scope}`}</p>
+            <p className="admin-kpi-value">{scopedDays.reduce((a, d) => a + d.fromGoogle, 0)}</p>
+            <p className="admin-kpi-note">{scopedDays.reduce((a, d) => a + d.fromAi, 0)} from AI assistants</p>
+          </div>}
           <div className="admin-kpi-card">
             <p className="admin-kpi-label">Average time per page{isToday ? ' · today' : ''}</p>
             <p className="admin-kpi-value">{seconds(data.totals.avgSeconds)}</p>
@@ -150,7 +182,7 @@ function SiteVisitsPage() {
           <div className="admin-panel-head"><h2 id="sv-days" className="admin-panel-title">By day</h2></div>
           <div className="admin-table-wrap overflow-x-auto">
             <table className="admin-table w-full">
-              <thead><tr><th>Day</th><th className="w-[40%]">Visits</th><th>Pages</th><th>From Google</th><th>From AI</th><th>Leads</th></tr></thead>
+              <thead><tr><th>Day</th><th className="w-[40%]">Visits</th><th>Pages</th><th>From Google</th><th>From AI</th>{data.hasLeads && <th>Leads</th>}</tr></thead>
               <tbody>
                 {[...data.days].reverse().map((d) => <tr key={d.date}
                   className={`sv-day-row ${data.focusDay === d.date ? 'is-selected' : ''}`}
@@ -168,7 +200,7 @@ function SiteVisitsPage() {
                   <td className="tabular-nums">{d.pageViews}</td>
                   <td className="tabular-nums">{d.fromGoogle}</td>
                   <td className="tabular-nums">{d.fromAi}</td>
-                  <td className="tabular-nums">{d.leads ? <strong>{d.leads}</strong> : 0}</td>
+                  {data.hasLeads && <td className="tabular-nums">{d.leads ? <strong>{d.leads}</strong> : 0}</td>}
                 </tr>)}
               </tbody>
             </table>
@@ -191,14 +223,14 @@ function SiteVisitsPage() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <section className="admin-panel lg:col-span-2" aria-labelledby="sv-pages">
+          <section className={`admin-panel ${data.site === 'adlerrochefort.com' ? 'lg:col-span-2' : 'lg:col-span-3'}`} aria-labelledby="sv-pages">
             <div className="admin-panel-head"><h2 id="sv-pages" className="admin-panel-title">Most viewed pages · {scope}</h2></div>
             <div className="admin-table-wrap overflow-x-auto">
               <table className="admin-table w-full">
                 <thead><tr><th>Page</th><th className="text-right">Views</th><th className="text-right">Landings</th></tr></thead>
                 <tbody>
                   <TopRows key={`p${scope}`} cols={3} items={data.pages} render={(p) => <tr key={p.path}>
-                    <td className="max-w-[420px] truncate"><a href={`https://adlerrochefort.com${p.path}`} target="_blank" rel="noopener noreferrer" className="hover:underline">{p.path}</a></td>
+                    <td className="max-w-[420px] truncate"><a href={`https://${data.site}${p.path}`} target="_blank" rel="noopener noreferrer" className="hover:underline">{p.path}</a></td>
                     <td className="text-right tabular-nums">{p.views}</td>
                     <td className="text-right tabular-nums">{p.landings}</td>
                   </tr>} />
@@ -206,17 +238,17 @@ function SiteVisitsPage() {
               </table>
             </div>
           </section>
-          <section className="admin-panel" aria-labelledby="sv-langs">
+          {data.site === 'adlerrochefort.com' && <section className="admin-panel" aria-labelledby="sv-langs">
             <div className="admin-panel-head"><h2 id="sv-langs" className="admin-panel-title">Page language · {scope}</h2></div>
             <table className="admin-table w-full"><tbody>
               <TopRows key={`l${scope}`} items={data.languages} render={(l) => <tr key={l.lang}><td>{LANG_LABEL[l.lang] ?? l.lang}</td><td className="text-right tabular-nums">{l.views}</td></tr>} />
             </tbody></table>
-          </section>
+          </section>}
         </div>
 
         <p className="text-xs text-[var(--admin-muted)]">
           Visit = one person in one browser session; pages = page views. "Landings" is the page where the person arrived on the site.
-          To stop counting your own visits, open adlerrochefort.com/?nao-contar=1 once on your phone and computer.
+          To stop counting your own visits, open {data.site}/?nao-contar=1 once on your phone and computer.
         </p>
       </>}
     </div>

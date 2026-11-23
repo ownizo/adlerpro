@@ -31,6 +31,30 @@ export const setTodayTask = createServerFn({ method: 'POST' })
     return { ok: true }
   })
 
+// Bulk complete: marks several pending tasks as done in a single update.
+export const completeTasksBulk = createServerFn({ method: 'POST' })
+  .middleware([requireRoleMiddleware('admin')])
+  .inputValidator((d: { ids: string[] }) => {
+    if (!Array.isArray(d?.ids) || d.ids.length === 0) throw new Error('Selecione pelo menos uma tarefa.')
+    if (d.ids.length > 500) throw new Error('Demasiadas tarefas selecionadas.')
+    const ids = [...new Set(d.ids)]
+    if (ids.some((id) => typeof id !== 'string' || id.length === 0 || id.length > 64)) throw new Error('id inválido')
+    return { ids }
+  })
+  .handler(async ({ data }) => {
+    const { sb, logActivity } = await import('./core')
+    const { data: rows, error } = await sb()
+      .from('client_tasks')
+      .update({ status: 'done', done_at: new Date().toISOString() })
+      .in('id', data.ids)
+      .eq('status', 'pending')
+      .select('id')
+    if (error) throw new Error(error.message)
+    const count = rows?.length ?? 0
+    await logActivity('hugo', 'complete_task', 'client_task', null, `${count} tarefa(s) concluída(s) em massa`)
+    return { ok: true, count }
+  })
+
 export const quickAddTask = createServerFn({ method: 'POST' })
   .middleware([requireRoleMiddleware('admin')])
   .inputValidator((d: { title: string; due_date?: string; priority?: number }) => {

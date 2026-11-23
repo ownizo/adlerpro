@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ClientTask, Company, IndividualClient, SalesOpportunity } from '@/lib/types'
 import { fetchAllTasksByDueDate, adminUpdateClientTaskStatus, adminGenerateRenewalTasks, fetchSalesOpportunity } from '@/lib/server-fns'
+import { completeTasksBulk } from '@/lib/crm-agent/today.functions'
 import { formatDate } from '@/lib/utils'
 import { SalesOpportunityDrawer } from './sales/SalesOpportunityDrawer'
 import { buildOwnerLookup } from './sales/salesPipelineUi'
@@ -23,6 +24,8 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
   const [generating, setGenerating] = useState(false)
   const [generateResult, setGenerateResult] = useState<{ created: number; skipped: number } | null>(null)
   const [openOpportunity, setOpenOpportunity] = useState<SalesOpportunity | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   async function loadTasks() {
     setLoading(true)
@@ -81,11 +84,63 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
   const upcoming = pending.filter((t) => t.dueDate > today)
   const done = tasks.filter((t) => t.status === 'done')
 
+  const selectableIds = pending.map((t) => t.id)
+  const selectedIds = selectableIds.filter((id) => selected.has(id))
+  const allSelected = selectableIds.length > 0 && selectedIds.length === selectableIds.length
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleGroup(ids: string[]) {
+    const allIn = ids.every((id) => selected.has(id))
+    setSelected((prev) => {
+      const next = new Set(prev)
+      ids.forEach((id) => (allIn ? next.delete(id) : next.add(id)))
+      return next
+    })
+  }
+
+  async function handleBulkComplete() {
+    if (selectedIds.length === 0) return
+    if (!window.confirm(`Mark ${selectedIds.length} task${selectedIds.length === 1 ? '' : 's'} as done?`)) return
+    setBulkBusy(true)
+    setError(null)
+    try {
+      await completeTasksBulk({ data: { ids: selectedIds } })
+      setSelected(new Set())
+      await loadTasks()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not complete tasks')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
   function renderGroup(title: string, groupTasks: ClientTask[], urgent = false) {
     if (groupTasks.length === 0) return null
     return (
       <div className="admin-task-list-group">
         <h3 className={`admin-task-list-heading${urgent ? ' admin-task-list-heading--overdue' : ''}`}>
+          {groupTasks.some((t) => t.status === 'pending') && (() => {
+            const ids = groupTasks.filter((t) => t.status === 'pending').map((t) => t.id)
+            const n = ids.filter((id) => selected.has(id)).length
+            return (
+              <input
+                type="checkbox"
+                className="admin-task-select"
+                checked={n === ids.length}
+                ref={(el) => { if (el) el.indeterminate = n > 0 && n < ids.length }}
+                onChange={() => toggleGroup(ids)}
+                aria-label={`Select all ${title.toLowerCase()} tasks`}
+              />
+            )
+          })()}
           {title} ({groupTasks.length})
         </h3>
         <div>
@@ -96,8 +151,19 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
             return (
               <div
                 key={task.id}
-                className={`admin-task-list-row${isOverdue ? ' admin-task-list-row--overdue' : ''}`}
+                className={`admin-task-list-row${isOverdue ? ' admin-task-list-row--overdue' : ''}${selected.has(task.id) ? ' admin-task-list-row--selected' : ''}`}
               >
+                {isDone ? (
+                  <span className="admin-task-select-spacer" aria-hidden="true" />
+                ) : (
+                  <input
+                    type="checkbox"
+                    className="admin-task-select"
+                    checked={selected.has(task.id)}
+                    onChange={() => toggleSelect(task.id)}
+                    aria-label={`Select ${task.title}`}
+                  />
+                )}
                 <button
                   className={`admin-task-checkbox${isDone ? ' admin-task-checkbox--done' : ''}`}
                   onClick={() => handleToggle(task)}
@@ -182,6 +248,30 @@ export function AdminTasksPanel({ companies, individualClients }: Props) {
           </p>
         )}
       </div>
+
+      {!loading && pending.length > 0 && (
+        <div className={`admin-task-bulk${selectedIds.length ? ' admin-task-bulk--active' : ''}`}>
+          <label className="admin-task-bulk-all">
+            <input
+              type="checkbox"
+              className="admin-task-select"
+              checked={allSelected}
+              ref={(el) => { if (el) el.indeterminate = selectedIds.length > 0 && !allSelected }}
+              onChange={() => setSelected(allSelected ? new Set() : new Set(selectableIds))}
+              aria-label="Select all open tasks"
+            />
+            <span>{selectedIds.length ? `${selectedIds.length} selected` : `Select all open (${selectableIds.length})`}</span>
+          </label>
+          {selectedIds.length > 0 && (
+            <div className="admin-task-bulk-actions">
+              <button type="button" className="admin-task-bulk-clear" onClick={() => setSelected(new Set())}>Clear</button>
+              <button type="button" className="admin-task-bulk-done" onClick={handleBulkComplete} disabled={bulkBusy}>
+                {bulkBusy ? 'Completing…' : `Mark ${selectedIds.length} as done`}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
 
