@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createFileRoute, Link, Navigate } from '@tanstack/react-router'
 import { AppLayout } from '@/components/AppLayout'
 import { useIdentity } from '@/lib/identity-context'
-import { fetchToday, quickAddTask, setTodayTask, type TodayData } from '@/lib/crm-agent/today.functions'
+import { completeTasksBulk, fetchToday, quickAddTask, setTodayTask, type TodayData } from '@/lib/crm-agent/today.functions'
 
 export const Route = createFileRoute('/admin/today')({
   component: TodayPage,
@@ -54,6 +54,7 @@ function TodayPage() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [newTask, setNewTask] = useState('')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const load = useCallback(async () => {
     try { setData(await fetchToday()); setError('') } catch (e) { setError(e instanceof Error ? e.message : 'Could not load.') }
@@ -76,6 +77,28 @@ function TodayPage() {
   }
 
   const t = data?.tasks
+  const taskList = t ? [...t.overdue, ...t.today, ...t.next_3_days] : []
+  const taskIds = taskList.map((x) => String(x.id))
+  const selectedIds = taskIds.filter((id) => selected.has(id))
+  const allSelected = taskIds.length > 0 && selectedIds.length === taskIds.length
+  const toggleOne = (id: string) => setSelected((prev) => {
+    const next = new Set(prev)
+    if (next.has(id)) next.delete(id); else next.add(id)
+    return next
+  })
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(taskIds))
+  const completeSelected = async () => {
+    if (!selectedIds.length) return
+    if (!window.confirm(`Mark ${selectedIds.length} task${selectedIds.length === 1 ? '' : 's'} as done?`)) return
+    setBusy('bulk')
+    try {
+      await completeTasksBulk({ data: { ids: selectedIds } })
+      setSelected(new Set())
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not complete tasks.')
+    } finally { setBusy(null) }
+  }
   const counts = data ? [
     { label: 'Overdue', value: t!.overdue.length, tone: t!.overdue.length ? 'danger' : '' },
     { label: 'Due today', value: t!.today.length, tone: '' },
@@ -112,13 +135,33 @@ function TodayPage() {
               <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="New task for today…" aria-label="New task" maxLength={200} />
               <button type="submit" disabled={busy === 'new' || !newTask.trim()}>Add</button>
             </form>
-            {[...t!.overdue, ...t!.today, ...t!.next_3_days].length === 0 && <p className="today-empty">No pending tasks. 🎉</p>}
+            {taskList.length === 0 && <p className="today-empty">No pending tasks. 🎉</p>}
+            {taskList.length > 0 && <div className={`today-bulk ${selectedIds.length ? 'has-selection' : ''}`}>
+              <label className="today-bulk-all">
+                <input
+                  type="checkbox"
+                  className="today-select"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = selectedIds.length > 0 && !allSelected }}
+                  onChange={toggleAll}
+                  aria-label="Select all tasks"
+                />
+                <span>{selectedIds.length ? `${selectedIds.length} selected` : `Select all (${taskIds.length})`}</span>
+              </label>
+              {selectedIds.length > 0 && <div className="today-bulk-actions">
+                <button type="button" className="today-bulk-clear" onClick={() => setSelected(new Set())}>Clear</button>
+                <button type="button" className="today-bulk-done" disabled={busy === 'bulk'} onClick={completeSelected}>
+                  {busy === 'bulk' ? 'Completing…' : `Mark ${selectedIds.length} as done`}
+                </button>
+              </div>}
+            </div>}
             <ul className="today-list">
-              {[...t!.overdue, ...t!.today, ...t!.next_3_days].map((task) => {
+              {taskList.map((task) => {
                 const id = String(task.id)
                 const due = String(task.due_date)
                 const late = due < data.today
-                return <li key={id} className={`today-task ${busy === id ? 'is-busy' : ''}`}>
+                return <li key={id} className={`today-task ${busy === id || (busy === 'bulk' && selected.has(id)) ? 'is-busy' : ''} ${selected.has(id) ? 'is-selected' : ''}`}>
+                  <input type="checkbox" className="today-select" checked={selected.has(id)} onChange={() => toggleOne(id)} aria-label={`Select ${String(task.title)}`} />
                   <button type="button" className="today-check" aria-label="Complete" onClick={() => act(id, { status: 'done' })} />
                   <div className="today-task-body">
                     <p className="today-task-title">{Number(task.priority) === 1 && <span className="today-prio" aria-label="Urgent" />}{String(task.title)}</p>

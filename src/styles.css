@@ -2297,6 +2297,16 @@ button.admin-user-avatar:focus-visible {
   border: 1px solid var(--admin-border); background: #FFFFFF; border-radius: 999px; padding: 0.3rem 0.65rem;
 }
 .today-add { display: flex; gap: 0.5rem; margin-bottom: 0.4rem; }
+.today-select { width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; accent-color: var(--admin-navy); }
+.today-task.is-selected { background: #F7F5F2; }
+.today-bulk { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 38px; padding: 0.35rem 0; margin-top: 0.25rem; border-bottom: 1px solid var(--admin-border); }
+.today-bulk-all { display: flex; align-items: center; gap: 0.75rem; font-size: 12.5px; font-weight: 600; color: var(--admin-muted); cursor: pointer; user-select: none; }
+.today-bulk.has-selection .today-bulk-all { color: var(--admin-ink); }
+.today-bulk-actions { display: flex; align-items: center; gap: 0.5rem; }
+.today-bulk-clear { font-size: 12px; font-weight: 600; color: var(--admin-muted); background: transparent; border: 0; padding: 0.3rem 0.4rem; cursor: pointer; }
+.today-bulk-done { font-size: 12px; font-weight: 700; color: #FFFFFF; background: var(--admin-navy); border: 1px solid var(--admin-navy); border-radius: 999px; padding: 0.35rem 0.8rem; cursor: pointer; }
+.today-bulk-done:disabled { opacity: 0.6; cursor: default; }
+
 .today-add input {
   flex: 1; min-width: 0; border: 1px solid var(--admin-border); border-radius: 10px;
   padding: 0.6rem 0.75rem; font-size: 14px; background: var(--admin-page);
@@ -2441,3 +2451,17 @@ button.admin-user-avatar:focus-visible {
 .sv-more, .today-add button:not(:disabled):hover { color: var(--admin-accent); }
 .aiv-own td { color: var(--admin-accent-hover); font-weight: 700; }
 .aiv-bar > span { background: var(--admin-accent) !important; }
+
+/* Tasks — bulk selection */
+.admin-task-select { width: 16px; height: 16px; flex-shrink: 0; cursor: pointer; accent-color: var(--admin-navy); }
+.admin-task-select-spacer { width: 16px; flex-shrink: 0; }
+.admin-task-list-heading .admin-task-select { margin-right: 0.5rem; vertical-align: -3px; }
+.admin-task-list-row--selected { background: #F7F5F2; }
+.admin-task-bulk { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 44px; padding: 0.45rem 0.9rem; margin-bottom: 0.75rem; background: #FFFFFF; border: 1px solid var(--admin-border); border-radius: 10px; }
+.admin-task-bulk--active { border-color: var(--admin-navy); }
+.admin-task-bulk-all { display: flex; align-items: center; gap: 0.6rem; font-size: 13px; font-weight: 600; color: var(--admin-muted); cursor: pointer; user-select: none; }
+.admin-task-bulk--active .admin-task-bulk-all { color: var(--admin-ink); }
+.admin-task-bulk-actions { display: flex; align-items: center; gap: 0.5rem; }
+.admin-task-bulk-clear { font-size: 12.5px; font-weight: 600; color: var(--admin-muted); background: transparent; border: 0; padding: 0.3rem 0.4rem; cursor: pointer; }
+.admin-task-bulk-done { font-size: 12.5px; font-weight: 700; color: #FFFFFF; background: var(--admin-navy); border: 1px solid var(--admin-navy); border-radius: 999px; padding: 0.4rem 0.9rem; cursor: pointer; }
+.admin-task-bulk-done:disabled { opacity: 0.6; cursor: default; }
