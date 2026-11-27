@@ -43,3 +43,13 @@ test('guardemar.com is tracked as an English site', () => {
   assert.equal(v.row.lang, 'en')
   assert.equal(v.row.source, 'google')
 })
+
+test('voyelis.com takes the language from the path', () => {
+  const de = buildTrackedVisit({ action: 'visit-start', visitId: 'y1', path: '/de/vergleich', url: 'https://voyelis.com/de/vergleich', referrer: '' }, { userAgent: UA, country: 'DE' })
+  const en = buildTrackedVisit({ action: 'visit-start', visitId: 'y2', path: '/guides/travel-insurance-usa', url: 'https://voyelis.com/guides/travel-insurance-usa', referrer: '' }, { userAgent: UA, country: 'GB' })
+  assert.equal(de?.kind, 'start')
+  if (de?.kind !== 'start' || en?.kind !== 'start') return
+  assert.equal(de.row.site, 'voyelis.com')
+  assert.equal(de.row.lang, 'de')
+  assert.equal(en.row.lang, 'en')
+})

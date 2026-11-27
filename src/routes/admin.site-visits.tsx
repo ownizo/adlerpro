@@ -14,7 +14,7 @@ export const Route = createFileRoute('/admin/site-visits')({
 const PERIODS = [1, 7, 30, 90] as const
 const PERIOD_LABEL: Record<number, string> = { 1: 'Today', 7: 'Last 7 days', 30: 'Last 30 days', 90: 'Last 3 months' }
 const TOP = 5
-const SITE_LABEL: Record<SiteKey, string> = { 'adlerrochefort.com': 'Adler & Rochefort', 'viagemgarantida.com': 'Viagem Garantida', 'guardemar.com': 'Guardemar' }
+const SITE_LABEL: Record<SiteKey, string> = { 'adlerrochefort.com': 'Adler & Rochefort', 'viagemgarantida.com': 'Viagem Garantida', 'guardemar.com': 'Guardemar', 'voyelis.com': 'Voyelis' }
 const SITE_STORAGE = 'admin-site-visits-site'
 
 function initialSite(): SiteKey {
