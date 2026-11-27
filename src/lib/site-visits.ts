@@ -2,11 +2,11 @@
 //
 // Rows are written by:
 // - adlerrochefort.com: /api/metrics/track (ownizo/adlerrochefort, netlify/functions/metrics-track.mjs)
-// - viagemgarantida.com and guardemar.com: /api/site-track in this repo (netlify/api-functions/site-track.mts)
+// - viagemgarantida.com, guardemar.com and voyelis.com: /api/site-track in this repo (netlify/api-functions/site-track.mts)
 // One row per page view by a real browser, cookieless, no IP and no user-agent string.
 // Pure functions here so they can be tested without Supabase.
 
-export const SITES = ['adlerrochefort.com', 'viagemgarantida.com', 'guardemar.com'] as const
+export const SITES = ['adlerrochefort.com', 'viagemgarantida.com', 'guardemar.com', 'voyelis.com'] as const
 export type SiteKey = (typeof SITES)[number]
 export const isSiteKey = (v: unknown): v is SiteKey => typeof v === 'string' && (SITES as readonly string[]).includes(v)
 
